@@ -71,6 +71,11 @@
 - `bot.OnMessage` sets `Response.ChannelID = msg.SenderChat.ID` when SenderChat is present
 - Admin `/spam` command (`directReport`) detects `origMsg.SenderChat` and passes channel ID for ban and cleanup
 - Anonymous admin posts (where `SenderChat.ID == group chat ID`) skip spam check entirely
+- `channelDisplayName` resolves display name from `*tbapi.Chat`: UserName > Title > `channel_<ID>`
+- `ReportBan` uses `https://t.me/<username>` links for channels (not `tg://user` which doesn't resolve negative IDs); plain name+ID for channels without username
+- Admin `/warn` command (`DirectWarnReport`) targets the channel display name instead of `@Channel_Bot`
+- Admin notification text in `directReport` shows channel display name and channel ID instead of Channel_Bot identity
+- `extractUsername` supports `tg://user` links, `t.me` channel links, plain channel name+ID, and `{id name...}` formats
 
 ### ExtraDeleteIDs Feature
 - `spamcheck.Response` includes `ExtraDeleteIDs []int` field for additional message IDs to delete when spam is detected

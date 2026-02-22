@@ -152,23 +152,12 @@ func TestAdmin_extractUsername(t *testing.T) {
 		expectedResult string
 		expectError    bool
 	}{
-		{
-			name:           "Markdown Format",
-			banMessage:     "**permanently banned [John_Doe](tg://user?id=123456)** some message text",
-			expectedResult: "John_Doe",
-			expectError:    false,
-		},
-		{
-			name:           "Plain Format",
-			banMessage:     "permanently banned {200312168 umputun Umputun U} some message text",
-			expectedResult: "umputun",
-			expectError:    false,
-		},
-		{
-			name:        "Invalid Format",
-			banMessage:  "permanently banned John_Doe some message text",
-			expectError: true,
-		},
+		{name: "markdown format", banMessage: "**permanently banned [John_Doe](tg://user?id=123456)** some text", expectedResult: "John_Doe"},
+		{name: "plain format", banMessage: "permanently banned {200312168 umputun Umputun U} some text", expectedResult: "umputun"},
+		{name: "t.me channel link", banMessage: "**permanently banned [spamchannel](https://t.me/spamchannel)**\n\nspam text", expectedResult: "spamchannel"},
+		{name: "plain channel with ID", banMessage: "**permanently banned mychannel (-100999888)**\n\nspam text", expectedResult: "mychannel"},
+		{name: "plain channel multi-word title", banMessage: "**permanently banned Spam News Channel (-100999888)**\n\ntext", expectedResult: "Spam News Channel"},
+		{name: "invalid format", banMessage: "permanently banned John_Doe some message text", expectError: true},
 	}
 
 	a := admin{}
@@ -220,11 +209,30 @@ func TestAdmin_reportBanChannel(t *testing.T) {
 		adm.ReportBan("spamchannel", msg)
 
 		require.Len(t, mockAPI.SendCalls(), 1)
+		sentText := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
 		markup := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).ReplyMarkup.(tbapi.InlineKeyboardMarkup)
 		// callback data should contain channel ID (-100999888), not Channel_Bot (136817688)
 		require.NotNil(t, markup.InlineKeyboard[0][0].CallbackData)
 		assert.Contains(t, *markup.InlineKeyboard[0][0].CallbackData, "-100999888:")
 		assert.NotContains(t, *markup.InlineKeyboard[0][0].CallbackData, "136817688")
+		// ban message should use t.me link, not tg://user
+		assert.Contains(t, sentText, "https://t.me/spamchannel")
+		assert.NotContains(t, sentText, "tg://user?id=136817688")
+	})
+
+	t.Run("channel message without username uses plain text with ID", func(t *testing.T) {
+		mockAPI.ResetCalls()
+		msg := &bot.Message{
+			From:       bot.User{ID: 136817688, Username: "Channel_Bot"},
+			SenderChat: bot.SenderChat{ID: -100999888},
+			Text:       "spam from channel",
+		}
+		adm.ReportBan("Some Channel", msg)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		sentText := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
+		assert.Contains(t, sentText, "permanently banned Some Channel (-100999888)")
+		assert.NotContains(t, sentText, "tg://user")
 	})
 
 	t.Run("regular user message uses From.ID in callback data", func(t *testing.T) {
@@ -236,9 +244,12 @@ func TestAdmin_reportBanChannel(t *testing.T) {
 		adm.ReportBan("spammer", msg)
 
 		require.Len(t, mockAPI.SendCalls(), 1)
+		sentText := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
 		markup := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).ReplyMarkup.(tbapi.InlineKeyboardMarkup)
 		require.NotNil(t, markup.InlineKeyboard[0][0].CallbackData)
 		assert.Contains(t, *markup.InlineKeyboard[0][0].CallbackData, "456:")
+		// regular user should use tg://user link
+		assert.Contains(t, sentText, "tg://user?id=456")
 	})
 }
 
@@ -468,6 +479,14 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		}
 
 		require.Len(t, botMock.UpdateSpamCalls(), 1)
+
+		// verify admin notification contains actual channel name and ID, not Channel_Bot
+		require.Len(t, mockAPI.SendCalls(), 1)
+		adminMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Contains(t, adminMsg.Text, "spam\\_channel") // escaped markdown
+		assert.Contains(t, adminMsg.Text, "12345")
+		assert.NotContains(t, adminMsg.Text, "Channel\\_Bot")
+		assert.NotContains(t, adminMsg.Text, "136817688")
 	})
 
 	t.Run("DirectSpamReport_AnonymousAdmin", func(t *testing.T) {
@@ -497,6 +516,96 @@ func TestAdmin_DirectCommands(t *testing.T) {
 			_, isChannelBan := call.C.(tbapi.BanChatSenderChatConfig)
 			assert.False(t, isChannelBan, "should not use BanChatSenderChatConfig for anonymous admin post")
 		}
+
+		require.Len(t, botMock.UpdateSpamCalls(), 1)
+	})
+
+	t.Run("DirectWarnReport_ChannelMessage", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		update := tbapi.Update{
+			Message: &tbapi.Message{
+				MessageID: 789,
+				Chat:      tbapi.Chat{ID: 123},
+				From:      &tbapi.User{UserName: "admin", ID: 111},
+				ReplyToMessage: &tbapi.Message{
+					MessageID:  999,
+					From:       &tbapi.User{UserName: "Channel_Bot", ID: 136817688},
+					SenderChat: &tbapi.Chat{ID: -100999888, UserName: "spam_channel"},
+					Text:       "inappropriate channel message",
+				},
+			},
+		}
+
+		err := adm.DirectWarnReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		warnMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Equal(t, int64(123), warnMsg.ChatID)
+		assert.Contains(t, warnMsg.Text, "@spam\\_channel") // escaped markdown
+		assert.NotContains(t, warnMsg.Text, "@Channel\\_Bot")
+		assert.Contains(t, warnMsg.Text, "please follow our rules")
+	})
+
+	t.Run("DirectWarnReport_ChannelMessage_TitleOnly", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		update := tbapi.Update{
+			Message: &tbapi.Message{
+				MessageID: 789,
+				Chat:      tbapi.Chat{ID: 123},
+				From:      &tbapi.User{UserName: "admin", ID: 111},
+				ReplyToMessage: &tbapi.Message{
+					MessageID:  999,
+					From:       &tbapi.User{UserName: "Channel_Bot", ID: 136817688},
+					SenderChat: &tbapi.Chat{ID: -100999888, Title: "Spam Channel"},
+					Text:       "inappropriate channel message",
+				},
+			},
+		}
+
+		err := adm.DirectWarnReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		warnMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Equal(t, int64(123), warnMsg.ChatID)
+		// title-only channel should not have @ prefix
+		assert.Contains(t, warnMsg.Text, "Spam Channel")
+		assert.NotContains(t, warnMsg.Text, "@Spam Channel")
+		assert.NotContains(t, warnMsg.Text, "@Channel")
+		assert.Contains(t, warnMsg.Text, "please follow our rules")
+	})
+
+	t.Run("DirectSpamReport_ChannelMessage_TitleOnly", func(t *testing.T) {
+		mockAPI, botMock, adm, teardown := setupTest()
+		defer teardown()
+
+		update := tbapi.Update{
+			Message: &tbapi.Message{
+				MessageID: 789,
+				Chat:      tbapi.Chat{ID: 123},
+				From:      &tbapi.User{UserName: "admin", ID: 111},
+				ReplyToMessage: &tbapi.Message{
+					MessageID:  999,
+					From:       &tbapi.User{UserName: "Channel_Bot", ID: 136817688},
+					SenderChat: &tbapi.Chat{ID: 12345, Title: "Spam Channel"},
+					Text:       "spam message text",
+				},
+			},
+		}
+
+		err := adm.DirectSpamReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		adminMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Contains(t, adminMsg.Text, "Spam Channel")
+		assert.Contains(t, adminMsg.Text, "12345")
+		assert.NotContains(t, adminMsg.Text, "Channel\\_Bot")
 
 		require.Len(t, botMock.UpdateSpamCalls(), 1)
 	})
@@ -660,14 +769,14 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 		}
 		adm.bot = botMock
 
-		// callback data with negative channel ID (channel unban)
+		// callback data with negative channel ID (channel unban), using t.me link format
 		query := &tbapi.CallbackQuery{
 			ID:   "test-callback-id",
 			Data: "-100999888:999",
 			Message: &tbapi.Message{
 				MessageID: 789,
 				Chat:      tbapi.Chat{ID: 456},
-				Text:      "**permanently banned [spamchannel](tg://user?id=-100999888)**\n\nSpam from channel",
+				Text:      "**permanently banned [spamchannel](https://t.me/spamchannel)**\n\nSpam from channel",
 				From:      &tbapi.User{UserName: "bot"},
 			},
 			From: &tbapi.User{UserName: "admin", ID: 111},
@@ -688,9 +797,51 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 		}
 		assert.True(t, foundChannelUnban, "expected UnbanChatSenderChatConfig for channel ID")
 
-		// verify approved user was added with channel ID
+		// verify approved user was added with channel ID and extracted name
 		require.Len(t, botMock.AddApprovedUserCalls(), 1)
 		assert.Equal(t, int64(-100999888), botMock.AddApprovedUserCalls()[0].ID)
+		assert.Equal(t, "spamchannel", botMock.AddApprovedUserCalls()[0].Name)
+	})
+
+	t.Run("callbackUnbanConfirmed_channel_plain_title", func(t *testing.T) {
+		mockAPI, _, adm, _ := setupCallback(false, false)
+		botMock := &mocks.BotMock{
+			UpdateHamFunc:       func(msg string) error { return nil },
+			AddApprovedUserFunc: func(id int64, name string) error { return nil },
+		}
+		adm.bot = botMock
+
+		// plain-title channel ban message (no username, multi-word title)
+		query := &tbapi.CallbackQuery{
+			ID:   "test-callback-id",
+			Data: "-100999888:999",
+			Message: &tbapi.Message{
+				MessageID: 789,
+				Chat:      tbapi.Chat{ID: 456},
+				Text:      "**permanently banned Spam News Channel (-100999888)**\n\nSpam from channel",
+				From:      &tbapi.User{UserName: "bot"},
+			},
+			From: &tbapi.User{UserName: "admin", ID: 111},
+		}
+
+		err := adm.callbackUnbanConfirmed(query)
+		require.NoError(t, err)
+
+		// verify UnbanChatSenderChatConfig was used
+		var foundChannelUnban bool
+		for _, call := range mockAPI.RequestCalls() {
+			if unbanCall, ok := call.C.(tbapi.UnbanChatSenderChatConfig); ok {
+				foundChannelUnban = true
+				assert.Equal(t, int64(-100999888), unbanCall.SenderChatID)
+				break
+			}
+		}
+		assert.True(t, foundChannelUnban, "expected UnbanChatSenderChatConfig for channel ID")
+
+		// verify approved user was added with correct multi-word channel name
+		require.Len(t, botMock.AddApprovedUserCalls(), 1)
+		assert.Equal(t, int64(-100999888), botMock.AddApprovedUserCalls()[0].ID)
+		assert.Equal(t, "Spam News Channel", botMock.AddApprovedUserCalls()[0].Name)
 	})
 
 	t.Run("callbackBanConfirmed_SoftBan_channel", func(t *testing.T) {
@@ -703,7 +854,7 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 			Message: &tbapi.Message{
 				MessageID: 789,
 				Chat:      tbapi.Chat{ID: 456},
-				Text:      "**permanently banned [spamchannel](tg://user?id=-100999888)**\n\nSpam from channel",
+				Text:      "**permanently banned [spamchannel](https://t.me/spamchannel)**\n\nSpam from channel",
 				From:      &tbapi.User{UserName: "bot"},
 			},
 			From: &tbapi.User{UserName: "admin", ID: 111},
@@ -1872,4 +2023,25 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 0, deleted)
 	})
+}
+
+func TestAdmin_channelDisplayName(t *testing.T) {
+	adm := &admin{}
+
+	tests := []struct {
+		name     string
+		chat     *tbapi.Chat
+		expected string
+	}{
+		{name: "nil chat", chat: nil, expected: ""},
+		{name: "username set", chat: &tbapi.Chat{ID: 123, UserName: "mychannel", Title: "My Channel"}, expected: "mychannel"},
+		{name: "title only", chat: &tbapi.Chat{ID: 123, Title: "My Channel"}, expected: "My Channel"},
+		{name: "neither username nor title", chat: &tbapi.Chat{ID: 123}, expected: "channel_123"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, adm.channelDisplayName(tt.chat))
+		})
+	}
 }

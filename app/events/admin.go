@@ -55,8 +55,19 @@ func (a *admin) ReportBan(banUserStr string, msg *bot.Message) {
 		callbackUser = bot.User{ID: msg.SenderChat.ID, Username: msg.SenderChat.UserName}
 	}
 
-	forwardMsg := fmt.Sprintf("**%spermanently banned [%s](tg://user?id=%d)**\n\n%s\n\n",
-		would, escapeMarkDownV1Text(banUserStr), msg.From.ID, text)
+	// for channels, use t.me link (tg://user doesn't resolve negative IDs);
+	// for regular users, keep the standard tg://user link
+	banLine := fmt.Sprintf("**%spermanently banned [%s](tg://user?id=%d)**",
+		would, escapeMarkDownV1Text(banUserStr), msg.From.ID)
+	switch {
+	case msg.SenderChat.ID != 0 && msg.SenderChat.UserName != "":
+		banLine = fmt.Sprintf("**%spermanently banned [%s](https://t.me/%s)**",
+			would, escapeMarkDownV1Text(banUserStr), msg.SenderChat.UserName)
+	case msg.SenderChat.ID != 0:
+		banLine = fmt.Sprintf("**%spermanently banned %s (%d)**",
+			would, escapeMarkDownV1Text(banUserStr), msg.SenderChat.ID)
+	}
+	forwardMsg := fmt.Sprintf("%s\n\n%s\n\n", banLine, text)
 	if err := a.sendWithUnbanMarkup(forwardMsg, "change ban", callbackUser, msg.ID, a.adminChatID); err != nil {
 		log.Printf("[WARN] failed to send admin message, %v", err)
 	}
@@ -193,12 +204,18 @@ func (a *admin) DirectBanReport(update tbapi.Update) error {
 	return a.directReport(update, false)
 }
 
-// DirectWarnReport handles messages replayed with "/warn" or "warn" by admin.
-// it is removing the original message and posting a warning to the main chat as well as recording the warning th admin chat
+// DirectWarnReport handles messages replied with "/warn" or "warn" by admin.
+// it removes the original message and posts a warning to the main chat.
+// for channel messages, the warning targets the channel name instead of the shared Channel_Bot user.
 func (a *admin) DirectWarnReport(update tbapi.Update) error {
+	warnLogFrom := update.Message.ReplyToMessage.From.UserName
+	warnLogID := update.Message.ReplyToMessage.From.ID
+	if sc := update.Message.ReplyToMessage.SenderChat; sc != nil && sc.ID != 0 {
+		warnLogFrom = a.channelDisplayName(sc)
+		warnLogID = sc.ID
+	}
 	log.Printf("[DEBUG] direct warn by admin %q: msg id: %d, from: %q (%d)",
-		update.Message.From.UserName, update.Message.ReplyToMessage.MessageID,
-		update.Message.ReplyToMessage.From.UserName, update.Message.ReplyToMessage.From.ID)
+		update.Message.From.UserName, update.Message.ReplyToMessage.MessageID, warnLogFrom, warnLogID)
 	origMsg := update.Message.ReplyToMessage
 
 	// this is a replayed message, it is an example of something we didn't like and want to issue a warning
@@ -237,8 +254,17 @@ func (a *admin) DirectWarnReport(update tbapi.Update) error {
 	}
 
 	// make a warning message and replay to origMsg.MessageID
-	warnMsg := fmt.Sprintf("warning from %s\n\n@%s %s", update.Message.From.UserName,
-		origMsg.From.UserName, a.warnMsg)
+	warnTarget := "@" + origMsg.From.UserName
+	if origMsg.SenderChat != nil && origMsg.SenderChat.ID != 0 && origMsg.SenderChat.ID != a.primChatID {
+		chName := a.channelDisplayName(origMsg.SenderChat)
+		if origMsg.SenderChat.UserName != "" {
+			warnTarget = "@" + chName
+		} else {
+			warnTarget = chName
+		}
+	}
+	warnMsg := fmt.Sprintf("warning from %s\n\n%s %s", update.Message.From.UserName,
+		warnTarget, a.warnMsg)
 	if err := send(tbapi.NewMessage(a.primChatID, escapeMarkDownV1Text(warnMsg)), a.tbAPI); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to send warning to main chat: %w", err))
 	}
@@ -261,6 +287,21 @@ func (a *admin) getForwardUsernameAndID(update tbapi.Update) (fwdID int64, usern
 		}
 	}
 	return 0, ""
+}
+
+// channelDisplayName resolves a display name for a channel from its tbapi.Chat.
+// returns UserName if set, else Title if set, else "channel_<ID>".
+func (a *admin) channelDisplayName(ch *tbapi.Chat) string {
+	if ch == nil {
+		return ""
+	}
+	if ch.UserName != "" {
+		return ch.UserName
+	}
+	if ch.Title != "" {
+		return ch.Title
+	}
+	return fmt.Sprintf("channel_%d", ch.ID)
 }
 
 // deleteUserMessages deletes all recent messages from a user with rate limiting
@@ -311,9 +352,14 @@ func (a *admin) deleteUserMessages(userID int64) (deleted int, err error) {
 
 // directReport handles messages replayed with "/spam" or "spam", or "/ban" or "ban" by admin
 func (a *admin) directReport(update tbapi.Update, updateSamples bool) error {
+	logFrom := update.Message.ReplyToMessage.From.UserName
+	logID := update.Message.ReplyToMessage.From.ID
+	if sc := update.Message.ReplyToMessage.SenderChat; sc != nil && sc.ID != 0 {
+		logFrom = a.channelDisplayName(sc)
+		logID = sc.ID
+	}
 	log.Printf("[DEBUG] direct ban by admin %q: msg id: %d, from: %q (%d)",
-		update.Message.From.UserName, update.Message.ReplyToMessage.MessageID,
-		update.Message.ReplyToMessage.From.UserName, update.Message.ReplyToMessage.From.ID)
+		update.Message.From.UserName, update.Message.ReplyToMessage.MessageID, logFrom, logID)
 
 	origMsg := update.Message.ReplyToMessage
 
@@ -369,9 +415,15 @@ func (a *admin) directReport(update tbapi.Update, updateSamples bool) error {
 	if len(spamInfo) > 0 {
 		spamInfoText = strings.Join(spamInfo, "\n")
 	}
+	displayName := origMsg.From.UserName
+	displayID := origMsg.From.ID
+	if channelID != 0 {
+		displayName = a.channelDisplayName(origMsg.SenderChat)
+		displayID = channelID
+	}
 	newMsgText := fmt.Sprintf("**original detection results for %s (%d)**\n\n%s\n\n%s\n\n\n"+
 		"*the user banned by %q and message deleted*",
-		escapeMarkDownV1Text(origMsg.From.UserName), origMsg.From.ID, msgTxt, escapeMarkDownV1Text(spamInfoText),
+		escapeMarkDownV1Text(displayName), displayID, msgTxt, escapeMarkDownV1Text(spamInfoText),
 		escapeMarkDownV1Text(update.Message.From.UserName))
 	if err := send(tbapi.NewMessage(a.adminChatID, newMsgText), a.tbAPI); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to send spam detection results to admin chat: %w", err))
@@ -414,6 +466,9 @@ func (a *admin) directReport(update tbapi.Update, updateSamples bool) error {
 	}
 
 	_, username := a.getForwardUsernameAndID(update)
+	if username == "" && channelID != 0 && origMsg.SenderChat != nil {
+		username = a.channelDisplayName(origMsg.SenderChat)
+	}
 
 	// skip ban and cleanup for anonymous admin posts - banning the shared system bot user
 	// (GroupAnonymousBot) would affect all anonymous admin messages in the group
@@ -868,19 +923,31 @@ func (a *admin) sendWithUnbanMarkup(text, action string, user bot.User, msgID in
 	return nil
 }
 
-// extractUsername tries to extract the username from a ban message
+// extractUsername tries to extract the username from a ban message.
+// supports tg://user markdown links, t.me channel links, plain channel name+ID, and plain {id name...} format.
 func (a *admin) extractUsername(text string) (string, error) {
 	// regex for markdown format: [username](tg://user?id=123456)
 	markdownRegex := regexp.MustCompile(`\[(.*?)\]\(tg://user\?id=\d+\)`)
-	matches := markdownRegex.FindStringSubmatch(text)
-	if len(matches) > 1 {
+	if matches := markdownRegex.FindStringSubmatch(text); len(matches) > 1 {
+		return matches[1], nil
+	}
+
+	// regex for t.me channel link format: [channelname](https://t.me/channelname)
+	tmeRegex := regexp.MustCompile(`\[(.*?)\]\(https://t\.me/\S+\)`)
+	if matches := tmeRegex.FindStringSubmatch(text); len(matches) > 1 {
+		return matches[1], nil
+	}
+
+	// regex for plain channel format: permanently banned channelname (-100999888)
+	// uses (.+?) to handle multi-word channel titles like "Spam News Channel"
+	plainChannelRegex := regexp.MustCompile(`permanently banned (.+?) \(-?\d+\)`)
+	if matches := plainChannelRegex.FindStringSubmatch(text); len(matches) > 1 {
 		return matches[1], nil
 	}
 
 	// regex for plain format: {200312168 umputun Umputun U}
 	plainRegex := regexp.MustCompile(`\{\d+ (\S+) .+?\}`)
-	matches = plainRegex.FindStringSubmatch(text)
-	if len(matches) > 1 {
+	if matches := plainRegex.FindStringSubmatch(text); len(matches) > 1 {
 		return matches[1], nil
 	}
 
