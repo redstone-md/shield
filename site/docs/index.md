@@ -211,7 +211,7 @@ If you encounter errors like `no persistent spam or ham samples found in the sto
 
 **For standalone installations:**
 1. Download sample data files from [this repository](https://github.com/umputun/tg-spam/tree/master/data) and place them in your data directory
-2. Run tg-spam specifying both `--files.dynamic=/path/to/data` and `--files.samples=/path/to/data` parameters for the first run
+2. Run tg-spam specifying `--files.dynamic=/path/to/data` for the first run (`--files.samples` defaults to the same path)
 3. After successful migration, the bot will rename files to `*.loaded` and store their content in the database
 4. For subsequent runs, you can omit these parameters as data is already in the database
 
@@ -553,7 +553,7 @@ The provided preset set of samples is just an example collected by the bot autho
 
 To do so, several conditions must be met:
 
-- For first-time setup, specify both `--files.dynamic [$FILES_DYNAMIC]` and `--files.samples [$FILES_SAMPLES]` parameters pointing to the directory with your data files
+- For first-time setup, specify `--files.dynamic [$FILES_DYNAMIC]` parameter pointing to the directory with your data files. The `--files.samples [$FILES_SAMPLES]` parameter defaults to the same path and usually doesn't need to be set separately
 - For custom database storage, set `--db` to your database URL
 - Admin chat should be enabled, see [Admin chat/group](#admin-chatgroup) section above
 - Admin name(s) should be set with `--super [$SUPER_USER]` parameter
