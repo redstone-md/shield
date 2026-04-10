@@ -148,6 +148,11 @@ type options struct {
 		Window    time.Duration `long:"window" env:"WINDOW" default:"1h" description:"time window for duplicate detection"`
 	} `group:"duplicates" namespace:"duplicates" env-namespace:"DUPLICATES"`
 
+	Moderation struct {
+		FirstStrike  time.Duration `long:"first-strike" env:"FIRST_STRIKE" default:"30m" description:"mute/restrict duration for the first automatic spam strike"`
+		SecondStrike time.Duration `long:"second-strike" env:"SECOND_STRIKE" default:"6h" description:"mute/restrict duration for the second automatic spam strike"`
+	} `group:"moderation" namespace:"moderation" env-namespace:"MODERATION"`
+
 	Report struct {
 		Enabled          bool          `long:"enabled" env:"ENABLED" description:"enable user spam reporting"`
 		Threshold        int           `long:"threshold" env:"THRESHOLD" default:"2" description:"number of reports to trigger admin notification"`
@@ -366,10 +371,16 @@ func execute(ctx context.Context, opts options) error {
 		return fmt.Errorf("can't make spam logger, %w", err)
 	}
 
+	detectedSpamStore, err := storage.NewDetectedSpam(ctx, dataDB)
+	if err != nil {
+		return fmt.Errorf("can't make detected spam store, %w", err)
+	}
+
 	// make telegram listener
 	tgListener := events.TelegramListener{
 		TbAPI:               tbAPI,
 		BotUsername:         tbAPI.Self.UserName,
+		InstanceID:          opts.InstanceID,
 		Group:               opts.Telegram.Group,
 		IdleDuration:        opts.Telegram.IdleDuration,
 		SuperUsers:          opts.SuperUsers,
@@ -384,6 +395,11 @@ func execute(ctx context.Context, opts options) error {
 		AdminGroup:          opts.AdminGroup,
 		TestingIDs:          opts.TestingIDs,
 		Locator:             locator,
+		DetectedSpamCounter: detectedSpamStore,
+		ModerationConfig: events.ModerationConfig{
+			FirstStrike:  opts.Moderation.FirstStrike,
+			SecondStrike: opts.Moderation.SecondStrike,
+		},
 		ReportConfig: events.ReportConfig{
 			Storage:          reportsStore,
 			Enabled:          opts.Report.Enabled,
@@ -875,7 +891,12 @@ func makeSpamLogger(ctx context.Context, gid string, wr io.Writer, dataDB *engin
 	}
 
 	logWr := events.SpamLoggerFunc(func(msg *bot.Message, response *bot.Response) {
+		userID := msg.From.ID
 		userName := msg.From.Username
+		if msg.SenderChat.ID != 0 {
+			userID = msg.SenderChat.ID
+			userName = msg.SenderChat.UserName
+		}
 		if userName == "" {
 			userName = msg.From.DisplayName
 		}
@@ -892,8 +913,8 @@ func makeSpamLogger(ctx context.Context, gid string, wr io.Writer, dataDB *engin
 		}{
 			TimeStamp:   time.Now().In(time.Local).Format(time.RFC3339),
 			DisplayName: msg.From.DisplayName,
-			UserName:    msg.From.Username,
-			UserID:      msg.From.ID,
+			UserName:    userName,
+			UserID:      userID,
 			Text:        text,
 		}
 		line, err := json.Marshal(&m)
@@ -908,7 +929,7 @@ func makeSpamLogger(ctx context.Context, gid string, wr io.Writer, dataDB *engin
 		// write to db store
 		rec := storage.DetectedSpamInfo{
 			Text:      text,
-			UserID:    msg.From.ID,
+			UserID:    userID,
 			UserName:  userName,
 			Timestamp: time.Now().In(time.Local),
 			GID:       gid,

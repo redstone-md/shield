@@ -31,6 +31,7 @@ type TelegramListener struct {
 	SpamLogger              SpamLogger    // logger to save spam to files and db
 	Bot                     Bot           // bot to handle messages
 	BotUsername             string        // telegram bot username (without "@" prefix)
+	InstanceID              string        // storage gid / instance id
 	Group                   string        // can be int64 or public group username (without "@" prefix)
 	AdminGroup              string        // can be int64 or public group username (without "@" prefix)
 	IdleDuration            time.Duration // idle timeout to send "idle" message to bots
@@ -45,11 +46,13 @@ type TelegramListener struct {
 	TrainingMode            bool          // do not ban users, just report and train spam detector
 	SoftBanMode             bool          // do not ban users, but restrict their actions
 	Locator                 Locator       // message locator to get info about messages
-	ReportConfig            ReportConfig  // user spam reporting configuration
-	DisableAdminSpamForward bool          // disable forwarding spam reports to admin chat support
-	Dry                     bool          // dry run, do not ban or send messages
-	AggressiveCleanup       bool          // delete all messages from user when banned via /spam command
-	AggressiveCleanupLimit  int           // max messages to delete in aggressive cleanup mode
+	DetectedSpamCounter     DetectedSpamCounter
+	ModerationConfig        ModerationConfig
+	ReportConfig            ReportConfig // user spam reporting configuration
+	DisableAdminSpamForward bool         // disable forwarding spam reports to admin chat support
+	Dry                     bool         // dry run, do not ban or send messages
+	AggressiveCleanup       bool         // delete all messages from user when banned via /spam command
+	AggressiveCleanupLimit  int          // max messages to delete in aggressive cleanup mode
 
 	adminHandler    *admin
 	reportsHandler  *userReports
@@ -135,6 +138,7 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 	l.reportsHandler = &userReports{
 		ReportConfig: l.ReportConfig,
 		tbAPI:        l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers,
+		detectedSpam: l.DetectedSpamCounter, gid: l.InstanceID, moderation: l.ModerationConfig,
 		primChatID: l.chatID, adminChatID: l.adminChatID,
 		trainingMode: l.TrainingMode, softBanMode: l.SoftBanMode, dry: l.Dry,
 	}
@@ -392,18 +396,27 @@ func (l *TelegramListener) procEvents(update tbapi.Update) error {
 
 		if l.SuperUsers.IsSuper(msg.From.Username, msg.From.ID) {
 			if l.TrainingMode {
-				l.adminHandler.ReportBan(banUserStr, msg)
+				l.adminHandler.ReportBan(banUserStr, msg, resp.BanInterval, l.SoftBanMode)
 			}
 			log.Printf("[DEBUG] superuser %s requested ban, ignored", banUserStr)
 			return nil
 		}
 
-		banReq := banRequest{duration: resp.BanInterval, userID: resp.User.ID, channelID: resp.ChannelID, userName: banUserStr,
-			chatID: fromChat, dry: l.Dry, training: l.TrainingMode, tbAPI: l.TbAPI, restrict: l.SoftBanMode}
+		duration, restrict := resp.BanInterval, l.SoftBanMode
+		if spamUserID != 0 && l.DetectedSpamCounter != nil {
+			if count, countErr := l.DetectedSpamCounter.CountByUserID(ctx, spamUserID); countErr != nil {
+				log.Printf("[WARN] failed to count spam strikes for user %d: %v", spamUserID, countErr)
+			} else {
+				duration, restrict = spamPenalty(count, l.SoftBanMode, l.ModerationConfig)
+			}
+		}
+
+		banReq := banRequest{duration: duration, userID: resp.User.ID, channelID: resp.ChannelID, userName: banUserStr,
+			chatID: fromChat, dry: l.Dry, training: l.TrainingMode, tbAPI: l.TbAPI, restrict: restrict}
 		if err := banUserOrChannel(banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban %s: %w", banUserStr, err))
 		} else if l.adminChatID != 0 && msg.From.ID != 0 {
-			l.adminHandler.ReportBan(banUserStr, msg)
+			l.adminHandler.ReportBan(banUserStr, msg, duration, restrict)
 		}
 	}
 

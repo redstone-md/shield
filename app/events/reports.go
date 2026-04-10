@@ -11,6 +11,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/storage"
+	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
 const reportLLMContext = `This message was manually reported by a trusted chat member via reply command or bot mention after it passed normal filters. Review it strictly against the moderation rules. Prioritize crypto exchange offers, illegal or suspicious work, scam or fraud, external ad links, drug-related content, hate or ethnic abuse, emoji-spam, and duplicate ad campaigns only when the provided context indicates repetition. Normal profanity alone is allowed unless it targets participants.`
@@ -39,9 +40,12 @@ type userReports struct {
 	tbAPI        TbAPI
 	bot          Bot
 	locator      Locator
+	detectedSpam DetectedSpamCounter
+	gid          string
 	superUsers   SuperUsers
 	primChatID   int64
 	adminChatID  int64
+	moderation   ModerationConfig
 	trainingMode bool
 	softBanMode  bool
 	dry          bool
@@ -119,7 +123,8 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 
 	if handled, err := r.tryLLMReportModeration(update, origMsg, msgTxt); handled {
 		if err == nil {
-			r.notifyPrimaryChat(reportOutcomeBanned)
+			duration, restrict := r.reportPenalty(ctx, origMsg.From.ID)
+			r.notifyPrimaryChat(reportOutcomeBanned, duration, restrict)
 		}
 		return err
 	}
@@ -150,13 +155,13 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 	if err != nil {
 		log.Printf("[WARN] failed to check report threshold: %v", err)
 	} else {
-		r.notifyPrimaryChat(outcome)
+		r.notifyPrimaryChat(outcome, 0, false)
 	}
 
 	return nil
 }
 
-func (r *userReports) notifyPrimaryChat(outcome reportOutcome) {
+func (r *userReports) notifyPrimaryChat(outcome reportOutcome, duration time.Duration, restrict bool) {
 	if r.primChatID == 0 {
 		return
 	}
@@ -164,13 +169,7 @@ func (r *userReports) notifyPrimaryChat(outcome reportOutcome) {
 	var text string
 	switch outcome {
 	case reportOutcomeBanned:
-		if r.dry {
-			text = "Репорт подтвержден. DRY mode: пользователь помечен как спамер, без реального бана."
-		} else if r.softBanMode {
-			text = "Репорт подтвержден. Пользователь ограничен."
-		} else {
-			text = "Репорт подтвержден. Пользователь забанен."
-		}
+		text = reportStatusText(duration, restrict, r.dry)
 	case reportOutcomeReview:
 		text = "Репорт принят. Сообщение отправлено на проверку."
 	case reportOutcomeAccepted:
@@ -196,10 +195,12 @@ func (r *userReports) tryLLMReportModeration(update tbapi.Update, origMsg *tbapi
 
 	log.Printf("[INFO] LLM confirmed reported message %d from %s (%d) as spam",
 		origMsg.MessageID, origMsg.From.UserName, origMsg.From.ID)
-	return true, r.applyImmediateReportModeration(update, origMsg, msgTxt, resp)
+	return true, r.applyImmediateReportModeration(context.Background(), update, origMsg, msgTxt, resp)
 }
 
-func (r *userReports) applyImmediateReportModeration(update tbapi.Update, origMsg *tbapi.Message, msgTxt string, resp bot.Response) error {
+func (r *userReports) applyImmediateReportModeration(ctx context.Context, update tbapi.Update, origMsg *tbapi.Message, msgTxt string, resp bot.Response) error {
+	duration, restrict := r.reportPenalty(ctx, origMsg.From.ID)
+
 	if err := r.bot.RemoveApprovedUser(origMsg.From.ID); err != nil {
 		log.Printf("[DEBUG] can't remove user %d from approved list: %v", origMsg.From.ID, err)
 	}
@@ -221,18 +222,20 @@ func (r *userReports) applyImmediateReportModeration(update tbapi.Update, origMs
 	}
 
 	banReq := banRequest{
-		duration: bot.PermanentBanDuration,
+		duration: duration,
 		userID:   origMsg.From.ID,
 		chatID:   r.primChatID,
 		tbAPI:    r.tbAPI,
 		dry:      r.dry,
 		training: r.trainingMode,
 		userName: origMsg.From.UserName,
-		restrict: r.softBanMode,
+		restrict: restrict,
 	}
 	if err := banUserOrChannel(banReq); err != nil {
 		return fmt.Errorf("failed to ban user %d after LLM-reviewed report: %w", origMsg.From.ID, err)
 	}
+
+	r.recordDetectedSpam(ctx, origMsg, resp.CheckResults)
 
 	if r.adminChatID != 0 {
 		reporterName := update.Message.From.UserName
@@ -263,6 +266,63 @@ func (r *userReports) applyImmediateReportModeration(update tbapi.Update, origMs
 	}
 
 	return nil
+}
+
+func (r *userReports) reportPenalty(ctx context.Context, userID int64) (time.Duration, bool) {
+	if r.detectedSpam == nil {
+		return spamPenalty(1, r.softBanMode, r.moderation)
+	}
+	count, err := r.detectedSpam.CountByUserID(ctx, userID)
+	if err != nil {
+		log.Printf("[WARN] failed to count spam strikes for reported user %d: %v", userID, err)
+		return spamPenalty(1, r.softBanMode, r.moderation)
+	}
+	return spamPenalty(count+1, r.softBanMode, r.moderation)
+}
+
+func (r *userReports) recordDetectedSpam(ctx context.Context, origMsg *tbapi.Message, checks []spamcheck.Response) {
+	if r.detectedSpam == nil {
+		return
+	}
+	userID := origMsg.From.ID
+	userName := origMsg.From.UserName
+	if origMsg.SenderChat != nil && origMsg.SenderChat.ID != 0 {
+		userID = origMsg.SenderChat.ID
+		userName = origMsg.SenderChat.UserName
+	}
+	if userName == "" && origMsg.From != nil {
+		userName = strings.TrimSpace(origMsg.From.FirstName + " " + origMsg.From.LastName)
+	}
+	text := strings.TrimSpace(strings.ReplaceAll(origMsg.Text, "\n", " "))
+	if text == "" {
+		text = strings.TrimSpace(strings.ReplaceAll(msgTextFromMessage(origMsg), "\n", " "))
+	}
+	rec := storage.DetectedSpamInfo{
+		GID:       r.gid,
+		Text:      text,
+		UserID:    userID,
+		UserName:  userName,
+		Timestamp: time.Now().In(time.Local),
+	}
+	if err := r.detectedSpam.Write(ctx, rec, checks); err != nil {
+		log.Printf("[WARN] failed to record detected spam for reported user %d: %v", userID, err)
+	}
+}
+
+func msgTextFromMessage(msg *tbapi.Message) string {
+	if msg == nil {
+		return ""
+	}
+	if msg.Text != "" {
+		return msg.Text
+	}
+	if msg.Caption != "" {
+		return msg.Caption
+	}
+	if msg.Quote != nil && msg.Quote.Text != "" {
+		return msg.Quote.Text
+	}
+	return ""
 }
 
 // checkReportRateLimit checks if a reporter has exceeded their rate limit

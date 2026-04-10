@@ -181,6 +181,19 @@ func (ds *DetectedSpam) FindByUserID(ctx context.Context, userID int64) (*Detect
 	return &entry, nil
 }
 
+// CountByUserID returns the number of detected spam entries for the given user in the current gid.
+func (ds *DetectedSpam) CountByUserID(ctx context.Context, userID int64) (int, error) {
+	ds.RLock()
+	defer ds.RUnlock()
+
+	query := ds.Adopt("SELECT COUNT(*) FROM detected_spam WHERE user_id = ? AND gid = ?")
+	var count int
+	if err := ds.GetContext(ctx, &count, query, userID, ds.GID()); err != nil {
+		return 0, fmt.Errorf("failed to count detected spam entries for user_id %d: %w", userID, err)
+	}
+	return count, nil
+}
+
 func (ds *DetectedSpam) migrate(ctx context.Context, tx *sqlx.Tx, gid string) error {
 	// try to select with new structure, if works - already migrated
 	var count int

@@ -54,6 +54,18 @@ type Locator interface {
 	GetUserMessageIDs(ctx context.Context, userID int64, limit int) ([]int, error)
 }
 
+// DetectedSpamCounter provides spam strike count for escalation.
+type DetectedSpamCounter interface {
+	CountByUserID(ctx context.Context, userID int64) (int, error)
+	Write(ctx context.Context, entry storage.DetectedSpamInfo, checks []spamcheck.Response) error
+}
+
+// ModerationConfig controls automatic penalty escalation.
+type ModerationConfig struct {
+	FirstStrike  time.Duration
+	SecondStrike time.Duration
+}
+
 // Reports is an interface for user spam reports storage
 type Reports interface {
 	Add(ctx context.Context, report storage.Report) error
@@ -166,6 +178,77 @@ type banRequest struct {
 	dry      bool
 	training bool // training mode, do not do the actual ban
 	restrict bool // restrict instead of ban
+}
+
+func spamPenalty(strikes int, keepRestricted bool, cfg ModerationConfig) (duration time.Duration, restrict bool) {
+	firstStrike := cfg.FirstStrike
+	if firstStrike <= 0 {
+		firstStrike = 30 * time.Minute
+	}
+	secondStrike := cfg.SecondStrike
+	if secondStrike <= 0 {
+		secondStrike = 6 * time.Hour
+	}
+
+	switch {
+	case keepRestricted:
+		return bot.PermanentBanDuration, true
+	case strikes <= 1:
+		return firstStrike, true
+	case strikes == 2:
+		return secondStrike, true
+	default:
+		return bot.PermanentBanDuration, false
+	}
+}
+
+func moderationActionText(duration time.Duration, restrict, dry bool) string {
+	if restrict {
+		switch {
+		case duration <= 30*time.Minute:
+			if dry {
+				return "would have muted for 30m"
+			}
+			return "muted for 30m"
+		case duration <= 6*time.Hour:
+			if dry {
+				return "would have muted for 6h"
+			}
+			return "muted for 6h"
+		default:
+			if dry {
+				return "would have restricted"
+			}
+			return "restricted"
+		}
+	}
+	if dry {
+		return "would have permanently banned"
+	}
+	return "permanently banned"
+}
+
+func reportStatusText(duration time.Duration, restrict, dry bool) string {
+	action := moderationActionText(duration, restrict, dry)
+	switch action {
+	case "would have muted for 30m":
+		return "Репорт подтвержден. DRY mode: пользователь был бы замучен на 30 минут."
+	case "muted for 30m":
+		return "Репорт подтвержден. Пользователь замучен на 30 минут."
+	case "would have muted for 6h":
+		return "Репорт подтвержден. DRY mode: пользователь был бы замучен на 6 часов."
+	case "muted for 6h":
+		return "Репорт подтвержден. Пользователь замучен на 6 часов."
+	case "would have permanently banned":
+		return "Репорт подтвержден. DRY mode: пользователь был бы забанен."
+	case "permanently banned":
+		return "Репорт подтвержден. Пользователь забанен."
+	default:
+		if dry {
+			return "Репорт подтвержден. DRY mode: пользователь был бы ограничен."
+		}
+		return "Репорт подтвержден. Пользователь ограничен."
+	}
 }
 
 // The bot must be an administrator in the supergroup for this to work

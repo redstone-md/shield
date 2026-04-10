@@ -40,18 +40,13 @@ const (
 )
 
 // ReportBan a ban message to admin chat with a button to unban the user
-func (a *admin) ReportBan(banUserStr string, msg *bot.Message) {
+func (a *admin) ReportBan(banUserStr string, msg *bot.Message, duration time.Duration, restrict bool) {
 	log.Printf("[DEBUG] report to admin chat, ban msgsData for %s, group: %d", banUserStr, a.adminChatID)
 	msgText := msg.Text
 	if msg.Quote != "" {
 		msgText = msg.Text + "\n" + msg.Quote
 	}
 	text := strings.ReplaceAll(escapeMarkDownV1Text(msgText), "\n", " ")
-	would := ""
-	if a.dry {
-		would = "would have "
-	}
-
 	// use channel identity for callback data when message is from a channel,
 	// so that unban/info buttons operate on the actual channel, not the shared Channel_Bot user
 	callbackUser := msg.From
@@ -61,15 +56,16 @@ func (a *admin) ReportBan(banUserStr string, msg *bot.Message) {
 
 	// for channels, use t.me link (tg://user doesn't resolve negative IDs);
 	// for regular users, keep the standard tg://user link
-	banLine := fmt.Sprintf("**%spermanently banned [%s](tg://user?id=%d)**",
-		would, escapeMarkDownV1Text(banUserStr), msg.From.ID)
+	actionText := moderationActionText(duration, restrict, a.dry)
+	banLine := fmt.Sprintf("**%s [%s](tg://user?id=%d)**",
+		actionText, escapeMarkDownV1Text(banUserStr), msg.From.ID)
 	switch {
 	case msg.SenderChat.ID != 0 && msg.SenderChat.UserName != "":
-		banLine = fmt.Sprintf("**%spermanently banned [%s](https://t.me/%s)**",
-			would, escapeMarkDownV1Text(banUserStr), msg.SenderChat.UserName)
+		banLine = fmt.Sprintf("**%s [%s](https://t.me/%s)**",
+			actionText, escapeMarkDownV1Text(banUserStr), msg.SenderChat.UserName)
 	case msg.SenderChat.ID != 0:
-		banLine = fmt.Sprintf("**%spermanently banned %s (%d)**",
-			would, escapeMarkDownV1Text(banUserStr), msg.SenderChat.ID)
+		banLine = fmt.Sprintf("**%s %s (%d)**",
+			actionText, escapeMarkDownV1Text(banUserStr), msg.SenderChat.ID)
 	}
 	forwardMsg := fmt.Sprintf("%s\n\n%s\n\n", banLine, text)
 	if err := a.sendWithUnbanMarkup(forwardMsg, "change ban", callbackUser, msg.ID, a.adminChatID); err != nil {
