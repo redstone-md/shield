@@ -15,6 +15,14 @@ import (
 
 const reportLLMContext = `This message was manually reported by a trusted chat member via reply command or bot mention after it passed normal filters. Review it strictly against the moderation rules. Prioritize crypto exchange offers, illegal or suspicious work, scam or fraud, external ad links, drug-related content, hate or ethnic abuse, emoji-spam, and duplicate ad campaigns only when the provided context indicates repetition. Normal profanity alone is allowed unless it targets participants.`
 
+type reportOutcome string
+
+const (
+	reportOutcomeAccepted reportOutcome = "accepted"
+	reportOutcomeReview   reportOutcome = "review"
+	reportOutcomeBanned   reportOutcome = "banned"
+)
+
 // ReportConfig is user spam reporting configuration
 type ReportConfig struct {
 	Storage          Reports       // reports storage for user spam reports
@@ -73,18 +81,6 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 		return fmt.Errorf("reported message is from super-user %s (%d), ignored", origMsg.From.UserName, origMsg.From.ID)
 	}
 
-	// validate reporter is approved user
-	if !r.bot.IsApprovedUser(update.Message.From.ID) {
-		log.Printf("[INFO] report rejected: reporter %d (%s) not in approved list",
-			update.Message.From.ID, update.Message.From.UserName)
-		// still delete the /report command to keep chat clean
-		_, _ = r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID:  update.Message.MessageID,
-			ChatConfig: tbapi.ChatConfig{ChatID: r.primChatID},
-		}})
-		return fmt.Errorf("reporter %d not in approved list", update.Message.From.ID)
-	}
-
 	// check rate limit for reporter
 	rateLimited, err := r.checkReportRateLimit(ctx, update.Message.From.ID)
 	if err != nil {
@@ -122,6 +118,9 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 	}
 
 	if handled, err := r.tryLLMReportModeration(update, origMsg, msgTxt); handled {
+		if err == nil {
+			r.notifyPrimaryChat(reportOutcomeBanned)
+		}
 		return err
 	}
 
@@ -147,11 +146,42 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 	}
 
 	// check if threshold reached
-	if err := r.checkReportThreshold(ctx, origMsg.MessageID, r.primChatID); err != nil {
+	outcome, err := r.checkReportThreshold(ctx, origMsg.MessageID, r.primChatID)
+	if err != nil {
 		log.Printf("[WARN] failed to check report threshold: %v", err)
+	} else {
+		r.notifyPrimaryChat(outcome)
 	}
 
 	return nil
+}
+
+func (r *userReports) notifyPrimaryChat(outcome reportOutcome) {
+	if r.primChatID == 0 {
+		return
+	}
+
+	var text string
+	switch outcome {
+	case reportOutcomeBanned:
+		if r.dry {
+			text = "Репорт подтвержден. DRY mode: пользователь помечен как спамер, без реального бана."
+		} else if r.softBanMode {
+			text = "Репорт подтвержден. Пользователь ограничен."
+		} else {
+			text = "Репорт подтвержден. Пользователь забанен."
+		}
+	case reportOutcomeReview:
+		text = "Репорт принят. Сообщение отправлено на проверку."
+	case reportOutcomeAccepted:
+		text = "Репорт принят."
+	default:
+		return
+	}
+
+	if err := send(tbapi.NewMessage(r.primChatID, text), r.tbAPI); err != nil {
+		log.Printf("[WARN] failed to send report status to primary chat: %v", err)
+	}
 }
 
 func (r *userReports) tryLLMReportModeration(update tbapi.Update, origMsg *tbapi.Message, msgTxt string) (bool, error) {
@@ -261,15 +291,15 @@ func (r *userReports) checkReportRateLimit(ctx context.Context, reporterID int64
 }
 
 // checkReportThreshold checks if report threshold is reached and sends admin notification if needed
-func (r *userReports) checkReportThreshold(ctx context.Context, msgID int, chatID int64) error {
+func (r *userReports) checkReportThreshold(ctx context.Context, msgID int, chatID int64) (reportOutcome, error) {
 	if r.Storage == nil {
-		return fmt.Errorf("reports storage not initialized")
+		return "", fmt.Errorf("reports storage not initialized")
 	}
 
 	// query all reports for this message
 	reports, err := r.Storage.GetByMessage(ctx, msgID, chatID)
 	if err != nil {
-		return fmt.Errorf("failed to get reports: %w", err)
+		return "", fmt.Errorf("failed to get reports: %w", err)
 	}
 
 	reportCount := len(reports)
@@ -278,14 +308,14 @@ func (r *userReports) checkReportThreshold(ctx context.Context, msgID int, chatI
 	if r.AutoBanThreshold > 0 && reportCount >= r.AutoBanThreshold {
 		log.Printf("[INFO] auto-ban threshold reached for msgID:%d, chatID:%d: %d reports (threshold: %d)",
 			msgID, chatID, reportCount, r.AutoBanThreshold)
-		return r.executeAutoBan(ctx, reports)
+		return reportOutcomeBanned, r.executeAutoBan(ctx, reports)
 	}
 
 	// check if manual approval threshold reached
 	if reportCount < r.Threshold {
 		log.Printf("[DEBUG] report threshold not reached for msgID:%d, chatID:%d: %d < %d",
 			msgID, chatID, reportCount, r.Threshold)
-		return nil
+		return reportOutcomeAccepted, nil
 	}
 
 	log.Printf("[INFO] report threshold reached for msgID:%d, chatID:%d: %d reports",
@@ -296,12 +326,12 @@ func (r *userReports) checkReportThreshold(ctx context.Context, msgID int, chatI
 		// notification already sent, update it
 		log.Printf("[DEBUG] updating existing notification for msgID:%d, admin_msg_id:%d",
 			msgID, reports[0].AdminMsgID)
-		return r.updateReportNotification(ctx, reports)
+		return reportOutcomeReview, r.updateReportNotification(ctx, reports)
 	}
 
 	// no notification sent yet, send new one
 	log.Printf("[DEBUG] sending new notification for msgID:%d", msgID)
-	return r.sendReportNotification(ctx, reports)
+	return reportOutcomeReview, r.sendReportNotification(ctx, reports)
 }
 
 // executeAutoBan executes automatic ban when auto-ban threshold is reached

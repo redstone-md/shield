@@ -152,8 +152,8 @@ type options struct {
 		Enabled          bool          `long:"enabled" env:"ENABLED" description:"enable user spam reporting"`
 		Threshold        int           `long:"threshold" env:"THRESHOLD" default:"2" description:"number of reports to trigger admin notification"`
 		AutoBanThreshold int           `long:"auto-ban-threshold" env:"AUTO_BAN_THRESHOLD" default:"0" description:"auto-ban after N reports (0=disabled, must be >= threshold)"`
-		RateLimit        int           `long:"rate-limit" env:"RATE_LIMIT" default:"10" description:"max reports per user per period"`
-		RatePeriod       time.Duration `long:"rate-period" env:"RATE_PERIOD" default:"1h" description:"rate limit time period"`
+		RateLimit        int           `long:"rate-limit" env:"RATE_LIMIT" default:"1" description:"max reports per user per period"`
+		RatePeriod       time.Duration `long:"rate-period" env:"RATE_PERIOD" default:"1m" description:"rate limit time period"`
 	} `group:"report" namespace:"report" env-namespace:"REPORT"`
 
 	Files struct {
