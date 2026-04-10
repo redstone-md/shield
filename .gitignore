@@ -38,6 +38,7 @@ tg-spam
 tg-spam-*
 _examples/lua_plugins/example
 docs/prompts/
+.env.tg-spam.local
 
 # ralphex progress logs
 .ralphex/progress/

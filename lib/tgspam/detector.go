@@ -56,6 +56,8 @@ type Detector struct {
 	// can be passed to checkers supporting history
 	hamHistory  *spamcheck.LastRequests
 	spamHistory *spamcheck.LastRequests
+	llmHistory  *spamcheck.LastRequests
+	userHistory map[string]*spamcheck.LastRequests
 
 	lock sync.RWMutex
 }
@@ -67,7 +69,9 @@ const (
 	// LLMConsensusAny flips the base decision if any eligible LLM agrees.
 	LLMConsensusAny LLMConsensusMode = "any"
 	// LLMConsensusAll flips the base decision only if all eligible LLMs agree.
-	LLMConsensusAll LLMConsensusMode = "all"
+	LLMConsensusAll    LLMConsensusMode = "all"
+	llmChatContextSize                  = 5
+	llmUserContextSize                  = 5
 )
 
 // detectorLLMCheck describes how a single LLM provider participates in Detector.Check.
@@ -77,10 +81,8 @@ type detectorLLMCheck struct {
 	// whether short messages should still be sent to the provider
 	checkShortMessages bool
 	// whether the provider confirms spam instead of checking clean messages
-	veto bool
-	// number of recent ham messages to pass as context
-	historySize int
-	check       func(context.Context, string, []spamcheck.Request) (bool, spamcheck.Response) // provider check function
+	veto  bool
+	check func(context.Context, string, llmContext) (bool, spamcheck.Response) // provider check function
 }
 
 type detectorLLMResult struct {
@@ -179,6 +181,8 @@ func NewDetector(p Config) *Detector {
 		luaChecks:         []plugin.Check{},
 		hamHistory:        spamcheck.NewLastRequests(p.HistorySize),
 		spamHistory:       spamcheck.NewLastRequests(p.HistorySize),
+		llmHistory:        spamcheck.NewLastRequests(max(p.HistorySize, llmChatContextSize)),
+		userHistory:       make(map[string]*spamcheck.LastRequests),
 		duplicateDetector: newDuplicateDetector(p.DuplicateDetection.Threshold, p.DuplicateDetection.Window),
 		luaEngine:         nil, // will be set with WithLuaEngine if needed
 	}
@@ -269,9 +273,10 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 		// 3. LLM checkers are configured but LLMs won't run (FirstMessageOnly/FirstMessagesCount not set)
 		openaiChecksShort := d.openaiChecker != nil && d.openaiChecker.params.CheckShortMessagesWithOpenAI
 		geminiChecksShort := d.geminiChecker != nil && d.geminiChecker.params.CheckShortMessages
-		llmEligible := d.FirstMessageOnly || d.FirstMessagesCount > 0
+		llmEligible := d.hasLLMEnabled()
 		if isSpamDetected(cr) || !llmEligible || (!openaiChecksShort && !geminiChecksShort) {
 			if isSpamDetected(cr) {
+				d.addToLLMHistory(req)
 				d.spamHistory.Push(req)
 				return true, cr // spam from the checks above
 			}
@@ -302,8 +307,7 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 	//  - short message with short-message checking enabled (ignores veto mode since there's no decision to veto)
 	//  - all checks passed (ham) and veto is false - improves false negative rate
 	//  - checks failed (spam) and veto is true - improves false positive rate
-	// FirstMessageOnly or FirstMessagesCount has to be set to use LLMs, because they are slow and expensive to run on all messages
-	if d.FirstMessageOnly || d.FirstMessagesCount > 0 {
+	if d.hasLLMEnabled() {
 		llmResults := make([]detectorLLMResult, 0, 2)
 		llmChecks := []detectorLLMCheck{
 			{
@@ -311,8 +315,7 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 				enabled:            d.openaiChecker != nil,
 				checkShortMessages: d.openaiChecker != nil && d.openaiChecker.params.CheckShortMessagesWithOpenAI,
 				veto:               d.OpenAIVeto,
-				historySize:        d.OpenAIHistorySize,
-				check: func(ctx context.Context, msg string, history []spamcheck.Request) (bool, spamcheck.Response) {
+				check: func(ctx context.Context, msg string, history llmContext) (bool, spamcheck.Response) {
 					return d.openaiChecker.check(ctx, msg, history)
 				},
 			},
@@ -321,8 +324,7 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 				enabled:            d.geminiChecker != nil,
 				checkShortMessages: d.geminiChecker != nil && d.geminiChecker.params.CheckShortMessages,
 				veto:               d.GeminiVeto,
-				historySize:        d.GeminiHistorySize,
-				check: func(ctx context.Context, msg string, history []spamcheck.Request) (bool, spamcheck.Response) {
+				check: func(ctx context.Context, msg string, history llmContext) (bool, spamcheck.Response) {
 					return d.geminiChecker.check(ctx, msg, history)
 				},
 			},
@@ -339,6 +341,7 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 	}
 
 	if spamDetected {
+		d.addToLLMHistory(req)
 		d.spamHistory.Push(req)
 		return true, cr
 	}
@@ -360,6 +363,7 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 			_ = d.userStorage.Write(ctx, au) // ignore error, failed to write to storage is not critical here
 		}
 	}
+	d.addToLLMHistory(req)
 	d.hamHistory.Push(req)
 	return false, cr
 }
@@ -369,6 +373,10 @@ func (d *Detector) normalizeLLMConsensusMode(mode LLMConsensusMode) LLMConsensus
 		return mode
 	}
 	return LLMConsensusAny
+}
+
+func (d *Detector) hasLLMEnabled() bool {
+	return d.openaiChecker != nil || d.geminiChecker != nil
 }
 
 func (d *Detector) shouldApplyLLMCheck(baseSpam, isShortMessage bool, cfg detectorLLMCheck) bool {
@@ -389,10 +397,7 @@ func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []
 		return detectorLLMResult{}, false
 	}
 
-	var hist []spamcheck.Request
-	if cfg.historySize > 0 && d.HistorySize > 0 {
-		hist = d.hamHistory.Last(cfg.historySize)
-	}
+	hist := d.llmContextForRequest(req)
 
 	ctx, cancel := d.ctxWithLLMTimeout()
 	defer cancel()
@@ -415,6 +420,39 @@ func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []
 	}
 
 	return detectorLLMResult{details: details, flip: flip}, true
+}
+
+func (d *Detector) llmContextForRequest(req spamcheck.Request) llmContext {
+	ctx := llmContext{
+		RecentChatMessages: d.llmHistory.Last(llmChatContextSize),
+	}
+
+	if req.UserID == "" {
+		return ctx
+	}
+
+	if h, ok := d.userHistory[req.UserID]; ok {
+		ctx.RecentUserMessages = h.Last(llmUserContextSize)
+	}
+	return ctx
+}
+
+func (d *Detector) addToLLMHistory(req spamcheck.Request) {
+	if req.CheckOnly || req.Msg == "" {
+		return
+	}
+
+	d.llmHistory.Push(req)
+	if req.UserID == "" {
+		return
+	}
+
+	h, ok := d.userHistory[req.UserID]
+	if !ok {
+		h = spamcheck.NewLastRequests(llmUserContextSize)
+		d.userHistory[req.UserID] = h
+	}
+	h.Push(req)
 }
 
 func (d *Detector) applyLLMConsensus(baseSpam bool, results []detectorLLMResult, mode LLMConsensusMode) bool {
@@ -450,6 +488,8 @@ func (d *Detector) Reset() {
 	d.classifier.reset()
 	d.approvedUsers = make(map[string]approved.UserInfo)
 	d.stopWords = []string{}
+	d.llmHistory = spamcheck.NewLastRequests(max(d.HistorySize, llmChatContextSize))
+	d.userHistory = make(map[string]*spamcheck.LastRequests)
 
 	// close the Lua engine and reset Lua checks if it exists
 	if d.luaEngine != nil {

@@ -67,7 +67,7 @@ func newOpenAIChecker(client openAIClient, params OpenAIConfig) *openAIChecker {
 }
 
 // check checks if a text is spam using OpenAI API
-func (o *openAIChecker) check(ctx context.Context, msg string, history []spamcheck.Request) (spam bool, cr spamcheck.Response) {
+func (o *openAIChecker) check(ctx context.Context, msg string, history llmContext) (spam bool, cr spamcheck.Response) {
 	if o.client == nil {
 		return false, spamcheck.Response{}
 	}

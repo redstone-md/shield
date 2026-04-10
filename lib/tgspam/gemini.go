@@ -56,7 +56,7 @@ func newGeminiChecker(client geminiClient, params GeminiConfig) *geminiChecker {
 }
 
 // check checks if a text is spam using Gemini API
-func (g *geminiChecker) check(ctx context.Context, msg string, history []spamcheck.Request) (spam bool, cr spamcheck.Response) {
+func (g *geminiChecker) check(ctx context.Context, msg string, history llmContext) (spam bool, cr spamcheck.Response) {
 	if g.client == nil {
 		return false, spamcheck.Response{}
 	}

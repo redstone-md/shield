@@ -1379,9 +1379,12 @@ func TestDetector_CheckOpenAI(t *testing.T) {
 		}
 		d.WithOpenAIChecker(mockOpenAIClient, OpenAIConfig{Model: "gpt4"})
 		spam, cr := d.Check(spamcheck.Request{Msg: "some message 1234"})
-		assert.False(t, spam)
-		require.Empty(t, cr)
-		assert.Empty(t, mockOpenAIClient.CreateChatCompletionCalls())
+		assert.True(t, spam)
+		require.Len(t, cr, 1)
+		assert.Equal(t, "openai", cr[0].Name)
+		assert.True(t, cr[0].Spam)
+		assert.Equal(t, "bad text, confidence: 100%", cr[0].Details)
+		assert.Len(t, mockOpenAIClient.CreateChatCompletionCalls(), 1)
 	})
 
 	t.Run("without openai", func(t *testing.T) {
@@ -2862,6 +2865,62 @@ func TestNewDetector_DefaultLLMConsensus(t *testing.T) {
 	assert.Equal(t, LLMConsensusAny, d.LLMConsensus)
 }
 
+func TestDetector_CheckWithLLMInParanoidMode(t *testing.T) {
+	d := NewDetector(Config{MaxAllowedEmoji: -1, MinMsgLen: 5})
+	openAIMock := &mocks.OpenAIClientMock{
+		CreateChatCompletionFunc: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+			return openai.ChatCompletionResponse{
+				Choices: []openai.ChatCompletionChoice{{
+					Message: openai.ChatCompletionMessage{Content: `{"spam": true, "reason":"llm hit", "confidence":95}`},
+				}},
+			}, nil
+		},
+	}
+	d.WithOpenAIChecker(openAIMock, OpenAIConfig{Model: "gpt4"})
+
+	spam, cr := d.Check(spamcheck.Request{Msg: "totally normal looking message", UserID: "42", UserName: "u42"})
+	assert.True(t, spam)
+	assert.Len(t, openAIMock.CreateChatCompletionCalls(), 1)
+	assert.NotNil(t, findResponseByName(cr, "openai"))
+}
+
+func TestDetector_LLMContextIncludesChatAndUserHistory(t *testing.T) {
+	d := NewDetector(Config{MaxAllowedEmoji: -1, MinMsgLen: 5})
+	var captured string
+	openAIMock := &mocks.OpenAIClientMock{
+		CreateChatCompletionFunc: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+			captured = req.Messages[1].Content
+			return openai.ChatCompletionResponse{
+				Choices: []openai.ChatCompletionChoice{{
+					Message: openai.ChatCompletionMessage{Content: `{"spam": false, "reason":"ok", "confidence":20}`},
+				}},
+			}, nil
+		},
+	}
+	d.WithOpenAIChecker(openAIMock, OpenAIConfig{Model: "gpt4"})
+
+	for i := 0; i < 6; i++ {
+		userID := "other"
+		userName := "other"
+		if i%2 == 0 {
+			userID = "42"
+			userName = "u42"
+		}
+		_, _ = d.Check(spamcheck.Request{
+			Msg:      fmt.Sprintf("msg-%d", i),
+			UserID:   userID,
+			UserName: userName,
+		})
+	}
+
+	_, _ = d.Check(spamcheck.Request{Msg: "trigger message", UserID: "42", UserName: "u42"})
+	assert.Contains(t, captured, "Recent chat messages:")
+	assert.Contains(t, captured, "Recent messages from the same user:")
+	assert.Contains(t, captured, `"u42": "msg-0"`)
+	assert.Contains(t, captured, `"u42": "msg-2"`)
+	assert.Contains(t, captured, `"u42": "msg-4"`)
+}
+
 func TestDetector_CheckWithLLMConsensus(t *testing.T) {
 	makeOpenAIResponse := func(spam bool, reason string, confidence int) openai.ChatCompletionResponse {
 		return openai.ChatCompletionResponse{
@@ -3355,6 +3414,27 @@ func TestDetector_ShortMessageApproval(t *testing.T) {
 		// IsApprovedUser returns false because count (2) is not > FirstMessagesCount (2)
 		assert.False(t, d.IsApprovedUser("111"))
 	})
+}
+
+func TestDetector_CheckStopWords_Ukrainian(t *testing.T) {
+	d := NewDetector(Config{})
+	lr, err := d.LoadStopWords(bytes.NewBufferString("пишіть у приват\nдеталі в особисті"))
+	require.NoError(t, err)
+	assert.Equal(t, LoadResult{StopWords: 2}, lr)
+
+	spam, checks := d.Check(spamcheck.Request{Msg: "Якщо цікаво, пишіть у приват, все поясню"})
+	assert.True(t, spam)
+	resp := findResponseByName(checks, "stopword")
+	require.NotNil(t, resp)
+	assert.True(t, resp.Spam)
+	assert.Contains(t, resp.Details, "пишіть у приват")
+
+	spam, checks = d.Check(spamcheck.Request{Msg: "Якщо цікаво, деталі в особисті, відповім пізніше"})
+	assert.True(t, spam)
+	resp = findResponseByName(checks, "stopword")
+	require.NotNil(t, resp)
+	assert.True(t, resp.Spam)
+	assert.Contains(t, resp.Details, "деталі в особисті")
 }
 
 // helper function to find response by name

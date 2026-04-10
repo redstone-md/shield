@@ -1,0 +1,49 @@
+services:
+  tg-spam:
+    build:
+      context: .
+    image: tg-spam-local:ua
+    container_name: tg-spam
+    hostname: tg-spam
+    restart: unless-stopped
+    env_file:
+      - .env.tg-spam.local
+    environment:
+      TZ: UTC
+      DRY: "true"
+      PARANOID: "true"
+      SERVER_ENABLED: "true"
+      SERVER_LISTEN: ":8080"
+      SERVER_AUTH: ${SERVER_AUTH}
+      NO_SPAM_REPLY: "false"
+      OPENAI_TOKEN: ${OPENAI_TOKEN}
+      OPENAI_API_BASE: ${OPENAI_API_BASE}
+      OPENAI_MODEL: ${OPENAI_MODEL}
+      OPENAI_MAX_TOKENS_REQUEST: "4000"
+      OPENAI_MAX_SYMBOLS_REQUEST: "24000"
+      OPENAI_MAX_TOKENS_RESPONSE: "512"
+      OPENAI_CHECK_SHORT_MESSAGES: "true"
+      OPENAI_VETO: "true"
+      LOGGER_ENABLED: "true"
+      LOGGER_FILE: /srv/logs/tg-spam.log
+      LOGGER_MAX_SIZE: 10M
+    volumes:
+      - ./var/tg-spam:/srv/data
+      - ./logs:/srv/logs
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  cloudflared-tgadmin:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-tgadmin
+    restart: unless-stopped
+    depends_on:
+      - tg-spam
+    env_file:
+      - .env.tg-spam.local
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --token
+      - ${CLOUDFLARED_TOKEN}

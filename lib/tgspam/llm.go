@@ -14,7 +14,12 @@ type llmResponse struct {
 	Confidence int    `json:"confidence"`
 }
 
-func runLLMProviderCheck(ctx context.Context, name, errorPrefix string, retryCount int, msg string, history []spamcheck.Request,
+type llmContext struct {
+	RecentChatMessages []spamcheck.Request
+	RecentUserMessages []spamcheck.Request
+}
+
+func runLLMProviderCheck(ctx context.Context, name, errorPrefix string, retryCount int, msg string, history llmContext,
 	send func(context.Context, string) (llmResponse, error),
 ) (spam bool, cr spamcheck.Response) {
 	if retryCount < 1 {
@@ -46,15 +51,35 @@ func runLLMProviderCheck(ctx context.Context, name, errorPrefix string, retryCou
 	}
 }
 
-func appendHistoryToLLMMessage(msg string, history []spamcheck.Request) string {
-	if len(history) == 0 {
+func appendHistoryToLLMMessage(msg string, history llmContext) string {
+	if len(history.RecentChatMessages) == 0 && len(history.RecentUserMessages) == 0 {
 		return msg
 	}
 
-	hist := make([]string, 0, len(history))
-	for _, h := range history {
-		hist = append(hist, fmt.Sprintf("%q: %q", h.UserName, h.Msg))
+	var sb strings.Builder
+	sb.WriteString("User message:\n")
+	sb.WriteString(msg)
+
+	if len(history.RecentChatMessages) > 0 {
+		sb.WriteString("\n\nRecent chat messages:\n")
+		for i, h := range history.RecentChatMessages {
+			if i > 0 {
+				sb.WriteByte('\n')
+			}
+			sb.WriteString(fmt.Sprintf("%q: %q", h.UserName, h.Msg))
+		}
 	}
 
-	return fmt.Sprintf("User message:\n%s\n\nHistory:\n%s\n", msg, strings.Join(hist, "\n"))
+	if len(history.RecentUserMessages) > 0 {
+		sb.WriteString("\n\nRecent messages from the same user:\n")
+		for i, h := range history.RecentUserMessages {
+			if i > 0 {
+				sb.WriteByte('\n')
+			}
+			sb.WriteString(fmt.Sprintf("%q: %q", h.UserName, h.Msg))
+		}
+	}
+
+	sb.WriteByte('\n')
+	return sb.String()
 }

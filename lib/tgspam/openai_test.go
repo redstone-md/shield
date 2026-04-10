@@ -42,7 +42,7 @@ func TestOpenAIChecker_Check(t *testing.T) {
 				}},
 			}, nil
 		}
-		spam, details := checker.check(context.Background(), "some text", nil)
+		spam, details := checker.check(context.Background(), "some text", llmContext{})
 		t.Logf("spam: %v, details: %+v", spam, details)
 		assert.True(t, spam)
 		assert.Equal(t, "openai", details.Name)
@@ -59,7 +59,7 @@ func TestOpenAIChecker_Check(t *testing.T) {
 				}},
 			}, nil
 		}
-		spam, details := checker.check(context.Background(), "some text", nil)
+		spam, details := checker.check(context.Background(), "some text", llmContext{})
 		t.Logf("spam: %v, details: %+v", spam, details)
 		assert.False(t, spam)
 		assert.Equal(t, "openai", details.Name)
@@ -72,7 +72,7 @@ func TestOpenAIChecker_Check(t *testing.T) {
 			contextMoqParam context.Context, chatCompletionRequest openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
 			return openai.ChatCompletionResponse{}, assert.AnError
 		}
-		spam, details := checker.check(context.Background(), "some text", nil)
+		spam, details := checker.check(context.Background(), "some text", llmContext{})
 		t.Logf("spam: %v, details: %+v", spam, details)
 		assert.False(t, spam)
 		assert.Equal(t, "openai", details.Name)
@@ -89,7 +89,7 @@ func TestOpenAIChecker_Check(t *testing.T) {
 				}},
 			}, nil
 		}
-		spam, details := checker.check(context.Background(), "some text", nil)
+		spam, details := checker.check(context.Background(), "some text", llmContext{})
 		t.Logf("spam: %v, details: %+v", spam, details)
 		assert.False(t, spam)
 		assert.Equal(t, "openai", details.Name)
@@ -104,7 +104,7 @@ func TestOpenAIChecker_Check(t *testing.T) {
 			contextMoqParam context.Context, chatCompletionRequest openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
 			return openai.ChatCompletionResponse{}, nil
 		}
-		spam, details := checker.check(context.Background(), "some text", nil)
+		spam, details := checker.check(context.Background(), "some text", llmContext{})
 		t.Logf("spam: %v, details: %+v", spam, details)
 		assert.False(t, spam)
 		assert.Equal(t, "openai", details.Name)
@@ -116,7 +116,7 @@ func TestOpenAIChecker_CheckWithHistory(t *testing.T) {
 	clientMock := &mocks.OpenAIClientMock{
 		CreateChatCompletionFunc: func(contextMoqParam context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
 			// verify the request contains history
-			assert.Contains(t, req.Messages[1].Content, "History:")
+			assert.Contains(t, req.Messages[1].Content, "Recent chat messages:")
 			assert.Contains(t, req.Messages[1].Content, `"user1": "first message"`)
 			assert.Contains(t, req.Messages[1].Content, `"user2": "second message"`)
 			assert.Contains(t, req.Messages[1].Content, `"user1": "third message"`)
@@ -130,11 +130,11 @@ func TestOpenAIChecker_CheckWithHistory(t *testing.T) {
 	}
 
 	checker := newOpenAIChecker(clientMock, OpenAIConfig{Model: "gpt-4o-mini"})
-	history := []spamcheck.Request{
+	history := llmContext{RecentChatMessages: []spamcheck.Request{
 		{Msg: "first message", UserName: "user1"},
 		{Msg: "second message", UserName: "user2"},
 		{Msg: "third message", UserName: "user1"},
-	}
+	}}
 
 	spam, details := checker.check(context.Background(), "current message", history)
 	t.Logf("spam: %v, details: %+v", spam, details)
@@ -161,26 +161,26 @@ func TestOpenAIChecker_FormatMessage(t *testing.T) {
 	tests := []struct {
 		name            string
 		currentMsg      string
-		history         []spamcheck.Request
+		history         llmContext
 		expectedMessage string
 	}{
 		{
 			name:            "message with no history",
 			currentMsg:      "hello world",
-			history:         []spamcheck.Request{},
+			history:         llmContext{},
 			expectedMessage: "hello world",
 		},
 		{
 			name:       "message with history",
 			currentMsg: "current message",
-			history: []spamcheck.Request{
+			history: llmContext{RecentChatMessages: []spamcheck.Request{
 				{Msg: "first message", UserName: "user1"},
 				{Msg: "second message", UserName: "user2"},
-			},
+			}},
 			expectedMessage: `User message:
 current message
 
-History:
+Recent chat messages:
 "user1": "first message"
 "user2": "second message"
 `,
@@ -188,16 +188,37 @@ History:
 		{
 			name:       "message with empty username in history",
 			currentMsg: "current message",
-			history: []spamcheck.Request{
+			history: llmContext{RecentChatMessages: []spamcheck.Request{
 				{Msg: "first message", UserName: ""},
 				{Msg: "second message", UserName: "user2"},
+			}},
+			expectedMessage: `User message:
+current message
+
+Recent chat messages:
+"": "first message"
+"user2": "second message"
+`,
+		},
+		{
+			name:       "message with chat and same-user history",
+			currentMsg: "current message",
+			history: llmContext{
+				RecentChatMessages: []spamcheck.Request{
+					{Msg: "chat one", UserName: "user1"},
+				},
+				RecentUserMessages: []spamcheck.Request{
+					{Msg: "user one", UserName: "user1"},
+				},
 			},
 			expectedMessage: `User message:
 current message
 
-History:
-"": "first message"
-"user2": "second message"
+Recent chat messages:
+"user1": "chat one"
+
+Recent messages from the same user:
+"user1": "user one"
 `,
 		},
 	}
@@ -312,7 +333,7 @@ func TestReasoningEffortInRequest(t *testing.T) {
 			})
 
 			// call the check method to trigger the client call
-			checker.check(context.Background(), "test message", nil)
+			checker.check(context.Background(), "test message", llmContext{})
 
 			// verify the reasoning_effort parameter in the request
 			if tt.expectInRequest {
@@ -420,7 +441,7 @@ func TestCustomPromptsInActualRequest(t *testing.T) {
 			})
 
 			// call the check method to trigger the request
-			checker.check(context.Background(), "test message", nil)
+			checker.check(context.Background(), "test message", llmContext{})
 
 			// verify the system message in the request contains what we expect
 			expectedContent := checker.buildSystemPrompt()
@@ -500,7 +521,7 @@ func TestMaxTokensFieldBasedOnModel(t *testing.T) {
 			})
 
 			// call the check method to trigger the client call
-			checker.check(context.Background(), "test message", nil)
+			checker.check(context.Background(), "test message", llmContext{})
 
 			// verify the correct field is used
 			if tt.expectMaxTokens {
@@ -542,7 +563,7 @@ func TestOpenAIChecker_TruncateUTF8(t *testing.T) {
 			MaxTokensRequest:  0, // forces tokenizer to be used if available, but let's test fallback
 		})
 
-		checker.check(context.Background(), msg, nil)
+		checker.check(context.Background(), msg, llmContext{})
 		assert.True(t, utf8.ValidString(capturedMsg), "Truncated string should be valid UTF-8. Got: %x", capturedMsg)
 	})
 }

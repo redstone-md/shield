@@ -38,7 +38,7 @@ func TestGeminiChecker_Check(t *testing.T) {
 				}},
 			}, nil
 		}
-		spam, details := checker.check(context.Background(), "some text", nil)
+		spam, details := checker.check(context.Background(), "some text", llmContext{})
 		t.Logf("spam: %v, details: %+v", spam, details)
 		assert.True(t, spam)
 		assert.Equal(t, "gemini", details.Name)
@@ -55,7 +55,7 @@ func TestGeminiChecker_Check(t *testing.T) {
 				}},
 			}, nil
 		}
-		spam, details := checker.check(context.Background(), "some text", nil)
+		spam, details := checker.check(context.Background(), "some text", llmContext{})
 		t.Logf("spam: %v, details: %+v", spam, details)
 		assert.False(t, spam)
 		assert.Equal(t, "gemini", details.Name)
@@ -68,7 +68,7 @@ func TestGeminiChecker_Check(t *testing.T) {
 			config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
 			return nil, assert.AnError
 		}
-		spam, details := checker.check(context.Background(), "some text", nil)
+		spam, details := checker.check(context.Background(), "some text", llmContext{})
 		t.Logf("spam: %v, details: %+v", spam, details)
 		assert.False(t, spam)
 		assert.Equal(t, "gemini", details.Name)
@@ -85,7 +85,7 @@ func TestGeminiChecker_Check(t *testing.T) {
 				}},
 			}, nil
 		}
-		spam, details := checker.check(context.Background(), "some text", nil)
+		spam, details := checker.check(context.Background(), "some text", llmContext{})
 		t.Logf("spam: %v, details: %+v", spam, details)
 		assert.False(t, spam)
 		assert.Equal(t, "gemini", details.Name)
@@ -100,7 +100,7 @@ func TestGeminiChecker_Check(t *testing.T) {
 			config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
 			return &genai.GenerateContentResponse{}, nil
 		}
-		spam, details := checker.check(context.Background(), "some text", nil)
+		spam, details := checker.check(context.Background(), "some text", llmContext{})
 		t.Logf("spam: %v, details: %+v", spam, details)
 		assert.False(t, spam)
 		assert.Equal(t, "gemini", details.Name)
@@ -109,7 +109,7 @@ func TestGeminiChecker_Check(t *testing.T) {
 
 	t.Run("nil client", func(t *testing.T) {
 		nilChecker := newGeminiChecker(nil, GeminiConfig{})
-		spam, details := nilChecker.check(context.Background(), "some text", nil)
+		spam, details := nilChecker.check(context.Background(), "some text", llmContext{})
 		assert.False(t, spam)
 		assert.Equal(t, spamcheck.Response{}, details)
 	})
@@ -121,7 +121,7 @@ func TestGeminiChecker_CheckWithHistory(t *testing.T) {
 			config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
 			// verify the request contains history
 			assert.Len(t, contents, 1)
-			assert.Contains(t, contents[0].Parts[0].Text, "History:")
+			assert.Contains(t, contents[0].Parts[0].Text, "Recent chat messages:")
 			assert.Contains(t, contents[0].Parts[0].Text, `"user1": "first message"`)
 			assert.Contains(t, contents[0].Parts[0].Text, `"user2": "second message"`)
 			assert.Contains(t, contents[0].Parts[0].Text, `"user1": "third message"`)
@@ -137,11 +137,11 @@ func TestGeminiChecker_CheckWithHistory(t *testing.T) {
 	}
 
 	checker := newGeminiChecker(clientMock, GeminiConfig{Model: "gemma-4-31b-it"})
-	history := []spamcheck.Request{
+	history := llmContext{RecentChatMessages: []spamcheck.Request{
 		{Msg: "first message", UserName: "user1"},
 		{Msg: "second message", UserName: "user2"},
 		{Msg: "third message", UserName: "user1"},
-	}
+	}}
 
 	spam, details := checker.check(context.Background(), "current message", history)
 	t.Logf("spam: %v, details: %+v", spam, details)
@@ -167,7 +167,7 @@ func TestGeminiChecker_SafetySettings(t *testing.T) {
 	}
 
 	checker := newGeminiChecker(clientMock, GeminiConfig{Model: "gemma-4-31b-it"})
-	checker.check(context.Background(), "test message", nil)
+	checker.check(context.Background(), "test message", llmContext{})
 
 	require.NotNil(t, capturedConfig)
 	require.Len(t, capturedConfig.SafetySettings, 4)
@@ -194,7 +194,7 @@ func TestGeminiChecker_CustomPrompts(t *testing.T) {
 		Model:         "gemma-4-31b-it",
 		CustomPrompts: []string{"check for crypto scams", "check for fake giveaways"},
 	})
-	checker.check(context.Background(), "test message", nil)
+	checker.check(context.Background(), "test message", llmContext{})
 
 	require.NotNil(t, capturedConfig)
 	require.NotNil(t, capturedConfig.SystemInstruction)
@@ -229,7 +229,7 @@ func TestGeminiChecker_RequestTruncation(t *testing.T) {
 
 	checker := newGeminiChecker(clientMock, GeminiConfig{MaxSymbolsRequest: 10})
 	longMsg := "this is a very long message that should be truncated"
-	checker.check(context.Background(), longMsg, nil)
+	checker.check(context.Background(), longMsg, llmContext{})
 
 	require.Len(t, capturedContents, 1)
 	assert.Len(t, capturedContents[0].Parts[0].Text, 10)
@@ -250,7 +250,7 @@ func TestGeminiChecker_ResponseWithThoughtTags(t *testing.T) {
 	}
 
 	checker := newGeminiChecker(clientMock, GeminiConfig{Model: "gemma-4-31b-it"})
-	spam, details := checker.check(context.Background(), "buy crypto now", nil)
+	spam, details := checker.check(context.Background(), "buy crypto now", llmContext{})
 	assert.True(t, spam)
 	assert.Equal(t, "gemini", details.Name)
 	assert.Equal(t, "crypto scam, confidence: 95%", details.Details)
@@ -278,7 +278,7 @@ func TestGeminiChecker_TruncateUTF8(t *testing.T) {
 		checker := newGeminiChecker(clientMock, GeminiConfig{
 			MaxSymbolsRequest: 1, // will take 1 rune
 		})
-		checker.check(context.Background(), msg, nil)
+		checker.check(context.Background(), msg, llmContext{})
 		assert.True(t, utf8.ValidString(capturedMsg), "Truncated string should be valid UTF-8. Got: %x", capturedMsg)
 		assert.Equal(t, "П", capturedMsg)
 	})
@@ -287,7 +287,7 @@ func TestGeminiChecker_TruncateUTF8(t *testing.T) {
 		checker := newGeminiChecker(clientMock, GeminiConfig{
 			MaxSymbolsRequest: 7, // 6 runes for 'Привет' + 1 rune for '🌞'
 		})
-		checker.check(context.Background(), msg, nil)
+		checker.check(context.Background(), msg, llmContext{})
 		assert.True(t, utf8.ValidString(capturedMsg), "Truncated string should be valid UTF-8. Got: %x", capturedMsg)
 		assert.Equal(t, "Привет🌞", capturedMsg)
 	})
