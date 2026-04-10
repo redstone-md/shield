@@ -489,6 +489,22 @@ func (l *TelegramListener) isReportCommand(text string) bool {
 	return false
 }
 
+func (l *TelegramListener) isBotMention(text string) bool {
+	text = strings.TrimSpace(strings.ToLower(text))
+	if text == "" || l.BotUsername == "" {
+		return false
+	}
+
+	needle := "@" + strings.ToLower(l.BotUsername)
+	for _, field := range strings.Fields(text) {
+		trimmed := strings.Trim(field, ".,:;!?()[]{}<>\"'")
+		if trimmed == needle {
+			return true
+		}
+	}
+	return false
+}
+
 // procUserReply processes regular user commands (reply) /report.
 // feature check is intentionally inside this function to keep command detection logic centralized.
 func (l *TelegramListener) procUserReply(ctx context.Context, update tbapi.Update) (handled bool) {
@@ -502,6 +518,17 @@ func (l *TelegramListener) procUserReply(ctx context.Context, update tbapi.Updat
 		log.Printf("[DEBUG] user %s (%d) reported spam", update.Message.From.UserName, update.Message.From.ID)
 		if err := l.reportsHandler.DirectUserReport(ctx, update); err != nil {
 			log.Printf("[WARN] failed to process user spam report: %v", err)
+		}
+		return true
+	case l.isBotMention(update.Message.Text):
+		if !l.ReportConfig.Enabled {
+			log.Printf("[DEBUG] user bot-mention reporting disabled, ignoring mention from %s (%d)",
+				update.Message.From.UserName, update.Message.From.ID)
+			return true
+		}
+		log.Printf("[DEBUG] user %s (%d) requested LLM review by bot mention", update.Message.From.UserName, update.Message.From.ID)
+		if err := l.reportsHandler.DirectUserReport(ctx, update); err != nil {
+			log.Printf("[WARN] failed to process user bot-mention report: %v", err)
 		}
 		return true
 	}

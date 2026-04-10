@@ -46,6 +46,8 @@ type Message struct {
 	Sent       time.Time
 	HTML       string    `json:",omitempty"`
 	Text       string    `json:",omitempty"`
+	LLMContext string    `json:"llm_context,omitempty"`
+	ForceLLM   bool      `json:"force_llm,omitempty"`
 	Entities   *[]Entity `json:",omitempty"`
 	Image      *Image    `json:",omitempty"`
 	ReplyTo    struct {

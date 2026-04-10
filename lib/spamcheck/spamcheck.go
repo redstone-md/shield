@@ -7,14 +7,16 @@ import (
 
 // Request is a request to check a message for spam.
 type Request struct {
-	Msg       string   `json:"msg"`        // message to check
-	UserID    string   `json:"user_id"`    // user id
-	UserName  string   `json:"user_name"`  // user name
-	FirstName string   `json:"first_name"` // user's first name
-	LastName  string   `json:"last_name"`  // user's last name
-	IsPremium bool     `json:"is_premium"` // true if user has telegram premium
-	Meta      MetaData `json:"meta"`       // meta-info, provided by the client
-	CheckOnly bool     `json:"check_only"` // if true, only check the message, do not write newly approved user to the database
+	Msg        string   `json:"msg"`         // message to check
+	UserID     string   `json:"user_id"`     // user id
+	UserName   string   `json:"user_name"`   // user name
+	FirstName  string   `json:"first_name"`  // user's first name
+	LastName   string   `json:"last_name"`   // user's last name
+	IsPremium  bool     `json:"is_premium"`  // true if user has telegram premium
+	Meta       MetaData `json:"meta"`        // meta-info, provided by the client
+	CheckOnly  bool     `json:"check_only"`  // if true, only check the message, do not write newly approved user to the database
+	ForceLLM   bool     `json:"force_llm"`   // force LLM review regardless of regular gating logic
+	LLMContext string   `json:"llm_context"` // extra moderation context for LLM review
 }
 
 // MetaData is a meta-info about the message, provided by the client.

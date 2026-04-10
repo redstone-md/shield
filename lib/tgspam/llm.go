@@ -15,6 +15,7 @@ type llmResponse struct {
 }
 
 type llmContext struct {
+	RequestContext     string
 	RecentChatMessages []spamcheck.Request
 	RecentUserMessages []spamcheck.Request
 }
@@ -52,11 +53,16 @@ func runLLMProviderCheck(ctx context.Context, name, errorPrefix string, retryCou
 }
 
 func appendHistoryToLLMMessage(msg string, history llmContext) string {
-	if len(history.RecentChatMessages) == 0 && len(history.RecentUserMessages) == 0 {
+	if history.RequestContext == "" && len(history.RecentChatMessages) == 0 && len(history.RecentUserMessages) == 0 {
 		return msg
 	}
 
 	var sb strings.Builder
+	if history.RequestContext != "" {
+		sb.WriteString("Moderation context:\n")
+		sb.WriteString(history.RequestContext)
+		sb.WriteString("\n\n")
+	}
 	sb.WriteString("User message:\n")
 	sb.WriteString(msg)
 

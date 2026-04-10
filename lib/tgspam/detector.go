@@ -274,7 +274,8 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 		openaiChecksShort := d.openaiChecker != nil && d.openaiChecker.params.CheckShortMessagesWithOpenAI
 		geminiChecksShort := d.geminiChecker != nil && d.geminiChecker.params.CheckShortMessages
 		llmEligible := d.hasLLMEnabled()
-		if isSpamDetected(cr) || !llmEligible || (!openaiChecksShort && !geminiChecksShort) {
+		forceLLM := req.ForceLLM && llmEligible
+		if isSpamDetected(cr) || !llmEligible || (!forceLLM && !openaiChecksShort && !geminiChecksShort) {
 			if isSpamDetected(cr) {
 				d.addToLLMHistory(req)
 				d.spamHistory.Push(req)
@@ -379,7 +380,10 @@ func (d *Detector) hasLLMEnabled() bool {
 	return d.openaiChecker != nil || d.geminiChecker != nil
 }
 
-func (d *Detector) shouldApplyLLMCheck(baseSpam, isShortMessage bool, cfg detectorLLMCheck) bool {
+func (d *Detector) shouldApplyLLMCheck(baseSpam, isShortMessage bool, forceLLM bool, cfg detectorLLMCheck) bool {
+	if forceLLM {
+		return true
+	}
 	if isShortMessage {
 		return cfg.checkShortMessages
 	}
@@ -393,7 +397,7 @@ func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []
 		return detectorLLMResult{}, false
 	}
 
-	if !d.shouldApplyLLMCheck(baseSpam, isShortMessage, cfg) {
+	if !d.shouldApplyLLMCheck(baseSpam, isShortMessage, req.ForceLLM, cfg) {
 		return detectorLLMResult{}, false
 	}
 
@@ -424,6 +428,7 @@ func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []
 
 func (d *Detector) llmContextForRequest(req spamcheck.Request) llmContext {
 	ctx := llmContext{
+		RequestContext:     req.LLMContext,
 		RecentChatMessages: d.llmHistory.Last(llmChatContextSize),
 	}
 

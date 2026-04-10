@@ -3601,6 +3601,29 @@ func TestTelegramListener_isReportCommand(t *testing.T) {
 	}
 }
 
+func TestTelegramListener_isBotMention(t *testing.T) {
+	tests := []struct {
+		name        string
+		botUsername string
+		text        string
+		want        bool
+	}{
+		{name: "simple mention", botUsername: "mybot", text: "@mybot проверь", want: true},
+		{name: "mention with punctuation", botUsername: "mybot", text: "@mybot, проверь это", want: true},
+		{name: "case insensitive", botUsername: "MyBot", text: "эй @mybot глянь", want: true},
+		{name: "no bot configured", botUsername: "", text: "@mybot help", want: false},
+		{name: "different bot", botUsername: "mybot", text: "@otherbot help", want: false},
+		{name: "empty text", botUsername: "mybot", text: "", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := &TelegramListener{BotUsername: tt.botUsername}
+			assert.Equal(t, tt.want, l.isBotMention(tt.text))
+		})
+	}
+}
+
 func TestTelegramListener_IsLinkedChannel(t *testing.T) {
 	tests := []struct {
 		name            string

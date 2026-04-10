@@ -41,7 +41,21 @@ type openAIClient interface {
 	CreateChatCompletion(context.Context, openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error)
 }
 
-const defaultPrompt = `I'll give you a text from the messaging application and you will return me a json with three fields: {"spam": true/false, "reason":"why this is spam", "confidence":1-100}. Set spam:true only of confidence above 80. Return JSON only with no extra formatting!` + "\n" + `If history of previous messages provided, use them as extra context to make the decision.`
+const defaultPrompt = `I'll give you a text from the messaging application and you will return me a json with three fields: {"spam": true/false, "reason":"why this is spam", "confidence":1-100}. Set spam:true only of confidence above 80. Return JSON only with no extra formatting!` + "\n" +
+	`If history of previous messages provided, use them as extra context to make the decision.` + "\n" +
+	`Treat this as strict community moderation, not only generic spam filtering.` + "\n" +
+	`Priority violations:` + "\n" +
+	`1. Buying, selling, or exchanging USDT or any cryptocurrency.` + "\n" +
+	`2. Illegal or suspicious work: arson, scam offices, fraud, drugs, easy money, drops, shady couriers, and similar schemes.` + "\n" +
+	`3. Reposting the same ad more than once per day by the same user, but only if the provided context says it is a duplicate.` + "\n" +
+	`General chat rules:` + "\n" +
+	`4. Classic spam, external links, and off-topic ads are prohibited.` + "\n" +
+	`5. Fakes, disinformation, and fraud are prohibited.` + "\n" +
+	`6. Aggression, hate speech, ethnic abuse, and incitement are prohibited.` + "\n" +
+	`7. Drugs are prohibited, including ads, sale, purchase, or bragging about use.` + "\n" +
+	`8. Emoji spam and meaningless emoji-only pictures are prohibited.` + "\n" +
+	`9. Political arguments are discouraged and should be treated as suspicious moderation content.` + "\n" +
+	`10. Any language is allowed, and profanity alone is allowed unless it targets or abuses participants.`
 
 // newOpenAIChecker makes a bot for ChatGPT
 func newOpenAIChecker(client openAIClient, params OpenAIConfig) *openAIChecker {

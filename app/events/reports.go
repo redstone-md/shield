@@ -13,6 +13,8 @@ import (
 	"github.com/umputun/tg-spam/app/storage"
 )
 
+const reportLLMContext = `This message was manually reported by a trusted chat member via reply command or bot mention after it passed normal filters. Review it strictly against the moderation rules. Prioritize crypto exchange offers, illegal or suspicious work, scam or fraud, external ad links, drug-related content, hate or ethnic abuse, emoji-spam, and duplicate ad campaigns only when the provided context indicates repetition. Normal profanity alone is allowed unless it targets participants.`
+
 // ReportConfig is user spam reporting configuration
 type ReportConfig struct {
 	Storage          Reports       // reports storage for user spam reports
@@ -119,6 +121,10 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 		msgTxt = msgTxt + "\n" + origMsg.Quote.Text
 	}
 
+	if handled, err := r.tryLLMReportModeration(update, origMsg, msgTxt); handled {
+		return err
+	}
+
 	// check if reports storage is initialized
 	if r.Storage == nil {
 		return fmt.Errorf("reports storage not initialized")
@@ -143,6 +149,87 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 	// check if threshold reached
 	if err := r.checkReportThreshold(ctx, origMsg.MessageID, r.primChatID); err != nil {
 		log.Printf("[WARN] failed to check report threshold: %v", err)
+	}
+
+	return nil
+}
+
+func (r *userReports) tryLLMReportModeration(update tbapi.Update, origMsg *tbapi.Message, msgTxt string) (bool, error) {
+	reviewMsg := transform(origMsg)
+	reviewMsg.ForceLLM = true
+	reviewMsg.LLMContext = reportLLMContext
+
+	resp := r.bot.OnMessage(*reviewMsg, true)
+	if !resp.Send {
+		return false, nil
+	}
+
+	log.Printf("[INFO] LLM confirmed reported message %d from %s (%d) as spam",
+		origMsg.MessageID, origMsg.From.UserName, origMsg.From.ID)
+	return true, r.applyImmediateReportModeration(update, origMsg, msgTxt, resp)
+}
+
+func (r *userReports) applyImmediateReportModeration(update tbapi.Update, origMsg *tbapi.Message, msgTxt string, resp bot.Response) error {
+	if err := r.bot.RemoveApprovedUser(origMsg.From.ID); err != nil {
+		log.Printf("[DEBUG] can't remove user %d from approved list: %v", origMsg.From.ID, err)
+	}
+
+	if !r.dry && msgTxt != "" {
+		if err := r.bot.UpdateSpam(msgTxt); err != nil {
+			log.Printf("[WARN] failed to update spam samples from LLM-reviewed report: %v", err)
+		}
+	}
+
+	if !r.dry {
+		_, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
+			MessageID:  origMsg.MessageID,
+			ChatConfig: tbapi.ChatConfig{ChatID: r.primChatID},
+		}})
+		if err != nil {
+			log.Printf("[WARN] failed to delete LLM-confirmed reported message %d: %v", origMsg.MessageID, err)
+		}
+	}
+
+	banReq := banRequest{
+		duration: bot.PermanentBanDuration,
+		userID:   origMsg.From.ID,
+		chatID:   r.primChatID,
+		tbAPI:    r.tbAPI,
+		dry:      r.dry,
+		training: r.trainingMode,
+		userName: origMsg.From.UserName,
+		restrict: r.softBanMode,
+	}
+	if err := banUserOrChannel(banReq); err != nil {
+		return fmt.Errorf("failed to ban user %d after LLM-reviewed report: %w", origMsg.From.ID, err)
+	}
+
+	if r.adminChatID != 0 {
+		reporterName := update.Message.From.UserName
+		if reporterName == "" {
+			reporterName = fmt.Sprintf("user%d", update.Message.From.ID)
+		}
+
+		details := "LLM reviewed report and classified it as spam"
+		for _, cr := range resp.CheckResults {
+			if cr.Name == "openai" || cr.Name == "gemini" {
+				details = cr.Details
+				break
+			}
+		}
+
+		notificationText := fmt.Sprintf(
+			"**LLM auto-moderated reported message**\n\n[%s](tg://user?id=%d)\n\n%s\n\n**Reporter:** [%s](tg://user?id=%d)\n**Reason:** %s",
+			escapeMarkDownV1Text(origMsg.From.UserName),
+			origMsg.From.ID,
+			truncateString(strings.ReplaceAll(escapeMarkDownV1Text(msgTxt), "\n", " "), 300, "..."),
+			escapeMarkDownV1Text(reporterName),
+			update.Message.From.ID,
+			escapeMarkDownV1Text(details),
+		)
+		if err := send(tbapi.NewMessage(r.adminChatID, notificationText), r.tbAPI); err != nil {
+			log.Printf("[WARN] failed to send LLM auto-moderation notification: %v", err)
+		}
 	}
 
 	return nil

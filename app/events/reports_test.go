@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/events/mocks"
 	"github.com/umputun/tg-spam/app/storage"
+	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
 func TestUserReports_checkReportRateLimit(t *testing.T) {
@@ -149,6 +151,12 @@ func TestUserReports_DirectUserReport(t *testing.T) {
 			IsApprovedUserFunc: func(id int64) bool {
 				return true // reporter is approved
 			},
+			OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+				assert.True(t, checkOnly)
+				assert.True(t, msg.ForceLLM)
+				assert.Equal(t, reportLLMContext, msg.LLMContext)
+				return bot.Response{}
+			},
 		}
 
 		rep := &userReports{
@@ -184,6 +192,84 @@ func TestUserReports_DirectUserReport(t *testing.T) {
 		assert.Len(t, mockAPI.RequestCalls(), 1, "should delete /report message")
 		assert.Len(t, mockReports.AddCalls(), 1, "should add report to storage")
 		assert.Len(t, mockReports.GetReporterCountSinceCalls(), 1, "should check rate limit")
+		assert.Len(t, mockBot.OnMessageCalls(), 1, "should force llm review before storing report")
+	})
+
+	t.Run("llm-confirmed report triggers immediate moderation", func(t *testing.T) {
+		mockAPI := &mocks.TbAPIMock{
+			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+				return &tbapi.APIResponse{Ok: true}, nil
+			},
+			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+				return tbapi.Message{MessageID: 1234}, nil
+			},
+		}
+
+		mockReports := &mocks.ReportsMock{
+			GetReporterCountSinceFunc: func(ctx context.Context, reporterID int64, since time.Time) (int, error) {
+				return 0, nil
+			},
+		}
+
+		mockBot := &mocks.BotMock{
+			IsApprovedUserFunc: func(id int64) bool { return true },
+			OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+				assert.True(t, checkOnly)
+				assert.True(t, msg.ForceLLM)
+				assert.Equal(t, reportLLMContext, msg.LLMContext)
+				return bot.Response{
+					Send: true,
+					CheckResults: []spamcheck.Response{
+						{Name: "openai", Spam: true, Details: "priority violation, confidence: 96%"},
+					},
+				}
+			},
+			RemoveApprovedUserFunc: func(id int64) error {
+				assert.Equal(t, int64(666), id)
+				return nil
+			},
+			UpdateSpamFunc: func(msg string) error {
+				assert.Equal(t, "spam message", msg)
+				return nil
+			},
+		}
+
+		rep := &userReports{
+			tbAPI:       mockAPI,
+			bot:         mockBot,
+			primChatID:  123,
+			adminChatID: 456,
+			superUsers:  SuperUsers{},
+			ReportConfig: ReportConfig{
+				Storage:    mockReports,
+				RateLimit:  10,
+				RatePeriod: time.Hour,
+				Threshold:  2,
+			},
+		}
+
+		update := tbapi.Update{
+			Message: &tbapi.Message{
+				MessageID: 789,
+				Chat:      tbapi.Chat{ID: 123},
+				Text:      "/report",
+				From:      &tbapi.User{UserName: "reporter", ID: 111},
+				ReplyToMessage: &tbapi.Message{
+					MessageID: 999,
+					From:      &tbapi.User{ID: 666, UserName: "spammer"},
+					Text:      "spam message",
+				},
+			},
+		}
+
+		err := rep.DirectUserReport(context.Background(), update)
+		require.NoError(t, err)
+		assert.Len(t, mockBot.OnMessageCalls(), 1)
+		assert.Len(t, mockBot.RemoveApprovedUserCalls(), 1)
+		assert.Len(t, mockBot.UpdateSpamCalls(), 1)
+		assert.Empty(t, mockReports.AddCalls(), "should not store report when llm already confirmed spam")
+		assert.GreaterOrEqual(t, len(mockAPI.RequestCalls()), 2, "should delete command and original message")
+		assert.Len(t, mockAPI.SendCalls(), 1, "should notify admin chat")
 	})
 
 	t.Run("reporter is superuser - should return error", func(t *testing.T) {
@@ -296,6 +382,7 @@ func TestUserReports_DirectUserReport(t *testing.T) {
 			IsApprovedUserFunc: func(id int64) bool {
 				return true // reporter is approved
 			},
+			OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} },
 		}
 
 		mockReports := &mocks.ReportsMock{
@@ -349,6 +436,7 @@ func TestUserReports_DirectUserReport(t *testing.T) {
 			IsApprovedUserFunc: func(id int64) bool {
 				return true
 			},
+			OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} },
 		}
 
 		mockReports := &mocks.ReportsMock{
@@ -405,6 +493,7 @@ func TestUserReports_DirectUserReport(t *testing.T) {
 			IsApprovedUserFunc: func(id int64) bool {
 				return true
 			},
+			OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} },
 		}
 
 		mockReports := &mocks.ReportsMock{
@@ -503,6 +592,7 @@ func TestUserReports_DirectUserReport(t *testing.T) {
 			IsApprovedUserFunc: func(id int64) bool {
 				return true
 			},
+			OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} },
 		}
 
 		rep := &userReports{
@@ -597,6 +687,7 @@ func TestUserReports_DirectUserReport(t *testing.T) {
 			IsApprovedUserFunc: func(id int64) bool {
 				return id == 222 // user 222 is approved
 			},
+			OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} },
 		}
 
 		mockReports := &mocks.ReportsMock{
@@ -668,6 +759,7 @@ func TestUserReports_DirectUserReport(t *testing.T) {
 
 		mockBot := &mocks.BotMock{
 			IsApprovedUserFunc: func(id int64) bool { return true },
+			OnMessageFunc:      func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} },
 		}
 
 		rep := &userReports{
@@ -717,6 +809,7 @@ func TestUserReports_DirectUserReport(t *testing.T) {
 
 		mockBot := &mocks.BotMock{
 			IsApprovedUserFunc: func(id int64) bool { return true },
+			OnMessageFunc:      func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} },
 		}
 
 		rep := &userReports{
@@ -765,6 +858,7 @@ func TestUserReports_DirectUserReport(t *testing.T) {
 
 		mockBot := &mocks.BotMock{
 			IsApprovedUserFunc: func(id int64) bool { return true },
+			OnMessageFunc:      func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} },
 		}
 
 		rep := &userReports{
@@ -814,6 +908,7 @@ func TestUserReports_DirectUserReport(t *testing.T) {
 
 		mockBot := &mocks.BotMock{
 			IsApprovedUserFunc: func(id int64) bool { return true },
+			OnMessageFunc:      func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} },
 		}
 
 		rep := &userReports{

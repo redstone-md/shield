@@ -18,6 +18,7 @@ func TestAppendHistoryToLLMMessage(t *testing.T) {
 
 	t.Run("with history", func(t *testing.T) {
 		history := llmContext{
+			RequestContext: "manual report",
 			RecentChatMessages: []spamcheck.Request{
 				{Msg: "first message", UserName: "user1"},
 				{Msg: "second message", UserName: ""},
@@ -29,7 +30,10 @@ func TestAppendHistoryToLLMMessage(t *testing.T) {
 
 		got := appendHistoryToLLMMessage("current message", history)
 
-		assert.Equal(t, `User message:
+		assert.Equal(t, `Moderation context:
+manual report
+
+User message:
 current message
 
 Recent chat messages:
