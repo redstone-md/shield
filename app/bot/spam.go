@@ -160,6 +160,7 @@ func (s *SpamFilter) OnMessage(msg Message, checkOnly bool) (response Response) 
 		if s.params.Dry {
 			msgPrefix = s.params.SpamDryMsg
 		}
+		msgPrefix = spamVerdictText(checkResults, msgPrefix)
 		spamRespMsg := fmt.Sprintf("%s: %q (%d)", msgPrefix, displayUsername, msg.From.ID)
 		return Response{Text: spamRespMsg, Send: true, ReplyTo: msg.ID, BanInterval: PermanentBanDuration, CheckResults: checkResults,
 			DeleteReplyTo: true, User: User{Username: msg.From.Username, ID: msg.From.ID, DisplayName: msg.From.DisplayName},
@@ -168,6 +169,26 @@ func (s *SpamFilter) OnMessage(msg Message, checkOnly bool) (response Response) 
 	}
 	log.Printf("[DEBUG] user %s is not a spammer, %s", displayUsername, checkResultStr)
 	return Response{CheckResults: checkResults} // not a spam
+}
+
+func spamVerdictText(results []spamcheck.Response, fallback string) string {
+	for _, result := range results {
+		if !result.Spam {
+			continue
+		}
+		if result.Name != "openai" && result.Name != "gemini" {
+			continue
+		}
+		reason := strings.TrimSpace(result.Details)
+		if idx := strings.LastIndex(reason, ", confidence:"); idx >= 0 {
+			reason = reason[:idx]
+		}
+		reason = strings.TrimSuffix(strings.TrimSpace(reason), ".")
+		if reason != "" {
+			return reason
+		}
+	}
+	return fallback
 }
 
 // UpdateSpam appends a message to the spam samples file and updates the classifier

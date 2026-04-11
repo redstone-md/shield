@@ -31,6 +31,7 @@ func TestOpenAIChecker_Check(t *testing.T) {
 		MaxTokensRequest:  3000,
 		MaxSymbolsRequest: 12000,
 		Model:             "gpt-4o-mini",
+		RetryCount:        2,
 	})
 
 	t.Run("spam response", func(t *testing.T) {
@@ -81,22 +82,30 @@ func TestOpenAIChecker_Check(t *testing.T) {
 	})
 
 	t.Run("bad encoding", func(t *testing.T) {
+		callCount := 0
 		clientMock.CreateChatCompletionFunc = func(
 			contextMoqParam context.Context, chatCompletionRequest openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+			callCount++
+			if callCount == 1 {
+				return openai.ChatCompletionResponse{
+					Choices: []openai.ChatCompletionChoice{{
+						Message: openai.ChatCompletionMessage{Content: `bad json`},
+					}},
+				}, nil
+			}
 			return openai.ChatCompletionResponse{
 				Choices: []openai.ChatCompletionChoice{{
-					Message: openai.ChatCompletionMessage{Content: `bad json`},
+					Message: openai.ChatCompletionMessage{Content: `{"spam": true, "reason":"recovered", "confidence":88}`},
 				}},
 			}, nil
 		}
 		spam, details := checker.check(context.Background(), "some text", llmContext{})
 		t.Logf("spam: %v, details: %+v", spam, details)
-		assert.False(t, spam)
+		assert.True(t, spam)
 		assert.Equal(t, "openai", details.Name)
-		assert.Equal(t, "OpenAI error: can't unmarshal response: bad json - invalid character 'b' looking for beginning of value",
-			details.Details)
-		assert.Equal(t, "can't unmarshal response: bad json - invalid character 'b' looking for beginning of value",
-			details.Error.Error())
+		assert.Equal(t, "recovered, confidence: 88%", details.Details)
+		assert.NoError(t, details.Error)
+		assert.Equal(t, 2, callCount)
 	})
 
 	t.Run("no choices", func(t *testing.T) {
@@ -109,6 +118,22 @@ func TestOpenAIChecker_Check(t *testing.T) {
 		assert.False(t, spam)
 		assert.Equal(t, "openai", details.Name)
 		assert.Equal(t, "OpenAI error: no choices in response", details.Details)
+	})
+
+	t.Run("fallback parser handles wrapped json", func(t *testing.T) {
+		clientMock.CreateChatCompletionFunc = func(
+			contextMoqParam context.Context, chatCompletionRequest openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+			return openai.ChatCompletionResponse{
+				Choices: []openai.ChatCompletionChoice{{
+					Message: openai.ChatCompletionMessage{Content: `analysis {"spam": true, "reason":"wrapped", "confidence":87,} done`},
+				}},
+			}, nil
+		}
+		spam, details := checker.check(context.Background(), "some text", llmContext{})
+		assert.True(t, spam)
+		assert.Equal(t, "openai", details.Name)
+		assert.Equal(t, "wrapped, confidence: 87%", details.Details)
+		assert.NoError(t, details.Error)
 	})
 }
 

@@ -103,4 +103,68 @@ func TestRunLLMProviderCheck(t *testing.T) {
 		require.Error(t, details.Error)
 		assert.EqualError(t, details.Error, "boom")
 	})
+
+	t.Run("retry count capped at twenty", func(t *testing.T) {
+		calls := 0
+
+		spam, details := runLLMProviderCheck(context.Background(), "openai", "OpenAI", 99, "test", llmContext{},
+			func(_ context.Context, msg string) (llmResponse, error) {
+				calls++
+				return llmResponse{}, errors.New("bad json")
+			},
+		)
+
+		require.False(t, spam)
+		assert.Equal(t, 20, calls)
+		require.Error(t, details.Error)
+		assert.EqualError(t, details.Error, "bad json")
+	})
+}
+
+func TestParseLLMResponse(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    llmResponse
+		wantErr string
+	}{
+		{
+			name:  "strict json",
+			input: `{"spam": true, "reason":"bad text", "confidence":91}`,
+			want:  llmResponse{IsSpam: true, Reason: "bad text", Confidence: 91},
+		},
+		{
+			name:  "wrapped json object",
+			input: `Answer: {"spam": false, "reason":"ok", "confidence":42} done`,
+			want:  llmResponse{IsSpam: false, Reason: "ok", Confidence: 42},
+		},
+		{
+			name:  "trailing comma json",
+			input: `{"spam": true, "reason":"bad text", "confidence":91,}`,
+			want:  llmResponse{IsSpam: true, Reason: "bad text", Confidence: 91},
+		},
+		{
+			name:  "fallback field parse",
+			input: `spam: true, reason: "job scam", confidence: 95`,
+			want:  llmResponse{IsSpam: true, Reason: "job scam", Confidence: 95},
+		},
+		{
+			name:    "invalid content",
+			input:   `nonsense`,
+			wantErr: "can't unmarshal response: nonsense",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseLLMResponse(tt.input)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

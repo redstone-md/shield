@@ -112,6 +112,37 @@ func TestSpamFilter_OnMessage(t *testing.T) {
 			},
 		},
 		{
+			name: "spam detected with openai verdict",
+			message: Message{
+				Text: "openai verdict",
+				From: User{ID: 1, Username: "user1"},
+			},
+			wantResponse: Response{
+				Text:          `job scam: "user1" (1)`,
+				Send:          true,
+				BanInterval:   PermanentBanDuration,
+				DeleteReplyTo: true,
+				User:          User{ID: 1, Username: "user1"},
+				CheckResults:  []spamcheck.Response{{Name: "openai", Spam: true, Details: "job scam, confidence: 95%"}},
+			},
+		},
+		{
+			name: "spam detected with gemini verdict in dry mode",
+			message: Message{
+				Text: "gemini verdict",
+				From: User{ID: 1, Username: "user1"},
+			},
+			dry: true,
+			wantResponse: Response{
+				Text:          `crypto solicitation: "user1" (1)`,
+				Send:          true,
+				BanInterval:   PermanentBanDuration,
+				DeleteReplyTo: true,
+				User:          User{ID: 1, Username: "user1"},
+				CheckResults:  []spamcheck.Response{{Name: "gemini", Spam: true, Details: "crypto solicitation, confidence: 91%"}},
+			},
+		},
+		{
 			name: "ham detected",
 			message: Message{
 				Text: "good message",
@@ -529,10 +560,16 @@ func TestSpamFilter_OnMessage(t *testing.T) {
 					if tc.wantRequest != (spamcheck.Request{}) {
 						assert.Equal(t, tc.wantRequest, req)
 					}
-					if tc.message.Text == "good message" {
+					switch tc.message.Text {
+					case "good message":
 						return false, []spamcheck.Response{{Name: "test", Spam: false, Details: "ham"}}
+					case "openai verdict":
+						return true, []spamcheck.Response{{Name: "openai", Spam: true, Details: "job scam, confidence: 95%"}}
+					case "gemini verdict":
+						return true, []spamcheck.Response{{Name: "gemini", Spam: true, Details: "crypto solicitation, confidence: 91%"}}
+					default:
+						return true, []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}}
 					}
-					return true, []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}}
 				},
 			}
 

@@ -2,7 +2,6 @@ package tgspam
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -121,10 +120,9 @@ func (g *geminiChecker) sendRequest(ctx context.Context, msg string) (response l
 	}
 
 	content := resp.Text()
-	content = stripThoughtTags(content)
-
-	if err := json.Unmarshal([]byte(content), &response); err != nil {
-		return llmResponse{}, fmt.Errorf("can't unmarshal response: %s - %w", content, err)
+	response, err = parseLLMResponse(content)
+	if err != nil {
+		return llmResponse{}, err
 	}
 
 	return response, nil

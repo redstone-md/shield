@@ -2,7 +2,6 @@ package tgspam
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -201,10 +200,9 @@ func (o *openAIChecker) sendRequest(ctx context.Context, msg string) (response l
 
 	// strip <thought> tags from response content if present
 	content := resp.Choices[0].Message.Content
-	content = stripThoughtTags(content)
-
-	if err := json.Unmarshal([]byte(content), &response); err != nil {
-		return llmResponse{}, fmt.Errorf("can't unmarshal response: %s - %w", content, err)
+	response, err = parseLLMResponse(content)
+	if err != nil {
+		return llmResponse{}, err
 	}
 
 	return response, nil

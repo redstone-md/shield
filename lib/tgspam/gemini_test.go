@@ -27,6 +27,7 @@ func TestGeminiChecker_Check(t *testing.T) {
 		MaxOutputTokens:   300,
 		MaxSymbolsRequest: 12000,
 		Model:             "gemma-4-31b-it",
+		RetryCount:        2,
 	})
 
 	t.Run("spam response", func(t *testing.T) {
@@ -77,11 +78,20 @@ func TestGeminiChecker_Check(t *testing.T) {
 	})
 
 	t.Run("bad encoding", func(t *testing.T) {
+		callCount := 0
 		clientMock.GenerateContentFunc = func(ctx context.Context, model string, contents []*genai.Content,
 			config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
+			callCount++
+			if callCount == 1 {
+				return &genai.GenerateContentResponse{
+					Candidates: []*genai.Candidate{{
+						Content: &genai.Content{Parts: []*genai.Part{{Text: `bad json`}}},
+					}},
+				}, nil
+			}
 			return &genai.GenerateContentResponse{
 				Candidates: []*genai.Candidate{{
-					Content: &genai.Content{Parts: []*genai.Part{{Text: `bad json`}}},
+					Content: &genai.Content{Parts: []*genai.Part{{Text: `{"spam": false, "reason":"recovered", "confidence":73}`}}},
 				}},
 			}, nil
 		}
@@ -89,10 +99,9 @@ func TestGeminiChecker_Check(t *testing.T) {
 		t.Logf("spam: %v, details: %+v", spam, details)
 		assert.False(t, spam)
 		assert.Equal(t, "gemini", details.Name)
-		assert.Equal(t, "Gemini error: can't unmarshal response: bad json - invalid character 'b' looking for beginning of value",
-			details.Details)
-		assert.Equal(t, "can't unmarshal response: bad json - invalid character 'b' looking for beginning of value",
-			details.Error.Error())
+		assert.Equal(t, "recovered, confidence: 73%", details.Details)
+		assert.NoError(t, details.Error)
+		assert.Equal(t, 2, callCount)
 	})
 
 	t.Run("no candidates", func(t *testing.T) {
@@ -112,6 +121,22 @@ func TestGeminiChecker_Check(t *testing.T) {
 		spam, details := nilChecker.check(context.Background(), "some text", llmContext{})
 		assert.False(t, spam)
 		assert.Equal(t, spamcheck.Response{}, details)
+	})
+
+	t.Run("fallback parser handles wrapped json", func(t *testing.T) {
+		clientMock.GenerateContentFunc = func(ctx context.Context, model string, contents []*genai.Content,
+			config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
+			return &genai.GenerateContentResponse{
+				Candidates: []*genai.Candidate{{
+					Content: &genai.Content{Parts: []*genai.Part{{Text: `analysis {"spam": true, "reason":"wrapped", "confidence":87,} done`}}},
+				}},
+			}, nil
+		}
+		spam, details := checker.check(context.Background(), "some text", llmContext{})
+		assert.True(t, spam)
+		assert.Equal(t, "gemini", details.Name)
+		assert.Equal(t, "wrapped, confidence: 87%", details.Details)
+		assert.NoError(t, details.Error)
 	})
 }
 
