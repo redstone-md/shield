@@ -81,7 +81,7 @@ func (l *TelegramListener) procEventsWithContext(ctx context.Context, update tba
 		return nil
 	}
 
-	event := l.makeIncomingEvent(msg)
+	event := l.makeIncomingEvent(update, msg)
 	return l.enqueueIncomingEvent(ctx, event, update)
 }
 
@@ -117,6 +117,17 @@ func (l *TelegramListener) ensurePipeline() {
 }
 
 func (l *TelegramListener) enqueueIncomingEvent(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error {
+	ctx = observability.WithEventMetadata(ctx, event.EventID, event.CorrelationID)
+	if l.IncomingEvents != nil {
+		created, err := l.IncomingEvents.Record(ctx, event)
+		if err != nil {
+			return fmt.Errorf("record incoming event %s: %w", event.EventID, err)
+		}
+		if !created {
+			observability.Logf(ctx, "[DEBUG] incoming event already recorded for key %s", event.IdempotencyKey)
+		}
+	}
+
 	l.ensurePipeline()
 
 	resultCh := make(chan error, 1)
@@ -179,7 +190,7 @@ func (l *TelegramListener) shutdownPipeline() {
 	}
 }
 
-func (l *TelegramListener) makeIncomingEvent(msg *bot.Message) moderation.IncomingEvent {
+func (l *TelegramListener) makeIncomingEvent(update tbapi.Update, msg *bot.Message) moderation.IncomingEvent {
 	subjectID := msg.From.ID
 	subjectUserName := msg.From.Username
 	if msg.SenderChat.ID != 0 {
@@ -187,13 +198,21 @@ func (l *TelegramListener) makeIncomingEvent(msg *bot.Message) moderation.Incomi
 		subjectUserName = msg.SenderChat.UserName
 	}
 
+	editedMessageID := 0
+	if update.EditedMessage != nil {
+		editedMessageID = update.EditedMessage.MessageID
+	}
+
 	return moderation.IncomingEvent{
-		EventID:       l.nextEventID(),
-		CorrelationID: l.currentCorrelationID(),
-		TenantID:      l.InstanceID,
-		Source:        "telegram.update",
-		ChatID:        msg.ChatID,
-		MessageID:     msg.ID,
+		EventID:         l.nextEventID(),
+		CorrelationID:   l.currentCorrelationID(),
+		TenantID:        l.InstanceID,
+		Source:          "telegram.update",
+		UpdateID:        update.UpdateID,
+		ChatID:          msg.ChatID,
+		MessageID:       msg.ID,
+		EditedMessageID: editedMessageID,
+		IdempotencyKey:  telegramIdempotencyKey(update.UpdateID, msg.ChatID, msg.ID, editedMessageID),
 		Subject: moderation.Subject{
 			ID:       subjectID,
 			UserName: subjectUserName,
@@ -207,6 +226,10 @@ func (l *TelegramListener) makeIncomingEvent(msg *bot.Message) moderation.Incomi
 		},
 		ReceivedAt: msg.Sent.UTC(),
 	}
+}
+
+func telegramIdempotencyKey(updateID int, chatID int64, messageID, editedMessageID int) string {
+	return fmt.Sprintf("telegram:update:%d:chat:%d:message:%d:edited:%d", updateID, chatID, messageID, editedMessageID)
 }
 
 func (l *TelegramListener) nextEventID() string {

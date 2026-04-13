@@ -266,6 +266,9 @@ func TestAssembleRuntimeBootstrapsRuleSet(t *testing.T) {
 	require.NoError(t, err)
 	defer assembly.close()
 
+	require.NotNil(t, assembly.RuleSets)
+	require.NotNil(t, assembly.IncomingEventsStore)
+
 	active, err := assembly.RuleSets.Active(ctx, "gr1")
 	require.NoError(t, err)
 	assert.Equal(t, "gr1", active.WorkspaceID)

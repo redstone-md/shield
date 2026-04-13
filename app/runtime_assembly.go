@@ -18,16 +18,17 @@ import (
 )
 
 type runtimeAssembly struct {
-	DataDB            *engine.SQL
-	SpamBot           *bot.SpamFilter
-	SpamLogger        events.SpamLogger
-	LoggerWriter      io.Closer
-	Locator           *storage.Locator
-	RuleSets          *storage.RuleSets
-	ReportsStore      *storage.Reports
-	DetectedSpamStore *storage.DetectedSpam
-	TelegramListener  *events.TelegramListener
-	Web               webRuntimeAssembly
+	DataDB              *engine.SQL
+	SpamBot             *bot.SpamFilter
+	SpamLogger          events.SpamLogger
+	LoggerWriter        io.Closer
+	Locator             *storage.Locator
+	RuleSets            *storage.RuleSets
+	IncomingEventsStore *storage.IncomingEvents
+	ReportsStore        *storage.Reports
+	DetectedSpamStore   *storage.DetectedSpam
+	TelegramListener    *events.TelegramListener
+	Web                 webRuntimeAssembly
 }
 
 type webRuntimeAssembly struct {
@@ -89,6 +90,11 @@ func assembleRuntime(ctx context.Context, opts options, detector *tgspam.Detecto
 		return nil, fmt.Errorf("can't bootstrap rule set, %w", err)
 	}
 
+	incomingEventsStore, err := storage.NewIncomingEvents(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make incoming events store, %w", err)
+	}
+
 	var reportsStore *storage.Reports
 	if opts.Report.Enabled {
 		reportsStore, err = storage.NewReports(ctx, dataDB)
@@ -103,14 +109,15 @@ func assembleRuntime(ctx context.Context, opts options, detector *tgspam.Detecto
 	}
 
 	assembly := &runtimeAssembly{
-		DataDB:            dataDB,
-		SpamBot:           spamBot,
-		SpamLogger:        spamLogger,
-		LoggerWriter:      loggerWr,
-		Locator:           locator,
-		RuleSets:          ruleSets,
-		ReportsStore:      reportsStore,
-		DetectedSpamStore: detectedSpamStore,
+		DataDB:              dataDB,
+		SpamBot:             spamBot,
+		SpamLogger:          spamLogger,
+		LoggerWriter:        loggerWr,
+		Locator:             locator,
+		RuleSets:            ruleSets,
+		IncomingEventsStore: incomingEventsStore,
+		ReportsStore:        reportsStore,
+		DetectedSpamStore:   detectedSpamStore,
 		Web: webRuntimeAssembly{
 			Detector:      spamBot.Detector,
 			SpamFilter:    spamBot,
@@ -214,6 +221,7 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 		AdminGroup:          opts.AdminGroup,
 		TestingIDs:          opts.TestingIDs,
 		Locator:             a.Locator,
+		IncomingEvents:      a.IncomingEventsStore,
 		DetectedSpamCounter: a.DetectedSpamStore,
 		ModerationConfig: events.ModerationConfig{
 			FirstStrike:  opts.Moderation.FirstStrike,

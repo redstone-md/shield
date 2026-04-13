@@ -45,6 +45,7 @@ type TelegramListener struct {
 	TrainingMode            bool          // do not ban users, just report and train spam detector
 	SoftBanMode             bool          // do not ban users, but restrict their actions
 	Locator                 Locator       // message locator to get info about messages
+	IncomingEvents          IncomingEvents
 	DetectedSpamCounter     DetectedSpamCounter
 	ModerationConfig        ModerationConfig
 	ReportConfig            ReportConfig // user spam reporting configuration
@@ -224,7 +225,9 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 				// we need to process an edited message as a new message, so we create a new update object
 				// and copy the edited message to the message field.
 				editedUpdate := tbapi.Update{
-					Message: update.EditedMessage,
+					UpdateID:      update.UpdateID,
+					Message:       update.EditedMessage,
+					EditedMessage: update.EditedMessage,
 				}
 				if err := l.procEvents(editedUpdate); err != nil {
 					log.Printf("[WARN] failed to process edited message update: %v", err)

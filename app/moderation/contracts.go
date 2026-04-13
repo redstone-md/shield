@@ -29,15 +29,18 @@ type Content struct {
 
 // IncomingEvent is the transport-neutral moderation input contract.
 type IncomingEvent struct {
-	EventID       string
-	CorrelationID string
-	TenantID      string
-	Source        string
-	ChatID        int64
-	MessageID     int
-	Subject       Subject
-	Content       Content
-	ReceivedAt    time.Time
+	EventID         string
+	CorrelationID   string
+	TenantID        string
+	Source          string
+	UpdateID        int
+	ChatID          int64
+	MessageID       int
+	EditedMessageID int
+	IdempotencyKey  string
+	Subject         Subject
+	Content         Content
+	ReceivedAt      time.Time
 }
 
 // DetectionSignal records one spam heuristic or model signal.

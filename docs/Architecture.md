@@ -109,7 +109,7 @@ classDiagram
 - `app/events` — Telegram ingestion, queue publication, in-process worker, policy evaluation, action execution, audit writing, and high-level event orchestration; code: [app/events/](../app/events/); entry points: [listener.go](../app/events/listener.go), [pipeline.go](../app/events/pipeline.go), [policy.go](../app/events/policy.go), [action_executor.go](../app/events/action_executor.go), [audit_writer.go](../app/events/audit_writer.go), [events.go](../app/events/events.go); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
 - `app/bot` — moderation-facing bot interface and current detection orchestration; code: [app/bot/](../app/bot/); entry point: [spam.go](../app/bot/spam.go)
 - `lib/tgspam` — reusable spam detection heuristics and optional LLM integrations; code: [lib/tgspam/](../lib/tgspam/)
-- `app/storage` — persistence for samples, reports, detected spam, and locators; code: [app/storage/](../app/storage/)
+- `app/storage` — persistence for samples, reports, detected spam, locators, bootstrap rule sets, and ingress `incoming_events`; code: [app/storage/](../app/storage/)
 - `app/webapi` — server-rendered admin UI and HTTP endpoints; code: [app/webapi/](../app/webapi/)
 - `app/moderation` — transport-neutral moderation contracts and internal queue seam for roadmap phase 0; code: [app/moderation/](../app/moderation/); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
 - `app/rules` — single-tenant moderation rule domain snapshots introduced for phase 1 bootstrap persistence; code: [app/rules/](../app/rules/)
@@ -135,6 +135,7 @@ classDiagram
 - `runtimeProbe` — defined in [app/runtime_probe.go](../app/runtime_probe.go); exposes `/healthz` and `/readyz` for the main process independently of `app/webapi`
 - `runtimeAssembly` — defined in [app/runtime_assembly.go](../app/runtime_assembly.go); assembles storage, gateway, and web runtime seams before `execute` orchestrates startup
 - `RuleSet` — defined in [app/rules/ruleset.go](../app/rules/ruleset.go); persisted bootstrap moderation configuration for one workspace
+- `IncomingEvents` — defined in [app/storage/incoming_events.go](../app/storage/incoming_events.go); durable ingress ledger keyed by Telegram idempotency key before queue publication
 
 ## 7) Verification status
 
@@ -150,6 +151,7 @@ classDiagram
 - Correlation metadata is also covered for `app/webapi` requests in [app/webapi/webapi_test.go](../app/webapi/webapi_test.go), which prove request metadata reaches downstream storage calls and request-scoped logs.
 - Main-runtime probe coverage is in [app/runtime_probe_test.go](../app/runtime_probe_test.go) and [app/main_test.go](../app/main_test.go), which prove the core process exposes `/healthz` and `/readyz` when configured.
 - Runtime assembly coverage remains in [app/main_test.go](../app/main_test.go), with startup behavior preserved while `execute` now orchestrates higher-level assemblies instead of wiring the full concrete chain inline.
+- Incoming-event ingress coverage is in [app/storage/incoming_events_test.go](../app/storage/incoming_events_test.go) and [app/events/listener_test.go](../app/events/listener_test.go), which prove deterministic Telegram idempotency keys and idempotent persistence before queue publication.
 
 ## 4) Dependency rules
 
@@ -173,6 +175,6 @@ classDiagram
 ## 6) Where to go next
 
 - Roadmap: [docs/ROADMAP.md](./ROADMAP.md)
-- Current phase plan: [docs/plans/roadmap/00-foundations-and-internal-pipeline.md](./plans/roadmap/00-foundations-and-internal-pipeline.md)
+- Current phase plan: [docs/plans/roadmap/01-single-tenant-rules-and-idempotency.md](./plans/roadmap/01-single-tenant-rules-and-idempotency.md)
 - Decisions: [docs/ADR/](./ADR/)
 - Runtime entry point: [app/main.go](../app/main.go)

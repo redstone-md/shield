@@ -128,6 +128,21 @@ func (s *auditWriterSpy) Write(ctx context.Context, record AuditRecord) error {
 	return nil
 }
 
+type incomingEventsSpy struct {
+	record func(ctx context.Context, event moderation.IncomingEvent) (bool, error)
+	calls  []moderation.IncomingEvent
+	ctxs   []context.Context
+}
+
+func (s *incomingEventsSpy) Record(ctx context.Context, event moderation.IncomingEvent) (bool, error) {
+	s.ctxs = append(s.ctxs, ctx)
+	s.calls = append(s.calls, event)
+	if s.record != nil {
+		return s.record(ctx, event)
+	}
+	return true, nil
+}
+
 type contextualBotSpy struct {
 	onMessage func(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response
 	ctxs      []context.Context
@@ -185,18 +200,30 @@ func TestTelegramListener_ProcEventsPublishesIncomingEvent(t *testing.T) {
 	defer teardown()
 
 	spy := &processorSpy{}
+	eventStore := &incomingEventsSpy{}
+	callOrder := make([]string, 0, 2)
+	eventStore.record = func(ctx context.Context, event moderation.IncomingEvent) (bool, error) {
+		callOrder = append(callOrder, "record")
+		return true, nil
+	}
+	spy.process = func(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error {
+		callOrder = append(callOrder, "process")
+		return nil
+	}
 	l := TelegramListener{
-		Bot:        &mocks.BotMock{},
-		Locator:    locator,
-		Group:      "123",
-		InstanceID: "tg-spam",
-		chatID:     123,
-		Queue:      moderation.NewInMemoryQueue(1),
-		processor:  spy,
+		Bot:            &mocks.BotMock{},
+		Locator:        locator,
+		IncomingEvents: eventStore,
+		Group:          "123",
+		InstanceID:     "tg-spam",
+		chatID:         123,
+		Queue:          moderation.NewInMemoryQueue(1),
+		processor:      spy,
 	}
 	defer l.shutdownPipeline()
 
 	update := tbapi.Update{
+		UpdateID: 701,
 		Message: &tbapi.Message{
 			MessageID: 77,
 			Chat:      tbapi.Chat{ID: 123, Type: "supergroup"},
@@ -212,12 +239,16 @@ func TestTelegramListener_ProcEventsPublishesIncomingEvent(t *testing.T) {
 	err := l.procEvents(update)
 	require.NoError(t, err)
 	require.Len(t, spy.calls, 1)
+	require.Len(t, eventStore.calls, 1)
 
 	got := spy.calls[0].Event
 	assert.Equal(t, "telegram.update", got.Source)
 	assert.Equal(t, "tg-spam", got.TenantID)
+	assert.Equal(t, 701, got.UpdateID)
 	assert.Equal(t, int64(123), got.ChatID)
 	assert.Equal(t, 77, got.MessageID)
+	assert.Equal(t, 0, got.EditedMessageID)
+	assert.Equal(t, "telegram:update:701:chat:123:message:77:edited:0", got.IdempotencyKey)
 	assert.Equal(t, int64(42), got.Subject.ID)
 	assert.Equal(t, "user", got.Subject.UserName)
 	assert.Equal(t, "visit https://example.com now", got.Content.Text)
@@ -227,6 +258,48 @@ func TestTelegramListener_ProcEventsPublishesIncomingEvent(t *testing.T) {
 	assert.Equal(t, update, spy.calls[0].Update)
 	assert.NotEmpty(t, got.EventID)
 	assert.NotEmpty(t, got.CorrelationID)
+	assert.Equal(t, got, eventStore.calls[0])
+	assert.Equal(t, []string{"record", "process"}, callOrder)
+	assertContextMetadata(t, eventStore.ctxs[0], got.EventID, got.CorrelationID)
+}
+
+func TestTelegramListener_ProcEventsBuildsEditedMessageIdempotencyKey(t *testing.T) {
+	locator, teardown := prepTestLocator(t)
+	defer teardown()
+
+	spy := &processorSpy{}
+	l := TelegramListener{
+		Bot:        &mocks.BotMock{},
+		Locator:    locator,
+		Group:      "123",
+		InstanceID: "tg-spam",
+		chatID:     123,
+		Queue:      moderation.NewInMemoryQueue(1),
+		processor:  spy,
+	}
+	defer l.shutdownPipeline()
+
+	edited := &tbapi.Message{
+		MessageID: 88,
+		Chat:      tbapi.Chat{ID: 123, Type: "supergroup"},
+		Text:      "edited spam",
+		From:      &tbapi.User{ID: 42, UserName: "user"},
+		Date:      int(time.Date(2026, 4, 13, 10, 5, 0, 0, time.UTC).Unix()),
+	}
+
+	err := l.procEvents(tbapi.Update{
+		UpdateID:      702,
+		Message:       edited,
+		EditedMessage: edited,
+	})
+	require.NoError(t, err)
+	require.Len(t, spy.calls, 1)
+
+	got := spy.calls[0].Event
+	assert.Equal(t, 702, got.UpdateID)
+	assert.Equal(t, 88, got.MessageID)
+	assert.Equal(t, 88, got.EditedMessageID)
+	assert.Equal(t, "telegram:update:702:chat:123:message:88:edited:88", got.IdempotencyKey)
 }
 
 func TestTelegramListener_TracerBulletSmoke(t *testing.T) {

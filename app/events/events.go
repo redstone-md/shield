@@ -11,6 +11,7 @@ import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
 	"github.com/umputun/tg-spam/app/bot"
+	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
@@ -58,6 +59,11 @@ type Locator interface {
 type DetectedSpamCounter interface {
 	CountByUserID(ctx context.Context, userID int64) (int, error)
 	Write(ctx context.Context, entry storage.DetectedSpamInfo, checks []spamcheck.Response) error
+}
+
+// IncomingEvents persists normalized ingress events before moderation processing.
+type IncomingEvents interface {
+	Record(ctx context.Context, event moderation.IncomingEvent) (bool, error)
 }
 
 // ModerationConfig controls automatic penalty escalation.
