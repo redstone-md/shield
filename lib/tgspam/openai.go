@@ -43,6 +43,7 @@ type openAIClient interface {
 const defaultPrompt = `I'll give you a text from the messaging application and you will return me a json with three fields: {"spam": true/false, "reason":"why this is spam", "confidence":1-100}. Set spam:true only of confidence above 80. Return JSON only with no extra formatting!` + "\n" +
 	`If history of previous messages provided, use them as extra context to make the decision.` + "\n" +
 	`Treat this as strict community moderation, not only generic spam filtering.` + "\n" +
+	`The chat is Russian-speaking, so always write the "reason" field in Russian, briefly and clearly.` + "\n" +
 	`Priority violations:` + "\n" +
 	`1. Buying, selling, or exchanging USDT or any cryptocurrency.` + "\n" +
 	`2. Illegal or suspicious work: arson, scam offices, fraud, drugs, easy money, drops, shady couriers, and similar schemes.` + "\n" +
