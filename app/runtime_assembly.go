@@ -10,6 +10,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/events"
+	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/app/webapi"
@@ -22,6 +23,7 @@ type runtimeAssembly struct {
 	SpamLogger        events.SpamLogger
 	LoggerWriter      io.Closer
 	Locator           *storage.Locator
+	RuleSets          *storage.RuleSets
 	ReportsStore      *storage.Reports
 	DetectedSpamStore *storage.DetectedSpam
 	TelegramListener  *events.TelegramListener
@@ -79,6 +81,14 @@ func assembleRuntime(ctx context.Context, opts options, detector *tgspam.Detecto
 		return nil, fmt.Errorf("can't make locator, %w", err)
 	}
 
+	ruleSets, err := storage.NewRuleSets(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make rule sets store, %w", err)
+	}
+	if _, err = ruleSets.EnsureBootstrap(ctx, bootstrapRuleSet(opts)); err != nil {
+		return nil, fmt.Errorf("can't bootstrap rule set, %w", err)
+	}
+
 	var reportsStore *storage.Reports
 	if opts.Report.Enabled {
 		reportsStore, err = storage.NewReports(ctx, dataDB)
@@ -98,6 +108,7 @@ func assembleRuntime(ctx context.Context, opts options, detector *tgspam.Detecto
 		SpamLogger:        spamLogger,
 		LoggerWriter:      loggerWr,
 		Locator:           locator,
+		RuleSets:          ruleSets,
 		ReportsStore:      reportsStore,
 		DetectedSpamStore: detectedSpamStore,
 		Web: webRuntimeAssembly{
@@ -109,6 +120,66 @@ func assembleRuntime(ctx context.Context, opts options, detector *tgspam.Detecto
 	}
 
 	return assembly, nil
+}
+
+func bootstrapRuleSet(opts options) rules.RuleSet {
+	return rules.RuleSet{
+		WorkspaceID: opts.InstanceID,
+		Source:      "bootstrap",
+		Meta: rules.MetaRules{
+			LinksLimit:      opts.Meta.LinksLimit,
+			MentionsLimit:   opts.Meta.MentionsLimit,
+			ImageOnly:       opts.Meta.ImageOnly,
+			LinksOnly:       opts.Meta.LinksOnly,
+			VideosOnly:      opts.Meta.VideosOnly,
+			AudiosOnly:      opts.Meta.AudiosOnly,
+			ContactOnly:     opts.Meta.ContactOnly,
+			Forwarded:       opts.Meta.Forward,
+			Keyboard:        opts.Meta.Keyboard,
+			UsernameSymbols: opts.Meta.UsernameSymbols,
+			Giveaway:        opts.Meta.Giveaway,
+		},
+		Duplicates: rules.DuplicateRules{
+			Threshold: opts.Duplicates.Threshold,
+			Window:    opts.Duplicates.Window,
+		},
+		AbnormalSpacing: rules.AbnormalSpacingRules{
+			Enabled:                 opts.AbnormalSpacing.Enabled,
+			SpaceRatioThreshold:     opts.AbnormalSpacing.SpaceRatioThreshold,
+			ShortWordRatioThreshold: opts.AbnormalSpacing.ShortWordRatioThreshold,
+			ShortWordLen:            opts.AbnormalSpacing.ShortWordLen,
+			MinWords:                opts.AbnormalSpacing.MinWords,
+		},
+		Moderation: rules.ModerationRules{
+			FirstStrike:  opts.Moderation.FirstStrike,
+			SecondStrike: opts.Moderation.SecondStrike,
+			SoftBan:      opts.SoftBan,
+			DryRun:       opts.Dry,
+		},
+		Reports: rules.ReportRules{
+			Enabled:          opts.Report.Enabled,
+			Threshold:        opts.Report.Threshold,
+			AutoBanThreshold: opts.Report.AutoBanThreshold,
+			RateLimit:        opts.Report.RateLimit,
+			RatePeriod:       opts.Report.RatePeriod,
+		},
+		OpenAI: rules.LLMRules{
+			Enabled:            opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "",
+			Veto:               opts.OpenAI.Veto,
+			Model:              opts.OpenAI.Model,
+			HistorySize:        opts.OpenAI.HistorySize,
+			CheckShortMessages: opts.OpenAI.CheckShortMessages,
+			CustomPrompts:      opts.OpenAI.CustomPrompts,
+		},
+		Gemini: rules.LLMRules{
+			Enabled:            opts.Gemini.Token != "",
+			Veto:               opts.Gemini.Veto,
+			Model:              opts.Gemini.Model,
+			HistorySize:        opts.Gemini.HistorySize,
+			CheckShortMessages: opts.Gemini.CheckShortMessages,
+			CustomPrompts:      opts.Gemini.CustomPrompts,
+		},
+	}
 }
 
 func makeApprovedUsersStore(ctx context.Context, dataDB *engine.SQL, detector *tgspam.Detector) (int, *storage.ApprovedUsers, error) {

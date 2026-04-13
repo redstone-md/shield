@@ -112,6 +112,7 @@ classDiagram
 - `app/storage` — persistence for samples, reports, detected spam, and locators; code: [app/storage/](../app/storage/)
 - `app/webapi` — server-rendered admin UI and HTTP endpoints; code: [app/webapi/](../app/webapi/)
 - `app/moderation` — transport-neutral moderation contracts and internal queue seam for roadmap phase 0; code: [app/moderation/](../app/moderation/); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
+- `app/rules` — single-tenant moderation rule domain snapshots introduced for phase 1 bootstrap persistence; code: [app/rules/](../app/rules/)
 
 ### 3.2 Interfaces / contracts
 
@@ -133,6 +134,7 @@ classDiagram
 - `app/webapi` request metadata middleware — defined in [app/webapi/webapi.go](../app/webapi/webapi.go); attaches `event_id` and `correlation_id` to request context and response headers
 - `runtimeProbe` — defined in [app/runtime_probe.go](../app/runtime_probe.go); exposes `/healthz` and `/readyz` for the main process independently of `app/webapi`
 - `runtimeAssembly` — defined in [app/runtime_assembly.go](../app/runtime_assembly.go); assembles storage, gateway, and web runtime seams before `execute` orchestrates startup
+- `RuleSet` — defined in [app/rules/ruleset.go](../app/rules/ruleset.go); persisted bootstrap moderation configuration for one workspace
 
 ## 7) Verification status
 

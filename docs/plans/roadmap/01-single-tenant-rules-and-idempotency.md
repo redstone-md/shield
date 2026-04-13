@@ -4,9 +4,9 @@
 
 ## Задачи
 
-- [ ] Ввести persistent `RuleSet` для одного workspace и хранить его в БД как отдельную сущность, а env-параметры использовать только как bootstrap defaults.
+- [x] Ввести persistent `RuleSet` для одного workspace и хранить его в БД как отдельную сущность, а env-параметры использовать только как bootstrap defaults.
 - [ ] Создать миграцию для таблиц `rule_sets`, `rule_set_versions`, `incoming_events`, `moderation_actions`.
-- [ ] Реализовать загрузчик `RuleSet`, который конвертирует текущие флаги `meta`, `duplicates`, `space`, `moderation`, `report`, `openai`, `gemini` в доменную конфигурацию.
+- [x] Реализовать загрузчик `RuleSet`, который конвертирует текущие флаги `meta`, `duplicates`, `space`, `moderation`, `report`, `openai`, `gemini` в доменную конфигурацию.
 - [ ] Добавить idempotency key для Telegram события на базе `update_id`, `chat_id`, `message_id`, `edited_message_id` и сохранять его в `incoming_events`.
 - [ ] Научить pipeline повторно получать уже обработанное решение по idempotency key вместо повторного бана или удаления.
 - [ ] Вынести нормализацию текста из детекторов в отдельный модуль с этапами lower-case, trim, cleanup zero-width, canonical whitespace и script folding hooks.

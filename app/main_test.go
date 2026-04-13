@@ -208,6 +208,71 @@ func Test_makeSpamBot(t *testing.T) {
 	})
 }
 
+func TestBootstrapRuleSet(t *testing.T) {
+	var opts options
+	opts.InstanceID = "gr1"
+	opts.Meta.LinksLimit = 3
+	opts.Meta.Keyboard = true
+	opts.Duplicates.Threshold = 2
+	opts.Duplicates.Window = time.Minute
+	opts.AbnormalSpacing.Enabled = true
+	opts.AbnormalSpacing.SpaceRatioThreshold = 0.4
+	opts.Moderation.FirstStrike = 30 * time.Minute
+	opts.Moderation.SecondStrike = 6 * time.Hour
+	opts.Report.Enabled = true
+	opts.Report.Threshold = 2
+	opts.OpenAI.Model = "gpt-4o-mini"
+	opts.OpenAI.CheckShortMessages = true
+	opts.Gemini.Model = "gemma"
+	opts.SoftBan = true
+	opts.Dry = true
+
+	got := bootstrapRuleSet(opts)
+
+	assert.Equal(t, "gr1", got.WorkspaceID)
+	assert.Equal(t, "bootstrap", got.Source)
+	assert.Equal(t, 3, got.Meta.LinksLimit)
+	assert.True(t, got.Meta.Keyboard)
+	assert.Equal(t, 2, got.Duplicates.Threshold)
+	assert.Equal(t, time.Minute, got.Duplicates.Window)
+	assert.True(t, got.AbnormalSpacing.Enabled)
+	assert.Equal(t, 0.4, got.AbnormalSpacing.SpaceRatioThreshold)
+	assert.Equal(t, 30*time.Minute, got.Moderation.FirstStrike)
+	assert.True(t, got.Moderation.SoftBan)
+	assert.True(t, got.Moderation.DryRun)
+	assert.True(t, got.Reports.Enabled)
+	assert.Equal(t, 2, got.Reports.Threshold)
+	assert.Equal(t, "gpt-4o-mini", got.OpenAI.Model)
+	assert.True(t, got.OpenAI.CheckShortMessages)
+	assert.Equal(t, "gemma", got.Gemini.Model)
+}
+
+func TestAssembleRuntimeBootstrapsRuleSet(t *testing.T) {
+	ctx := t.Context()
+	tmpDir := t.TempDir()
+
+	var opts options
+	opts.InstanceID = "gr1"
+	opts.DataBaseURL = fmt.Sprintf("sqlite://%s", path.Join(tmpDir, "tg-spam.db"))
+	opts.Files.SamplesDataPath = tmpDir
+	opts.Files.DynamicDataPath = tmpDir
+	opts.Moderation.FirstStrike = 30 * time.Minute
+	opts.Moderation.SecondStrike = 6 * time.Hour
+
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, "spam-samples.txt"), []byte("spam1\n"), 0o600))
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, "ham-samples.txt"), []byte("ham1\n"), 0o600))
+
+	assembly, err := assembleRuntime(ctx, opts, makeDetector(opts))
+	require.NoError(t, err)
+	defer assembly.close()
+
+	active, err := assembly.RuleSets.Active(ctx, "gr1")
+	require.NoError(t, err)
+	assert.Equal(t, "gr1", active.WorkspaceID)
+	assert.Equal(t, "bootstrap", active.Source)
+	assert.Equal(t, 30*time.Minute, active.Moderation.FirstStrike)
+}
+
 func Test_activateServerOnly(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
