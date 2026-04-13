@@ -21,6 +21,7 @@ Superseded by:
 - [x] Propagate moderation `event_id` and `correlation_id` through the in-process tracer-bullet path
 - [x] Propagate request `event_id` and `correlation_id` through `app/webapi`
 - [x] Add `/healthz` and `/readyz` probes for the main runtime
+- [x] Refactor `app/main.go` to orchestrate explicit runtime assemblies instead of wiring one direct concrete chain
 
 ## Context
 
@@ -45,6 +46,7 @@ Superseded by:
 - Carry `event_id` and `correlation_id` in `context.Context` for the moderation worker path so downstream detection, action, and storage logs can correlate a single event without widening every public interface.
 - Carry request `event_id` and `correlation_id` in `context.Context` for `app/webapi` so request-scoped storage calls and diagnostics correlate to the same operator action.
 - Expose runtime health and readiness from `app/main` independently of `app/webapi` so Telegram-first deployments still have probe endpoints.
+- Keep `app/main.go` as an orchestrator over explicit runtime assembly seams so startup wiring remains testable and does not collapse package boundaries back into one function.
 
 Key points:
 

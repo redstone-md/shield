@@ -296,11 +296,6 @@ func execute(ctx context.Context, opts options) error {
 		return fmt.Errorf("can't make samples dir, %w", err)
 	}
 
-	dataDB, err := makeDB(ctx, opts)
-	if err != nil {
-		return fmt.Errorf("can't make db, %w", err)
-	}
-
 	runtimeProbe := newRuntimeProbe(opts.InstanceID, revision)
 	if probeErr := activateRuntimeProbe(ctx, opts.Server.ProbeListenAddr, runtimeProbe); probeErr != nil {
 		return fmt.Errorf("can't activate runtime probe server, %w", probeErr)
@@ -310,47 +305,19 @@ func execute(ctx context.Context, opts options) error {
 	// make detector with all sample files loaded
 	detector := makeDetector(opts)
 
-	// make spam bot
-	spamBot, err := makeSpamBot(ctx, opts, dataDB, detector)
+	assembly, err := assembleRuntime(ctx, opts, detector)
 	if err != nil {
-		return fmt.Errorf("can't make spam bot, %w", err)
+		return err
 	}
+	defer assembly.close()
 	if opts.Convert == "only" {
-		log.Print("[WARN] convert only mode, converting text samples and exit")
 		return nil
-	}
-
-	// make store and load approved users
-	approvedUsersStore, auErr := storage.NewApprovedUsers(ctx, dataDB)
-	if auErr != nil {
-		return fmt.Errorf("can't make approved users store, %w", auErr)
-	}
-
-	count, err := detector.WithUserStorage(approvedUsersStore)
-	if err != nil {
-		return fmt.Errorf("can't load approved users, %w", err)
-	}
-	log.Printf("[DEBUG] approved users loaded: %d", count)
-
-	// make locator
-	locator, err := storage.NewLocator(ctx, opts.HistoryDuration, opts.HistoryMinSize, dataDB)
-	if err != nil {
-		return fmt.Errorf("can't make locator, %w", err)
-	}
-
-	// make reports storage if feature is enabled
-	var reportsStore *storage.Reports
-	if opts.Report.Enabled {
-		reportsStore, err = storage.NewReports(ctx, dataDB)
-		if err != nil {
-			return fmt.Errorf("can't make reports store, %w", err)
-		}
 	}
 
 	// activate web server if enabled, server-only mode (no telegram token)
 	if opts.Server.Enabled && (opts.Telegram.Token == "" || opts.Telegram.Group == "") {
 		// server starts in background goroutine without DM users provider
-		if srvErr := activateServer(ctx, opts, spamBot, locator, dataDB, nil, ""); srvErr != nil {
+		if srvErr := activateWebRuntime(ctx, opts, assembly.Web, nil); srvErr != nil {
 			return fmt.Errorf("can't activate web server, %w", srvErr)
 		}
 		runtimeProbe.SetReady(true)
@@ -366,80 +333,12 @@ func execute(ctx context.Context, opts options) error {
 	}
 	tbAPI.Debug = opts.TGDbg
 
-	// make spam logger writer
-	loggerWr, err := makeSpamLogWriter(opts)
-	if err != nil {
-		return fmt.Errorf("can't make spam log writer, %w", err)
-	}
-	defer loggerWr.Close()
-
-	// make spam logger
-	spamLogger, err := makeSpamLogger(ctx, opts.InstanceID, loggerWr, dataDB)
-	if err != nil {
-		return fmt.Errorf("can't make spam logger, %w", err)
-	}
-
-	detectedSpamStore, err := storage.NewDetectedSpam(ctx, dataDB)
-	if err != nil {
-		return fmt.Errorf("can't make detected spam store, %w", err)
-	}
-
-	// make telegram listener
-	tgListener := events.TelegramListener{
-		TbAPI:               tbAPI,
-		BotUsername:         tbAPI.Self.UserName,
-		InstanceID:          opts.InstanceID,
-		Group:               opts.Telegram.Group,
-		IdleDuration:        opts.Telegram.IdleDuration,
-		SuperUsers:          opts.SuperUsers,
-		Bot:                 spamBot,
-		StartupMsg:          opts.Message.Startup,
-		WarnMsg:             opts.Message.Warn,
-		NoSpamReply:         opts.NoSpamReply,
-		SuppressJoinMessage: opts.SuppressJoinMessage,
-		DeleteJoinMessages:  opts.Delete.JoinMessages,
-		DeleteLeaveMessages: opts.Delete.LeaveMessages,
-		SpamLogger:          spamLogger,
-		AdminGroup:          opts.AdminGroup,
-		TestingIDs:          opts.TestingIDs,
-		Locator:             locator,
-		DetectedSpamCounter: detectedSpamStore,
-		ModerationConfig: events.ModerationConfig{
-			FirstStrike:  opts.Moderation.FirstStrike,
-			SecondStrike: opts.Moderation.SecondStrike,
-		},
-		ReportConfig: events.ReportConfig{
-			Storage:          reportsStore,
-			Enabled:          opts.Report.Enabled,
-			Threshold:        opts.Report.Threshold,
-			AutoBanThreshold: opts.Report.AutoBanThreshold,
-			RateLimit:        opts.Report.RateLimit,
-			RatePeriod:       opts.Report.RatePeriod,
-		},
-		TrainingMode:            opts.Training,
-		SoftBanMode:             opts.SoftBan,
-		DisableAdminSpamForward: opts.DisableAdminSpamForward,
-		Dry:                     opts.Dry,
-		AggressiveCleanup:       opts.AggressiveCleanup,
-		AggressiveCleanupLimit:  opts.AggressiveCleanupLimit,
-	}
-
-	if opts.Delete.JoinMessages {
-		log.Print("[INFO] delete join messages enabled")
-	}
-	if opts.Delete.LeaveMessages {
-		log.Print("[INFO] delete leave messages enabled")
-	}
-
-	log.Printf("[DEBUG] telegram listener config: {bot: %s, group: %s, idle: %v, super: %v, admin: %s, "+
-		"testing: %v, no-reply: %v, suppress: %v, dry: %v, training: %v}",
-		tgListener.BotUsername, tgListener.Group, tgListener.IdleDuration, tgListener.SuperUsers,
-		tgListener.AdminGroup, tgListener.TestingIDs, tgListener.NoSpamReply, tgListener.SuppressJoinMessage,
-		tgListener.Dry, tgListener.TrainingMode)
+	tgListener := assembly.makeTelegramListener(opts, tbAPI)
+	logListenerConfig(tgListener)
 
 	// activate web server if enabled, with DM users provider from the telegram listener
 	if opts.Server.Enabled {
-		if srvErr := activateServer(ctx, opts, spamBot, locator, dataDB, &tgListener, tgListener.BotUsername); srvErr != nil {
+		if srvErr := activateWebRuntime(ctx, opts, assembly.Web, tgListener); srvErr != nil {
 			return fmt.Errorf("can't activate web server, %w", srvErr)
 		}
 	}
@@ -530,8 +429,7 @@ func checkVolumeMount(opts options) (ok bool) {
 	return false
 }
 
-func activateServer(ctx context.Context, opts options, sf *bot.SpamFilter, loc *storage.Locator,
-	db *engine.SQL, dmUsersProvider webapi.DMUsersProvider, botUsername string) (err error) {
+func activateServer(ctx context.Context, opts options, web webRuntimeAssembly, dmUsersProvider webapi.DMUsersProvider) (err error) {
 	authPassswd := opts.Server.AuthPasswd
 	if opts.Server.AuthPasswd == "auto" {
 		authPassswd, err = webapi.GenerateRandomPassword(20)
@@ -546,6 +444,11 @@ func activateServer(ctx context.Context, opts options, sf *bot.SpamFilter, loc *
 	}
 
 	// make store and load approved users
+	db, ok := web.StorageEngine.(*engine.SQL)
+	if !ok {
+		return fmt.Errorf("web storage engine must be *engine.SQL")
+	}
+
 	detectedSpamStore, dsErr := storage.NewDetectedSpam(ctx, db)
 	if dsErr != nil {
 		return fmt.Errorf("can't make detected spam store, %w", dsErr)
@@ -559,7 +462,7 @@ func activateServer(ctx context.Context, opts options, sf *bot.SpamFilter, loc *
 
 	settings := webapi.Settings{
 		InstanceID:              opts.InstanceID,
-		BotUsername:             botUsername,
+		BotUsername:             web.BotUsername,
 		PrimaryGroup:            opts.Telegram.Group,
 		AdminGroup:              opts.AdminGroup,
 		DisableAdminSpamForward: opts.DisableAdminSpamForward,
@@ -621,9 +524,9 @@ func activateServer(ctx context.Context, opts options, sf *bot.SpamFilter, loc *
 
 	srv := webapi.Server{Config: webapi.Config{
 		ListenAddr:      opts.Server.ListenAddr,
-		Detector:        sf.Detector,
-		SpamFilter:      sf,
-		Locator:         loc,
+		Detector:        web.Detector,
+		SpamFilter:      web.SpamFilter,
+		Locator:         web.Locator,
 		DetectedSpam:    detectedSpamStore,
 		Dictionary:      dictionaryStore,
 		StorageEngine:   db, // add database engine for backup functionality
