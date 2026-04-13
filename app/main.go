@@ -31,6 +31,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/events"
+	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/app/webapi"
@@ -302,10 +303,7 @@ func execute(ctx context.Context, opts options) error {
 	}
 	defer runtimeProbe.SetReady(false)
 
-	// make detector with all sample files loaded
-	detector := makeDetector(opts)
-
-	assembly, err := assembleRuntime(ctx, opts, detector)
+	assembly, err := assembleRuntime(ctx, opts)
 	if err != nil {
 		return err
 	}
@@ -549,6 +547,10 @@ func activateServer(ctx context.Context, opts options, web webRuntimeAssembly, d
 // makeDetector creates spam detector with all checkers and updaters
 // it loads samples and dynamic files
 func makeDetector(opts options) *tgspam.Detector {
+	return makeDetectorWithRuleSet(opts, bootstrapRuleSet(opts))
+}
+
+func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detector {
 	detectorConfig := tgspam.Config{
 		MaxAllowedEmoji:     opts.MaxEmoji,
 		MinMsgLen:           opts.MinMsgLen,
@@ -559,10 +561,10 @@ func makeDetector(opts options) *tgspam.Detector {
 		HTTPClient:          &http.Client{Timeout: opts.CAS.Timeout},
 		FirstMessageOnly:    !opts.ParanoidMode,
 		FirstMessagesCount:  opts.FirstMessagesCount,
-		OpenAIVeto:          opts.OpenAI.Veto,
-		OpenAIHistorySize:   opts.OpenAI.HistorySize, // how many last requests sent to openai
-		GeminiVeto:          opts.Gemini.Veto,
-		GeminiHistorySize:   opts.Gemini.HistorySize, // how many last requests sent to gemini
+		OpenAIVeto:          ruleSet.OpenAI.Veto,
+		OpenAIHistorySize:   ruleSet.OpenAI.HistorySize, // how many last requests sent to openai
+		GeminiVeto:          ruleSet.Gemini.Veto,
+		GeminiHistorySize:   ruleSet.Gemini.HistorySize, // how many last requests sent to gemini
 		LLMConsensus:        tgspam.LLMConsensusMode(opts.LLM.Consensus),
 		LLMRequestTimeout:   opts.LLM.RequestTimeout,
 		MultiLangWords:      opts.MultiLangWords,
@@ -583,27 +585,27 @@ func makeDetector(opts options) *tgspam.Detector {
 	}
 
 	// set duplicate detection config
-	detectorConfig.DuplicateDetection.Threshold = opts.Duplicates.Threshold
-	detectorConfig.DuplicateDetection.Window = opts.Duplicates.Window
-	if opts.Duplicates.Threshold > 0 {
+	detectorConfig.DuplicateDetection.Threshold = ruleSet.Duplicates.Threshold
+	detectorConfig.DuplicateDetection.Window = ruleSet.Duplicates.Window
+	if ruleSet.Duplicates.Threshold > 0 {
 		log.Printf("[INFO] duplicate messages check enabled, threshold: %d, window: %v",
-			opts.Duplicates.Threshold, opts.Duplicates.Window)
+			ruleSet.Duplicates.Threshold, ruleSet.Duplicates.Window)
 	}
 
 	detector := tgspam.NewDetector(detectorConfig)
 
-	if opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "" {
+	if ruleSet.OpenAI.Enabled && (opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "") {
 		log.Printf("[WARN] openai enabled")
 		openAIConfig := tgspam.OpenAIConfig{
 			SystemPrompt:                 opts.OpenAI.Prompt,
 			CustomPrompts:                opts.OpenAI.CustomPrompts,
-			Model:                        opts.OpenAI.Model,
+			Model:                        ruleSet.OpenAI.Model,
 			MaxTokensResponse:            opts.OpenAI.MaxTokensResponse,
 			MaxTokensRequest:             opts.OpenAI.MaxTokensRequest,
 			MaxSymbolsRequest:            opts.OpenAI.MaxSymbolsRequest,
 			RetryCount:                   opts.OpenAI.RetryCount,
 			ReasoningEffort:              opts.OpenAI.ReasoningEffort,
-			CheckShortMessagesWithOpenAI: opts.OpenAI.CheckShortMessages,
+			CheckShortMessagesWithOpenAI: ruleSet.OpenAI.CheckShortMessages,
 		}
 
 		config := openai.DefaultConfig(opts.OpenAI.Token)
@@ -615,16 +617,16 @@ func makeDetector(opts options) *tgspam.Detector {
 		detector.WithOpenAIChecker(openai.NewClientWithConfig(config), openAIConfig)
 	}
 
-	if opts.Gemini.Token != "" {
+	if ruleSet.Gemini.Enabled && opts.Gemini.Token != "" {
 		log.Printf("[WARN] gemini enabled")
 		geminiConfig := tgspam.GeminiConfig{
 			SystemPrompt:       opts.Gemini.Prompt,
 			CustomPrompts:      opts.Gemini.CustomPrompts,
-			Model:              opts.Gemini.Model,
+			Model:              ruleSet.Gemini.Model,
 			MaxOutputTokens:    opts.Gemini.MaxTokensResponse,
 			MaxSymbolsRequest:  opts.Gemini.MaxSymbolsRequest,
 			RetryCount:         opts.Gemini.RetryCount,
-			CheckShortMessages: opts.Gemini.CheckShortMessages,
+			CheckShortMessages: ruleSet.Gemini.CheckShortMessages,
 		}
 
 		client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
@@ -638,57 +640,57 @@ func makeDetector(opts options) *tgspam.Detector {
 		detector.WithGeminiChecker(client.Models, geminiConfig)
 	}
 
-	if opts.AbnormalSpacing.Enabled {
+	if ruleSet.AbnormalSpacing.Enabled {
 		log.Printf("[INFO] words spacing check enabled")
 		detector.AbnormalSpacing.Enabled = true
-		detector.AbnormalSpacing.ShortWordLen = opts.AbnormalSpacing.ShortWordLen
-		detector.AbnormalSpacing.ShortWordRatioThreshold = opts.AbnormalSpacing.ShortWordRatioThreshold
-		detector.AbnormalSpacing.SpaceRatioThreshold = opts.AbnormalSpacing.SpaceRatioThreshold
-		detector.AbnormalSpacing.MinWordsCount = opts.AbnormalSpacing.MinWords
+		detector.AbnormalSpacing.ShortWordLen = ruleSet.AbnormalSpacing.ShortWordLen
+		detector.AbnormalSpacing.ShortWordRatioThreshold = ruleSet.AbnormalSpacing.ShortWordRatioThreshold
+		detector.AbnormalSpacing.SpaceRatioThreshold = ruleSet.AbnormalSpacing.SpaceRatioThreshold
+		detector.AbnormalSpacing.MinWordsCount = ruleSet.AbnormalSpacing.MinWords
 	}
 
 	metaChecks := []tgspam.MetaCheck{}
-	if opts.Meta.ImageOnly {
+	if ruleSet.Meta.ImageOnly {
 		log.Printf("[INFO] image only check enabled, min text len: %d", opts.MinMsgLen)
 		metaChecks = append(metaChecks, tgspam.ImagesCheck(opts.MinMsgLen))
 	}
-	if opts.Meta.VideosOnly {
+	if ruleSet.Meta.VideosOnly {
 		log.Printf("[INFO] videos only check enabled, min text len: %d", opts.MinMsgLen)
 		metaChecks = append(metaChecks, tgspam.VideosCheck(opts.MinMsgLen))
 	}
-	if opts.Meta.AudiosOnly {
+	if ruleSet.Meta.AudiosOnly {
 		log.Printf("[INFO] audio only check enabled, min text len: %d", opts.MinMsgLen)
 		metaChecks = append(metaChecks, tgspam.AudioCheck(opts.MinMsgLen))
 	}
-	if opts.Meta.LinksLimit >= 0 {
-		log.Printf("[INFO] links check enabled, limit: %d", opts.Meta.LinksLimit)
-		metaChecks = append(metaChecks, tgspam.LinksCheck(opts.Meta.LinksLimit))
+	if ruleSet.Meta.LinksLimit >= 0 {
+		log.Printf("[INFO] links check enabled, limit: %d", ruleSet.Meta.LinksLimit)
+		metaChecks = append(metaChecks, tgspam.LinksCheck(ruleSet.Meta.LinksLimit))
 	}
-	if opts.Meta.MentionsLimit >= 0 {
-		log.Printf("[INFO] mentions check enabled, limit: %d", opts.Meta.MentionsLimit)
-		metaChecks = append(metaChecks, tgspam.MentionsCheck(opts.Meta.MentionsLimit))
+	if ruleSet.Meta.MentionsLimit >= 0 {
+		log.Printf("[INFO] mentions check enabled, limit: %d", ruleSet.Meta.MentionsLimit)
+		metaChecks = append(metaChecks, tgspam.MentionsCheck(ruleSet.Meta.MentionsLimit))
 	}
-	if opts.Meta.LinksOnly {
+	if ruleSet.Meta.LinksOnly {
 		log.Printf("[INFO] links only check enabled")
 		metaChecks = append(metaChecks, tgspam.LinkOnlyCheck())
 	}
-	if opts.Meta.Forward {
+	if ruleSet.Meta.Forwarded {
 		log.Printf("[INFO] forward check enabled")
 		metaChecks = append(metaChecks, tgspam.ForwardedCheck())
 	}
-	if opts.Meta.Keyboard {
+	if ruleSet.Meta.Keyboard {
 		log.Printf("[INFO] keyboard check enabled")
 		metaChecks = append(metaChecks, tgspam.KeyboardCheck())
 	}
-	if opts.Meta.ContactOnly {
+	if ruleSet.Meta.ContactOnly {
 		log.Printf("[INFO] contact only check enabled")
 		metaChecks = append(metaChecks, tgspam.ContactCheck())
 	}
-	if opts.Meta.UsernameSymbols != "" {
-		log.Printf("[INFO] username symbols check enabled, prohibited symbols: %q", opts.Meta.UsernameSymbols)
-		metaChecks = append(metaChecks, tgspam.UsernameSymbolsCheck(opts.Meta.UsernameSymbols))
+	if ruleSet.Meta.UsernameSymbols != "" {
+		log.Printf("[INFO] username symbols check enabled, prohibited symbols: %q", ruleSet.Meta.UsernameSymbols)
+		metaChecks = append(metaChecks, tgspam.UsernameSymbolsCheck(ruleSet.Meta.UsernameSymbols))
 	}
-	if opts.Meta.Giveaway {
+	if ruleSet.Meta.Giveaway {
 		log.Printf("[INFO] giveaway check enabled")
 		metaChecks = append(metaChecks, tgspam.GiveawayCheck())
 	}
@@ -725,7 +727,7 @@ func makeDetector(opts options) *tgspam.Detector {
 	return detector
 }
 
-func makeSpamBot(ctx context.Context, opts options, dataDB *engine.SQL, detector *tgspam.Detector) (*bot.SpamFilter, error) {
+func makeSpamBot(ctx context.Context, opts options, ruleSet rules.RuleSet, dataDB *engine.SQL, detector *tgspam.Detector) (*bot.SpamFilter, error) {
 	if dataDB == nil || detector == nil {
 		return nil, errors.New("nil datadb or detector")
 	}
@@ -754,7 +756,7 @@ func makeSpamBot(ctx context.Context, opts options, dataDB *engine.SQL, detector
 		DictStore:    dictionaryStore,
 		SpamMsg:      opts.Message.Spam,
 		SpamDryMsg:   opts.Message.Dry,
-		Dry:          opts.Dry,
+		Dry:          ruleSet.Moderation.DryRun,
 	}
 	spamBot := bot.NewSpamFilter(detector, spamBotParams)
 	log.Printf("[DEBUG] spam bot config: %+v", spamBotParams)

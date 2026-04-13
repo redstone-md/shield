@@ -24,6 +24,7 @@ type runtimeAssembly struct {
 	LoggerWriter        io.Closer
 	Locator             *storage.Locator
 	RuleSets            *storage.RuleSets
+	ActiveRuleSet       rules.RuleSet
 	IncomingEventsStore *storage.IncomingEvents
 	ReportsStore        *storage.Reports
 	DetectedSpamStore   *storage.DetectedSpam
@@ -39,15 +40,10 @@ type webRuntimeAssembly struct {
 	BotUsername   string
 }
 
-func assembleRuntime(ctx context.Context, opts options, detector *tgspam.Detector) (*runtimeAssembly, error) {
+func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error) {
 	dataDB, err := makeDB(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("can't make db, %w", err)
-	}
-
-	spamBot, err := makeSpamBot(ctx, opts, dataDB, detector)
-	if err != nil {
-		return nil, fmt.Errorf("can't make spam bot, %w", err)
 	}
 
 	loggerWr, err := makeSpamLogWriter(opts)
@@ -60,13 +56,33 @@ func assembleRuntime(ctx context.Context, opts options, detector *tgspam.Detecto
 		return nil, fmt.Errorf("can't make spam logger, %w", err)
 	}
 
+	ruleSets, err := storage.NewRuleSets(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make rule sets store, %w", err)
+	}
+	if _, err = ruleSets.EnsureBootstrap(ctx, bootstrapRuleSet(opts)); err != nil {
+		return nil, fmt.Errorf("can't bootstrap rule set, %w", err)
+	}
+	activeRuleSet, err := ruleSets.Active(ctx, opts.InstanceID)
+	if err != nil {
+		return nil, fmt.Errorf("can't load active rule set, %w", err)
+	}
+
+	detector := makeDetectorWithRuleSet(opts, activeRuleSet)
+	spamBot, err := makeSpamBot(ctx, opts, activeRuleSet, dataDB, detector)
+	if err != nil {
+		return nil, fmt.Errorf("can't make spam bot, %w", err)
+	}
+
 	if opts.Convert == "only" {
 		log.Print("[WARN] convert only mode, converting text samples and exit")
 		return &runtimeAssembly{
-			DataDB:       dataDB,
-			SpamBot:      spamBot,
-			SpamLogger:   spamLogger,
-			LoggerWriter: loggerWr,
+			DataDB:        dataDB,
+			SpamBot:       spamBot,
+			SpamLogger:    spamLogger,
+			LoggerWriter:  loggerWr,
+			RuleSets:      ruleSets,
+			ActiveRuleSet: activeRuleSet,
 		}, nil
 	}
 
@@ -80,14 +96,6 @@ func assembleRuntime(ctx context.Context, opts options, detector *tgspam.Detecto
 	locator, err := storage.NewLocator(ctx, opts.HistoryDuration, opts.HistoryMinSize, dataDB)
 	if err != nil {
 		return nil, fmt.Errorf("can't make locator, %w", err)
-	}
-
-	ruleSets, err := storage.NewRuleSets(ctx, dataDB)
-	if err != nil {
-		return nil, fmt.Errorf("can't make rule sets store, %w", err)
-	}
-	if _, err = ruleSets.EnsureBootstrap(ctx, bootstrapRuleSet(opts)); err != nil {
-		return nil, fmt.Errorf("can't bootstrap rule set, %w", err)
 	}
 
 	incomingEventsStore, err := storage.NewIncomingEvents(ctx, dataDB)
@@ -115,6 +123,7 @@ func assembleRuntime(ctx context.Context, opts options, detector *tgspam.Detecto
 		LoggerWriter:        loggerWr,
 		Locator:             locator,
 		RuleSets:            ruleSets,
+		ActiveRuleSet:       activeRuleSet,
 		IncomingEventsStore: incomingEventsStore,
 		ReportsStore:        reportsStore,
 		DetectedSpamStore:   detectedSpamStore,
@@ -224,21 +233,21 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 		IncomingEvents:      a.IncomingEventsStore,
 		DetectedSpamCounter: a.DetectedSpamStore,
 		ModerationConfig: events.ModerationConfig{
-			FirstStrike:  opts.Moderation.FirstStrike,
-			SecondStrike: opts.Moderation.SecondStrike,
+			FirstStrike:  a.ActiveRuleSet.Moderation.FirstStrike,
+			SecondStrike: a.ActiveRuleSet.Moderation.SecondStrike,
 		},
 		ReportConfig: events.ReportConfig{
 			Storage:          a.ReportsStore,
-			Enabled:          opts.Report.Enabled,
-			Threshold:        opts.Report.Threshold,
-			AutoBanThreshold: opts.Report.AutoBanThreshold,
-			RateLimit:        opts.Report.RateLimit,
-			RatePeriod:       opts.Report.RatePeriod,
+			Enabled:          a.ActiveRuleSet.Reports.Enabled,
+			Threshold:        a.ActiveRuleSet.Reports.Threshold,
+			AutoBanThreshold: a.ActiveRuleSet.Reports.AutoBanThreshold,
+			RateLimit:        a.ActiveRuleSet.Reports.RateLimit,
+			RatePeriod:       a.ActiveRuleSet.Reports.RatePeriod,
 		},
 		TrainingMode:            opts.Training,
-		SoftBanMode:             opts.SoftBan,
+		SoftBanMode:             a.ActiveRuleSet.Moderation.SoftBan,
 		DisableAdminSpamForward: opts.DisableAdminSpamForward,
-		Dry:                     opts.Dry,
+		Dry:                     a.ActiveRuleSet.Moderation.DryRun,
 		AggressiveCleanup:       opts.AggressiveCleanup,
 		AggressiveCleanupLimit:  opts.AggressiveCleanupLimit,
 	}

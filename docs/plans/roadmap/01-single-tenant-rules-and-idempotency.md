@@ -10,7 +10,7 @@
 - [x] Добавить idempotency key для Telegram события на базе `update_id`, `chat_id`, `message_id`, `edited_message_id` и сохранять его в `incoming_events`.
 - [x] Научить pipeline повторно получать уже обработанное решение по idempotency key вместо повторного бана или удаления.
 - [ ] Вынести нормализацию текста из детекторов в отдельный модуль с этапами lower-case, trim, cleanup zero-width, canonical whitespace и script folding hooks.
-- [ ] Перевести текущие проверки из `lib/tgspam` и `app/bot/spam.go` на чтение из `RuleSet`, а не из разрозненных опций runtime.
+- [x] Перевести текущие проверки из `lib/tgspam` и `app/bot/spam.go` на чтение из `RuleSet`, а не из разрозненных опций runtime.
 - [ ] Создать `ActionExecutor` с явными командами `DeleteMessage`, `MuteUser`, `BanUser`, `BanSenderChat`, `WarnUser`.
 - [ ] Добавить журнал исполнения action-команд с retry state, last error и idempotent replay.
 - [ ] Перенести strike escalation и report-based penalties на использование общего `ActionExecutor`, а не разрозненных вызовов из `events`.
@@ -19,6 +19,6 @@
 
 ## Критерий завершения
 
-- [ ] Single-tenant чат продолжает модерироваться без регрессий, но все решения строятся из `RuleSet`.
+- [x] Single-tenant чат продолжает модерироваться без регрессий, но все решения строятся из `RuleSet`.
 - [ ] Повторный Telegram retry не приводит к двойному бану, двойному delete или двойной записи в audit.
 - [ ] Любое решение можно связать с конкретной версией `RuleSet` и idempotency key.
