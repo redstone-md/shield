@@ -17,7 +17,7 @@ Superseded by:
 - [x] Extract Telegram sanction execution into a dedicated action executor used by the worker path
 - [x] Extract moderation decision logic into a policy engine with explicit `allow/delete/restrict/ban` outcomes
 - [x] Extract moderation-result recording into an audit writer used by the worker path
-- [ ] Add tracer-bullet smoke coverage for `ingestion -> queue -> worker -> decision -> audit`
+- [x] Add tracer-bullet smoke coverage for `ingestion -> queue -> worker -> decision -> audit`
 
 ## Context
 
@@ -213,6 +213,7 @@ flowchart LR
 | TST-006 | Telegram action executor applies ban and extra deletions | Unit | Telegram API requests are issued through the executor | `app/events/action_executor_test.go` |
 | TST-007 | Default policy engine returns explicit moderation actions | Unit | `allow/delete/restrict/ban` decisions match current rules | `app/events/policy_test.go` |
 | TST-008 | Default audit writer records actionable spam through current sinks | Unit | `SpamLogger` and locator writes happen through `AuditWriter` | `app/events/audit_writer_test.go` |
+| TST-009 | Listener tracer bullet smoke path | Unit | One update flows through queue, worker, detection, policy, action, and audit in order | `app/events/listener_test.go` |
 
 ### Regression and analysis
 

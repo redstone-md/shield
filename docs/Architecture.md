@@ -130,6 +130,16 @@ classDiagram
 - `telegramActionExecutor` — defined in [app/events/action_executor.go](../app/events/action_executor.go); applies bans/restrictions and message deletions
 - `defaultAuditWriter` — defined in [app/events/audit_writer.go](../app/events/audit_writer.go); records moderation results through current logging and locator sinks
 
+## 7) Verification status
+
+- Phase-0 tracer bullet is covered by [TestTelegramListener_TracerBulletSmoke](../app/events/listener_test.go), which proves:
+  - queue publication from the listener
+  - worker execution
+  - detection
+  - policy decision
+  - action execution
+  - audit recording
+
 ## 4) Dependency rules
 
 - Allowed dependencies:

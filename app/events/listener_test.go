@@ -40,6 +40,81 @@ func (s *processorSpy) Process(ctx context.Context, event moderation.IncomingEve
 	return nil
 }
 
+type policyEngineSpy struct {
+	decide func(ctx context.Context, req PolicyRequest) (PolicyOutcome, error)
+	calls  []PolicyRequest
+}
+
+func (s *policyEngineSpy) Decide(ctx context.Context, req PolicyRequest) (PolicyOutcome, error) {
+	s.calls = append(s.calls, req)
+	if s.decide != nil {
+		return s.decide(ctx, req)
+	}
+	return PolicyOutcome{}, nil
+}
+
+type actionExecutorSpy struct {
+	applyBan           func(req banRequest) error
+	deleteMessage      func(chatID int64, msgID int) error
+	deleteExtra        func(checkResults []spamcheck.Response, userID int64, username string, chatID int64) error
+	banCalls           []banRequest
+	deleteMessageCalls []struct {
+		ChatID int64
+		MsgID  int
+	}
+	deleteExtraCalls []struct {
+		CheckResults []spamcheck.Response
+		UserID       int64
+		Username     string
+		ChatID       int64
+	}
+}
+
+func (s *actionExecutorSpy) ApplyBan(req banRequest) error {
+	s.banCalls = append(s.banCalls, req)
+	if s.applyBan != nil {
+		return s.applyBan(req)
+	}
+	return nil
+}
+
+func (s *actionExecutorSpy) DeleteMessage(chatID int64, msgID int) error {
+	s.deleteMessageCalls = append(s.deleteMessageCalls, struct {
+		ChatID int64
+		MsgID  int
+	}{ChatID: chatID, MsgID: msgID})
+	if s.deleteMessage != nil {
+		return s.deleteMessage(chatID, msgID)
+	}
+	return nil
+}
+
+func (s *actionExecutorSpy) DeleteExtraMessages(checkResults []spamcheck.Response, userID int64, username string, chatID int64) error {
+	s.deleteExtraCalls = append(s.deleteExtraCalls, struct {
+		CheckResults []spamcheck.Response
+		UserID       int64
+		Username     string
+		ChatID       int64
+	}{CheckResults: checkResults, UserID: userID, Username: username, ChatID: chatID})
+	if s.deleteExtra != nil {
+		return s.deleteExtra(checkResults, userID, username, chatID)
+	}
+	return nil
+}
+
+type auditWriterSpy struct {
+	write func(ctx context.Context, record AuditRecord) error
+	calls []AuditRecord
+}
+
+func (s *auditWriterSpy) Write(ctx context.Context, record AuditRecord) error {
+	s.calls = append(s.calls, record)
+	if s.write != nil {
+		return s.write(ctx, record)
+	}
+	return nil
+}
+
 func TestTelegramListener_ProcEventsPublishesIncomingEvent(t *testing.T) {
 	locator, teardown := prepTestLocator(t)
 	defer teardown()
@@ -87,6 +162,108 @@ func TestTelegramListener_ProcEventsPublishesIncomingEvent(t *testing.T) {
 	assert.Equal(t, update, spy.calls[0].Update)
 	assert.NotEmpty(t, got.EventID)
 	assert.NotEmpty(t, got.CorrelationID)
+}
+
+func TestTelegramListener_TracerBulletSmoke(t *testing.T) {
+	callOrder := make([]string, 0, 4)
+
+	mockAPI := &mocks.TbAPIMock{
+		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
+			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+		},
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			return tbapi.Message{}, nil
+		},
+		GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
+			return nil, nil
+		},
+	}
+
+	locator, teardown := prepTestLocator(t)
+	defer teardown()
+
+	botMock := &mocks.BotMock{
+		OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+			callOrder = append(callOrder, "detection")
+			return bot.Response{
+				Send:        true,
+				BanInterval: time.Minute,
+				User:        bot.User{ID: 42, Username: "user"},
+				CheckResults: []spamcheck.Response{
+					{Name: "rule", Spam: true, Details: "smoke spam"},
+				},
+			}
+		},
+	}
+
+	policySpy := &policyEngineSpy{
+		decide: func(ctx context.Context, req PolicyRequest) (PolicyOutcome, error) {
+			callOrder = append(callOrder, "policy")
+			return PolicyOutcome{
+				Decision: moderation.PolicyDecision{
+					EventID:       req.Event.EventID,
+					CorrelationID: req.Event.CorrelationID,
+					Action:        moderation.ActionBan,
+					Reason:        "smoke policy",
+					Score:         1,
+					DecidedAt:     time.Now().UTC(),
+				},
+				Duration: time.Minute,
+			}, nil
+		},
+	}
+
+	actionSpy := &actionExecutorSpy{
+		applyBan: func(req banRequest) error {
+			callOrder = append(callOrder, "action")
+			return nil
+		},
+	}
+
+	auditSpy := &auditWriterSpy{
+		write: func(ctx context.Context, record AuditRecord) error {
+			callOrder = append(callOrder, "audit")
+			return nil
+		},
+	}
+
+	l := TelegramListener{
+		TbAPI:          mockAPI,
+		Bot:            botMock,
+		Group:          "gr",
+		Locator:        locator,
+		NoSpamReply:    true,
+		PolicyEngine:   policySpy,
+		ActionExecutor: actionSpy,
+		AuditWriter:    auditSpy,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	updChan := make(chan tbapi.Update, 1)
+	updChan <- tbapi.Update{
+		Message: &tbapi.Message{
+			MessageID: 55,
+			Chat:      tbapi.Chat{ID: 123},
+			Text:      "spam payload",
+			From:      &tbapi.User{ID: 42, UserName: "user"},
+			Date:      int(time.Now().Unix()),
+		},
+	}
+	close(updChan)
+	mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updChan }
+
+	err := l.Do(ctx)
+	require.EqualError(t, err, "telegram update chan closed")
+
+	assert.Equal(t, []string{"detection", "policy", "action", "audit"}, callOrder)
+	require.Len(t, policySpy.calls, 1)
+	require.Len(t, actionSpy.banCalls, 1)
+	require.Len(t, auditSpy.calls, 1)
+	assert.Equal(t, moderation.ActionBan, auditSpy.calls[0].Decision.Action)
+	assert.Equal(t, "spam payload", auditSpy.calls[0].Message.Text)
+	assert.Equal(t, int64(42), auditSpy.calls[0].SpamUserID)
 }
 
 func TestTelegramListener_Do(t *testing.T) {

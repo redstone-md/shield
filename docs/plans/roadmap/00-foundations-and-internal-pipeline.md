@@ -14,7 +14,7 @@
 - [x] Вынести запись результатов модерации в отдельный `audit writer`, который умеет сохранять входное событие, решение и результат исполнения.
 - [ ] Добавить `event_id` и `correlation_id` в логирование всех шагов пайплайна и протащить их через `app/events`, `app/bot`, `app/storage`, `app/webapi`.
 - [ ] Добавить readiness/health endpoints для основного runtime, а не только для web API.
-- [ ] Собрать smoke-тест на tracer bullet: `Telegram update -> queue -> worker -> detection -> policy -> action -> audit`.
+- [x] Собрать smoke-тест на tracer bullet: `Telegram update -> queue -> worker -> detection -> policy -> action -> audit`.
 - [x] Обновить `docs/ROADMAP.md` или отдельный ADR ссылкой на новые доменные контракты и execution order.
 
 ## Критерий завершения
