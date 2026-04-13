@@ -143,6 +143,7 @@ classDiagram
   - policy decision
   - action execution
   - audit recording
+- Baseline listener behavior is still covered by [TestTelegramListener_Do](../app/events/listener_test.go) and [TestTelegramListener_DoWithBotBan](../app/events/listener_test.go), which stay green through the queue-backed path.
 - Correlation metadata is covered by the moderation-path tests in [app/events/listener_test.go](../app/events/listener_test.go), which prove the same `event_id` and `correlation_id` reach detection, action, audit, and locator calls.
 - Correlation metadata is also covered for `app/webapi` requests in [app/webapi/webapi_test.go](../app/webapi/webapi_test.go), which prove request metadata reaches downstream storage calls and request-scoped logs.
 - Main-runtime probe coverage is in [app/runtime_probe_test.go](../app/runtime_probe_test.go) and [app/main_test.go](../app/main_test.go), which prove the core process exposes `/healthz` and `/readyz` when configured.

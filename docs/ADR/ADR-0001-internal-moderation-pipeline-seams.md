@@ -168,6 +168,7 @@ flowchart LR
 - Prove the new queue seam can publish, consume, and fail safely on close or canceled context.
 - Prove the listener now routes regular messages through the queue worker without breaking the existing tracer-bullet baseline.
 - Prove the same moderation event metadata reaches detection, action, audit, and storage calls in the worker path.
+- Prove the existing listener spam path still behaves the same after moving ingestion onto the internal queue.
 - Keep architecture docs and ADR links aligned with real repo paths.
 
 ### Test environment
@@ -191,6 +192,7 @@ flowchart LR
   - moderation decisions come from the policy engine rather than inline worker branching
   - moderation recording goes through the audit writer rather than inline worker writes
   - moderation `event_id` and `correlation_id` stay attached across detection, action, audit, and storage interactions
+  - existing listener baseline behavior still passes through the queue-backed path
 - Positive flows that MUST pass:
   - queue publish/consume
 - Negative / forbidden flows that MUST be rejected or fail safely:
