@@ -4,9 +4,9 @@
 
 ## Задачи
 
-- [ ] Зафиксировать ADR с mapping текущих пакетов на bounded contexts: `controlplane`, `gateway`, `detection`, `policy`, `audit`.
-- [ ] Описать единый внутренний контракт `IncomingEvent`, `DetectionResult`, `PolicyDecision`, `ModerationActionResult` и положить его в отдельный пакет без Telegram-specific деталей.
-- [ ] Создать интерфейс `Queue` и in-memory реализацию на каналах, чтобы отделить ingestion от обработки без немедленного ввода RabbitMQ/NATS.
+- [x] Зафиксировать ADR с mapping текущих пакетов на bounded contexts: `controlplane`, `gateway`, `detection`, `policy`, `audit`.
+- [x] Описать единый внутренний контракт `IncomingEvent`, `DetectionResult`, `PolicyDecision`, `ModerationActionResult` и положить его в отдельный пакет без Telegram-specific деталей.
+- [x] Создать интерфейс `Queue` и in-memory реализацию на каналах, чтобы отделить ingestion от обработки без немедленного ввода RabbitMQ/NATS.
 - [ ] Перевести `app/events/listener.go` с прямого вызова обработки на публикацию `IncomingEvent` в internal queue.
 - [ ] Создать worker-процессор, который читает событие из queue и вызывает detection, policy и action слои через интерфейсы, а не через связанные напрямую структуры.
 - [ ] Вынести применение санкций из `app/events` в отдельный `action executor`, чтобы `events` отвечал только за Telegram ingestion и transport-specific адаптацию.
@@ -15,7 +15,7 @@
 - [ ] Добавить `event_id` и `correlation_id` в логирование всех шагов пайплайна и протащить их через `app/events`, `app/bot`, `app/storage`, `app/webapi`.
 - [ ] Добавить readiness/health endpoints для основного runtime, а не только для web API.
 - [ ] Собрать smoke-тест на tracer bullet: `Telegram update -> queue -> worker -> detection -> policy -> action -> audit`.
-- [ ] Обновить `docs/ROADMAP.md` или отдельный ADR ссылкой на новые доменные контракты и execution order.
+- [x] Обновить `docs/ROADMAP.md` или отдельный ADR ссылкой на новые доменные контракты и execution order.
 
 ## Критерий завершения
 
