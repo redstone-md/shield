@@ -187,10 +187,11 @@ type options struct {
 	} `group:"message" namespace:"message" env-namespace:"MESSAGE"`
 
 	Server struct {
-		Enabled    bool   `long:"enabled" env:"ENABLED" description:"enable web server"`
-		ListenAddr string `long:"listen" env:"LISTEN" default:":8080" description:"listen address"`
-		AuthPasswd string `long:"auth" env:"AUTH" default:"auto" description:"basic auth password for user 'tg-spam'"`
-		AuthHash   string `long:"auth-hash" env:"AUTH_HASH" default:"" description:"basic auth password hash for user 'tg-spam'"`
+		Enabled         bool   `long:"enabled" env:"ENABLED" description:"enable web server"`
+		ListenAddr      string `long:"listen" env:"LISTEN" default:":8080" description:"listen address"`
+		ProbeListenAddr string `long:"probe-listen" env:"PROBE_LISTEN" default:"" description:"listen address for runtime health/readiness probes"`
+		AuthPasswd      string `long:"auth" env:"AUTH" default:"auto" description:"basic auth password for user 'tg-spam'"`
+		AuthHash        string `long:"auth-hash" env:"AUTH_HASH" default:"" description:"basic auth password hash for user 'tg-spam'"`
 	} `group:"server" namespace:"server" env-namespace:"SERVER"`
 
 	Training bool `long:"training" env:"TRAINING" description:"training mode, passive spam detection only"`
@@ -300,6 +301,12 @@ func execute(ctx context.Context, opts options) error {
 		return fmt.Errorf("can't make db, %w", err)
 	}
 
+	runtimeProbe := newRuntimeProbe(opts.InstanceID, revision)
+	if probeErr := activateRuntimeProbe(ctx, opts.Server.ProbeListenAddr, runtimeProbe); probeErr != nil {
+		return fmt.Errorf("can't activate runtime probe server, %w", probeErr)
+	}
+	defer runtimeProbe.SetReady(false)
+
 	// make detector with all sample files loaded
 	detector := makeDetector(opts)
 
@@ -346,6 +353,7 @@ func execute(ctx context.Context, opts options) error {
 		if srvErr := activateServer(ctx, opts, spamBot, locator, dataDB, nil, ""); srvErr != nil {
 			return fmt.Errorf("can't activate web server, %w", srvErr)
 		}
+		runtimeProbe.SetReady(true)
 		log.Printf("[WARN] no telegram token and group set, web server only mode")
 		<-ctx.Done()
 		return nil
@@ -435,6 +443,7 @@ func execute(ctx context.Context, opts options) error {
 			return fmt.Errorf("can't activate web server, %w", srvErr)
 		}
 	}
+	runtimeProbe.SetReady(true)
 
 	// run telegram listener and event processor loop
 	if err := tgListener.Do(ctx); err != nil { //nolint:staticcheck // do() runs infinite loop, always returns error on exit

@@ -13,7 +13,7 @@
 - [x] Вынести расчёт policy decision из `app/events` в отдельный пакет с минимальным правилом `allow/delete/restrict/ban`.
 - [x] Вынести запись результатов модерации в отдельный `audit writer`, который умеет сохранять входное событие, решение и результат исполнения.
 - [x] Добавить `event_id` и `correlation_id` в логирование всех шагов пайплайна и протащить их через `app/events`, `app/bot`, `app/storage`, `app/webapi`.
-- [ ] Добавить readiness/health endpoints для основного runtime, а не только для web API.
+- [x] Добавить readiness/health endpoints для основного runtime, а не только для web API.
 - [x] Собрать smoke-тест на tracer bullet: `Telegram update -> queue -> worker -> detection -> policy -> action -> audit`.
 - [x] Обновить `docs/ROADMAP.md` или отдельный ADR ссылкой на новые доменные контракты и execution order.
 

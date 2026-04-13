@@ -215,6 +215,7 @@ func Test_activateServerOnly(t *testing.T) {
 	var opts options
 	opts.Server.Enabled = true
 	opts.Server.ListenAddr = ":9988"
+	opts.Server.ProbeListenAddr = ":9989"
 	opts.Server.AuthPasswd = "auto"
 	opts.InstanceID = "gr1"
 	opts.DataBaseURL = fmt.Sprintf("sqlite://%s", path.Join(t.TempDir(), "tg-spam.db"))
@@ -258,6 +259,17 @@ func Test_activateServerOnly(t *testing.T) {
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Equal(t, "pong", string(body))
+
+	healthResp, err := http.Get("http://localhost:9989/healthz")
+	require.NoError(t, err)
+	defer healthResp.Body.Close()
+	assert.Equal(t, http.StatusOK, healthResp.StatusCode)
+
+	readyResp, err := http.Get("http://localhost:9989/readyz")
+	require.NoError(t, err)
+	defer readyResp.Body.Close()
+	assert.Equal(t, http.StatusOK, readyResp.StatusCode)
+
 	cancel()
 	<-done
 }

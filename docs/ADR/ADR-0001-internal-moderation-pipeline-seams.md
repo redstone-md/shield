@@ -20,6 +20,7 @@ Superseded by:
 - [x] Add tracer-bullet smoke coverage for `ingestion -> queue -> worker -> decision -> audit`
 - [x] Propagate moderation `event_id` and `correlation_id` through the in-process tracer-bullet path
 - [x] Propagate request `event_id` and `correlation_id` through `app/webapi`
+- [x] Add `/healthz` and `/readyz` probes for the main runtime
 
 ## Context
 
@@ -43,6 +44,7 @@ Superseded by:
 - Keep the runtime as a modular monolith and introduce an internal moderation seam through a transport-neutral `app/moderation` package plus an in-memory queue abstraction.
 - Carry `event_id` and `correlation_id` in `context.Context` for the moderation worker path so downstream detection, action, and storage logs can correlate a single event without widening every public interface.
 - Carry request `event_id` and `correlation_id` in `context.Context` for `app/webapi` so request-scoped storage calls and diagnostics correlate to the same operator action.
+- Expose runtime health and readiness from `app/main` independently of `app/webapi` so Telegram-first deployments still have probe endpoints.
 
 Key points:
 

@@ -131,6 +131,7 @@ classDiagram
 - `defaultAuditWriter` — defined in [app/events/audit_writer.go](../app/events/audit_writer.go); records moderation results through current logging and locator sinks
 - `app/observability` metadata helper — defined in [app/observability/context.go](../app/observability/context.go); carries `event_id` and `correlation_id` through the moderation tracer-bullet path
 - `app/webapi` request metadata middleware — defined in [app/webapi/webapi.go](../app/webapi/webapi.go); attaches `event_id` and `correlation_id` to request context and response headers
+- `runtimeProbe` — defined in [app/runtime_probe.go](../app/runtime_probe.go); exposes `/healthz` and `/readyz` for the main process independently of `app/webapi`
 
 ## 7) Verification status
 
@@ -143,6 +144,7 @@ classDiagram
   - audit recording
 - Correlation metadata is covered by the moderation-path tests in [app/events/listener_test.go](../app/events/listener_test.go), which prove the same `event_id` and `correlation_id` reach detection, action, audit, and locator calls.
 - Correlation metadata is also covered for `app/webapi` requests in [app/webapi/webapi_test.go](../app/webapi/webapi_test.go), which prove request metadata reaches downstream storage calls and request-scoped logs.
+- Main-runtime probe coverage is in [app/runtime_probe_test.go](../app/runtime_probe_test.go) and [app/main_test.go](../app/main_test.go), which prove the core process exposes `/healthz` and `/readyz` when configured.
 
 ## 4) Dependency rules
 
