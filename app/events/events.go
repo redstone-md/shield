@@ -166,20 +166,6 @@ func send(tbMsg tbapi.Chattable, tbAPI TbAPI) error {
 	return nil
 }
 
-type banRequest struct {
-	tbAPI TbAPI
-
-	userID    int64
-	channelID int64
-	chatID    int64
-	duration  time.Duration
-	userName  string
-
-	dry      bool
-	training bool // training mode, do not do the actual ban
-	restrict bool // restrict instead of ban
-}
-
 func spamPenalty(strikes int, keepRestricted bool, cfg ModerationConfig) (duration time.Duration, restrict bool) {
 	firstStrike := cfg.FirstStrike
 	if firstStrike <= 0 {
@@ -249,103 +235,6 @@ func reportStatusText(duration time.Duration, restrict, dry bool) string {
 		}
 		return "Репорт подтвержден. Пользователь ограничен."
 	}
-}
-
-// The bot must be an administrator in the supergroup for this to work
-// and must have the appropriate admin rights.
-// If channel is provided, it is banned instead of provided user, permanently.
-func banUserOrChannel(r banRequest) error {
-	// from Telegram Bot API documentation:
-	// > If user is restricted for more than 366 days or less than 30 seconds from the current time,
-	// > they are considered to be restricted forever
-	// because the API query uses unix timestamp rather than "ban duration",
-	// you do not want to accidentally get into this 30-second window of a lifetime ban.
-	// in practice BanDuration is equal to ten minutes,
-	// so this `if` statement is unlikely to be evaluated to true.
-
-	bannedEntity := fmt.Sprintf("user %d", r.userID)
-	if r.channelID != 0 {
-		bannedEntity = fmt.Sprintf("channel %d", r.channelID)
-	}
-	if r.dry {
-		log.Printf("[INFO] dry run: ban %s for %v", bannedEntity, r.duration)
-		return nil
-	}
-
-	if r.training {
-		log.Printf("[INFO] training mode: ban %s for %v", bannedEntity, r.duration)
-		return nil
-	}
-
-	if r.duration < 30*time.Second {
-		r.duration = 1 * time.Minute
-	}
-
-	// channel ban takes precedence over soft ban - channels can't be "restricted",
-	// they must be banned/unbanned via BanChatSenderChatConfig/UnbanChatSenderChatConfig
-	if r.channelID != 0 {
-		resp, err := r.tbAPI.Request(tbapi.BanChatSenderChatConfig{
-			ChatConfig:   tbapi.ChatConfig{ChatID: r.chatID},
-			SenderChatID: r.channelID,
-			UntilDate:    int(time.Now().Add(r.duration).Unix()),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to ban channel: %w", err)
-		}
-		if !resp.Ok {
-			return fmt.Errorf("response is not Ok: %v", string(resp.Result))
-		}
-		log.Printf("[INFO] channel %s banned by bot for %v", r.userName, r.duration)
-		return nil
-	}
-
-	if r.restrict { // soft ban mode - restrict user permissions
-		resp, err := r.tbAPI.Request(tbapi.RestrictChatMemberConfig{
-			ChatMemberConfig: tbapi.ChatMemberConfig{
-				ChatConfig: tbapi.ChatConfig{ChatID: r.chatID},
-				UserID:     r.userID,
-			},
-			UntilDate: time.Now().Add(r.duration).Unix(),
-			Permissions: &tbapi.ChatPermissions{
-				CanSendMessages:      false,
-				CanSendAudios:        false,
-				CanSendDocuments:     false,
-				CanSendPhotos:        false,
-				CanSendVideos:        false,
-				CanSendVideoNotes:    false,
-				CanSendVoiceNotes:    false,
-				CanSendOtherMessages: false,
-				CanChangeInfo:        false,
-				CanInviteUsers:       false,
-				CanPinMessages:       false,
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("failed to restrict user: %w", err)
-		}
-		if !resp.Ok {
-			return fmt.Errorf("response is not Ok: %v", string(resp.Result))
-		}
-		log.Printf("[INFO] %s restricted by bot for %v", r.userName, r.duration)
-		return nil
-	}
-
-	resp, err := r.tbAPI.Request(tbapi.BanChatMemberConfig{
-		ChatMemberConfig: tbapi.ChatMemberConfig{
-			ChatConfig: tbapi.ChatConfig{ChatID: r.chatID},
-			UserID:     r.userID,
-		},
-		UntilDate: time.Now().Add(r.duration).Unix(),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to ban user: %w", err)
-	}
-	if !resp.Ok {
-		return fmt.Errorf("response is not Ok: %v", string(resp.Result))
-	}
-
-	log.Printf("[INFO] user %s banned by bot for %v", r.userName, r.duration)
-	return nil
 }
 
 // transform converts telegram message to internal message format.

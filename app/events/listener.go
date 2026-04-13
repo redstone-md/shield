@@ -21,7 +21,6 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
 // TelegramListener listens to tg update, forward to bots and send back responses
@@ -54,6 +53,7 @@ type TelegramListener struct {
 	AggressiveCleanup       bool         // delete all messages from user when banned via /spam command
 	AggressiveCleanupLimit  int          // max messages to delete in aggressive cleanup mode
 	Queue                   moderation.Queue
+	ActionExecutor          ActionExecutor
 
 	adminHandler    *admin
 	reportsHandler  *userReports
@@ -612,38 +612,6 @@ func (l *TelegramListener) updateSupers() error {
 
 	log.Printf("[INFO] added admins, full list of supers: {%s}", strings.Join(l.SuperUsers, ", "))
 	return nil
-}
-
-// deleteExtraMessages deletes additional messages specified in check results (e.g., duplicate messages)
-func (l *TelegramListener) deleteExtraMessages(checkResults []spamcheck.Response, userID int64, username string, chatID int64) {
-	if len(checkResults) == 0 || l.Dry || l.TrainingMode {
-		return
-	}
-
-	// don't delete messages from superusers
-	if l.SuperUsers.IsSuper(username, userID) {
-		log.Printf("[DEBUG] skip extra deletions for superuser %s (%d)", username, userID)
-		return
-	}
-
-	for _, checkResult := range checkResults {
-		if !checkResult.Spam || len(checkResult.ExtraDeleteIDs) == 0 {
-			continue
-		}
-
-		log.Printf("[INFO] deleting %d extra messages from user %d", len(checkResult.ExtraDeleteIDs), userID)
-		for _, msgID := range checkResult.ExtraDeleteIDs {
-			// add small delay to avoid rate limiting
-			time.Sleep(35 * time.Millisecond)
-			if _, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-				MessageID:  msgID,
-				ChatConfig: tbapi.ChatConfig{ChatID: chatID},
-			}}); err != nil {
-				// don't fail the whole operation if some messages can't be deleted
-				log.Printf("[WARN] failed to delete extra message %d: %v", msgID, err)
-			}
-		}
-	}
 }
 
 // SuperUsers for moderators. Can be either username or user ID.

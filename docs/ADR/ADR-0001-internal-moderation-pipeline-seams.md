@@ -14,6 +14,7 @@ Superseded by:
 - [x] Create the initial architecture overview in `docs/Architecture.md`
 - [x] Rewire `app/events/listener.go` to publish `IncomingEvent` instead of invoking the moderation flow directly
 - [x] Add a worker that consumes from the queue and calls detection, policy, action, and audit layers through interfaces
+- [x] Extract Telegram sanction execution into a dedicated action executor used by the worker path
 - [ ] Add tracer-bullet smoke coverage for `ingestion -> queue -> worker -> decision -> audit`
 
 ## Context
@@ -42,6 +43,7 @@ Key points:
 - Map the current repository to five roadmap bounded contexts without splitting deployables yet: `controlplane`, `gateway`, `detection`, `policy`, and `audit`.
 - Treat `app/events` as the current `gateway` boundary responsible for Telegram-specific ingestion, adaptation, queue publication, and the temporary in-process worker.
 - Treat `app/bot` and `lib/tgspam` as the current `detection` boundary.
+- Treat the action executor under `app/events` as the first extracted action boundary until it becomes large enough for its own package.
 - Introduce policy and action contracts explicitly so later steps can move moderation decisions out of `app/events`.
 - Start with an in-memory queue so the async seam exists before infrastructure dependencies are introduced.
 
@@ -63,7 +65,7 @@ flowchart LR
   Queue --> Worker[events worker]
   Worker --> Detection
   Detection --> Policy
-  Policy --> Action
+  Policy --> Action[telegram action executor]
   Policy --> Audit
   Action --> Audit
   Control --> Audit
@@ -119,6 +121,7 @@ flowchart LR
 - New boundaries / responsibilities:
   - `app/moderation` owns cross-stage moderation contracts and queue seam
   - `app/events` now owns Telegram-specific ingestion plus the in-process queue worker adapter
+  - `app/events/action_executor.go` owns Telegram sanction application primitives
 - Feature flags / toggles:
   - None in this slice
 
@@ -169,6 +172,7 @@ flowchart LR
   - canceled context aborts publish
   - `procEvents` publishes a transport-neutral `IncomingEvent`
   - existing listener baseline test still passes through the worker-backed path
+  - sanction application goes through the executor abstraction
 - Positive flows that MUST pass:
   - queue publish/consume
 - Negative / forbidden flows that MUST be rejected or fail safely:
@@ -198,6 +202,7 @@ flowchart LR
 | TST-003 | Publish after queue close | Unit | `ErrQueueClosed` returned | `app/moderation/queue_test.go` |
 | TST-004 | Existing listener baseline | Unit | `TestTelegramListener_Do` stays green | `app/events/listener_test.go` |
 | TST-005 | Listener publishes `IncomingEvent` contract | Unit | Worker processor receives normalized contract + original update | `app/events/listener_test.go` |
+| TST-006 | Telegram action executor applies ban and extra deletions | Unit | Telegram API requests are issued through the executor | `app/events/action_executor_test.go` |
 
 ### Regression and analysis
 

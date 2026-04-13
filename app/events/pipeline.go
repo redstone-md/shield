@@ -99,6 +99,10 @@ func (l *TelegramListener) ensurePipeline() {
 	if l.processor == nil {
 		l.processor = listenerEventProcessor{listener: l}
 	}
+	if l.ActionExecutor == nil {
+		exec := newTelegramActionExecutor(l.TbAPI, l.Dry, l.TrainingMode, l.SuperUsers)
+		l.ActionExecutor = exec
+	}
 	l.pipeline.pending = make(map[string]pendingIncomingEvent)
 	l.pipeline.running = true
 	l.pipeline.worker.Add(1)
@@ -325,24 +329,23 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 		}
 
 		banReq := banRequest{duration: duration, userID: resp.User.ID, channelID: resp.ChannelID, userName: banUserStr,
-			chatID: fromChat, dry: l.Dry, training: l.TrainingMode, tbAPI: l.TbAPI, restrict: restrict}
-		if err := banUserOrChannel(banReq); err != nil {
+			chatID: fromChat, dry: l.Dry, training: l.TrainingMode, restrict: restrict}
+		if err := l.ActionExecutor.ApplyBan(banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban %s: %w", banUserStr, err))
 		} else if l.adminChatID != 0 && msg.From.ID != 0 {
 			l.adminHandler.ReportBan(banUserStr, msg, duration, restrict)
 		}
 	}
 
-	l.deleteExtraMessages(resp.CheckResults, msg.From.ID, msg.From.Username, fromChat)
+	if err := l.ActionExecutor.DeleteExtraMessages(resp.CheckResults, msg.From.ID, msg.From.Username, fromChat); err != nil {
+		errs = multierror.Append(errs, err)
+	}
 
 	canDelete := resp.DeleteReplyTo && resp.ReplyTo != 0 && !l.Dry &&
 		!l.SuperUsers.IsSuper(msg.From.Username, msg.From.ID) && !l.TrainingMode
 	if canDelete {
-		if _, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID:  resp.ReplyTo,
-			ChatConfig: tbapi.ChatConfig{ChatID: l.chatID},
-		}}); err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("failed to delete message %d: %w", resp.ReplyTo, err))
+		if err := l.ActionExecutor.DeleteMessage(l.chatID, resp.ReplyTo); err != nil {
+			errs = multierror.Append(errs, err)
 		}
 	}
 
