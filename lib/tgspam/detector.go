@@ -24,6 +24,7 @@ import (
 
 	"github.com/umputun/tg-spam/lib/approved"
 	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/umputun/tg-spam/lib/textnorm"
 	"github.com/umputun/tg-spam/lib/tgspam/plugin"
 )
 
@@ -1043,7 +1044,7 @@ func (d *Detector) isSpamClassified(msg string) spamcheck.Response {
 // otherwise substring match is used.
 func (d *Detector) isStopWord(msg string, req spamcheck.Request) spamcheck.Response {
 	// check message text
-	cleanMsg := normalizeSpaces(cleanEmoji(strings.ToLower(msg)))
+	cleanMsg := normalizeLookupText(cleanEmoji(msg))
 	for _, word := range d.stopWords { // stop words are already lowercased
 		if matchStopWord(cleanMsg, word) {
 			return spamcheck.Response{Name: "stopword", Spam: true, Details: strings.TrimPrefix(word, "=")}
@@ -1059,7 +1060,7 @@ func (d *Detector) isStopWord(msg string, req spamcheck.Request) spamcheck.Respo
 		names = append(names, req.UserID)
 	}
 	for _, name := range names {
-		normalizedName := normalizeSpaces(strings.ToLower(name))
+		normalizedName := normalizeLookupText(name)
 		for _, word := range d.stopWords {
 			if matchStopWord(normalizedName, word) {
 				return spamcheck.Response{Name: "stopword", Spam: true, Details: strings.TrimPrefix(word, "=")}
@@ -1079,11 +1080,11 @@ func matchStopWord(text, word string) bool {
 		if checkWord == "" {
 			return false // skip invalid "=" only pattern
 		}
-		normalizedWord := normalizeSpaces(checkWord) // word already lowercased at load time
+		normalizedWord := normalizeLookupText(checkWord) // word already lowercased at load time
 		return text == normalizedWord
 	}
 	// substring match
-	normalizedWord := normalizeSpaces(word) // word already lowercased at load time
+	normalizedWord := normalizeLookupText(word) // word already lowercased at load time
 	return strings.Contains(text, normalizedWord)
 }
 
@@ -1228,20 +1229,7 @@ func (d *Detector) isAbnormalSpacing(msg string) spamcheck.Response {
 
 // cleanText removes control and format characters from a given text
 func (d *Detector) cleanText(text string) string {
-	var result strings.Builder
-	result.Grow(len(text))
-	for _, r := range text {
-		// skip control and format characters
-		if unicode.Is(unicode.Cc, r) || unicode.Is(unicode.Cf, r) {
-			continue
-		}
-		// skip specific ranges of invisible characters
-		if (r >= 0x200B && r <= 0x200F) || (r >= 0x2060 && r <= 0x206F) {
-			continue
-		}
-		result.WriteRune(r)
-	}
-	return result.String()
+	return textnorm.New(textnorm.Options{StripInvisible: true}).Normalize(text)
 }
 
 func (d *Detector) ctxWithStoreTimeout() (context.Context, context.CancelFunc) {
@@ -1271,5 +1259,13 @@ func countEmoji(s string) int {
 
 // normalizeSpaces collapses multiple consecutive spaces into a single space
 func normalizeSpaces(s string) string {
-	return strings.Join(strings.Fields(s), " ")
+	return textnorm.New(textnorm.Options{Trim: true, CanonicalWhitespace: true}).Normalize(s)
+}
+
+func normalizeLookupText(text string) string {
+	return textnorm.New(textnorm.Options{
+		LowerCase:           true,
+		Trim:                true,
+		CanonicalWhitespace: true,
+	}).Normalize(text)
 }

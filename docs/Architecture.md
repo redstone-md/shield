@@ -109,6 +109,7 @@ classDiagram
 - `app/events` — Telegram ingestion, queue publication, in-process worker, policy evaluation, action execution, audit writing, and high-level event orchestration; code: [app/events/](../app/events/); entry points: [listener.go](../app/events/listener.go), [pipeline.go](../app/events/pipeline.go), [policy.go](../app/events/policy.go), [action_executor.go](../app/events/action_executor.go), [audit_writer.go](../app/events/audit_writer.go), [events.go](../app/events/events.go); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
 - `app/bot` — moderation-facing bot interface and current detection orchestration; code: [app/bot/](../app/bot/); entry point: [spam.go](../app/bot/spam.go)
 - `lib/tgspam` — reusable spam detection heuristics and optional LLM integrations; code: [lib/tgspam/](../lib/tgspam/)
+- `lib/textnorm` — shared text normalization stages for detector-facing cleanup and future script folding; code: [lib/textnorm/](../lib/textnorm/)
 - `app/storage` — persistence for samples, reports, detected spam, locators, bootstrap rule sets, and ingress `incoming_events`; code: [app/storage/](../app/storage/)
 - `app/webapi` — server-rendered admin UI and HTTP endpoints; code: [app/webapi/](../app/webapi/)
 - `app/moderation` — transport-neutral moderation contracts and internal queue seam for roadmap phase 0; code: [app/moderation/](../app/moderation/); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
@@ -138,6 +139,7 @@ classDiagram
 - `IncomingEvents` — defined in [app/storage/incoming_events.go](../app/storage/incoming_events.go); durable ingress ledger keyed by Telegram idempotency key before queue publication
 - `IncomingEvents` replay snapshot — stored in [app/storage/incoming_events.go](../app/storage/incoming_events.go); captures completed decision/action state so duplicate Telegram retries can short-circuit before worker execution
 - Active runtime `RuleSet` — loaded in [app/runtime_assembly.go](../app/runtime_assembly.go); now drives detector flags plus listener moderation/report configuration
+- `textnorm.Normalizer` — defined in [lib/textnorm/normalizer.go](../lib/textnorm/normalizer.go); centralizes lower-case, trim, invisible-character cleanup, canonical whitespace, and script-fold hooks
 
 ## 7) Verification status
 
@@ -156,6 +158,7 @@ classDiagram
 - Incoming-event ingress coverage is in [app/storage/incoming_events_test.go](../app/storage/incoming_events_test.go) and [app/events/listener_test.go](../app/events/listener_test.go), which prove deterministic Telegram idempotency keys and idempotent persistence before queue publication.
 - Replay coverage is in [app/storage/incoming_events_test.go](../app/storage/incoming_events_test.go) and [app/events/listener_test.go](../app/events/listener_test.go), which prove completed moderation snapshots are persisted and duplicate retries do not re-enter the worker.
 - Active-rule-set runtime coverage is in [app/main_test.go](../app/main_test.go), which proves a persisted active `RuleSet` overrides bootstrap defaults for detector behavior and listener moderation/report settings.
+- Text-normalization seam coverage is in [lib/textnorm/normalizer_test.go](../lib/textnorm/normalizer_test.go) plus the existing detector cleanup tests in [lib/tgspam/detector_test.go](../lib/tgspam/detector_test.go).
 
 ## 4) Dependency rules
 
