@@ -55,6 +55,7 @@ type TelegramListener struct {
 	Queue                   moderation.Queue
 	ActionExecutor          ActionExecutor
 	PolicyEngine            PolicyEngine
+	AuditWriter             AuditWriter
 
 	adminHandler    *admin
 	reportsHandler  *userReports

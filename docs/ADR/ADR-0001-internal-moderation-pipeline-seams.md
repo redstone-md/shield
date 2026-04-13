@@ -16,6 +16,7 @@ Superseded by:
 - [x] Add a worker that consumes from the queue and calls detection, policy, action, and audit layers through interfaces
 - [x] Extract Telegram sanction execution into a dedicated action executor used by the worker path
 - [x] Extract moderation decision logic into a policy engine with explicit `allow/delete/restrict/ban` outcomes
+- [x] Extract moderation-result recording into an audit writer used by the worker path
 - [ ] Add tracer-bullet smoke coverage for `ingestion -> queue -> worker -> decision -> audit`
 
 ## Context
@@ -46,6 +47,7 @@ Key points:
 - Treat `app/bot` and `lib/tgspam` as the current `detection` boundary.
 - Treat the policy engine under `app/events` as the first extracted policy boundary for the modular monolith.
 - Treat the action executor under `app/events` as the first extracted action boundary until it becomes large enough for its own package.
+- Treat the audit writer under `app/events` as the first extracted audit boundary until richer persistence is split further.
 - Introduce policy and action contracts explicitly so later steps can move moderation decisions out of `app/events`.
 - Start with an in-memory queue so the async seam exists before infrastructure dependencies are introduced.
 
@@ -68,7 +70,7 @@ flowchart LR
   Worker --> Detection
   Detection --> Policy[policy engine]
   Policy --> Action[telegram action executor]
-  Policy --> Audit
+  Policy --> Audit[audit writer]
   Action --> Audit
   Control --> Audit
 ```
@@ -125,6 +127,7 @@ flowchart LR
   - `app/events` now owns Telegram-specific ingestion plus the in-process queue worker adapter
   - `app/events/policy.go` owns minimal moderation decision logic
   - `app/events/action_executor.go` owns Telegram sanction application primitives
+  - `app/events/audit_writer.go` owns moderation-result recording
 - Feature flags / toggles:
   - None in this slice
 
@@ -177,6 +180,7 @@ flowchart LR
   - existing listener baseline test still passes through the worker-backed path
   - sanction application goes through the executor abstraction
   - moderation decisions come from the policy engine rather than inline worker branching
+  - moderation recording goes through the audit writer rather than inline worker writes
 - Positive flows that MUST pass:
   - queue publish/consume
 - Negative / forbidden flows that MUST be rejected or fail safely:
@@ -208,6 +212,7 @@ flowchart LR
 | TST-005 | Listener publishes `IncomingEvent` contract | Unit | Worker processor receives normalized contract + original update | `app/events/listener_test.go` |
 | TST-006 | Telegram action executor applies ban and extra deletions | Unit | Telegram API requests are issued through the executor | `app/events/action_executor_test.go` |
 | TST-007 | Default policy engine returns explicit moderation actions | Unit | `allow/delete/restrict/ban` decisions match current rules | `app/events/policy_test.go` |
+| TST-008 | Default audit writer records actionable spam through current sinks | Unit | `SpamLogger` and locator writes happen through `AuditWriter` | `app/events/audit_writer_test.go` |
 
 ### Regression and analysis
 
