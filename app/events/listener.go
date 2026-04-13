@@ -54,6 +54,7 @@ type TelegramListener struct {
 	AggressiveCleanupLimit  int          // max messages to delete in aggressive cleanup mode
 	Queue                   moderation.Queue
 	ActionExecutor          ActionExecutor
+	PolicyEngine            PolicyEngine
 
 	adminHandler    *admin
 	reportsHandler  *userReports

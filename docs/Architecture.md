@@ -54,6 +54,7 @@ flowchart LR
   Queue[[app/moderation.Queue]]
   Event[[app/moderation.IncomingEvent]]
   Worker[app/events worker]
+  Policy[app/events policy engine]
   Detection[app/bot]
   ActionExec[app/events action executor]
   DetectorLib[lib/tgspam]
@@ -64,6 +65,7 @@ flowchart LR
   Gateway --publishes to--> Queue
   Queue --consumed by--> Worker
   Worker --calls--> Detection
+  Worker --calls--> Policy
   Worker --calls--> ActionExec
   Detection --uses--> DetectorLib
   Gateway --reads/writes--> Storage
@@ -82,11 +84,13 @@ classDiagram
   class Queue
   class InMemoryQueue
   class listenerEventProcessor
+  class defaultPolicyEngine
   class telegramActionExecutor
 
   TelegramListener --> Queue : publishes to
   Queue <|.. InMemoryQueue : implemented by
   TelegramListener --> listenerEventProcessor : worker uses
+  listenerEventProcessor --> defaultPolicyEngine : asks for decision
   listenerEventProcessor --> telegramActionExecutor : applies actions through
   Queue --> IncomingEvent : transports
   IncomingEvent --> DetectionResult : analyzed into
@@ -98,7 +102,7 @@ classDiagram
 
 ### 3.1 Modules
 
-- `app/events` — Telegram ingestion, queue publication, in-process worker, action execution, and high-level event orchestration; code: [app/events/](../app/events/); entry points: [listener.go](../app/events/listener.go), [pipeline.go](../app/events/pipeline.go), [action_executor.go](../app/events/action_executor.go), [events.go](../app/events/events.go); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
+- `app/events` — Telegram ingestion, queue publication, in-process worker, policy evaluation, action execution, and high-level event orchestration; code: [app/events/](../app/events/); entry points: [listener.go](../app/events/listener.go), [pipeline.go](../app/events/pipeline.go), [policy.go](../app/events/policy.go), [action_executor.go](../app/events/action_executor.go), [events.go](../app/events/events.go); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
 - `app/bot` — moderation-facing bot interface and current detection orchestration; code: [app/bot/](../app/bot/); entry point: [spam.go](../app/bot/spam.go)
 - `lib/tgspam` — reusable spam detection heuristics and optional LLM integrations; code: [lib/tgspam/](../lib/tgspam/)
 - `app/storage` — persistence for samples, reports, detected spam, and locators; code: [app/storage/](../app/storage/)
@@ -118,6 +122,7 @@ classDiagram
 - `IncomingEvent` — defined in [app/moderation/contracts.go](../app/moderation/contracts.go); used by future gateway/worker seam
 - `InMemoryQueue` — defined in [app/moderation/queue.go](../app/moderation/queue.go); used by phase-0 tracer-bullet wiring
 - `listenerEventProcessor` — defined in [app/events/pipeline.go](../app/events/pipeline.go); adapts queued moderation events back into the current runtime flow
+- `defaultPolicyEngine` — defined in [app/events/policy.go](../app/events/policy.go); converts detection results into explicit moderation decisions
 - `telegramActionExecutor` — defined in [app/events/action_executor.go](../app/events/action_executor.go); applies bans/restrictions and message deletions
 
 ## 4) Dependency rules

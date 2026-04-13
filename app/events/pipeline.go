@@ -103,6 +103,9 @@ func (l *TelegramListener) ensurePipeline() {
 		exec := newTelegramActionExecutor(l.TbAPI, l.Dry, l.TrainingMode, l.SuperUsers)
 		l.ActionExecutor = exec
 	}
+	if l.PolicyEngine == nil {
+		l.PolicyEngine = defaultPolicyEngine{}
+	}
 	l.pipeline.pending = make(map[string]pendingIncomingEvent)
 	l.pipeline.running = true
 	l.pipeline.worker.Add(1)
@@ -288,9 +291,6 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 	}
 
 	resp := l.Bot.OnMessage(*msg, false)
-	if !resp.Send {
-		return nil
-	}
 
 	if resp.Send && !l.NoSpamReply && !l.TrainingMode {
 		if err := l.sendBotResponse(resp, fromChat, NotificationSilent); err != nil {
@@ -299,41 +299,71 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 	}
 
 	errs := new(multierror.Error)
+	spamUserID := msg.From.ID
+	if msg.SenderChat.ID != 0 {
+		spamUserID = msg.SenderChat.ID
+	}
+	banUserStr := l.getBanUsername(resp, update)
 	if resp.Send && resp.BanInterval > 0 {
-		log.Printf("[DEBUG] event_id=%s correlation_id=%s ban initiated for %+v", event.EventID, event.CorrelationID, resp)
 		l.SpamLogger.Save(msg, &resp)
-		spamUserID := msg.From.ID
-		if msg.SenderChat.ID != 0 {
-			spamUserID = msg.SenderChat.ID
-		}
 		if err := l.Locator.AddSpam(ctx, spamUserID, resp.CheckResults); err != nil {
 			log.Printf("[WARN] failed to add spam to locator: %v", err)
 		}
-		banUserStr := l.getBanUsername(resp, update)
+	}
 
-		if l.SuperUsers.IsSuper(msg.From.Username, msg.From.ID) {
-			if l.TrainingMode {
-				l.adminHandler.ReportBan(banUserStr, msg, resp.BanInterval, l.SoftBanMode)
-			}
-			log.Printf("[DEBUG] superuser %s requested ban, ignored", banUserStr)
-			return nil
+	strikeCount := 0
+	if spamUserID != 0 && l.DetectedSpamCounter != nil {
+		if count, countErr := l.DetectedSpamCounter.CountByUserID(ctx, spamUserID); countErr != nil {
+			log.Printf("[WARN] failed to count spam strikes for user %d: %v", spamUserID, countErr)
+		} else {
+			strikeCount = count
 		}
+	}
 
-		duration, restrict := resp.BanInterval, l.SoftBanMode
-		if spamUserID != 0 && l.DetectedSpamCounter != nil {
-			if count, countErr := l.DetectedSpamCounter.CountByUserID(ctx, spamUserID); countErr != nil {
-				log.Printf("[WARN] failed to count spam strikes for user %d: %v", spamUserID, countErr)
-			} else {
-				duration, restrict = spamPenalty(count, l.SoftBanMode, l.ModerationConfig)
-			}
+	policyOutcome, policyErr := l.PolicyEngine.Decide(ctx, PolicyRequest{
+		Event:         event,
+		Response:      resp,
+		Message:       msg,
+		SpamUserID:    spamUserID,
+		StrikeCount:   strikeCount,
+		UseEscalation: spamUserID != 0 && l.DetectedSpamCounter != nil,
+		SoftBanMode:   l.SoftBanMode,
+		Moderation:    l.ModerationConfig,
+		IsSuperUser:   l.SuperUsers.IsSuper(msg.From.Username, msg.From.ID),
+	})
+	if policyErr != nil {
+		return fmt.Errorf("policy decision failed: %w", policyErr)
+	}
+
+	if policyOutcome.Decision.Action == moderation.ActionAllow {
+		if resp.Send && l.SuperUsers.IsSuper(msg.From.Username, msg.From.ID) && l.TrainingMode && resp.BanInterval > 0 {
+			l.adminHandler.ReportBan(banUserStr, msg, resp.BanInterval, l.SoftBanMode)
 		}
+		return nil
+	}
 
-		banReq := banRequest{duration: duration, userID: resp.User.ID, channelID: resp.ChannelID, userName: banUserStr,
-			chatID: fromChat, dry: l.Dry, training: l.TrainingMode, restrict: restrict}
-		if err := l.ActionExecutor.ApplyBan(banReq); err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("failed to ban %s: %w", banUserStr, err))
-		} else if l.adminChatID != 0 && msg.From.ID != 0 {
-			l.adminHandler.ReportBan(banUserStr, msg, duration, restrict)
+	if resp.Send {
+		log.Printf("[DEBUG] event_id=%s correlation_id=%s policy action=%s reason=%q score=%.2f",
+			event.EventID, event.CorrelationID, policyOutcome.Decision.Action, policyOutcome.Decision.Reason, policyOutcome.Decision.Score)
+
+		switch policyOutcome.Decision.Action {
+		case moderation.ActionRestrict, moderation.ActionBan:
+			banReq := banRequest{
+				duration:  policyOutcome.Duration,
+				userID:    resp.User.ID,
+				channelID: resp.ChannelID,
+				userName:  banUserStr,
+				chatID:    fromChat,
+				dry:       l.Dry,
+				training:  l.TrainingMode,
+				restrict:  policyOutcome.Restrict,
+			}
+			if err := l.ActionExecutor.ApplyBan(banReq); err != nil {
+				errs = multierror.Append(errs, fmt.Errorf("failed to apply %s for %s: %w",
+					policyOutcome.Decision.Action, banUserStr, err))
+			} else if l.adminChatID != 0 && msg.From.ID != 0 {
+				l.adminHandler.ReportBan(banUserStr, msg, policyOutcome.Duration, policyOutcome.Restrict)
+			}
 		}
 	}
 
