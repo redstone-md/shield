@@ -64,6 +64,10 @@ type DetectedSpamCounter interface {
 // IncomingEvents persists normalized ingress events before moderation processing.
 type IncomingEvents interface {
 	Record(ctx context.Context, event moderation.IncomingEvent) (bool, error)
+	Reserve(ctx context.Context, event moderation.IncomingEvent) (storage.IncomingEventReplay, error)
+	Complete(ctx context.Context, idempotencyKey string,
+		decision moderation.PolicyDecision, actionResult moderation.ModerationActionResult,
+	) error
 }
 
 // ModerationConfig controls automatic penalty escalation.

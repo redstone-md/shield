@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -18,6 +19,13 @@ const (
 	CmdCreateIncomingEventsIndexes
 	CmdAddIncomingEvent
 	CmdGetIncomingEventByKey
+	CmdAddDecisionActionColumn
+	CmdAddDecisionReasonColumn
+	CmdAddDecisionScoreColumn
+	CmdAddActionAppliedColumn
+	CmdAddActionErrorColumn
+	CmdAddProcessedAtColumn
+	CmdCompleteIncomingEvent
 )
 
 var incomingEventsQueries = engine.NewQueryMap().
@@ -34,6 +42,12 @@ var incomingEventsQueries = engine.NewQueryMap().
 			message_id INTEGER NOT NULL DEFAULT 0,
 			edited_message_id INTEGER NOT NULL DEFAULT 0,
 			idempotency_key TEXT NOT NULL,
+			decision_action TEXT DEFAULT '',
+			decision_reason TEXT DEFAULT '',
+			decision_score REAL DEFAULT 0,
+			action_applied BOOLEAN,
+			action_error TEXT DEFAULT '',
+			processed_at DATETIME,
 			received_at DATETIME NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			UNIQUE(gid, idempotency_key)
@@ -50,6 +64,12 @@ var incomingEventsQueries = engine.NewQueryMap().
 			message_id INTEGER NOT NULL DEFAULT 0,
 			edited_message_id INTEGER NOT NULL DEFAULT 0,
 			idempotency_key TEXT NOT NULL,
+			decision_action TEXT DEFAULT '',
+			decision_reason TEXT DEFAULT '',
+			decision_score DOUBLE PRECISION DEFAULT 0,
+			action_applied BOOLEAN,
+			action_error TEXT DEFAULT '',
+			processed_at TIMESTAMP,
 			received_at TIMESTAMP NOT NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			UNIQUE(gid, idempotency_key)
@@ -73,25 +93,67 @@ var incomingEventsQueries = engine.NewQueryMap().
 	}).
 	AddSame(CmdGetIncomingEventByKey, `SELECT
 			id, gid, event_id, correlation_id, tenant_id, source, update_id, chat_id, message_id,
-			edited_message_id, idempotency_key, received_at, created_at
+			edited_message_id, idempotency_key, decision_action, decision_reason, decision_score,
+			action_applied, action_error, processed_at, received_at, created_at
 		FROM incoming_events
-		WHERE gid = ? AND idempotency_key = ?`)
+		WHERE gid = ? AND idempotency_key = ?`).
+	Add(CmdAddDecisionActionColumn, engine.Query{
+		Sqlite:   "ALTER TABLE incoming_events ADD COLUMN decision_action TEXT DEFAULT ''",
+		Postgres: "ALTER TABLE incoming_events ADD COLUMN IF NOT EXISTS decision_action TEXT DEFAULT ''",
+	}).
+	Add(CmdAddDecisionReasonColumn, engine.Query{
+		Sqlite:   "ALTER TABLE incoming_events ADD COLUMN decision_reason TEXT DEFAULT ''",
+		Postgres: "ALTER TABLE incoming_events ADD COLUMN IF NOT EXISTS decision_reason TEXT DEFAULT ''",
+	}).
+	Add(CmdAddDecisionScoreColumn, engine.Query{
+		Sqlite:   "ALTER TABLE incoming_events ADD COLUMN decision_score REAL DEFAULT 0",
+		Postgres: "ALTER TABLE incoming_events ADD COLUMN IF NOT EXISTS decision_score DOUBLE PRECISION DEFAULT 0",
+	}).
+	Add(CmdAddActionAppliedColumn, engine.Query{
+		Sqlite:   "ALTER TABLE incoming_events ADD COLUMN action_applied BOOLEAN",
+		Postgres: "ALTER TABLE incoming_events ADD COLUMN IF NOT EXISTS action_applied BOOLEAN",
+	}).
+	Add(CmdAddActionErrorColumn, engine.Query{
+		Sqlite:   "ALTER TABLE incoming_events ADD COLUMN action_error TEXT DEFAULT ''",
+		Postgres: "ALTER TABLE incoming_events ADD COLUMN IF NOT EXISTS action_error TEXT DEFAULT ''",
+	}).
+	Add(CmdAddProcessedAtColumn, engine.Query{
+		Sqlite:   "ALTER TABLE incoming_events ADD COLUMN processed_at DATETIME",
+		Postgres: "ALTER TABLE incoming_events ADD COLUMN IF NOT EXISTS processed_at TIMESTAMP",
+	}).
+	AddSame(CmdCompleteIncomingEvent, `UPDATE incoming_events
+		SET decision_action = ?, decision_reason = ?, decision_score = ?, action_applied = ?, action_error = ?, processed_at = ?
+		WHERE gid = ? AND idempotency_key = ? AND processed_at IS NULL`)
 
 // IncomingEventRecord stores one normalized Telegram ingress event.
 type IncomingEventRecord struct {
-	ID              int64     `db:"id"`
-	GID             string    `db:"gid"`
-	EventID         string    `db:"event_id"`
-	CorrelationID   string    `db:"correlation_id"`
-	TenantID        string    `db:"tenant_id"`
-	Source          string    `db:"source"`
-	UpdateID        int       `db:"update_id"`
-	ChatID          int64     `db:"chat_id"`
-	MessageID       int       `db:"message_id"`
-	EditedMessageID int       `db:"edited_message_id"`
-	IdempotencyKey  string    `db:"idempotency_key"`
-	ReceivedAt      time.Time `db:"received_at"`
-	CreatedAt       time.Time `db:"created_at"`
+	ID              int64        `db:"id"`
+	GID             string       `db:"gid"`
+	EventID         string       `db:"event_id"`
+	CorrelationID   string       `db:"correlation_id"`
+	TenantID        string       `db:"tenant_id"`
+	Source          string       `db:"source"`
+	UpdateID        int          `db:"update_id"`
+	ChatID          int64        `db:"chat_id"`
+	MessageID       int          `db:"message_id"`
+	EditedMessageID int          `db:"edited_message_id"`
+	IdempotencyKey  string       `db:"idempotency_key"`
+	DecisionAction  string       `db:"decision_action"`
+	DecisionReason  string       `db:"decision_reason"`
+	DecisionScore   float64      `db:"decision_score"`
+	ActionApplied   sql.NullBool `db:"action_applied"`
+	ActionError     string       `db:"action_error"`
+	ProcessedAt     sql.NullTime `db:"processed_at"`
+	ReceivedAt      time.Time    `db:"received_at"`
+	CreatedAt       time.Time    `db:"created_at"`
+}
+
+// IncomingEventReplay is the replay state for one idempotency key.
+type IncomingEventReplay struct {
+	Recorded     bool
+	Processed    bool
+	Decision     moderation.PolicyDecision
+	ActionResult moderation.ModerationActionResult
 }
 
 // IncomingEvents persists normalized ingress events keyed by idempotency key.
@@ -119,7 +181,29 @@ func NewIncomingEvents(ctx context.Context, db *engine.SQL) (*IncomingEvents, er
 	return res, nil
 }
 
-func (s *IncomingEvents) migrate(_ context.Context, _ *sqlx.Tx, _ string) error {
+func (s *IncomingEvents) migrate(ctx context.Context, tx *sqlx.Tx, _ string) error {
+	var count int
+	err := tx.GetContext(ctx, &count, "SELECT COUNT(*) FROM incoming_events WHERE processed_at IS NULL")
+	if err == nil {
+		return nil
+	}
+
+	for _, cmd := range []engine.DBCmd{
+		CmdAddDecisionActionColumn,
+		CmdAddDecisionReasonColumn,
+		CmdAddDecisionScoreColumn,
+		CmdAddActionAppliedColumn,
+		CmdAddActionErrorColumn,
+		CmdAddProcessedAtColumn,
+	} {
+		query, pickErr := incomingEventsQueries.Pick(s.Type(), cmd)
+		if pickErr != nil {
+			return fmt.Errorf("failed to get migration query %d: %w", cmd, pickErr)
+		}
+		if _, execErr := tx.ExecContext(ctx, query); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
+			return fmt.Errorf("failed to apply incoming events migration %d: %w", cmd, execErr)
+		}
+	}
 	return nil
 }
 
@@ -166,6 +250,84 @@ func (s *IncomingEvents) Record(ctx context.Context, event moderation.IncomingEv
 		return false, fmt.Errorf("failed to inspect insert result: %w", err)
 	}
 	return rows > 0, nil
+}
+
+// Reserve records the event or returns the previously completed replay state for the same key.
+func (s *IncomingEvents) Reserve(ctx context.Context, event moderation.IncomingEvent) (IncomingEventReplay, error) {
+	created, err := s.Record(ctx, event)
+	if err != nil {
+		return IncomingEventReplay{}, err
+	}
+	if created {
+		return IncomingEventReplay{Recorded: true}, nil
+	}
+
+	record, err := s.ByIdempotencyKey(ctx, event.IdempotencyKey)
+	if err != nil {
+		return IncomingEventReplay{}, err
+	}
+
+	replay := IncomingEventReplay{
+		Recorded:  false,
+		Processed: record.ProcessedAt.Valid,
+	}
+	if record.ProcessedAt.Valid {
+		replay.Decision = moderation.PolicyDecision{
+			EventID:       record.EventID,
+			CorrelationID: record.CorrelationID,
+			Action:        moderation.Action(record.DecisionAction),
+			Reason:        record.DecisionReason,
+			Score:         record.DecisionScore,
+			DecidedAt:     record.ProcessedAt.Time,
+		}
+		replay.ActionResult = moderation.ModerationActionResult{
+			EventID:       record.EventID,
+			CorrelationID: record.CorrelationID,
+			Action:        moderation.Action(record.DecisionAction),
+			Applied:       record.ActionApplied.Valid && record.ActionApplied.Bool,
+			Provider:      "telegram",
+			Error:         record.ActionError,
+			AppliedAt:     record.ProcessedAt.Time,
+		}
+	}
+	return replay, nil
+}
+
+// Complete persists the final decision/action snapshot for replay-safe duplicate suppression.
+func (s *IncomingEvents) Complete(ctx context.Context, idempotencyKey string,
+	decision moderation.PolicyDecision, actionResult moderation.ModerationActionResult,
+) error {
+	s.Lock()
+	defer s.Unlock()
+
+	query, err := incomingEventsQueries.Pick(s.Type(), CmdCompleteIncomingEvent)
+	if err != nil {
+		return fmt.Errorf("failed to get complete query: %w", err)
+	}
+	query = s.Adopt(query)
+
+	processedAt := actionResult.AppliedAt
+	if processedAt.IsZero() {
+		processedAt = decision.DecidedAt
+	}
+	if processedAt.IsZero() {
+		processedAt = time.Now().UTC()
+	}
+
+	_, err = s.ExecContext(ctx, query,
+		string(decision.Action),
+		decision.Reason,
+		decision.Score,
+		actionResult.Applied,
+		actionResult.Error,
+		processedAt,
+		s.GID(),
+		idempotencyKey,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to complete incoming event: %w", err)
+	}
+	return nil
 }
 
 // ByIdempotencyKey loads a previously recorded incoming event.

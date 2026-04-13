@@ -129,18 +129,51 @@ func (s *auditWriterSpy) Write(ctx context.Context, record AuditRecord) error {
 }
 
 type incomingEventsSpy struct {
-	record func(ctx context.Context, event moderation.IncomingEvent) (bool, error)
-	calls  []moderation.IncomingEvent
-	ctxs   []context.Context
+	record   func(ctx context.Context, event moderation.IncomingEvent) (bool, error)
+	reserve  func(ctx context.Context, event moderation.IncomingEvent) (storage.IncomingEventReplay, error)
+	complete func(ctx context.Context, idempotencyKey string, decision moderation.PolicyDecision,
+		actionResult moderation.ModerationActionResult) error
+	recordCalls   []moderation.IncomingEvent
+	reserveCalls  []moderation.IncomingEvent
+	completeCalls []struct {
+		IdempotencyKey string
+		Decision       moderation.PolicyDecision
+		ActionResult   moderation.ModerationActionResult
+	}
+	ctxs []context.Context
 }
 
 func (s *incomingEventsSpy) Record(ctx context.Context, event moderation.IncomingEvent) (bool, error) {
 	s.ctxs = append(s.ctxs, ctx)
-	s.calls = append(s.calls, event)
+	s.recordCalls = append(s.recordCalls, event)
 	if s.record != nil {
 		return s.record(ctx, event)
 	}
 	return true, nil
+}
+
+func (s *incomingEventsSpy) Reserve(ctx context.Context, event moderation.IncomingEvent) (storage.IncomingEventReplay, error) {
+	s.ctxs = append(s.ctxs, ctx)
+	s.reserveCalls = append(s.reserveCalls, event)
+	if s.reserve != nil {
+		return s.reserve(ctx, event)
+	}
+	return storage.IncomingEventReplay{Recorded: true}, nil
+}
+
+func (s *incomingEventsSpy) Complete(ctx context.Context, idempotencyKey string, decision moderation.PolicyDecision,
+	actionResult moderation.ModerationActionResult,
+) error {
+	s.ctxs = append(s.ctxs, ctx)
+	s.completeCalls = append(s.completeCalls, struct {
+		IdempotencyKey string
+		Decision       moderation.PolicyDecision
+		ActionResult   moderation.ModerationActionResult
+	}{IdempotencyKey: idempotencyKey, Decision: decision, ActionResult: actionResult})
+	if s.complete != nil {
+		return s.complete(ctx, idempotencyKey, decision, actionResult)
+	}
+	return nil
 }
 
 type contextualBotSpy struct {
@@ -202,9 +235,9 @@ func TestTelegramListener_ProcEventsPublishesIncomingEvent(t *testing.T) {
 	spy := &processorSpy{}
 	eventStore := &incomingEventsSpy{}
 	callOrder := make([]string, 0, 2)
-	eventStore.record = func(ctx context.Context, event moderation.IncomingEvent) (bool, error) {
+	eventStore.reserve = func(ctx context.Context, event moderation.IncomingEvent) (storage.IncomingEventReplay, error) {
 		callOrder = append(callOrder, "record")
-		return true, nil
+		return storage.IncomingEventReplay{Recorded: true}, nil
 	}
 	spy.process = func(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error {
 		callOrder = append(callOrder, "process")
@@ -239,7 +272,7 @@ func TestTelegramListener_ProcEventsPublishesIncomingEvent(t *testing.T) {
 	err := l.procEvents(update)
 	require.NoError(t, err)
 	require.Len(t, spy.calls, 1)
-	require.Len(t, eventStore.calls, 1)
+	require.Len(t, eventStore.reserveCalls, 1)
 
 	got := spy.calls[0].Event
 	assert.Equal(t, "telegram.update", got.Source)
@@ -258,9 +291,59 @@ func TestTelegramListener_ProcEventsPublishesIncomingEvent(t *testing.T) {
 	assert.Equal(t, update, spy.calls[0].Update)
 	assert.NotEmpty(t, got.EventID)
 	assert.NotEmpty(t, got.CorrelationID)
-	assert.Equal(t, got, eventStore.calls[0])
+	assert.Equal(t, got, eventStore.reserveCalls[0])
 	assert.Equal(t, []string{"record", "process"}, callOrder)
 	assertContextMetadata(t, eventStore.ctxs[0], got.EventID, got.CorrelationID)
+}
+
+func TestTelegramListener_ProcEventsSkipsProcessedDuplicate(t *testing.T) {
+	locator, teardown := prepTestLocator(t)
+	defer teardown()
+
+	spy := &processorSpy{}
+	eventStore := &incomingEventsSpy{
+		reserve: func(ctx context.Context, event moderation.IncomingEvent) (storage.IncomingEventReplay, error) {
+			return storage.IncomingEventReplay{
+				Recorded:  false,
+				Processed: true,
+				Decision: moderation.PolicyDecision{
+					Action: moderation.ActionBan,
+				},
+				ActionResult: moderation.ModerationActionResult{
+					Action:  moderation.ActionBan,
+					Applied: true,
+				},
+			}, nil
+		},
+	}
+
+	l := TelegramListener{
+		Bot:            &mocks.BotMock{},
+		Locator:        locator,
+		IncomingEvents: eventStore,
+		Group:          "123",
+		InstanceID:     "tg-spam",
+		chatID:         123,
+		Queue:          moderation.NewInMemoryQueue(1),
+		processor:      spy,
+	}
+	defer l.shutdownPipeline()
+
+	update := tbapi.Update{
+		UpdateID: 703,
+		Message: &tbapi.Message{
+			MessageID: 79,
+			Chat:      tbapi.Chat{ID: 123, Type: "supergroup"},
+			Text:      "retry spam",
+			From:      &tbapi.User{ID: 42, UserName: "user"},
+			Date:      int(time.Date(2026, 4, 13, 10, 10, 0, 0, time.UTC).Unix()),
+		},
+	}
+
+	err := l.procEvents(update)
+	require.NoError(t, err)
+	require.Empty(t, spy.calls)
+	require.Len(t, eventStore.reserveCalls, 1)
 }
 
 func TestTelegramListener_ProcEventsBuildsEditedMessageIdempotencyKey(t *testing.T) {
@@ -457,6 +540,55 @@ func TestTelegramListener_ProcessQueuedEventLogsCorrelationIDs(t *testing.T) {
 	err := l.processQueuedEvent(context.Background(), event, update)
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "event_id=evt-123 correlation_id=corr-123")
+}
+
+func TestTelegramListener_ProcessQueuedEventCompletesReplayState(t *testing.T) {
+	locator := &locatorContextSpy{}
+	botMock := &contextualBotSpy{
+		onMessage: func(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response {
+			return bot.Response{
+				Send:        true,
+				BanInterval: time.Minute,
+				User:        bot.User{ID: 42, Username: "user"},
+				CheckResults: []spamcheck.Response{
+					{Name: "rule", Spam: true, Details: "smoke spam"},
+				},
+			}
+		},
+	}
+
+	store := &incomingEventsSpy{}
+	l := TelegramListener{
+		Bot:            botMock,
+		Locator:        locator,
+		IncomingEvents: store,
+		NoSpamReply:    true,
+		PolicyEngine:   defaultPolicyEngine{},
+		ActionExecutor: &actionExecutorSpy{},
+		AuditWriter:    &auditWriterSpy{},
+	}
+
+	event := moderation.IncomingEvent{
+		EventID:        "evt-123",
+		CorrelationID:  "corr-123",
+		IdempotencyKey: "telegram:update:1:chat:123:message:55:edited:0",
+	}
+	update := tbapi.Update{
+		Message: &tbapi.Message{
+			MessageID: 55,
+			Chat:      tbapi.Chat{ID: 123},
+			Text:      "hello",
+			From:      &tbapi.User{ID: 42, UserName: "user"},
+			Date:      int(time.Now().Unix()),
+		},
+	}
+
+	err := l.processQueuedEvent(context.Background(), event, update)
+	require.NoError(t, err)
+	require.Len(t, store.completeCalls, 1)
+	assert.Equal(t, event.IdempotencyKey, store.completeCalls[0].IdempotencyKey)
+	assert.Equal(t, moderation.ActionBan, store.completeCalls[0].Decision.Action)
+	assert.True(t, store.completeCalls[0].ActionResult.Applied)
 }
 
 func assertContextMetadata(t *testing.T, ctx context.Context, eventID, correlationID string) {

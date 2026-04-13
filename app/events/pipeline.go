@@ -119,12 +119,18 @@ func (l *TelegramListener) ensurePipeline() {
 func (l *TelegramListener) enqueueIncomingEvent(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error {
 	ctx = observability.WithEventMetadata(ctx, event.EventID, event.CorrelationID)
 	if l.IncomingEvents != nil {
-		created, err := l.IncomingEvents.Record(ctx, event)
+		replay, err := l.IncomingEvents.Reserve(ctx, event)
 		if err != nil {
-			return fmt.Errorf("record incoming event %s: %w", event.EventID, err)
+			return fmt.Errorf("reserve incoming event %s: %w", event.EventID, err)
 		}
-		if !created {
-			observability.Logf(ctx, "[DEBUG] incoming event already recorded for key %s", event.IdempotencyKey)
+		if replay.Processed {
+			observability.Logf(ctx, "[INFO] replay moderation decision for key %s action=%s applied=%t",
+				event.IdempotencyKey, replay.Decision.Action, replay.ActionResult.Applied)
+			return nil
+		}
+		if !replay.Recorded {
+			observability.Logf(ctx, "[INFO] duplicate incoming event already in progress for key %s", event.IdempotencyKey)
+			return nil
 		}
 	}
 
@@ -376,9 +382,25 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 			}); err != nil {
 				errs = multierror.Append(errs, fmt.Errorf("audit write failed: %w", err))
 			}
+			if err := l.completeIncomingEvent(ctx, event, policyOutcome.Decision, actionResult); err != nil {
+				errs = multierror.Append(errs, err)
+			}
 		}
 		if resp.Send && l.SuperUsers.IsSuper(msg.From.Username, msg.From.ID) && l.TrainingMode && resp.BanInterval > 0 {
 			l.adminHandler.ReportBan(banUserStr, msg, resp.BanInterval, l.SoftBanMode)
+		}
+		if !resp.Send || resp.BanInterval <= 0 {
+			actionResult := moderation.ModerationActionResult{
+				EventID:       event.EventID,
+				CorrelationID: event.CorrelationID,
+				Action:        policyOutcome.Decision.Action,
+				Applied:       false,
+				Provider:      "telegram",
+				AppliedAt:     time.Now().UTC(),
+			}
+			if err := l.completeIncomingEvent(ctx, event, policyOutcome.Decision, actionResult); err != nil {
+				errs = multierror.Append(errs, err)
+			}
 		}
 		if err := errs.ErrorOrNil(); err != nil {
 			return fmt.Errorf("processing events failed: %w", err)
@@ -434,6 +456,10 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 		}); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("audit write failed: %w", err))
 		}
+
+		if err := l.completeIncomingEvent(ctx, event, policyOutcome.Decision, actionResult); err != nil {
+			errs = multierror.Append(errs, err)
+		}
 	}
 
 	if err := l.ActionExecutor.DeleteExtraMessages(ctx, resp.CheckResults, msg.From.ID, msg.From.Username, fromChat); err != nil {
@@ -450,6 +476,18 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 
 	if err := errs.ErrorOrNil(); err != nil {
 		return fmt.Errorf("processing events failed: %w", err)
+	}
+	return nil
+}
+
+func (l *TelegramListener) completeIncomingEvent(ctx context.Context, event moderation.IncomingEvent,
+	decision moderation.PolicyDecision, actionResult moderation.ModerationActionResult,
+) error {
+	if l.IncomingEvents == nil {
+		return nil
+	}
+	if err := l.IncomingEvents.Complete(ctx, event.IdempotencyKey, decision, actionResult); err != nil {
+		return fmt.Errorf("complete incoming event %s: %w", event.EventID, err)
 	}
 	return nil
 }

@@ -54,3 +54,66 @@ func TestIncomingEventsRecord(t *testing.T) {
 	assert.Equal(t, event.IdempotencyKey, record.IdempotencyKey)
 	assert.Equal(t, event.ReceivedAt, record.ReceivedAt)
 }
+
+func TestIncomingEventsReserveAndComplete(t *testing.T) {
+	db, err := engine.NewSqlite(":memory:", "gr1")
+	require.NoError(t, err)
+	defer db.Close()
+
+	store, err := NewIncomingEvents(context.Background(), db)
+	require.NoError(t, err)
+
+	event := moderation.IncomingEvent{
+		EventID:         "evt-2",
+		CorrelationID:   "corr-2",
+		TenantID:        "tg-spam",
+		Source:          "telegram.update",
+		UpdateID:        702,
+		ChatID:          123,
+		MessageID:       78,
+		EditedMessageID: 0,
+		IdempotencyKey:  "telegram:update:702:chat:123:message:78:edited:0",
+		ReceivedAt:      time.Date(2026, 4, 13, 11, 5, 0, 0, time.UTC),
+	}
+
+	replay, err := store.Reserve(context.Background(), event)
+	require.NoError(t, err)
+	assert.True(t, replay.Recorded)
+	assert.False(t, replay.Processed)
+
+	err = store.Complete(context.Background(), event.IdempotencyKey,
+		moderation.PolicyDecision{
+			EventID:       event.EventID,
+			CorrelationID: event.CorrelationID,
+			Action:        moderation.ActionBan,
+			Reason:        "smoke policy",
+			Score:         1,
+			DecidedAt:     time.Date(2026, 4, 13, 11, 6, 0, 0, time.UTC),
+		},
+		moderation.ModerationActionResult{
+			EventID:       event.EventID,
+			CorrelationID: event.CorrelationID,
+			Action:        moderation.ActionBan,
+			Applied:       true,
+			Provider:      "telegram",
+			AppliedAt:     time.Date(2026, 4, 13, 11, 6, 0, 0, time.UTC),
+		},
+	)
+	require.NoError(t, err)
+
+	replay, err = store.Reserve(context.Background(), event)
+	require.NoError(t, err)
+	assert.False(t, replay.Recorded)
+	assert.True(t, replay.Processed)
+	assert.Equal(t, moderation.ActionBan, replay.Decision.Action)
+	assert.Equal(t, "smoke policy", replay.Decision.Reason)
+	assert.True(t, replay.ActionResult.Applied)
+
+	record, err := store.ByIdempotencyKey(context.Background(), event.IdempotencyKey)
+	require.NoError(t, err)
+	assert.True(t, record.ProcessedAt.Valid)
+	assert.Equal(t, "ban", record.DecisionAction)
+	assert.Equal(t, "smoke policy", record.DecisionReason)
+	assert.True(t, record.ActionApplied.Valid)
+	assert.True(t, record.ActionApplied.Bool)
+}
