@@ -428,3 +428,16 @@ MVP можно считать состоявшимся, когда выполн�
 2. Поднять локальную infra-среду и миграции
 3. Реализовать tracer bullet `webhook -> queue -> fast heuristic -> policy -> audit`
 4. После этого разворачивать control plane и tenant model
+
+## Детализация по этапам
+
+- Этап 0: [Foundations и внутренний pipeline](plans/roadmap/00-foundations-and-internal-pipeline.md)
+- Этап 1: [Single-tenant rules, idempotency и безопасное исполнение](plans/roadmap/01-single-tenant-rules-and-idempotency.md)
+- Этап 2: [Control Plane MVP поверх текущего web UI/API](plans/roadmap/02-control-plane-mvp.md)
+- Этап 3: [Multi-tenant core](plans/roadmap/03-multi-tenant-core.md)
+- Этап 4: [Fast Path production-grade](plans/roadmap/04-fast-path-hardening.md)
+- Этап 5: [Policy Engine v2](plans/roadmap/05-policy-engine-v2.md)
+- Этап 6: [Slow Path для LLM и Vision](plans/roadmap/06-slow-path-llm-and-vision.md)
+- Этап 7: [Audit, review и appeals](plans/roadmap/07-audit-review-and-appeals.md)
+- Этап 8: [Feedback loop и knowledge base](plans/roadmap/08-feedback-loop-and-knowledge-base.md)
+- Этап 9: [SaaS hardening и эксплуатационная зрелость](plans/roadmap/09-saas-hardening.md)
