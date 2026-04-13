@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -22,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/umputun/tg-spam/app/events"
+	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/app/webapi/mocks"
@@ -57,6 +59,62 @@ func TestServer_Run(t *testing.T) {
 
 	cancel()
 	<-done
+}
+
+func TestServer_RequestMetadataMiddlewarePropagatesToDetectedSpam(t *testing.T) {
+	var capturedCtx context.Context
+
+	server := NewServer(Config{
+		Settings: Settings{InstanceID: "inst"},
+		DetectedSpam: &mocks.DetectedSpamMock{
+			FindByUserIDFunc: func(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error) {
+				capturedCtx = ctx
+				return &storage.DetectedSpamInfo{UserID: userID, UserName: "user"}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/check/42", nil)
+	req.SetPathValue("user_id", "42")
+	req.Header.Set("X-Request-ID", "req-123")
+	rr := httptest.NewRecorder()
+
+	handler := server.requestMetadataMiddleware(http.HandlerFunc(server.checkIDHandler))
+	handler.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "req-123", rr.Header().Get(requestHeaderCorrelationID))
+	assert.NotEmpty(t, rr.Header().Get(requestHeaderEventID))
+
+	meta, ok := observability.MetadataFromContext(capturedCtx)
+	require.True(t, ok)
+	assert.Equal(t, rr.Header().Get(requestHeaderEventID), meta.EventID)
+	assert.Equal(t, "req-123", meta.CorrelationID)
+}
+
+func TestServer_CheckMsgHandlerLogsRequestMetadata(t *testing.T) {
+	var buf bytes.Buffer
+	oldWriter := log.Writer()
+	oldFlags := log.Flags()
+	log.SetOutput(&buf)
+	log.SetFlags(0)
+	defer func() {
+		log.SetOutput(oldWriter)
+		log.SetFlags(oldFlags)
+	}()
+
+	server := NewServer(Config{Settings: Settings{InstanceID: "inst"}})
+	req := httptest.NewRequest(http.MethodPost, "/check", strings.NewReader("bad request"))
+	req.Header.Set("X-Request-ID", "req-456")
+	rr := httptest.NewRecorder()
+
+	handler := server.requestMetadataMiddleware(http.HandlerFunc(server.checkMsgHandler))
+	handler.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, buf.String(), "event_id=")
+	assert.Contains(t, buf.String(), "correlation_id=req-456")
+	assert.Equal(t, "req-456", rr.Header().Get(requestHeaderCorrelationID))
 }
 
 func TestServer_RunAuth(t *testing.T) {

@@ -130,6 +130,7 @@ classDiagram
 - `telegramActionExecutor` — defined in [app/events/action_executor.go](../app/events/action_executor.go); applies bans/restrictions and message deletions
 - `defaultAuditWriter` — defined in [app/events/audit_writer.go](../app/events/audit_writer.go); records moderation results through current logging and locator sinks
 - `app/observability` metadata helper — defined in [app/observability/context.go](../app/observability/context.go); carries `event_id` and `correlation_id` through the moderation tracer-bullet path
+- `app/webapi` request metadata middleware — defined in [app/webapi/webapi.go](../app/webapi/webapi.go); attaches `event_id` and `correlation_id` to request context and response headers
 
 ## 7) Verification status
 
@@ -141,6 +142,7 @@ classDiagram
   - action execution
   - audit recording
 - Correlation metadata is covered by the moderation-path tests in [app/events/listener_test.go](../app/events/listener_test.go), which prove the same `event_id` and `correlation_id` reach detection, action, audit, and locator calls.
+- Correlation metadata is also covered for `app/webapi` requests in [app/webapi/webapi_test.go](../app/webapi/webapi_test.go), which prove request metadata reaches downstream storage calls and request-scoped logs.
 
 ## 4) Dependency rules
 

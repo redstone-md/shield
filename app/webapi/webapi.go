@@ -19,6 +19,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/didip/tollbooth/v8"
@@ -28,6 +29,7 @@ import (
 	"github.com/go-pkgz/routegroup"
 
 	"github.com/umputun/tg-spam/app/events"
+	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/approved"
@@ -48,6 +50,13 @@ var tmpl = template.Must(template.ParseFS(templateFS, "assets/*.html", "assets/c
 
 // startTime tracks when the server started
 var startTime = time.Now()
+var requestSeq uint64
+
+const (
+	requestHeaderEventID       = "X-Event-ID"
+	requestHeaderCorrelationID = "X-Correlation-ID"
+	requestHeaderRequestID     = "X-Request-ID"
+)
 
 // Server is a web API server.
 type Server struct {
@@ -195,6 +204,7 @@ func NewServer(config Config) *Server {
 func (s *Server) Run(ctx context.Context) error {
 	router := routegroup.New(http.NewServeMux())
 	router.Use(rest.Recoverer(log.Default()))
+	router.Use(s.requestMetadataMiddleware)
 	router.Use(logger.New(logger.Log(log.Default()), logger.Prefix("[DEBUG]")).Handler)
 	router.Use(rest.Throttle(1000))
 	router.Use(rest.AppInfo("tg-spam", "umputun", s.Version), rest.Ping)
@@ -229,6 +239,39 @@ func (s *Server) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to run server: %w", err)
 	}
 	return nil
+}
+
+func (s *Server) requestMetadataMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		eventID, correlationID := s.requestMetadata(r)
+		ctx := observability.WithEventMetadata(r.Context(), eventID, correlationID)
+		w.Header().Set(requestHeaderEventID, eventID)
+		w.Header().Set(requestHeaderCorrelationID, correlationID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (s *Server) requestMetadata(r *http.Request) (eventID, correlationID string) {
+	seq := atomic.AddUint64(&requestSeq, 1)
+	instanceID := strings.TrimSpace(s.Settings.InstanceID)
+	if instanceID == "" {
+		instanceID = "tg-spam"
+	}
+
+	eventID = strings.TrimSpace(r.Header.Get(requestHeaderEventID))
+	if eventID == "" {
+		eventID = fmt.Sprintf("web-%s-%d", instanceID, seq)
+	}
+
+	correlationID = strings.TrimSpace(r.Header.Get(requestHeaderCorrelationID))
+	if correlationID == "" {
+		correlationID = strings.TrimSpace(r.Header.Get(requestHeaderRequestID))
+	}
+	if correlationID == "" {
+		correlationID = fmt.Sprintf("corr-web-%s-%d", instanceID, seq)
+	}
+
+	return eventID, correlationID
 }
 
 func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
@@ -331,7 +374,7 @@ func (s *Server) checkMsgHandler(w http.ResponseWriter, r *http.Request) {
 		// API request
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "can't decode request", "details": err.Error()})
-			log.Printf("[WARN] can't decode request: %v", err)
+			observability.Logf(r.Context(), "[WARN] can't decode request: %v", err)
 			return
 		}
 	} else {
@@ -361,7 +404,7 @@ func (s *Server) checkMsgHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := tmpl.ExecuteTemplate(w, "check_results", resultDisplay); err != nil {
-		log.Printf("[WARN] can't execute result template: %v", err)
+		observability.Logf(r.Context(), "[WARN] can't execute result template: %v", err)
 		http.Error(w, "Error rendering result", http.StatusInternalServerError)
 		return
 	}
@@ -648,7 +691,7 @@ func (s *Server) addDictionaryEntryHandler(w http.ResponseWriter, r *http.Reques
 
 	// reload samples to apply dictionary changes immediately
 	if err := s.SpamFilter.ReloadSamples(); err != nil {
-		log.Printf("[WARN] failed to reload samples after dictionary add: %v", err)
+		observability.Logf(r.Context(), "[WARN] failed to reload samples after dictionary add: %v", err)
 		if !isHtmxRequest {
 			_ = rest.EncodeJSON(w, http.StatusInternalServerError,
 				rest.JSON{"error": "entry added but reload failed", "details": err.Error()})
@@ -695,7 +738,7 @@ func (s *Server) deleteDictionaryEntryHandler(w http.ResponseWriter, r *http.Req
 
 	// reload samples to apply dictionary changes immediately
 	if err := s.SpamFilter.ReloadSamples(); err != nil {
-		log.Printf("[WARN] failed to reload samples after dictionary delete: %v", err)
+		observability.Logf(r.Context(), "[WARN] failed to reload samples after dictionary delete: %v", err)
 		if !isHtmxRequest {
 			_ = rest.EncodeJSON(w, http.StatusInternalServerError,
 				rest.JSON{"error": "entry deleted but reload failed", "details": err.Error()})
@@ -713,7 +756,7 @@ func (s *Server) deleteDictionaryEntryHandler(w http.ResponseWriter, r *http.Req
 
 // htmlSpamCheckHandler handles GET / request.
 // It returns rendered spam_check.html template with all the components.
-func (s *Server) htmlSpamCheckHandler(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) htmlSpamCheckHandler(w http.ResponseWriter, r *http.Request) {
 	tmplData := struct {
 		Version string
 	}{
@@ -721,7 +764,7 @@ func (s *Server) htmlSpamCheckHandler(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	if err := tmpl.ExecuteTemplate(w, "spam_check.html", tmplData); err != nil {
-		log.Printf("[WARN] can't execute template: %v", err)
+		observability.Logf(r.Context(), "[WARN] can't execute template: %v", err)
 		http.Error(w, "Error executing template", http.StatusInternalServerError)
 		return
 	}
@@ -733,7 +776,7 @@ func (s *Server) htmlManageSamplesHandler(w http.ResponseWriter, _ *http.Request
 	s.renderSamples(w, "manage_samples.html")
 }
 
-func (s *Server) htmlManageUsersHandler(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) htmlManageUsersHandler(w http.ResponseWriter, r *http.Request) {
 	users := s.Detector.ApprovedUsers()
 	tmplData := struct {
 		ApprovedUsers      []approved.UserInfo
@@ -745,7 +788,7 @@ func (s *Server) htmlManageUsersHandler(w http.ResponseWriter, _ *http.Request) 
 	tmplData.TotalApprovedUsers = len(tmplData.ApprovedUsers)
 
 	if err := tmpl.ExecuteTemplate(w, "manage_users.html", tmplData); err != nil {
-		log.Printf("[WARN] can't execute template: %v", err)
+		observability.Logf(r.Context(), "[WARN] can't execute template: %v", err)
 		http.Error(w, "Error executing template", http.StatusInternalServerError)
 		return
 	}
@@ -758,7 +801,7 @@ func (s *Server) htmlManageDictionaryHandler(w http.ResponseWriter, r *http.Requ
 func (s *Server) htmlDetectedSpamHandler(w http.ResponseWriter, r *http.Request) {
 	ds, err := s.DetectedSpam.Read(r.Context())
 	if err != nil {
-		log.Printf("[ERROR] Failed to fetch detected spam: %v", err)
+		observability.Logf(r.Context(), "[ERROR] Failed to fetch detected spam: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -848,7 +891,7 @@ func (s *Server) htmlDetectedSpamHandler(w http.ResponseWriter, r *http.Request)
 
 		// first render the content template
 		if err := tmpl.ExecuteTemplate(&buf, "detected_spam_content", tmplData); err != nil {
-			log.Printf("[WARN] can't execute content template: %v", err)
+			observability.Logf(r.Context(), "[WARN] can't execute content template: %v", err)
 			http.Error(w, "Error executing template", http.StatusInternalServerError)
 			return
 		}
@@ -865,14 +908,14 @@ func (s *Server) htmlDetectedSpamHandler(w http.ResponseWriter, r *http.Request)
 
 		// write the combined response
 		if _, err := buf.WriteTo(w); err != nil {
-			log.Printf("[WARN] failed to write response: %v", err)
+			observability.Logf(r.Context(), "[WARN] failed to write response: %v", err)
 		}
 		return
 	}
 
 	// full page render for normal requests
 	if err := tmpl.ExecuteTemplate(w, "detected_spam.html", tmplData); err != nil {
-		log.Printf("[WARN] can't execute template: %v", err)
+		observability.Logf(r.Context(), "[WARN] can't execute template: %v", err)
 		http.Error(w, "Error executing template", http.StatusInternalServerError)
 		return
 	}
@@ -887,26 +930,26 @@ func (s *Server) htmlAddDetectedSpamHandler(w http.ResponseWriter, r *http.Reque
 
 	id, err := strconv.ParseInt(r.FormValue("id"), 10, 64)
 	if err != nil || msg == "" {
-		log.Printf("[WARN] bad request: %v", err)
+		observability.Logf(r.Context(), "[WARN] bad request: %v", err)
 		reportErr(fmt.Errorf("bad request: %v", err), http.StatusBadRequest)
 		return
 	}
 
 	if err := s.SpamFilter.UpdateSpam(msg); err != nil {
-		log.Printf("[WARN] failed to update spam samples: %v", err)
+		observability.Logf(r.Context(), "[WARN] failed to update spam samples: %v", err)
 		reportErr(fmt.Errorf("can't update spam samples: %v", err), http.StatusInternalServerError)
 		return
 
 	}
 	if err := s.DetectedSpam.SetAddedToSamplesFlag(r.Context(), id); err != nil {
-		log.Printf("[WARN] failed to update detected spam: %v", err)
+		observability.Logf(r.Context(), "[WARN] failed to update detected spam: %v", err)
 		reportErr(fmt.Errorf("can't update detected spam: %v", err), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) htmlSettingsHandler(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) htmlSettingsHandler(w http.ResponseWriter, r *http.Request) {
 	// get database information if StorageEngine is available
 	var dbInfo struct {
 		DatabaseType   string `json:"database_type"`
@@ -980,7 +1023,7 @@ func (s *Server) htmlSettingsHandler(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	if err := tmpl.ExecuteTemplate(w, "settings.html", data); err != nil {
-		log.Printf("[WARN] can't execute template: %v", err)
+		observability.Logf(r.Context(), "[WARN] can't execute template: %v", err)
 		http.Error(w, "Error executing template", http.StatusInternalServerError)
 		return
 	}
@@ -1039,7 +1082,7 @@ func (s *Server) getDMUsersHandler(w http.ResponseWriter, r *http.Request) {
 	}{Users: viewUsers}
 
 	if err := tmpl.ExecuteTemplate(w, "dm_users.html", data); err != nil {
-		log.Printf("[WARN] can't execute dm_users template: %v", err)
+		observability.Logf(r.Context(), "[WARN] can't execute dm_users template: %v", err)
 		http.Error(w, "Error rendering template", http.StatusInternalServerError)
 		return
 	}
@@ -1160,20 +1203,20 @@ func (s *Server) downloadBackupHandler(w http.ResponseWriter, r *http.Request) {
 	gzipWriter := gzip.NewWriter(w)
 	defer func() {
 		if err := gzipWriter.Close(); err != nil {
-			log.Printf("[ERROR] failed to close gzip writer: %v", err)
+			observability.Logf(r.Context(), "[ERROR] failed to close gzip writer: %v", err)
 		}
 	}()
 
 	// stream backup directly to response through gzip
 	if err := s.StorageEngine.Backup(r.Context(), gzipWriter); err != nil {
-		log.Printf("[ERROR] failed to create backup: %v", err)
+		observability.Logf(r.Context(), "[ERROR] failed to create backup: %v", err)
 		// we've already started writing the response, so we can't send a proper error response
 		return
 	}
 
 	// flush the gzip writer to ensure all data is written
 	if err := gzipWriter.Flush(); err != nil {
-		log.Printf("[ERROR] failed to flush gzip writer: %v", err)
+		observability.Logf(r.Context(), "[ERROR] failed to flush gzip writer: %v", err)
 	}
 }
 
@@ -1205,20 +1248,20 @@ func (s *Server) downloadExportToPostgresHandler(w http.ResponseWriter, r *http.
 	gzipWriter := gzip.NewWriter(w)
 	defer func() {
 		if err := gzipWriter.Close(); err != nil {
-			log.Printf("[ERROR] failed to close gzip writer: %v", err)
+			observability.Logf(r.Context(), "[ERROR] failed to close gzip writer: %v", err)
 		}
 	}()
 
 	// stream export directly to response through gzip
 	if err := s.StorageEngine.BackupSqliteAsPostgres(r.Context(), gzipWriter); err != nil {
-		log.Printf("[ERROR] failed to create export: %v", err)
+		observability.Logf(r.Context(), "[ERROR] failed to create export: %v", err)
 		// we've already started writing the response, so we can't send a proper error response
 		return
 	}
 
 	// flush the gzip writer to ensure all data is written
 	if err := gzipWriter.Flush(); err != nil {
-		log.Printf("[ERROR] failed to flush gzip writer: %v", err)
+		observability.Logf(r.Context(), "[ERROR] failed to flush gzip writer: %v", err)
 	}
 }
 
