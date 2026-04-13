@@ -53,13 +53,16 @@ flowchart LR
   Gateway[app/events]
   Queue[[app/moderation.Queue]]
   Event[[app/moderation.IncomingEvent]]
+  Worker[app/events worker]
   Detection[app/bot]
   DetectorLib[lib/tgspam]
   Storage[app/storage]
   WebAPI[app/webapi]
 
   Gateway --publishes--> Event
-  Gateway --will use--> Queue
+  Gateway --publishes to--> Queue
+  Queue --consumed by--> Worker
+  Worker --calls--> Detection
   Detection --uses--> DetectorLib
   Gateway --reads/writes--> Storage
   WebAPI --reads/writes--> Storage
@@ -76,9 +79,11 @@ classDiagram
   class ModerationActionResult
   class Queue
   class InMemoryQueue
+  class listenerEventProcessor
 
   TelegramListener --> Queue : publishes to
   Queue <|.. InMemoryQueue : implemented by
+  TelegramListener --> listenerEventProcessor : worker uses
   Queue --> IncomingEvent : transports
   IncomingEvent --> DetectionResult : analyzed into
   DetectionResult --> PolicyDecision : evaluated into
@@ -89,7 +94,7 @@ classDiagram
 
 ### 3.1 Modules
 
-- `app/events` — Telegram ingestion and high-level event orchestration; code: [app/events/](../app/events/); entry points: [listener.go](../app/events/listener.go), [events.go](../app/events/events.go); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
+- `app/events` — Telegram ingestion, queue publication, in-process worker, and high-level event orchestration; code: [app/events/](../app/events/); entry points: [listener.go](../app/events/listener.go), [pipeline.go](../app/events/pipeline.go), [events.go](../app/events/events.go); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
 - `app/bot` — moderation-facing bot interface and current detection orchestration; code: [app/bot/](../app/bot/); entry point: [spam.go](../app/bot/spam.go)
 - `lib/tgspam` — reusable spam detection heuristics and optional LLM integrations; code: [lib/tgspam/](../lib/tgspam/)
 - `app/storage` — persistence for samples, reports, detected spam, and locators; code: [app/storage/](../app/storage/)
@@ -101,13 +106,14 @@ classDiagram
 - `IncomingEvent` — source of truth: [app/moderation/contracts.go](../app/moderation/contracts.go); producer: `app/events`; future consumer: phase-0 worker
 - `DetectionResult` — source of truth: [app/moderation/contracts.go](../app/moderation/contracts.go); producer: detection layer; consumer: policy layer
 - `PolicyDecision` — source of truth: [app/moderation/contracts.go](../app/moderation/contracts.go); producer: future policy package; consumer: action executor and audit writer
-- `Queue` — source of truth: [app/moderation/queue.go](../app/moderation/queue.go); producer: ingestion; consumer: worker; docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
+- `Queue` — source of truth: [app/moderation/queue.go](../app/moderation/queue.go); producer: ingestion; consumer: [app/events/pipeline.go](../app/events/pipeline.go); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
 
 ### 3.3 Key types
 
 - `TelegramListener` — defined in [app/events/listener.go](../app/events/listener.go); used by `app/main.go`
 - `IncomingEvent` — defined in [app/moderation/contracts.go](../app/moderation/contracts.go); used by future gateway/worker seam
 - `InMemoryQueue` — defined in [app/moderation/queue.go](../app/moderation/queue.go); used by phase-0 tracer-bullet wiring
+- `listenerEventProcessor` — defined in [app/events/pipeline.go](../app/events/pipeline.go); adapts queued moderation events back into the current runtime flow
 
 ## 4) Dependency rules
 

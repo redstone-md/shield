@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -15,10 +16,78 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/events/mocks"
+	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
+
+type processorSpy struct {
+	process func(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error
+	calls   []processorSpyCall
+}
+
+type processorSpyCall struct {
+	Event  moderation.IncomingEvent
+	Update tbapi.Update
+}
+
+func (s *processorSpy) Process(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error {
+	s.calls = append(s.calls, processorSpyCall{Event: event, Update: update})
+	if s.process != nil {
+		return s.process(ctx, event, update)
+	}
+	return nil
+}
+
+func TestTelegramListener_ProcEventsPublishesIncomingEvent(t *testing.T) {
+	locator, teardown := prepTestLocator(t)
+	defer teardown()
+
+	spy := &processorSpy{}
+	l := TelegramListener{
+		Bot:        &mocks.BotMock{},
+		Locator:    locator,
+		Group:      "123",
+		InstanceID: "tg-spam",
+		chatID:     123,
+		Queue:      moderation.NewInMemoryQueue(1),
+		processor:  spy,
+	}
+	defer l.shutdownPipeline()
+
+	update := tbapi.Update{
+		Message: &tbapi.Message{
+			MessageID: 77,
+			Chat:      tbapi.Chat{ID: 123, Type: "supergroup"},
+			Text:      "visit https://example.com now",
+			Entities: []tbapi.MessageEntity{
+				{Type: "text_link", Offset: 6, Length: 19, URL: "https://example.com"},
+			},
+			From: &tbapi.User{ID: 42, UserName: "user"},
+			Date: int(time.Date(2026, 4, 13, 10, 0, 0, 0, time.UTC).Unix()),
+		},
+	}
+
+	err := l.procEvents(update)
+	require.NoError(t, err)
+	require.Len(t, spy.calls, 1)
+
+	got := spy.calls[0].Event
+	assert.Equal(t, "telegram.update", got.Source)
+	assert.Equal(t, "tg-spam", got.TenantID)
+	assert.Equal(t, int64(123), got.ChatID)
+	assert.Equal(t, 77, got.MessageID)
+	assert.Equal(t, int64(42), got.Subject.ID)
+	assert.Equal(t, "user", got.Subject.UserName)
+	assert.Equal(t, "visit https://example.com now", got.Content.Text)
+	assert.True(t, reflect.DeepEqual([]string{"https://example.com"}, got.Content.Links))
+	assert.False(t, got.Content.HasMedia)
+	assert.Equal(t, "false", got.Content.Attributes["with_forward"])
+	assert.Equal(t, update, spy.calls[0].Update)
+	assert.NotEmpty(t, got.EventID)
+	assert.NotEmpty(t, got.CorrelationID)
+}
 
 func TestTelegramListener_Do(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}

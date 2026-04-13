@@ -8,7 +8,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"slices"
@@ -21,6 +20,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/umputun/tg-spam/app/bot"
+	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
@@ -53,9 +53,12 @@ type TelegramListener struct {
 	Dry                     bool         // dry run, do not ban or send messages
 	AggressiveCleanup       bool         // delete all messages from user when banned via /spam command
 	AggressiveCleanupLimit  int          // max messages to delete in aggressive cleanup mode
+	Queue                   moderation.Queue
 
 	adminHandler    *admin
 	reportsHandler  *userReports
+	processor       incomingEventProcessor
+	pipeline        listenerPipeline
 	dmUsers         dmUsers // recent DM senders, stored in memory for admin UI
 	chatID          int64
 	adminChatID     int64
@@ -162,10 +165,12 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			l.shutdownPipeline()
 			return fmt.Errorf("listener context canceled: %w", ctx.Err())
 
 		case update, ok := <-updates:
 			if !ok {
+				l.shutdownPipeline()
 				return fmt.Errorf("telegram update chan closed")
 			}
 
@@ -293,7 +298,7 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 			}
 
 			// process regular messages, the main part of the bot
-			if err := l.procEvents(update); err != nil {
+			if err := l.procEventsWithContext(ctx, update); err != nil {
 				log.Printf("[WARN] failed to process update: %v", err)
 				continue
 			}
@@ -305,140 +310,6 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 			}
 		}
 	}
-}
-
-func (l *TelegramListener) procEvents(update tbapi.Update) error {
-	msgJSON, errJSON := json.Marshal(update.Message)
-	if errJSON != nil {
-		return fmt.Errorf("failed to marshal update.Message to json: %w", errJSON)
-	}
-
-	// intercept private (DM) messages before any other processing.
-	// stores the sender info for the admin UI and silently drops the message.
-	if update.Message.Chat.Type == "private" {
-		if update.Message.From == nil {
-			return nil
-		}
-		from := update.Message.From
-		displayName := strings.TrimSpace(from.FirstName + " " + from.LastName)
-		l.dmUsers.Add(DMUser{
-			UserID:      from.ID,
-			UserName:    from.UserName,
-			DisplayName: displayName,
-			Timestamp:   time.Now(),
-		})
-		return nil
-	}
-
-	fromChat := update.Message.Chat.ID
-	// ignore messages from other chats except the one we are monitor and ones from the test list
-	if !l.isChatAllowed(fromChat) {
-		return nil
-	}
-
-	log.Printf("[DEBUG] %s", string(msgJSON))
-	msg := transform(update.Message)
-
-	// ignore messages with empty text, no media, no video, no video note, no forward
-	if strings.TrimSpace(msg.Text) == "" && msg.Image == nil && !msg.WithVideoNote && !msg.WithVideo && !msg.WithForward {
-		return nil
-	}
-	ctx := context.TODO()
-	log.Printf("[DEBUG] incoming msg: %+v", strings.ReplaceAll(msg.Text, "\n", " "))
-	log.Printf("[DEBUG] incoming msg details: %+v", msg)
-
-	// use channel identity for locator when message is sent on behalf of a channel
-	locatorUserID := msg.From.ID
-	locatorUserName := msg.From.Username
-	if msg.SenderChat.ID != 0 {
-		locatorUserID = msg.SenderChat.ID
-		locatorUserName = msg.SenderChat.UserName
-	}
-	if err := l.Locator.AddMessage(ctx, msg.Text, fromChat, locatorUserID, locatorUserName, msg.ID); err != nil {
-		log.Printf("[WARN] failed to add message to locator: %v", err)
-	}
-
-	// skip spam check for anonymous admin posts from this group or from the linked channel.
-	// when admins post "as the group", SenderChat.ID equals the group's chat ID;
-	// when the linked channel posts, SenderChat.ID equals the linked channel ID.
-	if msg.SenderChat.ID != 0 && (msg.SenderChat.ID == fromChat || msg.SenderChat.ID == l.linkedChannelID) {
-		log.Printf("[DEBUG] skipping spam check for anonymous admin post from group itself or linked channel")
-		return nil
-	}
-
-	resp := l.Bot.OnMessage(*msg, false)
-
-	if !resp.Send { // not spam
-		return nil
-	}
-
-	// send response to the channel if allowed
-	if resp.Send && !l.NoSpamReply && !l.TrainingMode {
-		if err := l.sendBotResponse(resp, fromChat, NotificationSilent); err != nil {
-			log.Printf("[WARN] failed to respond on update, %v", err)
-		}
-	}
-
-	errs := new(multierror.Error)
-
-	// ban user if requested by bot
-	if resp.Send && resp.BanInterval > 0 {
-		log.Printf("[DEBUG] ban initiated for %+v", resp)
-		l.SpamLogger.Save(msg, &resp)
-		spamUserID := msg.From.ID
-		if msg.SenderChat.ID != 0 {
-			spamUserID = msg.SenderChat.ID
-		}
-		if err := l.Locator.AddSpam(ctx, spamUserID, resp.CheckResults); err != nil {
-			log.Printf("[WARN] failed to add spam to locator: %v", err)
-		}
-		banUserStr := l.getBanUsername(resp, update)
-
-		if l.SuperUsers.IsSuper(msg.From.Username, msg.From.ID) {
-			if l.TrainingMode {
-				l.adminHandler.ReportBan(banUserStr, msg, resp.BanInterval, l.SoftBanMode)
-			}
-			log.Printf("[DEBUG] superuser %s requested ban, ignored", banUserStr)
-			return nil
-		}
-
-		duration, restrict := resp.BanInterval, l.SoftBanMode
-		if spamUserID != 0 && l.DetectedSpamCounter != nil {
-			if count, countErr := l.DetectedSpamCounter.CountByUserID(ctx, spamUserID); countErr != nil {
-				log.Printf("[WARN] failed to count spam strikes for user %d: %v", spamUserID, countErr)
-			} else {
-				duration, restrict = spamPenalty(count, l.SoftBanMode, l.ModerationConfig)
-			}
-		}
-
-		banReq := banRequest{duration: duration, userID: resp.User.ID, channelID: resp.ChannelID, userName: banUserStr,
-			chatID: fromChat, dry: l.Dry, training: l.TrainingMode, tbAPI: l.TbAPI, restrict: restrict}
-		if err := banUserOrChannel(banReq); err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("failed to ban %s: %w", banUserStr, err))
-		} else if l.adminChatID != 0 && msg.From.ID != 0 {
-			l.adminHandler.ReportBan(banUserStr, msg, duration, restrict)
-		}
-	}
-
-	// delete extra messages if spam detected (e.g., duplicates)
-	l.deleteExtraMessages(resp.CheckResults, msg.From.ID, msg.From.Username, fromChat)
-
-	// delete message if requested by bot
-	canDelete := resp.DeleteReplyTo && resp.ReplyTo != 0 && !l.Dry &&
-		!l.SuperUsers.IsSuper(msg.From.Username, msg.From.ID) && !l.TrainingMode
-	if canDelete {
-		if _, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID:  resp.ReplyTo,
-			ChatConfig: tbapi.ChatConfig{ChatID: l.chatID},
-		}}); err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("failed to delete message %d: %w", resp.ReplyTo, err))
-		}
-	}
-
-	if err := errs.ErrorOrNil(); err != nil {
-		return fmt.Errorf("processing events failed: %w", err)
-	}
-	return nil
 }
 
 // procSuperReply processes superuser commands (reply) /spam, /ban, /warn

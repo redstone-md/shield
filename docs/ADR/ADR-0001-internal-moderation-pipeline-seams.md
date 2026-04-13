@@ -12,15 +12,15 @@ Superseded by:
 - [x] Add an in-memory `Queue` interface implementation as the first async seam
 - [x] Map current packages to roadmap bounded contexts
 - [x] Create the initial architecture overview in `docs/Architecture.md`
-- [ ] Rewire `app/events/listener.go` to publish `IncomingEvent` instead of invoking the moderation flow directly
-- [ ] Add a worker that consumes from the queue and calls detection, policy, action, and audit layers through interfaces
+- [x] Rewire `app/events/listener.go` to publish `IncomingEvent` instead of invoking the moderation flow directly
+- [x] Add a worker that consumes from the queue and calls detection, policy, action, and audit layers through interfaces
 - [ ] Add tracer-bullet smoke coverage for `ingestion -> queue -> worker -> decision -> audit`
 
 ## Context
 
 - The current runtime is a single-process Go application with Telegram ingestion in `app/events`, moderation logic behind `app/bot`, and persistence in `app/storage`.
 - `docs/ROADMAP.md` and `docs/plans/roadmap/00-foundations-and-internal-pipeline.md` require explicit bounded contexts and an internal asynchronous seam before introducing control-plane, multi-tenant, and slow-path work.
-- The existing code already has useful interfaces, but there is no transport-neutral package for moderation contracts and no queue abstraction to separate ingestion from processing.
+- The existing code already has useful interfaces, but phase 0 needed a transport-neutral package for moderation contracts and a queue abstraction to separate ingestion from processing.
 - Success for the first phase requires small, behavior-preserving increments that keep the modular monolith intact while making future extraction possible.
 - This ADR does not introduce RabbitMQ/NATS yet and does not split the runtime into separate OS processes.
 
@@ -40,7 +40,7 @@ Superseded by:
 Key points:
 
 - Map the current repository to five roadmap bounded contexts without splitting deployables yet: `controlplane`, `gateway`, `detection`, `policy`, and `audit`.
-- Treat `app/events` as the current `gateway` boundary responsible for Telegram-specific ingestion and adaptation.
+- Treat `app/events` as the current `gateway` boundary responsible for Telegram-specific ingestion, adaptation, queue publication, and the temporary in-process worker.
 - Treat `app/bot` and `lib/tgspam` as the current `detection` boundary.
 - Introduce policy and action contracts explicitly so later steps can move moderation decisions out of `app/events`.
 - Start with an in-memory queue so the async seam exists before infrastructure dependencies are introduced.
@@ -60,7 +60,8 @@ flowchart LR
 
   TG --> Gateway
   Gateway --> Queue
-  Queue --> Detection
+  Queue --> Worker[events worker]
+  Worker --> Detection
   Detection --> Policy
   Policy --> Action
   Policy --> Audit
@@ -95,7 +96,7 @@ flowchart LR
 ### Positive
 
 - Future work can depend on explicit moderation contracts instead of Telegram structs.
-- Queue-backed processing can be introduced incrementally with lower regression risk.
+- Queue-backed processing is now introduced inside the process with lower regression risk.
 - Architecture docs now reflect the intended target boundaries.
 
 ### Negative / risks
@@ -117,7 +118,7 @@ flowchart LR
   - docs under `docs/`
 - New boundaries / responsibilities:
   - `app/moderation` owns cross-stage moderation contracts and queue seam
-  - `app/events` remains Telegram-specific ingestion until the next slice
+  - `app/events` now owns Telegram-specific ingestion plus the in-process queue worker adapter
 - Feature flags / toggles:
   - None in this slice
 
@@ -148,7 +149,7 @@ flowchart LR
 ### Objectives
 
 - Prove the new queue seam can publish, consume, and fail safely on close or canceled context.
-- Prove the new slice does not regress the existing listener tracer-bullet baseline.
+- Prove the listener now routes regular messages through the queue worker without breaking the existing tracer-bullet baseline.
 - Keep architecture docs and ADR links aligned with real repo paths.
 
 ### Test environment
@@ -166,7 +167,8 @@ flowchart LR
   - `InMemoryQueue.Publish` delivers to `Consume`
   - publish on closed queue fails with `ErrQueueClosed`
   - canceled context aborts publish
-  - existing listener baseline test still passes
+  - `procEvents` publishes a transport-neutral `IncomingEvent`
+  - existing listener baseline test still passes through the worker-backed path
 - Positive flows that MUST pass:
   - queue publish/consume
 - Negative / forbidden flows that MUST be rejected or fail safely:
@@ -195,11 +197,12 @@ flowchart LR
 | TST-002 | Publish with canceled context | Unit | `context.Canceled` returned | `app/moderation/queue_test.go` |
 | TST-003 | Publish after queue close | Unit | `ErrQueueClosed` returned | `app/moderation/queue_test.go` |
 | TST-004 | Existing listener baseline | Unit | `TestTelegramListener_Do` stays green | `app/events/listener_test.go` |
+| TST-005 | Listener publishes `IncomingEvent` contract | Unit | Worker processor receives normalized contract + original update | `app/events/listener_test.go` |
 
 ### Regression and analysis
 
 - Regression suites to run:
-  - `go test ./app/moderation ./app/events -run 'TestInMemoryQueue|TestTelegramListener_Do' -count=1`
+  - `go test ./app/moderation ./app/events -run 'TestInMemoryQueue|TestTelegramListener_Do|TestTelegramListener_ProcEventsPublishesIncomingEvent' -count=1`
 - Static analysis:
   - `git diff --check`
 - Monitoring during rollout:

@@ -7,8 +7,8 @@
 - [x] Зафиксировать ADR с mapping текущих пакетов на bounded contexts: `controlplane`, `gateway`, `detection`, `policy`, `audit`.
 - [x] Описать единый внутренний контракт `IncomingEvent`, `DetectionResult`, `PolicyDecision`, `ModerationActionResult` и положить его в отдельный пакет без Telegram-specific деталей.
 - [x] Создать интерфейс `Queue` и in-memory реализацию на каналах, чтобы отделить ingestion от обработки без немедленного ввода RabbitMQ/NATS.
-- [ ] Перевести `app/events/listener.go` с прямого вызова обработки на публикацию `IncomingEvent` в internal queue.
-- [ ] Создать worker-процессор, который читает событие из queue и вызывает detection, policy и action слои через интерфейсы, а не через связанные напрямую структуры.
+- [x] Перевести `app/events/listener.go` с прямого вызова обработки на публикацию `IncomingEvent` в internal queue.
+- [x] Создать worker-процессор, который читает событие из queue и вызывает detection, policy и action слои через интерфейсы, а не через связанные напрямую структуры.
 - [ ] Вынести применение санкций из `app/events` в отдельный `action executor`, чтобы `events` отвечал только за Telegram ingestion и transport-specific адаптацию.
 - [ ] Вынести расчёт policy decision из `app/events` в отдельный пакет с минимальным правилом `allow/delete/restrict/ban`.
 - [ ] Вынести запись результатов модерации в отдельный `audit writer`, который умеет сохранять входное событие, решение и результат исполнения.
