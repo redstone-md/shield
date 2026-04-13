@@ -1,19 +1,20 @@
 package events
 
 import (
+	"context"
 	"fmt"
-	"log"
 	"time"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
+	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
 type ActionExecutor interface {
-	ApplyBan(banRequest) error
-	DeleteMessage(chatID int64, msgID int) error
-	DeleteExtraMessages(checkResults []spamcheck.Response, userID int64, username string, chatID int64) error
+	ApplyBan(ctx context.Context, req banRequest) error
+	DeleteMessage(ctx context.Context, chatID int64, msgID int) error
+	DeleteExtraMessages(ctx context.Context, checkResults []spamcheck.Response, userID int64, username string, chatID int64) error
 }
 
 type telegramActionExecutor struct {
@@ -32,29 +33,33 @@ func newTelegramActionExecutor(tbAPI TbAPI, dry, trainingMode bool, superUsers S
 	}
 }
 
-func (e telegramActionExecutor) ApplyBan(req banRequest) error {
+func (e telegramActionExecutor) ApplyBan(ctx context.Context, req banRequest) error {
 	req.tbAPI = e.tbAPI
-	return banUserOrChannel(req)
+	return banUserOrChannel(ctx, req)
 }
 
-func (e telegramActionExecutor) DeleteMessage(chatID int64, msgID int) error {
+func (e telegramActionExecutor) DeleteMessage(ctx context.Context, chatID int64, msgID int) error {
 	_, err := e.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 		MessageID:  msgID,
 		ChatConfig: tbapi.ChatConfig{ChatID: chatID},
 	}})
 	if err != nil {
+		observability.Logf(ctx, "[WARN] failed to delete message %d: %v", msgID, err)
 		return fmt.Errorf("delete message %d: %w", msgID, err)
 	}
+	observability.Logf(ctx, "[DEBUG] deleted message %d", msgID)
 	return nil
 }
 
-func (e telegramActionExecutor) DeleteExtraMessages(checkResults []spamcheck.Response, userID int64, username string, chatID int64) error {
+func (e telegramActionExecutor) DeleteExtraMessages(ctx context.Context, checkResults []spamcheck.Response,
+	userID int64, username string, chatID int64,
+) error {
 	if len(checkResults) == 0 || e.dry || e.trainingMode {
 		return nil
 	}
 
 	if e.superUsers.IsSuper(username, userID) {
-		log.Printf("[DEBUG] skip extra deletions for superuser %s (%d)", username, userID)
+		observability.Logf(ctx, "[DEBUG] skip extra deletions for superuser %s (%d)", username, userID)
 		return nil
 	}
 
@@ -63,11 +68,11 @@ func (e telegramActionExecutor) DeleteExtraMessages(checkResults []spamcheck.Res
 			continue
 		}
 
-		log.Printf("[INFO] deleting %d extra messages from user %d", len(checkResult.ExtraDeleteIDs), userID)
+		observability.Logf(ctx, "[INFO] deleting %d extra messages from user %d", len(checkResult.ExtraDeleteIDs), userID)
 		for _, msgID := range checkResult.ExtraDeleteIDs {
 			time.Sleep(35 * time.Millisecond)
-			if err := e.DeleteMessage(chatID, msgID); err != nil {
-				log.Printf("[WARN] failed to delete extra message %d: %v", msgID, err)
+			if err := e.DeleteMessage(ctx, chatID, msgID); err != nil {
+				observability.Logf(ctx, "[WARN] failed to delete extra message %d: %v", msgID, err)
 			}
 		}
 	}
@@ -91,13 +96,13 @@ type banRequest struct {
 // The bot must be an administrator in the supergroup for this to work
 // and must have the appropriate admin rights.
 // If channel is provided, it is banned instead of provided user, permanently.
-func banUserOrChannel(r banRequest) error {
+func banUserOrChannel(ctx context.Context, r banRequest) error {
 	if r.dry {
 		bannedEntity := fmt.Sprintf("user %d", r.userID)
 		if r.channelID != 0 {
 			bannedEntity = fmt.Sprintf("channel %d", r.channelID)
 		}
-		log.Printf("[INFO] dry run: ban %s for %v", bannedEntity, r.duration)
+		observability.Logf(ctx, "[INFO] dry run: ban %s for %v", bannedEntity, r.duration)
 		return nil
 	}
 
@@ -106,7 +111,7 @@ func banUserOrChannel(r banRequest) error {
 		if r.channelID != 0 {
 			bannedEntity = fmt.Sprintf("channel %d", r.channelID)
 		}
-		log.Printf("[INFO] training mode: ban %s for %v", bannedEntity, r.duration)
+		observability.Logf(ctx, "[INFO] training mode: ban %s for %v", bannedEntity, r.duration)
 		return nil
 	}
 
@@ -126,7 +131,7 @@ func banUserOrChannel(r banRequest) error {
 		if !resp.Ok {
 			return fmt.Errorf("response is not Ok: %v", string(resp.Result))
 		}
-		log.Printf("[INFO] channel %s banned by bot for %v", r.userName, r.duration)
+		observability.Logf(ctx, "[INFO] channel %s banned by bot for %v", r.userName, r.duration)
 		return nil
 	}
 
@@ -157,7 +162,7 @@ func banUserOrChannel(r banRequest) error {
 		if !resp.Ok {
 			return fmt.Errorf("response is not Ok: %v", string(resp.Result))
 		}
-		log.Printf("[INFO] %s restricted by bot for %v", r.userName, r.duration)
+		observability.Logf(ctx, "[INFO] %s restricted by bot for %v", r.userName, r.duration)
 		return nil
 	}
 
@@ -175,6 +180,6 @@ func banUserOrChannel(r banRequest) error {
 		return fmt.Errorf("response is not Ok: %v", string(resp.Result))
 	}
 
-	log.Printf("[INFO] user %s banned by bot for %v", r.userName, r.duration)
+	observability.Logf(ctx, "[INFO] user %s banned by bot for %v", r.userName, r.duration)
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "modernc.org/sqlite" // sqlite driver loaded here
 
+	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
@@ -211,7 +212,7 @@ func (l *Locator) AddMessage(ctx context.Context, msg string, chatID, userID int
 	defer l.Unlock()
 
 	hash := l.MsgHash(msg)
-	log.Printf("[DEBUG] add message to locator: %q, hash:%s, userID:%d, user name:%q, chatID:%d, msgID:%d",
+	observability.Logf(ctx, "[DEBUG] add message to locator: %q, hash:%s, userID:%d, user name:%q, chatID:%d, msgID:%d",
 		msg, hash, userID, userName, chatID, msgID)
 
 	query, err := locatorQueries.Pick(l.Type(), CmdAddLocatorMessage)
@@ -279,7 +280,7 @@ func (l *Locator) Message(ctx context.Context, msg string) (MsgMeta, bool) {
 	query := l.Adopt(`SELECT time, chat_id, user_id, user_name, msg_id FROM messages WHERE hash = ? AND gid = ?`)
 	err := l.GetContext(ctx, &meta, query, hash, l.GID())
 	if err != nil {
-		log.Printf("[DEBUG] failed to find message by hash %q: %v", hash, err)
+		observability.Logf(ctx, "[DEBUG] failed to find message by hash %q: %v", hash, err)
 		return MsgMeta{}, false
 	}
 	return meta, true
@@ -294,7 +295,7 @@ func (l *Locator) UserNameByID(ctx context.Context, userID int64) string {
 	query := l.Adopt(`SELECT user_name FROM messages WHERE user_id = ? AND gid = ? LIMIT 1`)
 	err := l.GetContext(ctx, &userName, query, userID, l.GID())
 	if err != nil {
-		log.Printf("[DEBUG] failed to find user name by id %d: %v", userID, err)
+		observability.Logf(ctx, "[DEBUG] failed to find user name by id %d: %v", userID, err)
 		return ""
 	}
 	return userName
@@ -309,7 +310,7 @@ func (l *Locator) UserIDByName(ctx context.Context, userName string) int64 {
 	query := l.Adopt(`SELECT user_id FROM messages WHERE user_name = ? AND gid = ? LIMIT 1`)
 	err := l.GetContext(ctx, &userID, query, userName, l.GID())
 	if err != nil {
-		log.Printf("[DEBUG] failed to find user id by name %q: %v", userName, err)
+		observability.Logf(ctx, "[DEBUG] failed to find user id by name %q: %v", userName, err)
 		return 0
 	}
 	return userID

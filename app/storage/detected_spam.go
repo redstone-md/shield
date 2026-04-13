@@ -12,6 +12,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
@@ -117,7 +118,8 @@ func (ds *DetectedSpam) Write(ctx context.Context, entry DetectedSpamInfo, check
 		return fmt.Errorf("failed to insert detected spam entry: %w", err)
 	}
 
-	log.Printf("[INFO] detected spam entry added for gid:%s, user_id:%d, name:%s", entry.GID, entry.UserID, entry.UserName)
+	observability.Logf(ctx, "[INFO] detected spam entry added for gid:%s, user_id:%d, name:%s",
+		entry.GID, entry.UserID, entry.UserName)
 	return nil
 }
 

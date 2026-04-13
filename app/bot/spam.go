@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
+	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/lib/approved"
 	"github.com/umputun/tg-spam/lib/spamcheck"
@@ -73,6 +74,11 @@ func NewSpamFilter(detector Detector, params SpamConfig) *SpamFilter {
 
 // OnMessage checks if user already approved and if not checks if user is a spammer
 func (s *SpamFilter) OnMessage(msg Message, checkOnly bool) (response Response) {
+	return s.OnMessageWithContext(context.Background(), msg, checkOnly)
+}
+
+// OnMessageWithContext checks if user already approved and if not checks if user is a spammer.
+func (s *SpamFilter) OnMessageWithContext(ctx context.Context, msg Message, checkOnly bool) (response Response) {
 	if msg.From.ID == 0 { // don't check system messages
 		return Response{}
 	}
@@ -155,7 +161,7 @@ func (s *SpamFilter) OnMessage(msg Message, checkOnly bool) (response Response) 
 	}
 	checkResultStr := strings.Join(crs, ", ")
 	if isSpam {
-		log.Printf("[INFO] user %s detected as spammer: %s, %q", displayUsername, checkResultStr, msgText)
+		observability.Logf(ctx, "[INFO] user %s detected as spammer: %s, %q", displayUsername, checkResultStr, msgText)
 		msgPrefix := s.params.SpamMsg
 		if s.params.Dry {
 			msgPrefix = s.params.SpamDryMsg
@@ -167,7 +173,7 @@ func (s *SpamFilter) OnMessage(msg Message, checkOnly bool) (response Response) 
 			ChannelID: msg.SenderChat.ID,
 		}
 	}
-	log.Printf("[DEBUG] user %s is not a spammer, %s", displayUsername, checkResultStr)
+	observability.Logf(ctx, "[DEBUG] user %s is not a spammer, %s", displayUsername, checkResultStr)
 	return Response{CheckResults: checkResults} // not a spam
 }
 

@@ -231,7 +231,7 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 		userName: origMsg.From.UserName,
 		restrict: restrict,
 	}
-	if err := banUserOrChannel(banReq); err != nil {
+	if err := banUserOrChannel(ctx, banReq); err != nil {
 		return fmt.Errorf("failed to ban user %d after LLM-reviewed report: %w", origMsg.From.ID, err)
 	}
 
@@ -447,7 +447,7 @@ func (r *userReports) executeAutoBan(ctx context.Context, reports []storage.Repo
 		userName: reportedUserName,
 		restrict: r.softBanMode, // IMPORTANT: use soft-ban if enabled
 	}
-	if err := banUserOrChannel(banReq); err != nil {
+	if err := banUserOrChannel(ctx, banReq); err != nil {
 		log.Printf("[WARN] failed to auto-ban user %d: %v", reportedUserID, err)
 	}
 
@@ -797,7 +797,7 @@ func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.Callba
 		userName: reportedUserName,
 		restrict: r.softBanMode, // respect soft-ban mode
 	}
-	if err := banUserOrChannel(banReq); err != nil {
+	if err := banUserOrChannel(ctx, banReq); err != nil {
 		log.Printf("[WARN] failed to ban user %d: %v", reportedUserID, err)
 	}
 
@@ -953,7 +953,7 @@ func (r *userReports) callbackReportBanReporterConfirm(ctx context.Context, quer
 		training: r.trainingMode,
 		userName: reporterName,
 	}
-	if banErr := banUserOrChannel(banReq); banErr != nil {
+	if banErr := banUserOrChannel(ctx, banReq); banErr != nil {
 		log.Printf("[WARN] failed to ban reporter %d: %v", reporterID, banErr)
 	}
 

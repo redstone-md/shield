@@ -1,6 +1,7 @@
 package events
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -20,7 +21,7 @@ func TestTelegramActionExecutor_DeleteExtraMessages(t *testing.T) {
 	}
 	exec := newTelegramActionExecutor(mockAPI, false, false, nil)
 
-	err := exec.DeleteExtraMessages([]spamcheck.Response{{
+	err := exec.DeleteExtraMessages(context.Background(), []spamcheck.Response{{
 		Name:           "duplicates",
 		Spam:           true,
 		ExtraDeleteIDs: []int{11, 12},
@@ -39,7 +40,7 @@ func TestTelegramActionExecutor_ApplyBan(t *testing.T) {
 	}
 	exec := newTelegramActionExecutor(mockAPI, false, false, nil)
 
-	err := exec.ApplyBan(banRequest{
+	err := exec.ApplyBan(context.Background(), banRequest{
 		userID:   42,
 		chatID:   123,
 		userName: "user",

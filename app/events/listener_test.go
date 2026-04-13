@@ -1,9 +1,11 @@
 package events
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"reflect"
 	"strings"
@@ -17,6 +19,7 @@ import (
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/events/mocks"
 	"github.com/umputun/tg-spam/app/moderation"
+	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/spamcheck"
@@ -54,15 +57,18 @@ func (s *policyEngineSpy) Decide(ctx context.Context, req PolicyRequest) (Policy
 }
 
 type actionExecutorSpy struct {
-	applyBan           func(req banRequest) error
-	deleteMessage      func(chatID int64, msgID int) error
-	deleteExtra        func(checkResults []spamcheck.Response, userID int64, username string, chatID int64) error
+	applyBan           func(ctx context.Context, req banRequest) error
+	deleteMessage      func(ctx context.Context, chatID int64, msgID int) error
+	deleteExtra        func(ctx context.Context, checkResults []spamcheck.Response, userID int64, username string, chatID int64) error
+	banCtxs            []context.Context
 	banCalls           []banRequest
 	deleteMessageCalls []struct {
-		ChatID int64
-		MsgID  int
+		Context context.Context
+		ChatID  int64
+		MsgID   int
 	}
 	deleteExtraCalls []struct {
+		Context      context.Context
 		CheckResults []spamcheck.Response
 		UserID       int64
 		Username     string
@@ -70,34 +76,39 @@ type actionExecutorSpy struct {
 	}
 }
 
-func (s *actionExecutorSpy) ApplyBan(req banRequest) error {
+func (s *actionExecutorSpy) ApplyBan(ctx context.Context, req banRequest) error {
+	s.banCtxs = append(s.banCtxs, ctx)
 	s.banCalls = append(s.banCalls, req)
 	if s.applyBan != nil {
-		return s.applyBan(req)
+		return s.applyBan(ctx, req)
 	}
 	return nil
 }
 
-func (s *actionExecutorSpy) DeleteMessage(chatID int64, msgID int) error {
+func (s *actionExecutorSpy) DeleteMessage(ctx context.Context, chatID int64, msgID int) error {
 	s.deleteMessageCalls = append(s.deleteMessageCalls, struct {
-		ChatID int64
-		MsgID  int
-	}{ChatID: chatID, MsgID: msgID})
+		Context context.Context
+		ChatID  int64
+		MsgID   int
+	}{Context: ctx, ChatID: chatID, MsgID: msgID})
 	if s.deleteMessage != nil {
-		return s.deleteMessage(chatID, msgID)
+		return s.deleteMessage(ctx, chatID, msgID)
 	}
 	return nil
 }
 
-func (s *actionExecutorSpy) DeleteExtraMessages(checkResults []spamcheck.Response, userID int64, username string, chatID int64) error {
+func (s *actionExecutorSpy) DeleteExtraMessages(ctx context.Context, checkResults []spamcheck.Response,
+	userID int64, username string, chatID int64,
+) error {
 	s.deleteExtraCalls = append(s.deleteExtraCalls, struct {
+		Context      context.Context
 		CheckResults []spamcheck.Response
 		UserID       int64
 		Username     string
 		ChatID       int64
-	}{CheckResults: checkResults, UserID: userID, Username: username, ChatID: chatID})
+	}{Context: ctx, CheckResults: checkResults, UserID: userID, Username: username, ChatID: chatID})
 	if s.deleteExtra != nil {
-		return s.deleteExtra(checkResults, userID, username, chatID)
+		return s.deleteExtra(ctx, checkResults, userID, username, chatID)
 	}
 	return nil
 }
@@ -105,14 +116,68 @@ func (s *actionExecutorSpy) DeleteExtraMessages(checkResults []spamcheck.Respons
 type auditWriterSpy struct {
 	write func(ctx context.Context, record AuditRecord) error
 	calls []AuditRecord
+	ctxs  []context.Context
 }
 
 func (s *auditWriterSpy) Write(ctx context.Context, record AuditRecord) error {
+	s.ctxs = append(s.ctxs, ctx)
 	s.calls = append(s.calls, record)
 	if s.write != nil {
 		return s.write(ctx, record)
 	}
 	return nil
+}
+
+type contextualBotSpy struct {
+	onMessage func(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response
+	ctxs      []context.Context
+	msgs      []bot.Message
+}
+
+func (s *contextualBotSpy) OnMessageWithContext(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response {
+	s.ctxs = append(s.ctxs, ctx)
+	s.msgs = append(s.msgs, msg)
+	if s.onMessage != nil {
+		return s.onMessage(ctx, msg, checkOnly)
+	}
+	return bot.Response{}
+}
+
+func (s *contextualBotSpy) OnMessage(msg bot.Message, checkOnly bool) bot.Response {
+	return s.OnMessageWithContext(context.Background(), msg, checkOnly)
+}
+
+func (s *contextualBotSpy) UpdateSpam(string) error             { return nil }
+func (s *contextualBotSpy) UpdateHam(string) error              { return nil }
+func (s *contextualBotSpy) AddApprovedUser(int64, string) error { return nil }
+func (s *contextualBotSpy) RemoveApprovedUser(int64) error      { return nil }
+func (s *contextualBotSpy) IsApprovedUser(int64) bool           { return false }
+
+type locatorContextSpy struct {
+	addMessageCtxs []context.Context
+	addSpamCtxs    []context.Context
+}
+
+func (s *locatorContextSpy) AddMessage(ctx context.Context, msg string, chatID, userID int64, userName string, msgID int) error {
+	s.addMessageCtxs = append(s.addMessageCtxs, ctx)
+	return nil
+}
+
+func (s *locatorContextSpy) AddSpam(ctx context.Context, userID int64, checks []spamcheck.Response) error {
+	s.addSpamCtxs = append(s.addSpamCtxs, ctx)
+	return nil
+}
+
+func (s *locatorContextSpy) Message(context.Context, string) (storage.MsgMeta, bool) {
+	return storage.MsgMeta{}, false
+}
+func (s *locatorContextSpy) Spam(context.Context, int64) (storage.SpamData, bool) {
+	return storage.SpamData{}, false
+}
+func (s *locatorContextSpy) MsgHash(string) string                      { return "" }
+func (s *locatorContextSpy) UserNameByID(context.Context, int64) string { return "" }
+func (s *locatorContextSpy) GetUserMessageIDs(context.Context, int64, int) ([]int, error) {
+	return nil, nil
 }
 
 func TestTelegramListener_ProcEventsPublishesIncomingEvent(t *testing.T) {
@@ -179,11 +244,10 @@ func TestTelegramListener_TracerBulletSmoke(t *testing.T) {
 		},
 	}
 
-	locator, teardown := prepTestLocator(t)
-	defer teardown()
+	locator := &locatorContextSpy{}
 
-	botMock := &mocks.BotMock{
-		OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+	botMock := &contextualBotSpy{
+		onMessage: func(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response {
 			callOrder = append(callOrder, "detection")
 			return bot.Response{
 				Send:        true,
@@ -214,7 +278,7 @@ func TestTelegramListener_TracerBulletSmoke(t *testing.T) {
 	}
 
 	actionSpy := &actionExecutorSpy{
-		applyBan: func(req banRequest) error {
+		applyBan: func(ctx context.Context, req banRequest) error {
 			callOrder = append(callOrder, "action")
 			return nil
 		},
@@ -223,7 +287,7 @@ func TestTelegramListener_TracerBulletSmoke(t *testing.T) {
 	auditSpy := &auditWriterSpy{
 		write: func(ctx context.Context, record AuditRecord) error {
 			callOrder = append(callOrder, "audit")
-			return nil
+			return locator.AddSpam(ctx, record.SpamUserID, record.Response.CheckResults)
 		},
 	}
 
@@ -264,6 +328,70 @@ func TestTelegramListener_TracerBulletSmoke(t *testing.T) {
 	assert.Equal(t, moderation.ActionBan, auditSpy.calls[0].Decision.Action)
 	assert.Equal(t, "spam payload", auditSpy.calls[0].Message.Text)
 	assert.Equal(t, int64(42), auditSpy.calls[0].SpamUserID)
+
+	eventID := policySpy.calls[0].Event.EventID
+	correlationID := policySpy.calls[0].Event.CorrelationID
+	require.NotEmpty(t, eventID)
+	require.NotEmpty(t, correlationID)
+	assertContextMetadata(t, botMock.ctxs[0], eventID, correlationID)
+	assertContextMetadata(t, actionSpy.banCtxs[0], eventID, correlationID)
+	assertContextMetadata(t, actionSpy.deleteExtraCalls[0].Context, eventID, correlationID)
+	assertContextMetadata(t, auditSpy.ctxs[0], eventID, correlationID)
+	assertContextMetadata(t, locator.addMessageCtxs[0], eventID, correlationID)
+	assertContextMetadata(t, locator.addSpamCtxs[0], eventID, correlationID)
+}
+
+func TestTelegramListener_ProcessQueuedEventLogsCorrelationIDs(t *testing.T) {
+	var buf bytes.Buffer
+	oldWriter := log.Writer()
+	oldFlags := log.Flags()
+	log.SetOutput(&buf)
+	log.SetFlags(0)
+	defer func() {
+		log.SetOutput(oldWriter)
+		log.SetFlags(oldFlags)
+	}()
+
+	locator := &locatorContextSpy{}
+	botMock := &contextualBotSpy{
+		onMessage: func(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response {
+			return bot.Response{}
+		},
+	}
+
+	l := TelegramListener{
+		Bot:            botMock,
+		Locator:        locator,
+		PolicyEngine:   &policyEngineSpy{},
+		ActionExecutor: &actionExecutorSpy{},
+		AuditWriter:    &auditWriterSpy{},
+	}
+
+	event := moderation.IncomingEvent{
+		EventID:       "evt-123",
+		CorrelationID: "corr-123",
+	}
+	update := tbapi.Update{
+		Message: &tbapi.Message{
+			MessageID: 55,
+			Chat:      tbapi.Chat{ID: 123},
+			Text:      "hello",
+			From:      &tbapi.User{ID: 42, UserName: "user"},
+			Date:      int(time.Now().Unix()),
+		},
+	}
+
+	err := l.processQueuedEvent(context.Background(), event, update)
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "event_id=evt-123 correlation_id=corr-123")
+}
+
+func assertContextMetadata(t *testing.T, ctx context.Context, eventID, correlationID string) {
+	t.Helper()
+	meta, ok := observability.MetadataFromContext(ctx)
+	require.True(t, ok)
+	assert.Equal(t, eventID, meta.EventID)
+	assert.Equal(t, correlationID, meta.CorrelationID)
 }
 
 func TestTelegramListener_Do(t *testing.T) {

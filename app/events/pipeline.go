@@ -16,6 +16,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
+	"github.com/umputun/tg-spam/app/observability"
 )
 
 type incomingEventProcessor interface {
@@ -262,18 +263,19 @@ func collectLinks(msg *bot.Message) []string {
 }
 
 func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error {
+	ctx = observability.WithEventMetadata(ctx, event.EventID, event.CorrelationID)
+
 	msgJSON, errJSON := json.Marshal(update.Message)
 	if errJSON != nil {
 		return fmt.Errorf("failed to marshal update.Message to json: %w", errJSON)
 	}
 
 	fromChat := update.Message.Chat.ID
-	log.Printf("[DEBUG] event_id=%s correlation_id=%s %s", event.EventID, event.CorrelationID, string(msgJSON))
+	observability.Logf(ctx, "[DEBUG] %s", string(msgJSON))
 	msg := transform(update.Message)
 
-	log.Printf("[DEBUG] event_id=%s correlation_id=%s incoming msg: %+v",
-		event.EventID, event.CorrelationID, strings.ReplaceAll(msg.Text, "\n", " "))
-	log.Printf("[DEBUG] event_id=%s correlation_id=%s incoming msg details: %+v", event.EventID, event.CorrelationID, msg)
+	observability.Logf(ctx, "[DEBUG] incoming msg: %+v", strings.ReplaceAll(msg.Text, "\n", " "))
+	observability.Logf(ctx, "[DEBUG] incoming msg details: %+v", msg)
 
 	// use channel identity for locator when message is sent on behalf of a channel
 	locatorUserID := msg.From.ID
@@ -283,21 +285,20 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 		locatorUserName = msg.SenderChat.UserName
 	}
 	if err := l.Locator.AddMessage(ctx, msg.Text, fromChat, locatorUserID, locatorUserName, msg.ID); err != nil {
-		log.Printf("[WARN] failed to add message to locator: %v", err)
+		observability.Logf(ctx, "[WARN] failed to add message to locator: %v", err)
 	}
 
 	// skip spam check for anonymous admin posts from this group or from the linked channel.
 	if msg.SenderChat.ID != 0 && (msg.SenderChat.ID == fromChat || msg.SenderChat.ID == l.linkedChannelID) {
-		log.Printf("[DEBUG] event_id=%s correlation_id=%s skipping spam check for anonymous admin post from group itself or linked channel",
-			event.EventID, event.CorrelationID)
+		observability.Logf(ctx, "[DEBUG] skipping spam check for anonymous admin post from group itself or linked channel")
 		return nil
 	}
 
-	resp := l.Bot.OnMessage(*msg, false)
+	resp := l.botOnMessage(ctx, *msg, false)
 
 	if resp.Send && !l.NoSpamReply && !l.TrainingMode {
 		if err := l.sendBotResponse(resp, fromChat, NotificationSilent); err != nil {
-			log.Printf("[WARN] failed to respond on update, %v", err)
+			observability.Logf(ctx, "[WARN] failed to respond on update, %v", err)
 		}
 	}
 
@@ -310,7 +311,7 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 	strikeCount := 0
 	if spamUserID != 0 && l.DetectedSpamCounter != nil {
 		if count, countErr := l.DetectedSpamCounter.CountByUserID(ctx, spamUserID); countErr != nil {
-			log.Printf("[WARN] failed to count spam strikes for user %d: %v", spamUserID, countErr)
+			observability.Logf(ctx, "[WARN] failed to count spam strikes for user %d: %v", spamUserID, countErr)
 		} else {
 			strikeCount = count
 		}
@@ -363,8 +364,8 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 	}
 
 	if resp.Send {
-		log.Printf("[DEBUG] event_id=%s correlation_id=%s policy action=%s reason=%q score=%.2f",
-			event.EventID, event.CorrelationID, policyOutcome.Decision.Action, policyOutcome.Decision.Reason, policyOutcome.Decision.Score)
+		observability.Logf(ctx, "[DEBUG] policy action=%s reason=%q score=%.2f",
+			policyOutcome.Decision.Action, policyOutcome.Decision.Reason, policyOutcome.Decision.Score)
 
 		actionResult := moderation.ModerationActionResult{
 			EventID:       event.EventID,
@@ -386,7 +387,7 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 				training:  l.TrainingMode,
 				restrict:  policyOutcome.Restrict,
 			}
-			if err := l.ActionExecutor.ApplyBan(banReq); err != nil {
+			if err := l.ActionExecutor.ApplyBan(ctx, banReq); err != nil {
 				actionResult.Applied = false
 				actionResult.Error = err.Error()
 				errs = multierror.Append(errs, fmt.Errorf("failed to apply %s for %s: %w",
@@ -412,14 +413,14 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 		}
 	}
 
-	if err := l.ActionExecutor.DeleteExtraMessages(resp.CheckResults, msg.From.ID, msg.From.Username, fromChat); err != nil {
+	if err := l.ActionExecutor.DeleteExtraMessages(ctx, resp.CheckResults, msg.From.ID, msg.From.Username, fromChat); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 
 	canDelete := resp.DeleteReplyTo && resp.ReplyTo != 0 && !l.Dry &&
 		!l.SuperUsers.IsSuper(msg.From.Username, msg.From.ID) && !l.TrainingMode
 	if canDelete {
-		if err := l.ActionExecutor.DeleteMessage(l.chatID, resp.ReplyTo); err != nil {
+		if err := l.ActionExecutor.DeleteMessage(ctx, l.chatID, resp.ReplyTo); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 	}
@@ -428,4 +429,15 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 		return fmt.Errorf("processing events failed: %w", err)
 	}
 	return nil
+}
+
+type contextualBot interface {
+	OnMessageWithContext(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response
+}
+
+func (l *TelegramListener) botOnMessage(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response {
+	if b, ok := l.Bot.(contextualBot); ok {
+		return b.OnMessageWithContext(ctx, msg, checkOnly)
+	}
+	return l.Bot.OnMessage(msg, checkOnly)
 }

@@ -189,7 +189,7 @@ func (a *admin) MsgHandler(update tbapi.Update) error {
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: info.UserID,
 			channelID: channelIDFromCallback(info.UserID),
 			chatID:    a.primChatID, tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
-		if err := banUserOrChannel(banReq); err != nil {
+		if err := banUserOrChannel(context.Background(), banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", info.UserID, err))
 		}
 	}
@@ -257,7 +257,7 @@ func (a *admin) msgHandlerFallback(update tbapi.Update, fwdID int64, username, m
 	// ban user (no message deletion - we don't have the message ID from primary chat)
 	banReq := banRequest{duration: bot.PermanentBanDuration, userID: fwdID, chatID: a.primChatID,
 		tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
-	if err := banUserOrChannel(banReq); err != nil {
+	if err := banUserOrChannel(context.Background(), banReq); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", fwdID, err))
 	}
 
@@ -567,7 +567,7 @@ func (a *admin) directReport(update tbapi.Update, updateSamples bool) error {
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: origMsg.From.ID, channelID: channelID,
 			chatID: a.primChatID, tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
 
-		if err := banUserOrChannel(banReq); err != nil {
+		if err := banUserOrChannel(context.Background(), banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", origMsg.From.ID, err))
 		}
 	}
@@ -722,7 +722,7 @@ func (a *admin) callbackBanConfirmed(query *tbapi.CallbackQuery) error {
 		}
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: userID, channelID: channelIDFromCallback(userID),
 			chatID: a.primChatID, tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: userName, restrict: false}
-		if err := banUserOrChannel(banReq); err != nil {
+		if err := banUserOrChannel(context.Background(), banReq); err != nil {
 			return fmt.Errorf("failed to ban user %d: %w", userID, err)
 		}
 	}
@@ -920,7 +920,7 @@ func (a *admin) deleteAndBan(query *tbapi.CallbackQuery, userID int64, msgID int
 	// check if user is super and don't ban if so
 	msgFromSuper := userName != "" && a.superUsers.IsSuper(userName, userID)
 	if !msgFromSuper {
-		if err := banUserOrChannel(banReq); err != nil {
+		if err := banUserOrChannel(context.Background(), banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", userID, err))
 		}
 	}

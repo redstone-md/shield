@@ -18,6 +18,7 @@ Superseded by:
 - [x] Extract moderation decision logic into a policy engine with explicit `allow/delete/restrict/ban` outcomes
 - [x] Extract moderation-result recording into an audit writer used by the worker path
 - [x] Add tracer-bullet smoke coverage for `ingestion -> queue -> worker -> decision -> audit`
+- [x] Propagate moderation `event_id` and `correlation_id` through the in-process tracer-bullet path
 
 ## Context
 
@@ -39,6 +40,7 @@ Superseded by:
 ## Decision
 
 - Keep the runtime as a modular monolith and introduce an internal moderation seam through a transport-neutral `app/moderation` package plus an in-memory queue abstraction.
+- Carry `event_id` and `correlation_id` in `context.Context` for the moderation worker path so downstream detection, action, and storage logs can correlate a single event without widening every public interface.
 
 Key points:
 
@@ -159,6 +161,7 @@ flowchart LR
 
 - Prove the new queue seam can publish, consume, and fail safely on close or canceled context.
 - Prove the listener now routes regular messages through the queue worker without breaking the existing tracer-bullet baseline.
+- Prove the same moderation event metadata reaches detection, action, audit, and storage calls in the worker path.
 - Keep architecture docs and ADR links aligned with real repo paths.
 
 ### Test environment
@@ -181,6 +184,7 @@ flowchart LR
   - sanction application goes through the executor abstraction
   - moderation decisions come from the policy engine rather than inline worker branching
   - moderation recording goes through the audit writer rather than inline worker writes
+  - moderation `event_id` and `correlation_id` stay attached across detection, action, audit, and storage interactions
 - Positive flows that MUST pass:
   - queue publish/consume
 - Negative / forbidden flows that MUST be rejected or fail safely:
