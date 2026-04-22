@@ -117,7 +117,7 @@ func (l *TelegramListener) ensurePipeline() {
 }
 
 func (l *TelegramListener) enqueueIncomingEvent(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error {
-	ctx = observability.WithEventMetadata(ctx, event.EventID, event.CorrelationID)
+	ctx = observability.WithModerationMetadata(ctx, event.EventID, event.CorrelationID, event.IdempotencyKey)
 	if l.IncomingEvents != nil {
 		replay, err := l.IncomingEvents.Reserve(ctx, event)
 		if err != nil {
@@ -292,7 +292,7 @@ func collectLinks(msg *bot.Message) []string {
 }
 
 func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error {
-	ctx = observability.WithEventMetadata(ctx, event.EventID, event.CorrelationID)
+	ctx = observability.WithModerationMetadata(ctx, event.EventID, event.CorrelationID, event.IdempotencyKey)
 
 	msgJSON, errJSON := json.Marshal(update.Message)
 	if errJSON != nil {

@@ -110,7 +110,7 @@ classDiagram
 - `app/bot` — moderation-facing bot interface and current detection orchestration; code: [app/bot/](../app/bot/); entry point: [spam.go](../app/bot/spam.go)
 - `lib/tgspam` — reusable spam detection heuristics and optional LLM integrations; code: [lib/tgspam/](../lib/tgspam/)
 - `lib/textnorm` — shared text normalization stages for detector-facing cleanup and future script folding; code: [lib/textnorm/](../lib/textnorm/)
-- `app/storage` — persistence for samples, reports, detected spam, locators, bootstrap rule sets, ingress `incoming_events`, and executor `moderation_actions`; code: [app/storage/](../app/storage/)
+- `app/storage` — persistence for samples, reports, detected spam, locators, bootstrap rule sets, ingress `incoming_events`, and executor `moderation_actions` with retry/replay lookup by command target; code: [app/storage/](../app/storage/)
 - `app/webapi` — server-rendered admin UI and HTTP endpoints; code: [app/webapi/](../app/webapi/)
 - `app/moderation` — transport-neutral moderation contracts and internal queue seam for roadmap phase 0; code: [app/moderation/](../app/moderation/); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
 - `app/rules` — single-tenant moderation rule domain snapshots introduced for phase 1 bootstrap persistence; code: [app/rules/](../app/rules/)
@@ -140,7 +140,7 @@ classDiagram
 - `IncomingEvents` replay snapshot — stored in [app/storage/incoming_events.go](../app/storage/incoming_events.go); captures completed decision/action state so duplicate Telegram retries can short-circuit before worker execution
 - Active runtime `RuleSet` — loaded in [app/runtime_assembly.go](../app/runtime_assembly.go); now drives detector flags plus listener moderation/report configuration
 - `textnorm.Normalizer` — defined in [lib/textnorm/normalizer.go](../lib/textnorm/normalizer.go); centralizes lower-case, trim, invisible-character cleanup, canonical whitespace, and script-fold hooks
-- `ModerationActions` — defined in [app/storage/moderation_actions.go](../app/storage/moderation_actions.go); durable executor command journal for bans, restrictions, and deletes
+- `ModerationActions` — defined in [app/storage/moderation_actions.go](../app/storage/moderation_actions.go); durable executor command journal for bans, restrictions, and deletes, including latest-attempt replay lookup for idempotent command execution
 
 ## 7) Verification status
 
@@ -160,7 +160,7 @@ classDiagram
 - Replay coverage is in [app/storage/incoming_events_test.go](../app/storage/incoming_events_test.go) and [app/events/listener_test.go](../app/events/listener_test.go), which prove completed moderation snapshots are persisted and duplicate retries do not re-enter the worker.
 - Active-rule-set runtime coverage is in [app/main_test.go](../app/main_test.go), which proves a persisted active `RuleSet` overrides bootstrap defaults for detector behavior and listener moderation/report settings.
 - Text-normalization seam coverage is in [lib/textnorm/normalizer_test.go](../lib/textnorm/normalizer_test.go) plus the existing detector cleanup tests in [lib/tgspam/detector_test.go](../lib/tgspam/detector_test.go).
-- Action-journal seam coverage is in [app/storage/moderation_actions_test.go](../app/storage/moderation_actions_test.go), [app/events/action_executor_test.go](../app/events/action_executor_test.go), and [app/main_test.go](../app/main_test.go).
+- Action-journal and replay coverage is in [app/storage/moderation_actions_test.go](../app/storage/moderation_actions_test.go), [app/events/action_executor_test.go](../app/events/action_executor_test.go), and [app/main_test.go](../app/main_test.go).
 
 ## 4) Dependency rules
 

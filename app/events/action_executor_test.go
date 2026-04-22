@@ -24,7 +24,7 @@ func TestTelegramActionExecutor_DeleteExtraMessages(t *testing.T) {
 	journal := &moderationActionsSpy{}
 	exec := newTelegramActionExecutor(mockAPI, false, false, nil, journal)
 
-	ctx := observability.WithEventMetadata(context.Background(), "evt-1", "corr-1")
+	ctx := observability.WithModerationMetadata(context.Background(), "evt-1", "corr-1", "key-1")
 	err := exec.DeleteExtraMessages(ctx, []spamcheck.Response{{
 		Name:           "duplicates",
 		Spam:           true,
@@ -37,6 +37,7 @@ func TestTelegramActionExecutor_DeleteExtraMessages(t *testing.T) {
 	assert.Equal(t, 12, mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).MessageID)
 	assert.Equal(t, "delete_message", journal.calls[0].Command)
 	assert.Equal(t, "completed", journal.calls[0].Status)
+	assert.Equal(t, "key-1", journal.calls[0].IdempotencyKey)
 }
 
 func TestTelegramActionExecutor_ApplyBan(t *testing.T) {
@@ -48,7 +49,7 @@ func TestTelegramActionExecutor_ApplyBan(t *testing.T) {
 	journal := &moderationActionsSpy{}
 	exec := newTelegramActionExecutor(mockAPI, false, false, nil, journal)
 
-	ctx := observability.WithEventMetadata(context.Background(), "evt-1", "corr-1")
+	ctx := observability.WithModerationMetadata(context.Background(), "evt-1", "corr-1", "key-1")
 	err := exec.ApplyBan(ctx, banRequest{
 		userID:   42,
 		chatID:   123,
@@ -62,13 +63,61 @@ func TestTelegramActionExecutor_ApplyBan(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, "ban_user", journal.calls[0].Command)
 	assert.Equal(t, "completed", journal.calls[0].Status)
+	assert.Equal(t, 1, journal.calls[0].Attempt)
+}
+
+func TestTelegramActionExecutor_SkipCompletedReplay(t *testing.T) {
+	mockAPI := &mocks.TbAPIMock{
+		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+			return &tbapi.APIResponse{Ok: true}, nil
+		},
+	}
+	journal := &moderationActionsSpy{
+		last: storage.ModerationActionReplay{Found: true, Completed: true, Attempt: 1},
+	}
+	exec := newTelegramActionExecutor(mockAPI, false, false, nil, journal)
+
+	ctx := observability.WithModerationMetadata(context.Background(), "evt-1", "corr-1", "key-1")
+	err := exec.DeleteMessage(ctx, 123, 77)
+	require.NoError(t, err)
+	require.Len(t, mockAPI.RequestCalls(), 0)
+	require.Len(t, journal.calls, 0)
+}
+
+func TestTelegramActionExecutor_RetryFailedActionWithNextAttempt(t *testing.T) {
+	mockAPI := &mocks.TbAPIMock{
+		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+			return &tbapi.APIResponse{Ok: true}, nil
+		},
+	}
+	journal := &moderationActionsSpy{
+		last: storage.ModerationActionReplay{Found: true, Completed: false, Attempt: 1, LastError: "telegram timeout"},
+	}
+	exec := newTelegramActionExecutor(mockAPI, false, false, nil, journal)
+
+	ctx := observability.WithModerationMetadata(context.Background(), "evt-2", "corr-2", "key-1")
+	err := exec.ApplyBan(ctx, banRequest{
+		userID:   42,
+		chatID:   123,
+		userName: "user",
+		duration: time.Minute,
+	})
+	require.NoError(t, err)
+	require.Len(t, mockAPI.RequestCalls(), 1)
+	require.Len(t, journal.calls, 1)
+	assert.Equal(t, 2, journal.calls[0].Attempt)
 }
 
 type moderationActionsSpy struct {
 	calls []storage.ModerationActionEntry
+	last  storage.ModerationActionReplay
 }
 
 func (s *moderationActionsSpy) Add(_ context.Context, entry storage.ModerationActionEntry) error {
 	s.calls = append(s.calls, entry)
 	return nil
+}
+
+func (s *moderationActionsSpy) Last(_ context.Context, _ storage.ModerationActionLookup) (storage.ModerationActionReplay, error) {
+	return s.last, nil
 }

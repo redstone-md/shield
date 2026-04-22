@@ -57,3 +57,51 @@ func TestModerationActionsAdd(t *testing.T) {
 	assert.Equal(t, "failed", entries[1].Status)
 	assert.Equal(t, "message not found", entries[1].LastError)
 }
+
+func TestModerationActionsLast(t *testing.T) {
+	db, err := engine.NewSqlite(":memory:", "gr1")
+	require.NoError(t, err)
+	defer db.Close()
+
+	store, err := NewModerationActions(context.Background(), db)
+	require.NoError(t, err)
+
+	err = store.Add(context.Background(), ModerationActionEntry{
+		EventID:        "evt-1",
+		CorrelationID:  "corr-1",
+		IdempotencyKey: "key-1",
+		Command:        "ban_user",
+		Status:         "failed",
+		ChatID:         123,
+		SubjectID:      42,
+		Attempt:        1,
+		LastError:      "telegram timeout",
+		CreatedAt:      time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC),
+	})
+	require.NoError(t, err)
+
+	err = store.Add(context.Background(), ModerationActionEntry{
+		EventID:        "evt-2",
+		CorrelationID:  "corr-2",
+		IdempotencyKey: "key-1",
+		Command:        "ban_user",
+		Status:         "completed",
+		ChatID:         123,
+		SubjectID:      42,
+		Attempt:        2,
+		CreatedAt:      time.Date(2026, 4, 22, 12, 1, 0, 0, time.UTC),
+	})
+	require.NoError(t, err)
+
+	replay, err := store.Last(context.Background(), ModerationActionLookup{
+		IdempotencyKey: "key-1",
+		Command:        "ban_user",
+		ChatID:         123,
+		SubjectID:      42,
+	})
+	require.NoError(t, err)
+	assert.True(t, replay.Found)
+	assert.True(t, replay.Completed)
+	assert.Equal(t, 2, replay.Attempt)
+	assert.Empty(t, replay.LastError)
+}

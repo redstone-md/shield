@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -14,6 +15,7 @@ const (
 	CmdCreateModerationActionsTable engine.DBCmd = iota + 700
 	CmdCreateModerationActionsIndexes
 	CmdAddModerationAction
+	CmdGetLatestModerationAction
 )
 
 var moderationActionsQueries = engine.NewQueryMap().
@@ -56,7 +58,14 @@ var moderationActionsQueries = engine.NewQueryMap().
 	`).
 	AddSame(CmdAddModerationAction, `INSERT INTO moderation_actions
 		(gid, event_id, correlation_id, idempotency_key, command, status, chat_id, subject_id, message_id, attempt, last_error, created_at)
-		VALUES (:gid, :event_id, :correlation_id, :idempotency_key, :command, :status, :chat_id, :subject_id, :message_id, :attempt, :last_error, :created_at)`)
+		VALUES (:gid, :event_id, :correlation_id, :idempotency_key, :command, :status, :chat_id, :subject_id, :message_id, :attempt, :last_error, :created_at)`).
+	AddSame(CmdGetLatestModerationAction, `SELECT
+			id, gid, event_id, correlation_id, idempotency_key, command, status,
+			chat_id, subject_id, message_id, attempt, last_error, created_at
+		FROM moderation_actions
+		WHERE gid = ? AND idempotency_key = ? AND command = ? AND chat_id = ? AND subject_id = ? AND message_id = ?
+		ORDER BY attempt DESC, id DESC
+		LIMIT 1`)
 
 // ModerationActionEntry stores one executor command attempt.
 type ModerationActionEntry struct {
@@ -73,6 +82,23 @@ type ModerationActionEntry struct {
 	Attempt        int       `db:"attempt"`
 	LastError      string    `db:"last_error"`
 	CreatedAt      time.Time `db:"created_at"`
+}
+
+// ModerationActionLookup identifies one idempotent action command target.
+type ModerationActionLookup struct {
+	IdempotencyKey string
+	Command        string
+	ChatID         int64
+	SubjectID      int64
+	MessageID      int
+}
+
+// ModerationActionReplay returns the latest persisted action attempt for one target.
+type ModerationActionReplay struct {
+	Found     bool
+	Completed bool
+	Attempt   int
+	LastError string
 }
 
 // ModerationActions persists executor command attempts.
@@ -140,4 +166,38 @@ func (m *ModerationActions) ByEventID(ctx context.Context, eventID string) ([]Mo
 		return nil, fmt.Errorf("failed to get moderation actions: %w", err)
 	}
 	return entries, nil
+}
+
+// Last returns the latest action attempt for the same idempotency key and command target.
+func (m *ModerationActions) Last(ctx context.Context, lookup ModerationActionLookup) (ModerationActionReplay, error) {
+	m.RLock()
+	defer m.RUnlock()
+
+	query, err := moderationActionsQueries.Pick(m.Type(), CmdGetLatestModerationAction)
+	if err != nil {
+		return ModerationActionReplay{}, fmt.Errorf("failed to get latest moderation action query: %w", err)
+	}
+	query = m.Adopt(query)
+
+	var entry ModerationActionEntry
+	if err := m.GetContext(ctx, &entry, query,
+		m.GID(),
+		lookup.IdempotencyKey,
+		lookup.Command,
+		lookup.ChatID,
+		lookup.SubjectID,
+		lookup.MessageID,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return ModerationActionReplay{}, nil
+		}
+		return ModerationActionReplay{}, fmt.Errorf("failed to get latest moderation action: %w", err)
+	}
+
+	return ModerationActionReplay{
+		Found:     true,
+		Completed: entry.Status == "completed",
+		Attempt:   entry.Attempt,
+		LastError: entry.LastError,
+	}, nil
 }

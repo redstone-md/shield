@@ -39,25 +39,36 @@ func newTelegramActionExecutor(tbAPI TbAPI, dry, trainingMode bool, superUsers S
 }
 
 func (e telegramActionExecutor) ApplyBan(ctx context.Context, req banRequest) error {
-	req.tbAPI = e.tbAPI
 	command := banCommand(req)
+	subjectID := banSubjectID(req)
+	attempt, replayed := e.replayAttempt(ctx, command, req.chatID, subjectID, 0)
+	if replayed {
+		return nil
+	}
+
+	req.tbAPI = e.tbAPI
 	err := banUserOrChannel(ctx, req)
-	e.recordAction(ctx, command, req.chatID, banSubjectID(req), 0, err)
+	e.recordAction(ctx, command, req.chatID, subjectID, 0, attempt, err)
 	return err
 }
 
 func (e telegramActionExecutor) DeleteMessage(ctx context.Context, chatID int64, msgID int) error {
+	attempt, replayed := e.replayAttempt(ctx, commandDeleteMessage, chatID, 0, msgID)
+	if replayed {
+		return nil
+	}
+
 	_, err := e.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 		MessageID:  msgID,
 		ChatConfig: tbapi.ChatConfig{ChatID: chatID},
 	}})
 	if err != nil {
 		observability.Logf(ctx, "[WARN] failed to delete message %d: %v", msgID, err)
-		e.recordAction(ctx, commandDeleteMessage, chatID, 0, msgID, err)
+		e.recordAction(ctx, commandDeleteMessage, chatID, 0, msgID, attempt, err)
 		return fmt.Errorf("delete message %d: %w", msgID, err)
 	}
 	observability.Logf(ctx, "[DEBUG] deleted message %d", msgID)
-	e.recordAction(ctx, commandDeleteMessage, chatID, 0, msgID, nil)
+	e.recordAction(ctx, commandDeleteMessage, chatID, 0, msgID, attempt, nil)
 	return nil
 }
 
@@ -116,20 +127,56 @@ func banSubjectID(req banRequest) int64 {
 	return req.userID
 }
 
-func (e telegramActionExecutor) recordAction(ctx context.Context, command string, chatID, subjectID int64, msgID int, execErr error) {
+func (e telegramActionExecutor) replayAttempt(ctx context.Context, command string,
+	chatID, subjectID int64, msgID int,
+) (attempt int, replayed bool) {
+	if e.actions == nil {
+		return 1, false
+	}
+
+	meta, ok := observability.MetadataFromContext(ctx)
+	if !ok || meta.IdempotencyKey == "" {
+		return 1, false
+	}
+
+	replay, err := e.actions.Last(ctx, storage.ModerationActionLookup{
+		IdempotencyKey: meta.IdempotencyKey,
+		Command:        command,
+		ChatID:         chatID,
+		SubjectID:      subjectID,
+		MessageID:      msgID,
+	})
+	if err != nil {
+		observability.Logf(ctx, "[WARN] failed to load moderation action replay %s: %v", command, err)
+		return 1, false
+	}
+	if replay.Completed {
+		observability.Logf(ctx, "[INFO] skip replayed moderation action %s", command)
+		return replay.Attempt, true
+	}
+	if replay.Found {
+		return replay.Attempt + 1, false
+	}
+	return 1, false
+}
+
+func (e telegramActionExecutor) recordAction(ctx context.Context,
+	command string, chatID, subjectID int64, msgID, attempt int, execErr error,
+) {
 	if e.actions == nil {
 		return
 	}
 	meta, _ := observability.MetadataFromContext(ctx)
 	entry := storage.ModerationActionEntry{
-		EventID:       meta.EventID,
-		CorrelationID: meta.CorrelationID,
-		Command:       command,
-		Status:        actionStatusCompleted,
-		ChatID:        chatID,
-		SubjectID:     subjectID,
-		MessageID:     msgID,
-		Attempt:       1,
+		EventID:        meta.EventID,
+		CorrelationID:  meta.CorrelationID,
+		IdempotencyKey: meta.IdempotencyKey,
+		Command:        command,
+		Status:         actionStatusCompleted,
+		ChatID:         chatID,
+		SubjectID:      subjectID,
+		MessageID:      msgID,
+		Attempt:        attempt,
 	}
 	if execErr != nil {
 		entry.Status = actionStatusFailed

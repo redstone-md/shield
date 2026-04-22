@@ -73,6 +73,7 @@ type IncomingEvents interface {
 // ModerationActions stores durable executor command attempts.
 type ModerationActions interface {
 	Add(ctx context.Context, entry storage.ModerationActionEntry) error
+	Last(ctx context.Context, lookup storage.ModerationActionLookup) (storage.ModerationActionReplay, error)
 }
 
 // ModerationConfig controls automatic penalty escalation.

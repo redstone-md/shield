@@ -10,8 +10,9 @@ type metadataKey struct{}
 
 // Metadata carries correlation fields for the moderation flow.
 type Metadata struct {
-	EventID       string
-	CorrelationID string
+	EventID        string
+	CorrelationID  string
+	IdempotencyKey string
 }
 
 // WithEventMetadata stores correlation metadata in a context.
@@ -19,6 +20,15 @@ func WithEventMetadata(ctx context.Context, eventID, correlationID string) conte
 	return context.WithValue(ctx, metadataKey{}, Metadata{
 		EventID:       eventID,
 		CorrelationID: correlationID,
+	})
+}
+
+// WithModerationMetadata stores correlation and idempotency metadata in a context.
+func WithModerationMetadata(ctx context.Context, eventID, correlationID, idempotencyKey string) context.Context {
+	return context.WithValue(ctx, metadataKey{}, Metadata{
+		EventID:        eventID,
+		CorrelationID:  correlationID,
+		IdempotencyKey: idempotencyKey,
 	})
 }
 
@@ -31,7 +41,7 @@ func MetadataFromContext(ctx context.Context) (Metadata, bool) {
 	if !ok {
 		return Metadata{}, false
 	}
-	if meta.EventID == "" && meta.CorrelationID == "" {
+	if meta.EventID == "" && meta.CorrelationID == "" && meta.IdempotencyKey == "" {
 		return Metadata{}, false
 	}
 	return meta, true
@@ -43,7 +53,11 @@ func Prefix(ctx context.Context) string {
 	if !ok {
 		return ""
 	}
-	return fmt.Sprintf("event_id=%s correlation_id=%s ", meta.EventID, meta.CorrelationID)
+	prefix := fmt.Sprintf("event_id=%s correlation_id=%s ", meta.EventID, meta.CorrelationID)
+	if meta.IdempotencyKey != "" {
+		prefix += fmt.Sprintf("idempotency_key=%s ", meta.IdempotencyKey)
+	}
+	return prefix
 }
 
 // Logf writes a log line prefixed with correlation metadata when present.
