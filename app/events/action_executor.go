@@ -8,6 +8,7 @@ import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
 	"github.com/umputun/tg-spam/app/observability"
+	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
@@ -22,20 +23,27 @@ type telegramActionExecutor struct {
 	dry          bool
 	trainingMode bool
 	superUsers   SuperUsers
+	actions      ModerationActions
 }
 
-func newTelegramActionExecutor(tbAPI TbAPI, dry, trainingMode bool, superUsers SuperUsers) telegramActionExecutor {
+func newTelegramActionExecutor(tbAPI TbAPI, dry, trainingMode bool, superUsers SuperUsers,
+	actions ModerationActions,
+) telegramActionExecutor {
 	return telegramActionExecutor{
 		tbAPI:        tbAPI,
 		dry:          dry,
 		trainingMode: trainingMode,
 		superUsers:   superUsers,
+		actions:      actions,
 	}
 }
 
 func (e telegramActionExecutor) ApplyBan(ctx context.Context, req banRequest) error {
 	req.tbAPI = e.tbAPI
-	return banUserOrChannel(ctx, req)
+	command := banCommand(req)
+	err := banUserOrChannel(ctx, req)
+	e.recordAction(ctx, command, req.chatID, banSubjectID(req), 0, err)
+	return err
 }
 
 func (e telegramActionExecutor) DeleteMessage(ctx context.Context, chatID int64, msgID int) error {
@@ -45,9 +53,11 @@ func (e telegramActionExecutor) DeleteMessage(ctx context.Context, chatID int64,
 	}})
 	if err != nil {
 		observability.Logf(ctx, "[WARN] failed to delete message %d: %v", msgID, err)
+		e.recordAction(ctx, commandDeleteMessage, chatID, 0, msgID, err)
 		return fmt.Errorf("delete message %d: %w", msgID, err)
 	}
 	observability.Logf(ctx, "[DEBUG] deleted message %d", msgID)
+	e.recordAction(ctx, commandDeleteMessage, chatID, 0, msgID, nil)
 	return nil
 }
 
@@ -77,6 +87,57 @@ func (e telegramActionExecutor) DeleteExtraMessages(ctx context.Context, checkRe
 		}
 	}
 	return nil
+}
+
+const (
+	commandDeleteMessage  = "delete_message"
+	commandMuteUser       = "mute_user"
+	commandBanUser        = "ban_user"
+	commandBanSenderChat  = "ban_sender_chat"
+	actionStatusCompleted = "completed"
+	actionStatusFailed    = "failed"
+)
+
+func banCommand(req banRequest) string {
+	switch {
+	case req.channelID != 0:
+		return commandBanSenderChat
+	case req.restrict:
+		return commandMuteUser
+	default:
+		return commandBanUser
+	}
+}
+
+func banSubjectID(req banRequest) int64 {
+	if req.channelID != 0 {
+		return req.channelID
+	}
+	return req.userID
+}
+
+func (e telegramActionExecutor) recordAction(ctx context.Context, command string, chatID, subjectID int64, msgID int, execErr error) {
+	if e.actions == nil {
+		return
+	}
+	meta, _ := observability.MetadataFromContext(ctx)
+	entry := storage.ModerationActionEntry{
+		EventID:       meta.EventID,
+		CorrelationID: meta.CorrelationID,
+		Command:       command,
+		Status:        actionStatusCompleted,
+		ChatID:        chatID,
+		SubjectID:     subjectID,
+		MessageID:     msgID,
+		Attempt:       1,
+	}
+	if execErr != nil {
+		entry.Status = actionStatusFailed
+		entry.LastError = execErr.Error()
+	}
+	if err := e.actions.Add(ctx, entry); err != nil {
+		observability.Logf(ctx, "[WARN] failed to record moderation action %s: %v", command, err)
+	}
 }
 
 type banRequest struct {

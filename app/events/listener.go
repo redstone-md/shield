@@ -46,6 +46,7 @@ type TelegramListener struct {
 	SoftBanMode             bool          // do not ban users, but restrict their actions
 	Locator                 Locator       // message locator to get info about messages
 	IncomingEvents          IncomingEvents
+	ModerationActions       ModerationActions
 	DetectedSpamCounter     DetectedSpamCounter
 	ModerationConfig        ModerationConfig
 	ReportConfig            ReportConfig // user spam reporting configuration

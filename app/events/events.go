@@ -70,6 +70,11 @@ type IncomingEvents interface {
 	) error
 }
 
+// ModerationActions stores durable executor command attempts.
+type ModerationActions interface {
+	Add(ctx context.Context, entry storage.ModerationActionEntry) error
+}
+
 // ModerationConfig controls automatic penalty escalation.
 type ModerationConfig struct {
 	FirstStrike  time.Duration

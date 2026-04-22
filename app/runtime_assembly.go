@@ -18,18 +18,19 @@ import (
 )
 
 type runtimeAssembly struct {
-	DataDB              *engine.SQL
-	SpamBot             *bot.SpamFilter
-	SpamLogger          events.SpamLogger
-	LoggerWriter        io.Closer
-	Locator             *storage.Locator
-	RuleSets            *storage.RuleSets
-	ActiveRuleSet       rules.RuleSet
-	IncomingEventsStore *storage.IncomingEvents
-	ReportsStore        *storage.Reports
-	DetectedSpamStore   *storage.DetectedSpam
-	TelegramListener    *events.TelegramListener
-	Web                 webRuntimeAssembly
+	DataDB                 *engine.SQL
+	SpamBot                *bot.SpamFilter
+	SpamLogger             events.SpamLogger
+	LoggerWriter           io.Closer
+	Locator                *storage.Locator
+	RuleSets               *storage.RuleSets
+	ActiveRuleSet          rules.RuleSet
+	IncomingEventsStore    *storage.IncomingEvents
+	ModerationActionsStore *storage.ModerationActions
+	ReportsStore           *storage.Reports
+	DetectedSpamStore      *storage.DetectedSpam
+	TelegramListener       *events.TelegramListener
+	Web                    webRuntimeAssembly
 }
 
 type webRuntimeAssembly struct {
@@ -102,6 +103,10 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	if err != nil {
 		return nil, fmt.Errorf("can't make incoming events store, %w", err)
 	}
+	moderationActionsStore, err := storage.NewModerationActions(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make moderation actions store, %w", err)
+	}
 
 	var reportsStore *storage.Reports
 	if opts.Report.Enabled {
@@ -117,16 +122,17 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	}
 
 	assembly := &runtimeAssembly{
-		DataDB:              dataDB,
-		SpamBot:             spamBot,
-		SpamLogger:          spamLogger,
-		LoggerWriter:        loggerWr,
-		Locator:             locator,
-		RuleSets:            ruleSets,
-		ActiveRuleSet:       activeRuleSet,
-		IncomingEventsStore: incomingEventsStore,
-		ReportsStore:        reportsStore,
-		DetectedSpamStore:   detectedSpamStore,
+		DataDB:                 dataDB,
+		SpamBot:                spamBot,
+		SpamLogger:             spamLogger,
+		LoggerWriter:           loggerWr,
+		Locator:                locator,
+		RuleSets:               ruleSets,
+		ActiveRuleSet:          activeRuleSet,
+		IncomingEventsStore:    incomingEventsStore,
+		ModerationActionsStore: moderationActionsStore,
+		ReportsStore:           reportsStore,
+		DetectedSpamStore:      detectedSpamStore,
 		Web: webRuntimeAssembly{
 			Detector:      spamBot.Detector,
 			SpamFilter:    spamBot,
@@ -231,6 +237,7 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 		TestingIDs:          opts.TestingIDs,
 		Locator:             a.Locator,
 		IncomingEvents:      a.IncomingEventsStore,
+		ModerationActions:   a.ModerationActionsStore,
 		DetectedSpamCounter: a.DetectedSpamStore,
 		ModerationConfig: events.ModerationConfig{
 			FirstStrike:  a.ActiveRuleSet.Moderation.FirstStrike,

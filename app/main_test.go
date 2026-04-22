@@ -326,6 +326,7 @@ func TestAssembleRuntimeBootstrapsRuleSet(t *testing.T) {
 
 	require.NotNil(t, assembly.RuleSets)
 	require.NotNil(t, assembly.IncomingEventsStore)
+	require.NotNil(t, assembly.ModerationActionsStore)
 
 	active, err := assembly.RuleSets.Active(ctx, "gr1")
 	require.NoError(t, err)

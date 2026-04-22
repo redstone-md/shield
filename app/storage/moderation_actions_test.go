@@ -1,0 +1,59 @@
+package storage
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/umputun/tg-spam/app/storage/engine"
+)
+
+func TestModerationActionsAdd(t *testing.T) {
+	db, err := engine.NewSqlite(":memory:", "gr1")
+	require.NoError(t, err)
+	defer db.Close()
+
+	store, err := NewModerationActions(context.Background(), db)
+	require.NoError(t, err)
+
+	err = store.Add(context.Background(), ModerationActionEntry{
+		EventID:        "evt-1",
+		CorrelationID:  "corr-1",
+		IdempotencyKey: "key-1",
+		Command:        "ban_user",
+		Status:         "completed",
+		ChatID:         123,
+		SubjectID:      42,
+		Attempt:        1,
+		CreatedAt:      time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC),
+	})
+	require.NoError(t, err)
+
+	err = store.Add(context.Background(), ModerationActionEntry{
+		EventID:        "evt-1",
+		CorrelationID:  "corr-1",
+		IdempotencyKey: "key-1",
+		Command:        "delete_message",
+		Status:         "failed",
+		ChatID:         123,
+		SubjectID:      42,
+		MessageID:      77,
+		Attempt:        2,
+		LastError:      "message not found",
+		CreatedAt:      time.Date(2026, 4, 22, 12, 1, 0, 0, time.UTC),
+	})
+	require.NoError(t, err)
+
+	entries, err := store.ByEventID(context.Background(), "evt-1")
+	require.NoError(t, err)
+	require.Len(t, entries, 2)
+	assert.Equal(t, "gr1", entries[0].GID)
+	assert.Equal(t, "ban_user", entries[0].Command)
+	assert.Equal(t, "completed", entries[0].Status)
+	assert.Equal(t, "delete_message", entries[1].Command)
+	assert.Equal(t, "failed", entries[1].Status)
+	assert.Equal(t, "message not found", entries[1].LastError)
+}

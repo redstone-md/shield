@@ -101,7 +101,7 @@ func (l *TelegramListener) ensurePipeline() {
 		l.processor = listenerEventProcessor{listener: l}
 	}
 	if l.ActionExecutor == nil {
-		exec := newTelegramActionExecutor(l.TbAPI, l.Dry, l.TrainingMode, l.SuperUsers)
+		exec := newTelegramActionExecutor(l.TbAPI, l.Dry, l.TrainingMode, l.SuperUsers, l.ModerationActions)
 		l.ActionExecutor = exec
 	}
 	if l.PolicyEngine == nil {
