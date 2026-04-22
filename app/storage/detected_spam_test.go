@@ -123,6 +123,7 @@ func (s *StorageTestSuite) TestDetectedSpam_Write() {
 				Score:          2,
 				MatchedRules:   []string{"duplicates", "openai"},
 				RuleSetVersion: 3,
+				IdempotencyKey: "telegram:update:1:chat:2:message:3:edited:0",
 			}
 
 			checks := []spamcheck.Response{
@@ -147,6 +148,7 @@ func (s *StorageTestSuite) TestDetectedSpam_Write() {
 			s.Equal("duplicates", saved.SignalSource)
 			s.Equal(2.0, saved.Score)
 			s.Equal(3, saved.RuleSetVersion)
+			s.Equal("telegram:update:1:chat:2:message:3:edited:0", saved.IdempotencyKey)
 		})
 	}
 }
@@ -214,6 +216,7 @@ func (s *StorageTestSuite) TestDetectedSpam_Read() {
 				Score:          2,
 				MatchedRules:   []string{"duplicates", "openai"},
 				RuleSetVersion: 4,
+				IdempotencyKey: "telegram:update:11:chat:22:message:33:edited:0",
 			}
 			checks := []spamcheck.Response{{Name: "test", Spam: true, Details: "test details"}}
 
@@ -233,6 +236,7 @@ func (s *StorageTestSuite) TestDetectedSpam_Read() {
 			s.Equal(entry.Score, entries[0].Score)
 			s.Equal(entry.MatchedRules, entries[0].MatchedRules)
 			s.Equal(entry.RuleSetVersion, entries[0].RuleSetVersion)
+			s.Equal(entry.IdempotencyKey, entries[0].IdempotencyKey)
 		})
 	}
 }
@@ -291,6 +295,7 @@ func (s *StorageTestSuite) TestDetectedSpam() {
 						Score:          1,
 						MatchedRules:   []string{"duplicates"},
 						RuleSetVersion: 1,
+						IdempotencyKey: "telegram:update:1:chat:2:message:3:edited:0",
 					},
 					checks: []spamcheck.Response{{
 						Name:    "Check1",
@@ -338,6 +343,7 @@ func (s *StorageTestSuite) TestDetectedSpam() {
 					s.Equal(tt.entry.UserID, entries[0].UserID)
 					s.Equal(tt.entry.UserName, entries[0].UserName)
 					s.Equal(tt.checks, entries[0].Checks)
+					s.Equal(tt.entry.IdempotencyKey, entries[0].IdempotencyKey)
 				})
 			}
 		})
@@ -371,6 +377,7 @@ func (s *StorageTestSuite) TestDetectedSpam_FindByUserID() {
 					Score:          2,
 					MatchedRules:   []string{"duplicates", "openai"},
 					RuleSetVersion: 9,
+					IdempotencyKey: "telegram:update:9:chat:8:message:7:edited:0",
 				}
 				checks := []spamcheck.Response{{
 					Name:    "test",
@@ -393,6 +400,7 @@ func (s *StorageTestSuite) TestDetectedSpam_FindByUserID() {
 				s.Equal(expected.Score, entry.Score)
 				s.Equal(expected.MatchedRules, entry.MatchedRules)
 				s.Equal(expected.RuleSetVersion, entry.RuleSetVersion)
+				s.Equal(expected.IdempotencyKey, entry.IdempotencyKey)
 				s.Equal(ts.Unix(), entry.Timestamp.UTC().Unix()) // ensure UTC comparison
 			})
 

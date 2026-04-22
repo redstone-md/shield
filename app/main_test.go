@@ -111,6 +111,7 @@ func TestMakeSpamLogger_SaveAudit(t *testing.T) {
 	require.True(t, ok)
 
 	record := events.AuditRecord{
+		Event:          moderation.IncomingEvent{IdempotencyKey: "telegram:update:55:chat:66:message:77:edited:0"},
 		Message:        &bot.Message{Text: "Test message\nblah", From: bot.User{ID: 123, DisplayName: "Test User", Username: "testuser"}},
 		Decision:       moderation.PolicyDecision{Score: 2},
 		RuleSetVersion: 7,
@@ -125,12 +126,13 @@ func TestMakeSpamLogger_SaveAudit(t *testing.T) {
 	require.NoError(t, err)
 
 	savedMsgs := []storage.DetectedSpamInfo{}
-	err = db.Select(&savedMsgs, "SELECT text, user_id, user_name, checks, signal_source, score, matched_rules, rule_set_version FROM detected_spam")
+	err = db.Select(&savedMsgs, "SELECT text, user_id, user_name, checks, signal_source, score, matched_rules, rule_set_version, idempotency_key FROM detected_spam")
 	require.NoError(t, err)
 	require.Len(t, savedMsgs, 1)
 	assert.Equal(t, "duplicates", savedMsgs[0].SignalSource)
 	assert.Equal(t, 2.0, savedMsgs[0].Score)
 	assert.Equal(t, 7, savedMsgs[0].RuleSetVersion)
+	assert.Equal(t, "telegram:update:55:chat:66:message:77:edited:0", savedMsgs[0].IdempotencyKey)
 	assert.JSONEq(t, `["duplicates","openai"]`, savedMsgs[0].MatchedRulesJSON)
 }
 

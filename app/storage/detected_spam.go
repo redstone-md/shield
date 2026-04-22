@@ -41,6 +41,7 @@ type DetectedSpamInfo struct {
 	MatchedRulesJSON string               `db:"matched_rules"`
 	MatchedRules     []string             `db:"-"`
 	RuleSetVersion   int                  `db:"rule_set_version"`
+	IdempotencyKey   string               `db:"idempotency_key"`
 }
 
 // detected spam query commands
@@ -51,6 +52,7 @@ const (
 	CmdAddDetectedSpamScoreColumn
 	CmdAddDetectedSpamMatchedRulesColumn
 	CmdAddDetectedSpamRuleSetVersionColumn
+	CmdAddDetectedSpamIdempotencyKeyColumn
 )
 
 // queries holds all detected spam queries
@@ -68,7 +70,8 @@ var detectedSpamQueries = engine.NewQueryMap().
             signal_source TEXT DEFAULT '',
             score REAL DEFAULT 0,
             matched_rules TEXT DEFAULT '[]',
-            rule_set_version INTEGER DEFAULT 0
+            rule_set_version INTEGER DEFAULT 0,
+            idempotency_key TEXT DEFAULT ''
         )`,
 		Postgres: `CREATE TABLE IF NOT EXISTS detected_spam (
             id SERIAL PRIMARY KEY,
@@ -82,7 +85,8 @@ var detectedSpamQueries = engine.NewQueryMap().
             signal_source TEXT DEFAULT '',
             score DOUBLE PRECISION DEFAULT 0,
             matched_rules TEXT DEFAULT '[]',
-            rule_set_version INTEGER DEFAULT 0
+            rule_set_version INTEGER DEFAULT 0,
+            idempotency_key TEXT DEFAULT ''
         )`,
 	}).
 	AddSame(CmdCreateDetectedSpamIndexes, `
@@ -106,6 +110,10 @@ var detectedSpamQueries = engine.NewQueryMap().
 	Add(CmdAddDetectedSpamRuleSetVersionColumn, engine.Query{
 		Sqlite:   "ALTER TABLE detected_spam ADD COLUMN rule_set_version INTEGER DEFAULT 0",
 		Postgres: "ALTER TABLE detected_spam ADD COLUMN IF NOT EXISTS rule_set_version INTEGER DEFAULT 0",
+	}).
+	Add(CmdAddDetectedSpamIdempotencyKeyColumn, engine.Query{
+		Sqlite:   "ALTER TABLE detected_spam ADD COLUMN idempotency_key TEXT DEFAULT ''",
+		Postgres: "ALTER TABLE detected_spam ADD COLUMN IF NOT EXISTS idempotency_key TEXT DEFAULT ''",
 	}).
 	Add(CmdAddGIDColumn, engine.Query{
 		Sqlite:   "ALTER TABLE detected_spam ADD COLUMN gid TEXT DEFAULT ''",
@@ -150,11 +158,11 @@ func (ds *DetectedSpam) Write(ctx context.Context, entry DetectedSpamInfo, check
 	}
 
 	query := ds.Adopt(`INSERT INTO detected_spam
-		(gid, text, user_id, user_name, timestamp, checks, signal_source, score, matched_rules, rule_set_version)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		(gid, text, user_id, user_name, timestamp, checks, signal_source, score, matched_rules, rule_set_version, idempotency_key)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	_, err = ds.ExecContext(ctx, query,
 		entry.GID, entry.Text, entry.UserID, entry.UserName, entry.Timestamp, string(checksJSON),
-		entry.SignalSource, entry.Score, string(matchedRulesJSON), entry.RuleSetVersion)
+		entry.SignalSource, entry.Score, string(matchedRulesJSON), entry.RuleSetVersion, entry.IdempotencyKey)
 	if err != nil {
 		return fmt.Errorf("failed to insert detected spam entry: %w", err)
 	}
@@ -276,6 +284,7 @@ func (ds *DetectedSpam) migrate(ctx context.Context, tx *sqlx.Tx, gid string) er
 		CmdAddDetectedSpamScoreColumn,
 		CmdAddDetectedSpamMatchedRulesColumn,
 		CmdAddDetectedSpamRuleSetVersionColumn,
+		CmdAddDetectedSpamIdempotencyKeyColumn,
 	} {
 		query, qErr := detectedSpamQueries.Pick(ds.Type(), cmd)
 		if qErr != nil {

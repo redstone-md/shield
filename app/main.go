@@ -831,6 +831,7 @@ func (l auditSpamLogger) SaveAudit(ctx context.Context, record events.AuditRecor
 	entry.Score = record.Decision.Score
 	entry.MatchedRules = events.MatchedRules(record.Response.CheckResults)
 	entry.RuleSetVersion = record.RuleSetVersion
+	entry.IdempotencyKey = record.Event.IdempotencyKey
 	if err := l.writeLog(entry, record.Message.From.DisplayName); err != nil {
 		return err
 	}
