@@ -142,6 +142,7 @@ classDiagram
 - `textnorm.Normalizer` — defined in [lib/textnorm/normalizer.go](../lib/textnorm/normalizer.go); centralizes lower-case, trim, invisible-character cleanup, canonical whitespace, and script-fold hooks
 - `ModerationActions` — defined in [app/storage/moderation_actions.go](../app/storage/moderation_actions.go); durable executor command journal for bans, restrictions, and deletes, including latest-attempt replay lookup for idempotent command execution
 - Report-driven sanctions in [app/events/reports.go](../app/events/reports.go) now flow through the shared `ActionExecutor`, so manual report approval and auto-ban thresholds reuse the same command journal and replay boundary as the queue worker
+- Reporter-ban callbacks in [app/events/reports.go](../app/events/reports.go) also reuse the shared `ActionExecutor`, closing the remaining direct report-side ban path
 
 ## 7) Verification status
 
@@ -163,6 +164,7 @@ classDiagram
 - Text-normalization seam coverage is in [lib/textnorm/normalizer_test.go](../lib/textnorm/normalizer_test.go) plus the existing detector cleanup tests in [lib/tgspam/detector_test.go](../lib/tgspam/detector_test.go).
 - Action-journal and replay coverage is in [app/storage/moderation_actions_test.go](../app/storage/moderation_actions_test.go), [app/events/action_executor_test.go](../app/events/action_executor_test.go), and [app/main_test.go](../app/main_test.go).
 - Report-executor coverage is in [app/events/reports_test.go](../app/events/reports_test.go), which proves report approval and report auto-ban reuse the shared action executor.
+- Reporter-ban callback coverage is in [app/events/reports_test.go](../app/events/reports_test.go), which proves `callbackReportBanReporterConfirm` now uses the shared action executor.
 
 ## 4) Dependency rules
 

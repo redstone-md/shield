@@ -2415,6 +2415,57 @@ func TestUserReports_CallbackReportBanReporterConfirm(t *testing.T) {
 		assert.Len(t, mockReports.DeleteReporterCalls(), 1)
 		assert.Len(t, mockReports.DeleteByMessageCalls(), 1)
 	})
+
+	t.Run("uses shared action executor", func(t *testing.T) {
+		mockAPI := &mocks.TbAPIMock{
+			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+				return tbapi.Message{}, nil
+			},
+			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+				return &tbapi.APIResponse{Ok: true}, nil
+			},
+		}
+
+		var callCount int
+		mockReports := &mocks.ReportsMock{
+			GetByMessageFunc: func(ctx context.Context, msgID int, chatID int64) ([]storage.Report, error) {
+				callCount++
+				if callCount == 1 {
+					return []storage.Report{
+						{MsgID: 100, ChatID: 200, ReporterUserID: 111, ReporterUserName: "reporter1", ReportedUserID: 666, ReportedUserName: "spammer"},
+						{MsgID: 100, ChatID: 200, ReporterUserID: 222, ReporterUserName: "reporter2", ReportedUserID: 666, ReportedUserName: "spammer"},
+					}, nil
+				}
+				return []storage.Report{
+					{MsgID: 100, ChatID: 200, ReporterUserID: 222, ReporterUserName: "reporter2", ReportedUserID: 666, ReportedUserName: "spammer"},
+				}, nil
+			},
+			DeleteReporterFunc: func(ctx context.Context, reporterID int64, msgID int, chatID int64) error {
+				return nil
+			},
+		}
+		actions := &actionExecutorSpy{}
+
+		rep := &userReports{
+			tbAPI:        mockAPI,
+			primChatID:   200,
+			ReportConfig: ReportConfig{Storage: mockReports},
+			actions:      actions,
+		}
+
+		query := &tbapi.CallbackQuery{
+			Data:    "R!111:100",
+			From:    &tbapi.User{UserName: "admin"},
+			Message: &tbapi.Message{Chat: tbapi.Chat{ID: 456}, MessageID: 999, Text: "Test", Date: int(time.Now().Unix())},
+		}
+
+		err := rep.callbackReportBanReporterConfirm(context.Background(), query)
+		require.NoError(t, err)
+		require.Len(t, actions.banCalls, 1)
+		assert.Equal(t, int64(111), actions.banCalls[0].userID)
+		assert.Equal(t, int64(200), actions.banCalls[0].chatID)
+		assert.Len(t, mockReports.DeleteReporterCalls(), 1)
+	})
 }
 
 func TestUserReports_CallbackReportCancel(t *testing.T) {

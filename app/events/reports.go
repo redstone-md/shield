@@ -986,19 +986,25 @@ func (r *userReports) callbackReportBanReporterConfirm(ctx context.Context, quer
 	if reporterName == "" {
 		reporterName = fmt.Sprintf("user_%d", reporterID)
 	}
+	ctx = r.reportActionContext(ctx, "ban_reporter", msgID, reporterID)
 
-	// ban reporter permanently
-	banReq := banRequest{
+	req := banRequest{
 		duration: bot.PermanentBanDuration,
 		userID:   reporterID,
 		chatID:   chatID,
-		tbAPI:    r.tbAPI,
 		dry:      r.dry,
 		training: r.trainingMode,
 		userName: reporterName,
 	}
-	if banErr := banUserOrChannel(ctx, banReq); banErr != nil {
-		log.Printf("[WARN] failed to ban reporter %d: %v", reporterID, banErr)
+	if r.actions != nil {
+		if banErr := r.actions.ApplyBan(ctx, req); banErr != nil {
+			log.Printf("[WARN] failed to ban reporter %d: %v", reporterID, banErr)
+		}
+	} else {
+		req.tbAPI = r.tbAPI
+		if banErr := banUserOrChannel(ctx, req); banErr != nil {
+			log.Printf("[WARN] failed to ban reporter %d: %v", reporterID, banErr)
+		}
 	}
 
 	// delete reporter from database
