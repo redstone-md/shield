@@ -60,8 +60,11 @@ type actionExecutorSpy struct {
 	applyBan           func(ctx context.Context, req banRequest) error
 	deleteMessage      func(ctx context.Context, chatID int64, msgID int) error
 	deleteExtra        func(ctx context.Context, checkResults []spamcheck.Response, userID int64, username string, chatID int64) error
+	warnUser           func(ctx context.Context, req warnRequest) error
 	banCtxs            []context.Context
 	banCalls           []banRequest
+	warnCtxs           []context.Context
+	warnCalls          []warnRequest
 	deleteMessageCalls []struct {
 		Context context.Context
 		ChatID  int64
@@ -109,6 +112,15 @@ func (s *actionExecutorSpy) DeleteExtraMessages(ctx context.Context, checkResult
 	}{Context: ctx, CheckResults: checkResults, UserID: userID, Username: username, ChatID: chatID})
 	if s.deleteExtra != nil {
 		return s.deleteExtra(ctx, checkResults, userID, username, chatID)
+	}
+	return nil
+}
+
+func (s *actionExecutorSpy) WarnUser(ctx context.Context, req warnRequest) error {
+	s.warnCtxs = append(s.warnCtxs, ctx)
+	s.warnCalls = append(s.warnCalls, req)
+	if s.warnUser != nil {
+		return s.warnUser(ctx, req)
 	}
 	return nil
 }
@@ -1705,6 +1717,72 @@ func TestTelegramListener_DoWithDirectWarnReport(t *testing.T) {
 	assert.Equal(t, 999999, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
 	assert.Equal(t, int64(123), mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).ChatID)
 	assert.Equal(t, 0, mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).MessageID)
+}
+
+func TestTelegramListener_DoWithDirectWarnReportUsesActionExecutor(t *testing.T) {
+	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
+	mockAPI := &mocks.TbAPIMock{
+		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
+			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+		},
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			return tbapi.Message{Text: c.(tbapi.MessageConfig).Text, From: &tbapi.User{UserName: "user"}}, nil
+		},
+		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+			return &tbapi.APIResponse{Ok: true}, nil
+		},
+		GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) { return nil, nil },
+	}
+	actionSpy := &actionExecutorSpy{}
+	l := TelegramListener{
+		SpamLogger:     mockLogger,
+		TbAPI:          mockAPI,
+		Bot:            &mocks.BotMock{},
+		Group:          "gr",
+		StartupMsg:     "startup",
+		SuperUsers:     SuperUsers{"superuser1"},
+		Locator:        &locatorContextSpy{},
+		WarnMsg:        "You've violated our rules",
+		ActionExecutor: actionSpy,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	updMsg := tbapi.Update{
+		Message: &tbapi.Message{
+			Chat: tbapi.Chat{ID: 123},
+			Text: "/warn",
+			From: &tbapi.User{UserName: "superuser1", ID: 77},
+			ReplyToMessage: &tbapi.Message{
+				MessageID: 999999,
+				From:      &tbapi.User{ID: 666, UserName: "user"},
+				Text:      "text 123",
+			},
+		},
+	}
+	updChan := make(chan tbapi.Update, 1)
+	updChan <- updMsg
+	close(updChan)
+	mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updChan }
+
+	err := l.Do(ctx)
+	require.EqualError(t, err, "telegram update chan closed")
+	assert.Empty(t, mockLogger.SaveCalls())
+
+	require.Len(t, actionSpy.deleteMessageCalls, 2)
+	assert.Equal(t, 999999, actionSpy.deleteMessageCalls[0].MsgID)
+	assert.Equal(t, 0, actionSpy.deleteMessageCalls[1].MsgID)
+	require.Len(t, actionSpy.warnCalls, 1)
+	assert.Equal(t, int64(123), actionSpy.warnCalls[0].chatID)
+	assert.Equal(t, int64(666), actionSpy.warnCalls[0].subjectID)
+	assert.Equal(t, 999999, actionSpy.warnCalls[0].messageID)
+	assert.Contains(t, actionSpy.warnCalls[0].text, "warning from superuser1")
+	assert.Contains(t, actionSpy.warnCalls[0].text, "@user You've violated our rules")
+
+	require.Len(t, mockAPI.SendCalls(), 1)
+	assert.Equal(t, "startup", mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text)
+	assert.Empty(t, mockAPI.RequestCalls())
 }
 
 func TestTelegramListener_DoWithAdminUnBan(t *testing.T) {

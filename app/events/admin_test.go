@@ -13,6 +13,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/events/mocks"
+	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
@@ -454,6 +455,38 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		assert.Equal(t, int64(123), warnMsg.ChatID) // should be sent to the primary chat
 		assert.Contains(t, warnMsg.Text, "warning from admin")
 		assert.Contains(t, warnMsg.Text, "@user please follow our rules")
+	})
+
+	t.Run("DirectWarnReport_UsesActionExecutor", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		actionSpy := &actionExecutorSpy{}
+		adm.actions = actionSpy
+
+		update := createReplyUpdate("admin", 111, "user", 222, "inappropriate message")
+		err := adm.DirectWarnReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, actionSpy.deleteMessageCalls, 2)
+		assert.Equal(t, 999, actionSpy.deleteMessageCalls[0].MsgID)
+		assert.Equal(t, 789, actionSpy.deleteMessageCalls[1].MsgID)
+
+		require.Len(t, actionSpy.warnCalls, 1)
+		assert.Equal(t, int64(123), actionSpy.warnCalls[0].chatID)
+		assert.Equal(t, int64(222), actionSpy.warnCalls[0].subjectID)
+		assert.Equal(t, 999, actionSpy.warnCalls[0].messageID)
+		assert.Contains(t, actionSpy.warnCalls[0].text, "warning from admin")
+		assert.Contains(t, actionSpy.warnCalls[0].text, "@user please follow our rules")
+
+		meta, ok := observability.MetadataFromContext(actionSpy.warnCtxs[0])
+		require.True(t, ok)
+		assert.Equal(t, "warn-123-999", meta.EventID)
+		assert.Equal(t, "corr-warn-999", meta.CorrelationID)
+		assert.Equal(t, "warn:chat:123:msg:999:cmd:789", meta.IdempotencyKey)
+
+		assert.Empty(t, mockAPI.RequestCalls())
+		assert.Empty(t, mockAPI.SendCalls())
 	})
 
 	t.Run("DirectSpamReport_ChannelMessage", func(t *testing.T) {

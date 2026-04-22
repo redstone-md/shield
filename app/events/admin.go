@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/umputun/tg-spam/app/bot"
+	"github.com/umputun/tg-spam/app/observability"
 )
 
 // admin is a helper to handle all admin-group related stuff, created by listener
@@ -23,6 +24,7 @@ type admin struct {
 	bot                    Bot
 	locator                Locator
 	superUsers             SuperUsers
+	actions                ActionExecutor
 	primChatID             int64
 	adminChatID            int64
 	trainingMode           bool
@@ -316,48 +318,93 @@ func (a *admin) DirectWarnReport(update tbapi.Update) error {
 		return fmt.Errorf("warn message is from super-user %s (%d), ignored", origMsg.From.UserName, origMsg.From.ID)
 	}
 	errs := new(multierror.Error)
-	// delete original message
-	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID:  origMsg.MessageID,
-		ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
-	}})
-	if err != nil {
-		errs = multierror.Append(errs, fmt.Errorf("failed to delete message %d: %w", origMsg.MessageID, err))
-	} else {
-		log.Printf("[INFO] warn message %d deleted", origMsg.MessageID)
+	ctx := a.warnContext(update, origMsg)
+
+	if err := a.deleteWarnMessage(ctx, origMsg.MessageID, "warn"); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	if err := a.deleteWarnMessage(ctx, update.Message.MessageID, "admin warn report"); err != nil {
+		errs = multierror.Append(errs, err)
 	}
 
-	// delete reply message
-	_, err = a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID:  update.Message.MessageID,
-		ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
-	}})
-	if err != nil {
-		errs = multierror.Append(errs, fmt.Errorf("failed to delete message %d: %w", update.Message.MessageID, err))
-	} else {
-		log.Printf("[INFO] admin warn reprot message %d deleted", update.Message.MessageID)
-	}
-
-	// make a warning message and replay to origMsg.MessageID
-	warnTarget := "@" + origMsg.From.UserName
-	if origMsg.SenderChat != nil && origMsg.SenderChat.ID != 0 && origMsg.SenderChat.ID != a.primChatID {
-		chName := a.channelDisplayName(origMsg.SenderChat)
-		if origMsg.SenderChat.UserName != "" {
-			warnTarget = "@" + chName
-		} else {
-			warnTarget = chName
-		}
-	}
 	warnMsg := fmt.Sprintf("warning from %s\n\n%s %s", update.Message.From.UserName,
-		warnTarget, a.warnMsg)
-	if err := send(tbapi.NewMessage(a.primChatID, escapeMarkDownV1Text(warnMsg)), a.tbAPI); err != nil {
-		errs = multierror.Append(errs, fmt.Errorf("failed to send warning to main chat: %w", err))
+		a.warnTarget(origMsg), a.warnMsg)
+	if err := a.sendWarnMessage(ctx, origMsg, warnMsg); err != nil {
+		errs = multierror.Append(errs, err)
 	}
 
 	if err := errs.ErrorOrNil(); err != nil {
 		return fmt.Errorf("direct warn report failed: %w", err)
 	}
 	return nil
+}
+
+func (a *admin) deleteWarnMessage(ctx context.Context, msgID int, label string) error {
+	if a.actions != nil {
+		if err := a.actions.DeleteMessage(ctx, a.primChatID, msgID); err != nil {
+			return fmt.Errorf("failed to delete message %d: %w", msgID, err)
+		}
+		log.Printf("[INFO] %s message %d deleted", label, msgID)
+		return nil
+	}
+
+	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
+		MessageID:  msgID,
+		ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
+	}})
+	if err != nil {
+		return fmt.Errorf("failed to delete message %d: %w", msgID, err)
+	}
+	log.Printf("[INFO] %s message %d deleted", label, msgID)
+	return nil
+}
+
+func (a *admin) sendWarnMessage(ctx context.Context, origMsg *tbapi.Message, warnMsg string) error {
+	if a.actions != nil {
+		if err := a.actions.WarnUser(ctx, warnRequest{
+			chatID:    a.primChatID,
+			subjectID: warnSubjectID(origMsg),
+			messageID: origMsg.MessageID,
+			text:      warnMsg,
+		}); err != nil {
+			return fmt.Errorf("failed to send warning to main chat: %w", err)
+		}
+		return nil
+	}
+
+	if err := send(tbapi.NewMessage(a.primChatID, escapeMarkDownV1Text(warnMsg)), a.tbAPI); err != nil {
+		return fmt.Errorf("failed to send warning to main chat: %w", err)
+	}
+	return nil
+}
+
+func (a *admin) warnTarget(origMsg *tbapi.Message) string {
+	warnTarget := "@" + origMsg.From.UserName
+	if origMsg.SenderChat != nil && origMsg.SenderChat.ID != 0 && origMsg.SenderChat.ID != a.primChatID {
+		chName := a.channelDisplayName(origMsg.SenderChat)
+		if origMsg.SenderChat.UserName != "" {
+			return "@" + chName
+		}
+		return chName
+	}
+	return warnTarget
+}
+
+func (a *admin) warnContext(update tbapi.Update, origMsg *tbapi.Message) context.Context {
+	eventID := fmt.Sprintf("warn-%d-%d", a.primChatID, origMsg.MessageID)
+	correlationID := fmt.Sprintf("corr-warn-%d", origMsg.MessageID)
+	idempotencyKey := fmt.Sprintf("warn:chat:%d:msg:%d:cmd:%d", a.primChatID, origMsg.MessageID, update.Message.MessageID)
+	return observability.WithModerationMetadata(context.Background(), eventID, correlationID, idempotencyKey)
+}
+
+func warnSubjectID(msg *tbapi.Message) int64 {
+	if msg.SenderChat != nil && msg.SenderChat.ID != 0 {
+		return msg.SenderChat.ID
+	}
+	if msg.From != nil {
+		return msg.From.ID
+	}
+	return 0
 }
 
 // returns the user ID and username from the tg update if's forwarded message,

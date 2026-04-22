@@ -129,7 +129,7 @@ classDiagram
 - `InMemoryQueue` — defined in [app/moderation/queue.go](../app/moderation/queue.go); used by phase-0 tracer-bullet wiring
 - `listenerEventProcessor` — defined in [app/events/pipeline.go](../app/events/pipeline.go); adapts queued moderation events back into the current runtime flow
 - `defaultPolicyEngine` — defined in [app/events/policy.go](../app/events/policy.go); converts detection results into explicit moderation decisions
-- `telegramActionExecutor` — defined in [app/events/action_executor.go](../app/events/action_executor.go); applies bans/restrictions and message deletions
+- `telegramActionExecutor` — defined in [app/events/action_executor.go](../app/events/action_executor.go); applies bans/restrictions, message deletions, and warning messages through the shared executor surface
 - `defaultAuditWriter` — defined in [app/events/audit_writer.go](../app/events/audit_writer.go); records moderation results through current logging and locator sinks
 - `app/observability` metadata helper — defined in [app/observability/context.go](../app/observability/context.go); carries `event_id` and `correlation_id` through the moderation tracer-bullet path
 - `app/webapi` request metadata middleware — defined in [app/webapi/webapi.go](../app/webapi/webapi.go); attaches `event_id` and `correlation_id` to request context and response headers
@@ -143,6 +143,7 @@ classDiagram
 - `ModerationActions` — defined in [app/storage/moderation_actions.go](../app/storage/moderation_actions.go); durable executor command journal for bans, restrictions, and deletes, including latest-attempt replay lookup for idempotent command execution
 - Report-driven sanctions in [app/events/reports.go](../app/events/reports.go) now flow through the shared `ActionExecutor`, so manual report approval and auto-ban thresholds reuse the same command journal and replay boundary as the queue worker
 - Reporter-ban callbacks in [app/events/reports.go](../app/events/reports.go) also reuse the shared `ActionExecutor`, closing the remaining direct report-side ban path
+- Admin `/warn` handling in [app/events/admin.go](../app/events/admin.go) now also reuses the shared `ActionExecutor`, so delete-plus-warn flows carry idempotency metadata and enter the same journal boundary as the rest of moderation actions
 - Enriched moderation audit now persists into [app/storage/detected_spam.go](../app/storage/detected_spam.go) with `signal_source`, `score`, `matched_rules`, `rule_set_version`, and `idempotency_key`, fed by [app/events/audit_writer.go](../app/events/audit_writer.go) and the runtime spam logger
 - Failed Telegram action attempts remain retryable in [app/storage/incoming_events.go](../app/storage/incoming_events.go): failure snapshots keep decision/error state without setting `processed_at`, so a later duplicate delivery can re-enter the pipeline without duplicating successful audit writes
 
@@ -169,6 +170,7 @@ classDiagram
 - Reporter-ban callback coverage is in [app/events/reports_test.go](../app/events/reports_test.go), which proves `callbackReportBanReporterConfirm` now uses the shared action executor.
 - Audit enrichment coverage is in [app/storage/detected_spam_test.go](../app/storage/detected_spam_test.go), [app/events/audit_writer_test.go](../app/events/audit_writer_test.go), and [app/main_test.go](../app/main_test.go), which prove enriched audit data including `idempotency_key` persists through the runtime spam logger into `detected_spam`.
 - Retry-recovery integration coverage is in [app/storage/incoming_events_test.go](../app/storage/incoming_events_test.go) and [app/events/listener_test.go](../app/events/listener_test.go), which prove processed duplicates are suppressed, failed Telegram actions stay retryable, and retries do not create duplicate final audit entries.
+- Shared warn-executor coverage is in [app/events/action_executor_test.go](../app/events/action_executor_test.go), [app/events/admin_test.go](../app/events/admin_test.go), and [app/events/listener_test.go](../app/events/listener_test.go), which prove `WarnUser` is journaled and runtime `/warn` flows reuse the shared action executor.
 
 ## 4) Dependency rules
 

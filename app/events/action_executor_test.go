@@ -108,6 +108,32 @@ func TestTelegramActionExecutor_RetryFailedActionWithNextAttempt(t *testing.T) {
 	assert.Equal(t, 2, journal.calls[0].Attempt)
 }
 
+func TestTelegramActionExecutor_WarnUser(t *testing.T) {
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			return tbapi.Message{}, nil
+		},
+	}
+	journal := &moderationActionsSpy{}
+	exec := newTelegramActionExecutor(mockAPI, false, false, nil, journal)
+
+	ctx := observability.WithModerationMetadata(context.Background(), "evt-3", "corr-3", "key-3")
+	err := exec.WarnUser(ctx, warnRequest{
+		chatID:    123,
+		subjectID: 42,
+		messageID: 77,
+		text:      "warning from admin\n\n@user please follow our rules",
+	})
+	require.NoError(t, err)
+	require.Len(t, mockAPI.SendCalls(), 1)
+	require.Len(t, journal.calls, 1)
+	assert.Equal(t, "warn_user", journal.calls[0].Command)
+	assert.Equal(t, "completed", journal.calls[0].Status)
+	assert.Equal(t, 42, int(journal.calls[0].SubjectID))
+	assert.Equal(t, 77, journal.calls[0].MessageID)
+	assert.Equal(t, "key-3", journal.calls[0].IdempotencyKey)
+}
+
 type moderationActionsSpy struct {
 	calls []storage.ModerationActionEntry
 	last  storage.ModerationActionReplay

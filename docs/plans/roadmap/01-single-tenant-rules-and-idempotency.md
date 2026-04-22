@@ -11,7 +11,7 @@
 - [x] Научить pipeline повторно получать уже обработанное решение по idempotency key вместо повторного бана или удаления.
 - [x] Вынести нормализацию текста из детекторов в отдельный модуль с этапами lower-case, trim, cleanup zero-width, canonical whitespace и script folding hooks.
 - [x] Перевести текущие проверки из `lib/tgspam` и `app/bot/spam.go` на чтение из `RuleSet`, а не из разрозненных опций runtime.
-- [ ] Создать `ActionExecutor` с явными командами `DeleteMessage`, `MuteUser`, `BanUser`, `BanSenderChat`, `WarnUser`.
+- [x] Создать `ActionExecutor` с явными командами `DeleteMessage`, `MuteUser`, `BanUser`, `BanSenderChat`, `WarnUser`.
 - [x] Добавить журнал исполнения action-команд с retry state, last error и idempotent replay.
 - [x] Перенести strike escalation и report-based penalties на использование общего `ActionExecutor`, а не разрозненных вызовов из `events`.
 - [x] Расширить audit-запись так, чтобы для каждого решения сохранялись `signal source`, `score`, `matched rules` и `rule_set_version`.

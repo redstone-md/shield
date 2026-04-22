@@ -16,6 +16,7 @@ type ActionExecutor interface {
 	ApplyBan(ctx context.Context, req banRequest) error
 	DeleteMessage(ctx context.Context, chatID int64, msgID int) error
 	DeleteExtraMessages(ctx context.Context, checkResults []spamcheck.Response, userID int64, username string, chatID int64) error
+	WarnUser(ctx context.Context, req warnRequest) error
 }
 
 type telegramActionExecutor struct {
@@ -100,11 +101,27 @@ func (e telegramActionExecutor) DeleteExtraMessages(ctx context.Context, checkRe
 	return nil
 }
 
+func (e telegramActionExecutor) WarnUser(ctx context.Context, req warnRequest) error {
+	attempt, replayed := e.replayAttempt(ctx, commandWarnUser, req.chatID, req.subjectID, req.messageID)
+	if replayed {
+		return nil
+	}
+
+	if err := send(tbapi.NewMessage(req.chatID, escapeMarkDownV1Text(req.text)), e.tbAPI); err != nil {
+		e.recordAction(ctx, commandWarnUser, req.chatID, req.subjectID, req.messageID, attempt, err)
+		return fmt.Errorf("warn user %d: %w", req.subjectID, err)
+	}
+
+	e.recordAction(ctx, commandWarnUser, req.chatID, req.subjectID, req.messageID, attempt, nil)
+	return nil
+}
+
 const (
 	commandDeleteMessage  = "delete_message"
 	commandMuteUser       = "mute_user"
 	commandBanUser        = "ban_user"
 	commandBanSenderChat  = "ban_sender_chat"
+	commandWarnUser       = "warn_user"
 	actionStatusCompleted = "completed"
 	actionStatusFailed    = "failed"
 )
@@ -199,6 +216,13 @@ type banRequest struct {
 	dry      bool
 	training bool
 	restrict bool
+}
+
+type warnRequest struct {
+	chatID    int64
+	subjectID int64
+	messageID int
+	text      string
 }
 
 // The bot must be an administrator in the supergroup for this to work

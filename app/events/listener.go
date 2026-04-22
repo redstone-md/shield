@@ -136,8 +136,10 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 		}
 	}
 
+	l.ensurePipeline()
+
 	l.adminHandler = &admin{
-		tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers,
+		tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers, actions: l.ActionExecutor,
 		primChatID: l.chatID, adminChatID: l.adminChatID,
 		trainingMode: l.TrainingMode, softBan: l.SoftBanMode, dry: l.Dry, warnMsg: l.WarnMsg,
 		aggressiveCleanup: l.AggressiveCleanup, aggressiveCleanupLimit: l.AggressiveCleanupLimit,
