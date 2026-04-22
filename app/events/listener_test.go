@@ -591,6 +591,139 @@ func TestTelegramListener_ProcessQueuedEventCompletesReplayState(t *testing.T) {
 	assert.True(t, store.completeCalls[0].ActionResult.Applied)
 }
 
+func TestTelegramListener_DuplicateRetryDoesNotRepeatSuccessfulActionOrAudit(t *testing.T) {
+	locator, teardown := prepTestLocator(t)
+	defer teardown()
+
+	db, err := engine.NewSqlite(":memory:", "gr1")
+	require.NoError(t, err)
+	defer db.Close()
+
+	store, err := storage.NewIncomingEvents(context.Background(), db)
+	require.NoError(t, err)
+
+	botMock := &contextualBotSpy{
+		onMessage: func(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response {
+			return bot.Response{
+				Send:        true,
+				BanInterval: time.Minute,
+				User:        bot.User{ID: 42, Username: "user"},
+				CheckResults: []spamcheck.Response{
+					{Name: "rule", Spam: true, Details: "smoke spam"},
+				},
+			}
+		},
+	}
+	actionSpy := &actionExecutorSpy{}
+	auditSpy := &auditWriterSpy{}
+
+	l := TelegramListener{
+		Bot:            botMock,
+		Locator:        locator,
+		IncomingEvents: store,
+		NoSpamReply:    true,
+		PolicyEngine:   defaultPolicyEngine{},
+		ActionExecutor: actionSpy,
+		AuditWriter:    auditSpy,
+		Group:          "123",
+		InstanceID:     "tg-spam",
+		chatID:         123,
+	}
+
+	update := tbapi.Update{
+		UpdateID: 704,
+		Message: &tbapi.Message{
+			MessageID: 80,
+			Chat:      tbapi.Chat{ID: 123, Type: "supergroup"},
+			Text:      "retry spam",
+			From:      &tbapi.User{ID: 42, UserName: "user"},
+			Date:      int(time.Date(2026, 4, 13, 10, 15, 0, 0, time.UTC).Unix()),
+		},
+	}
+
+	err = l.procEvents(update)
+	require.NoError(t, err)
+	err = l.procEvents(update)
+	require.NoError(t, err)
+
+	require.Len(t, actionSpy.banCalls, 1)
+	require.Len(t, auditSpy.calls, 1)
+}
+
+func TestTelegramListener_DuplicateRetryRecoversAfterTelegramActionFailure(t *testing.T) {
+	locator, teardown := prepTestLocator(t)
+	defer teardown()
+
+	db, err := engine.NewSqlite(":memory:", "gr1")
+	require.NoError(t, err)
+	defer db.Close()
+
+	store, err := storage.NewIncomingEvents(context.Background(), db)
+	require.NoError(t, err)
+
+	botMock := &contextualBotSpy{
+		onMessage: func(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response {
+			return bot.Response{
+				Send:        true,
+				BanInterval: time.Minute,
+				User:        bot.User{ID: 42, Username: "user"},
+				CheckResults: []spamcheck.Response{
+					{Name: "rule", Spam: true, Details: "smoke spam"},
+				},
+			}
+		},
+	}
+	attempts := 0
+	actionSpy := &actionExecutorSpy{
+		applyBan: func(ctx context.Context, req banRequest) error {
+			attempts++
+			if attempts == 1 {
+				return fmt.Errorf("telegram timeout")
+			}
+			return nil
+		},
+	}
+	auditSpy := &auditWriterSpy{}
+
+	l := TelegramListener{
+		Bot:            botMock,
+		Locator:        locator,
+		IncomingEvents: store,
+		NoSpamReply:    true,
+		PolicyEngine:   defaultPolicyEngine{},
+		ActionExecutor: actionSpy,
+		AuditWriter:    auditSpy,
+		Group:          "123",
+		InstanceID:     "tg-spam",
+		chatID:         123,
+	}
+
+	update := tbapi.Update{
+		UpdateID: 705,
+		Message: &tbapi.Message{
+			MessageID: 81,
+			Chat:      tbapi.Chat{ID: 123, Type: "supergroup"},
+			Text:      "retry spam",
+			From:      &tbapi.User{ID: 42, UserName: "user"},
+			Date:      int(time.Date(2026, 4, 13, 10, 20, 0, 0, time.UTC).Unix()),
+		},
+	}
+
+	err = l.procEvents(update)
+	require.Error(t, err)
+	err = l.procEvents(update)
+	require.NoError(t, err)
+
+	require.Len(t, actionSpy.banCalls, 2)
+	require.Len(t, auditSpy.calls, 1)
+
+	record, err := store.ByIdempotencyKey(context.Background(), "telegram:update:705:chat:123:message:81:edited:0")
+	require.NoError(t, err)
+	assert.True(t, record.ProcessedAt.Valid)
+	assert.True(t, record.ActionApplied.Valid)
+	assert.True(t, record.ActionApplied.Bool)
+}
+
 func assertContextMetadata(t *testing.T, ctx context.Context, eventID, correlationID string) {
 	t.Helper()
 	meta, ok := observability.MetadataFromContext(ctx)

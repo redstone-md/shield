@@ -117,3 +117,61 @@ func TestIncomingEventsReserveAndComplete(t *testing.T) {
 	assert.True(t, record.ActionApplied.Valid)
 	assert.True(t, record.ActionApplied.Bool)
 }
+
+func TestIncomingEventsReserveAllowsRetryAfterFailedAction(t *testing.T) {
+	db, err := engine.NewSqlite(":memory:", "gr1")
+	require.NoError(t, err)
+	defer db.Close()
+
+	store, err := NewIncomingEvents(context.Background(), db)
+	require.NoError(t, err)
+
+	event := moderation.IncomingEvent{
+		EventID:        "evt-3",
+		CorrelationID:  "corr-3",
+		TenantID:       "tg-spam",
+		Source:         "telegram.update",
+		UpdateID:       703,
+		ChatID:         123,
+		MessageID:      79,
+		IdempotencyKey: "telegram:update:703:chat:123:message:79:edited:0",
+		ReceivedAt:     time.Date(2026, 4, 13, 11, 10, 0, 0, time.UTC),
+	}
+
+	replay, err := store.Reserve(context.Background(), event)
+	require.NoError(t, err)
+	assert.True(t, replay.Recorded)
+	assert.False(t, replay.Processed)
+
+	err = store.Complete(context.Background(), event.IdempotencyKey,
+		moderation.PolicyDecision{
+			EventID:       event.EventID,
+			CorrelationID: event.CorrelationID,
+			Action:        moderation.ActionBan,
+			Reason:        "telegram failure",
+			Score:         1,
+			DecidedAt:     time.Date(2026, 4, 13, 11, 11, 0, 0, time.UTC),
+		},
+		moderation.ModerationActionResult{
+			EventID:       event.EventID,
+			CorrelationID: event.CorrelationID,
+			Action:        moderation.ActionBan,
+			Applied:       false,
+			Provider:      "telegram",
+			Error:         "telegram timeout",
+			AppliedAt:     time.Date(2026, 4, 13, 11, 11, 0, 0, time.UTC),
+		},
+	)
+	require.NoError(t, err)
+
+	replay, err = store.Reserve(context.Background(), event)
+	require.NoError(t, err)
+	assert.True(t, replay.Recorded)
+	assert.False(t, replay.Processed)
+
+	record, err := store.ByIdempotencyKey(context.Background(), event.IdempotencyKey)
+	require.NoError(t, err)
+	assert.False(t, record.ProcessedAt.Valid)
+	assert.Equal(t, "ban", record.DecisionAction)
+	assert.Equal(t, "telegram timeout", record.ActionError)
+}

@@ -144,6 +144,7 @@ classDiagram
 - Report-driven sanctions in [app/events/reports.go](../app/events/reports.go) now flow through the shared `ActionExecutor`, so manual report approval and auto-ban thresholds reuse the same command journal and replay boundary as the queue worker
 - Reporter-ban callbacks in [app/events/reports.go](../app/events/reports.go) also reuse the shared `ActionExecutor`, closing the remaining direct report-side ban path
 - Enriched moderation audit now persists into [app/storage/detected_spam.go](../app/storage/detected_spam.go) with `signal_source`, `score`, `matched_rules`, `rule_set_version`, and `idempotency_key`, fed by [app/events/audit_writer.go](../app/events/audit_writer.go) and the runtime spam logger
+- Failed Telegram action attempts remain retryable in [app/storage/incoming_events.go](../app/storage/incoming_events.go): failure snapshots keep decision/error state without setting `processed_at`, so a later duplicate delivery can re-enter the pipeline without duplicating successful audit writes
 
 ## 7) Verification status
 
@@ -167,6 +168,7 @@ classDiagram
 - Report-executor coverage is in [app/events/reports_test.go](../app/events/reports_test.go), which proves report approval and report auto-ban reuse the shared action executor.
 - Reporter-ban callback coverage is in [app/events/reports_test.go](../app/events/reports_test.go), which proves `callbackReportBanReporterConfirm` now uses the shared action executor.
 - Audit enrichment coverage is in [app/storage/detected_spam_test.go](../app/storage/detected_spam_test.go), [app/events/audit_writer_test.go](../app/events/audit_writer_test.go), and [app/main_test.go](../app/main_test.go), which prove enriched audit data including `idempotency_key` persists through the runtime spam logger into `detected_spam`.
+- Retry-recovery integration coverage is in [app/storage/incoming_events_test.go](../app/storage/incoming_events_test.go) and [app/events/listener_test.go](../app/events/listener_test.go), which prove processed duplicates are suppressed, failed Telegram actions stay retryable, and retries do not create duplicate final audit entries.
 
 ## 4) Dependency rules
 

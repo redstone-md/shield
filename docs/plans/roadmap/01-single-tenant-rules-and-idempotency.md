@@ -15,10 +15,10 @@
 - [x] Добавить журнал исполнения action-команд с retry state, last error и idempotent replay.
 - [x] Перенести strike escalation и report-based penalties на использование общего `ActionExecutor`, а не разрозненных вызовов из `events`.
 - [x] Расширить audit-запись так, чтобы для каждого решения сохранялись `signal source`, `score`, `matched rules` и `rule_set_version`.
-- [ ] Добавить integration-тесты на повторную доставку одного update, повторное выполнение action и восстановление после ошибки Telegram API.
+- [x] Добавить integration-тесты на повторную доставку одного update, повторное выполнение action и восстановление после ошибки Telegram API.
 
 ## Критерий завершения
 
 - [x] Single-tenant чат продолжает модерироваться без регрессий, но все решения строятся из `RuleSet`.
-- [ ] Повторный Telegram retry не приводит к двойному бану, двойному delete или двойной записи в audit.
+- [x] Повторный Telegram retry не приводит к двойному бану, двойному delete или двойной записи в audit.
 - [x] Любое решение можно связать с конкретной версией `RuleSet` и idempotency key.

@@ -271,6 +271,9 @@ func (s *IncomingEvents) Reserve(ctx context.Context, event moderation.IncomingE
 		Recorded:  false,
 		Processed: record.ProcessedAt.Valid,
 	}
+	if !record.ProcessedAt.Valid && (record.DecisionAction != "" || record.ActionError != "" || record.ActionApplied.Valid) {
+		replay.Recorded = true
+	}
 	if record.ProcessedAt.Valid {
 		replay.Decision = moderation.PolicyDecision{
 			EventID:       record.EventID,
@@ -306,12 +309,17 @@ func (s *IncomingEvents) Complete(ctx context.Context, idempotencyKey string,
 	}
 	query = s.Adopt(query)
 
+	markProcessed := shouldMarkProcessed(decision, actionResult)
 	processedAt := actionResult.AppliedAt
-	if processedAt.IsZero() {
+	if processedAt.IsZero() && markProcessed {
 		processedAt = decision.DecidedAt
 	}
-	if processedAt.IsZero() {
+	if processedAt.IsZero() && markProcessed {
 		processedAt = time.Now().UTC()
+	}
+	var processedAtValue any
+	if markProcessed {
+		processedAtValue = processedAt
 	}
 
 	_, err = s.ExecContext(ctx, query,
@@ -320,7 +328,7 @@ func (s *IncomingEvents) Complete(ctx context.Context, idempotencyKey string,
 		decision.Score,
 		actionResult.Applied,
 		actionResult.Error,
-		processedAt,
+		processedAtValue,
 		s.GID(),
 		idempotencyKey,
 	)
@@ -328,6 +336,16 @@ func (s *IncomingEvents) Complete(ctx context.Context, idempotencyKey string,
 		return fmt.Errorf("failed to complete incoming event: %w", err)
 	}
 	return nil
+}
+
+func shouldMarkProcessed(decision moderation.PolicyDecision, actionResult moderation.ModerationActionResult) bool {
+	if actionResult.Error != "" {
+		return false
+	}
+	if actionResult.Applied {
+		return true
+	}
+	return decision.Action == moderation.ActionAllow
 }
 
 // ByIdempotencyKey loads a previously recorded incoming event.
