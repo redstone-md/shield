@@ -145,6 +145,7 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 	l.reportsHandler = &userReports{
 		ReportConfig: l.ReportConfig,
 		tbAPI:        l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers,
+		actions:      l.ActionExecutor,
 		detectedSpam: l.DetectedSpamCounter, gid: l.InstanceID, moderation: l.ModerationConfig,
 		primChatID: l.chatID, adminChatID: l.adminChatID,
 		trainingMode: l.TrainingMode, softBanMode: l.SoftBanMode, dry: l.Dry,

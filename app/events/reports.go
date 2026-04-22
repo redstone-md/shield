@@ -10,6 +10,7 @@ import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
 	"github.com/umputun/tg-spam/app/bot"
+	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
@@ -43,6 +44,7 @@ type userReports struct {
 	detectedSpam DetectedSpamCounter
 	gid          string
 	superUsers   SuperUsers
+	actions      ActionExecutor
 	primChatID   int64
 	adminChatID  int64
 	moderation   ModerationConfig
@@ -200,6 +202,7 @@ func (r *userReports) tryLLMReportModeration(update tbapi.Update, origMsg *tbapi
 
 func (r *userReports) applyImmediateReportModeration(ctx context.Context, update tbapi.Update, origMsg *tbapi.Message, msgTxt string, resp bot.Response) error {
 	duration, restrict := r.reportPenalty(ctx, origMsg.From.ID)
+	ctx = r.reportActionContext(ctx, "llm_auto", origMsg.MessageID, origMsg.From.ID)
 
 	if err := r.bot.RemoveApprovedUser(origMsg.From.ID); err != nil {
 		log.Printf("[DEBUG] can't remove user %d from approved list: %v", origMsg.From.ID, err)
@@ -211,7 +214,11 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 		}
 	}
 
-	if !r.dry {
+	if r.actions != nil {
+		if err := r.actions.DeleteMessage(ctx, r.primChatID, origMsg.MessageID); err != nil {
+			log.Printf("[WARN] failed to delete LLM-confirmed reported message %d: %v", origMsg.MessageID, err)
+		}
+	} else if !r.dry {
 		_, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 			MessageID:  origMsg.MessageID,
 			ChatConfig: tbapi.ChatConfig{ChatID: r.primChatID},
@@ -221,18 +228,24 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 		}
 	}
 
-	banReq := banRequest{
+	req := banRequest{
 		duration: duration,
 		userID:   origMsg.From.ID,
 		chatID:   r.primChatID,
-		tbAPI:    r.tbAPI,
 		dry:      r.dry,
 		training: r.trainingMode,
 		userName: origMsg.From.UserName,
 		restrict: restrict,
 	}
-	if err := banUserOrChannel(ctx, banReq); err != nil {
-		return fmt.Errorf("failed to ban user %d after LLM-reviewed report: %w", origMsg.From.ID, err)
+	if r.actions != nil {
+		if err := r.actions.ApplyBan(ctx, req); err != nil {
+			return fmt.Errorf("failed to ban user %d after LLM-reviewed report: %w", origMsg.From.ID, err)
+		}
+	} else {
+		req.tbAPI = r.tbAPI
+		if err := banUserOrChannel(ctx, req); err != nil {
+			return fmt.Errorf("failed to ban user %d after LLM-reviewed report: %w", origMsg.From.ID, err)
+		}
 	}
 
 	r.recordDetectedSpam(ctx, origMsg, resp.CheckResults)
@@ -410,6 +423,7 @@ func (r *userReports) executeAutoBan(ctx context.Context, reports []storage.Repo
 
 	log.Printf("[INFO] executing auto-ban for user %d (%s) based on %d reports",
 		reportedUserID, reportedUserName, len(reports))
+	ctx = r.reportActionContext(ctx, "threshold_auto", msgID, reportedUserID)
 
 	// remove user from approved list
 	if remErr := r.bot.RemoveApprovedUser(reportedUserID); remErr != nil {
@@ -424,7 +438,13 @@ func (r *userReports) executeAutoBan(ctx context.Context, reports []storage.Repo
 	}
 
 	// delete reported message from primary chat
-	if !r.dry {
+	if r.actions != nil {
+		if err := r.actions.DeleteMessage(ctx, chatID, msgID); err != nil {
+			log.Printf("[WARN] failed to delete reported message %d: %v", msgID, err)
+		} else {
+			log.Printf("[INFO] reported message %d auto-deleted", msgID)
+		}
+	} else if !r.dry {
 		_, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 			MessageID:  msgID,
 			ChatConfig: tbapi.ChatConfig{ChatID: chatID},
@@ -436,19 +456,24 @@ func (r *userReports) executeAutoBan(ctx context.Context, reports []storage.Repo
 		}
 	}
 
-	// ban reported user - CRITICAL: respect soft-ban mode
-	banReq := banRequest{
+	req := banRequest{
 		duration: bot.PermanentBanDuration,
 		userID:   reportedUserID,
 		chatID:   chatID,
-		tbAPI:    r.tbAPI,
 		dry:      r.dry,
 		training: r.trainingMode,
 		userName: reportedUserName,
 		restrict: r.softBanMode, // IMPORTANT: use soft-ban if enabled
 	}
-	if err := banUserOrChannel(ctx, banReq); err != nil {
-		log.Printf("[WARN] failed to auto-ban user %d: %v", reportedUserID, err)
+	if r.actions != nil {
+		if err := r.actions.ApplyBan(ctx, req); err != nil {
+			log.Printf("[WARN] failed to auto-ban user %d: %v", reportedUserID, err)
+		}
+	} else {
+		req.tbAPI = r.tbAPI
+		if err := banUserOrChannel(ctx, req); err != nil {
+			log.Printf("[WARN] failed to auto-ban user %d: %v", reportedUserID, err)
+		}
 	}
 
 	// handle admin notification - update existing or send new
@@ -760,6 +785,7 @@ func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.Callba
 	chatID := reports[0].ChatID
 	msgText := reports[0].MsgText
 	reportedUserName := reports[0].ReportedUserName
+	ctx = r.reportActionContext(ctx, "admin_ban", msgID, reportedUserID)
 
 	// remove user from approved list
 	if remErr := r.bot.RemoveApprovedUser(reportedUserID); remErr != nil {
@@ -774,7 +800,13 @@ func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.Callba
 	}
 
 	// delete reported message from primary chat
-	if !r.dry {
+	if r.actions != nil {
+		if err := r.actions.DeleteMessage(ctx, chatID, msgID); err != nil {
+			log.Printf("[WARN] failed to delete reported message %d: %v", msgID, err)
+		} else {
+			log.Printf("[INFO] reported message %d deleted", msgID)
+		}
+	} else if !r.dry {
 		_, err = r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 			MessageID:  msgID,
 			ChatConfig: tbapi.ChatConfig{ChatID: chatID},
@@ -786,19 +818,24 @@ func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.Callba
 		}
 	}
 
-	// ban reported user permanently (or restrict if soft-ban enabled)
-	banReq := banRequest{
+	req := banRequest{
 		duration: bot.PermanentBanDuration,
 		userID:   reportedUserID,
 		chatID:   chatID,
-		tbAPI:    r.tbAPI,
 		dry:      r.dry,
 		training: r.trainingMode,
 		userName: reportedUserName,
 		restrict: r.softBanMode, // respect soft-ban mode
 	}
-	if err := banUserOrChannel(ctx, banReq); err != nil {
-		log.Printf("[WARN] failed to ban user %d: %v", reportedUserID, err)
+	if r.actions != nil {
+		if err := r.actions.ApplyBan(ctx, req); err != nil {
+			log.Printf("[WARN] failed to ban user %d: %v", reportedUserID, err)
+		}
+	} else {
+		req.tbAPI = r.tbAPI
+		if err := banUserOrChannel(ctx, req); err != nil {
+			log.Printf("[WARN] failed to ban user %d: %v", reportedUserID, err)
+		}
 	}
 
 	// delete all reports for this message
@@ -817,6 +854,13 @@ func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.Callba
 
 	log.Printf("[INFO] report ban approved for user %d by admin %s", reportedUserID, query.From.UserName)
 	return nil
+}
+
+func (r *userReports) reportActionContext(ctx context.Context, action string, msgID int, userID int64) context.Context {
+	eventID := fmt.Sprintf("report-%s-%d-%d", action, r.primChatID, msgID)
+	correlationID := fmt.Sprintf("corr-report-%s-%d", action, msgID)
+	idempotencyKey := fmt.Sprintf("report:%s:chat:%d:msg:%d:user:%d", action, r.primChatID, msgID, userID)
+	return observability.WithModerationMetadata(ctx, eventID, correlationID, idempotencyKey)
 }
 
 // callbackReportReject handles the callback when admin rejects a user report

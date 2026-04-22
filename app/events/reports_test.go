@@ -1889,6 +1889,63 @@ func TestUserReports_UpdateReportNotification(t *testing.T) {
 }
 
 func TestUserReports_CallbackReportBan(t *testing.T) {
+	t.Run("uses shared action executor for delete and ban", func(t *testing.T) {
+		mockAPI := &mocks.TbAPIMock{
+			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+				return tbapi.Message{}, nil
+			},
+			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+				return &tbapi.APIResponse{Ok: true}, nil
+			},
+		}
+
+		mockReports := &mocks.ReportsMock{
+			GetByMessageFunc: func(ctx context.Context, msgID int, chatID int64) ([]storage.Report, error) {
+				return []storage.Report{
+					{MsgID: 100, ChatID: 200, ReportedUserID: 666, ReportedUserName: "spammer", MsgText: "spam msg"},
+				}, nil
+			},
+			DeleteByMessageFunc: func(ctx context.Context, msgID int, chatID int64) error {
+				return nil
+			},
+		}
+
+		mockBot := &mocks.BotMock{
+			RemoveApprovedUserFunc: func(userID int64) error { return nil },
+			UpdateSpamFunc:         func(msg string) error { return nil },
+		}
+		actions := &actionExecutorSpy{}
+
+		rep := &userReports{
+			tbAPI:        mockAPI,
+			adminChatID:  456,
+			primChatID:   200,
+			ReportConfig: ReportConfig{Storage: mockReports},
+			bot:          mockBot,
+			actions:      actions,
+		}
+
+		query := &tbapi.CallbackQuery{
+			Data: "R+666:100",
+			From: &tbapi.User{UserName: "admin"},
+			Message: &tbapi.Message{
+				Chat:      tbapi.Chat{ID: 456},
+				MessageID: 999,
+				Text:      "**User spam reported (1 reports)**",
+				Date:      int(time.Now().Unix()),
+			},
+		}
+
+		err := rep.callbackReportBan(context.Background(), query)
+		require.NoError(t, err)
+		require.Len(t, actions.deleteMessageCalls, 1)
+		require.Len(t, actions.banCalls, 1)
+		assert.Equal(t, int64(200), actions.deleteMessageCalls[0].ChatID)
+		assert.Equal(t, 100, actions.deleteMessageCalls[0].MsgID)
+		assert.Equal(t, int64(666), actions.banCalls[0].userID)
+		assert.Equal(t, int64(200), actions.banCalls[0].chatID)
+	})
+
 	t.Run("successful ban approval", func(t *testing.T) {
 		mockAPI := &mocks.TbAPIMock{
 			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
@@ -2085,6 +2142,52 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		assert.False(t, banReqReceived.restrict, "should use ban mode when soft-ban disabled")
 		assert.Equal(t, int64(666), banReqReceived.userID, "should ban correct user")
 	})
+}
+
+func TestUserReports_ExecuteAutoBanUsesSharedActionExecutor(t *testing.T) {
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			return tbapi.Message{MessageID: 123}, nil
+		},
+		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+			return &tbapi.APIResponse{Ok: true}, nil
+		},
+	}
+	mockBot := &mocks.BotMock{
+		RemoveApprovedUserFunc: func(id int64) error { return nil },
+		UpdateSpamFunc:         func(msg string) error { return nil },
+	}
+	mockReports := &mocks.ReportsMock{
+		DeleteByMessageFunc: func(ctx context.Context, msgID int, chatID int64) error { return nil },
+	}
+	actions := &actionExecutorSpy{}
+
+	rep := &userReports{
+		tbAPI:       mockAPI,
+		bot:         mockBot,
+		actions:     actions,
+		primChatID:  200,
+		adminChatID: 456,
+		softBanMode: true,
+		ReportConfig: ReportConfig{
+			Storage:          mockReports,
+			Threshold:        2,
+			AutoBanThreshold: 3,
+		},
+	}
+
+	err := rep.executeAutoBan(context.Background(), []storage.Report{
+		{MsgID: 100, ChatID: 200, ReporterUserID: 111, ReportedUserID: 666, ReportedUserName: "spammer", MsgText: "spam"},
+		{MsgID: 100, ChatID: 200, ReporterUserID: 222, ReportedUserID: 666, ReportedUserName: "spammer", MsgText: "spam"},
+		{MsgID: 100, ChatID: 200, ReporterUserID: 333, ReportedUserID: 666, ReportedUserName: "spammer", MsgText: "spam"},
+	})
+	require.NoError(t, err)
+	require.Len(t, actions.deleteMessageCalls, 1)
+	require.Len(t, actions.banCalls, 1)
+	assert.Equal(t, int64(200), actions.deleteMessageCalls[0].ChatID)
+	assert.Equal(t, 100, actions.deleteMessageCalls[0].MsgID)
+	assert.True(t, actions.banCalls[0].restrict)
+	assert.Equal(t, int64(666), actions.banCalls[0].userID)
 }
 
 func TestUserReports_CallbackReportReject(t *testing.T) {
