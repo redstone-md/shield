@@ -3,9 +3,11 @@ package events
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
+	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
 type AuditWriter interface {
@@ -13,13 +15,18 @@ type AuditWriter interface {
 }
 
 type AuditRecord struct {
-	Event        moderation.IncomingEvent
-	Message      *bot.Message
-	Response     bot.Response
-	Decision     moderation.PolicyDecision
-	ActionResult moderation.ModerationActionResult
-	ChatID       int64
-	SpamUserID   int64
+	Event          moderation.IncomingEvent
+	Message        *bot.Message
+	Response       bot.Response
+	Decision       moderation.PolicyDecision
+	ActionResult   moderation.ModerationActionResult
+	RuleSetVersion int
+	ChatID         int64
+	SpamUserID     int64
+}
+
+type enrichedAuditLogger interface {
+	SaveAudit(ctx context.Context, record AuditRecord) error
 }
 
 type defaultAuditWriter struct {
@@ -33,7 +40,13 @@ func (w defaultAuditWriter) Write(ctx context.Context, record AuditRecord) error
 	}
 
 	if w.spamLogger != nil {
-		w.spamLogger.Save(record.Message, &record.Response)
+		if logger, ok := w.spamLogger.(enrichedAuditLogger); ok {
+			if err := logger.SaveAudit(ctx, record); err != nil {
+				return fmt.Errorf("save enriched audit: %w", err)
+			}
+		} else {
+			w.spamLogger.Save(record.Message, &record.Response)
+		}
 	}
 	if w.locator != nil {
 		if err := w.locator.AddSpam(ctx, record.SpamUserID, record.Response.CheckResults); err != nil {
@@ -41,4 +54,24 @@ func (w defaultAuditWriter) Write(ctx context.Context, record AuditRecord) error
 		}
 	}
 	return nil
+}
+
+// MatchedRules returns the names of spam checks that matched.
+func MatchedRules(results []spamcheck.Response) []string {
+	res := make([]string, 0, len(results))
+	for _, result := range results {
+		if result.Spam {
+			res = append(res, result.Name)
+		}
+	}
+	return res
+}
+
+// SignalSource returns the primary spam signal source for an audit record.
+func SignalSource(results []spamcheck.Response) string {
+	rules := MatchedRules(results)
+	if len(rules) == 0 {
+		return "policy"
+	}
+	return strings.TrimSpace(rules[0])
 }

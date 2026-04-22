@@ -239,6 +239,7 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 		IncomingEvents:      a.IncomingEventsStore,
 		ModerationActions:   a.ModerationActionsStore,
 		DetectedSpamCounter: a.DetectedSpamStore,
+		RuleSetVersion:      a.ActiveRuleSet.Version,
 		ModerationConfig: events.ModerationConfig{
 			FirstStrike:  a.ActiveRuleSet.Moderation.FirstStrike,
 			SecondStrike: a.ActiveRuleSet.Moderation.SecondStrike,

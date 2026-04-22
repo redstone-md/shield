@@ -20,6 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/umputun/tg-spam/app/bot"
+	"github.com/umputun/tg-spam/app/events"
+	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
@@ -89,6 +91,47 @@ func TestMakeSpamLogger(t *testing.T) {
 	assert.JSONEq(t, `[{"name":"Check1","spam":true,"details":"Details 1"},{"name":"Check2","spam":false,"details":"Details 2"}]`,
 		savedMsgs[0].ChecksJSON)
 
+}
+
+func TestMakeSpamLogger_SaveAudit(t *testing.T) {
+	file, err := os.CreateTemp(os.TempDir(), "log")
+	require.NoError(t, err)
+	defer os.Remove(file.Name())
+
+	db, err := engine.NewSqlite(":memory:", "gr1")
+	require.NoError(t, err)
+	defer db.Close()
+
+	logger, err := makeSpamLogger(context.Background(), "gr1", file, db)
+	require.NoError(t, err)
+
+	enriched, ok := logger.(interface {
+		SaveAudit(context.Context, events.AuditRecord) error
+	})
+	require.True(t, ok)
+
+	record := events.AuditRecord{
+		Message:        &bot.Message{Text: "Test message\nblah", From: bot.User{ID: 123, DisplayName: "Test User", Username: "testuser"}},
+		Decision:       moderation.PolicyDecision{Score: 2},
+		RuleSetVersion: 7,
+		Response:       bot.Response{},
+	}
+	record.Response.CheckResults = []spamcheck.Response{
+		{Name: "duplicates", Spam: true, Details: "dup"},
+		{Name: "openai", Spam: true, Details: "llm"},
+	}
+
+	err = enriched.SaveAudit(context.Background(), record)
+	require.NoError(t, err)
+
+	savedMsgs := []storage.DetectedSpamInfo{}
+	err = db.Select(&savedMsgs, "SELECT text, user_id, user_name, checks, signal_source, score, matched_rules, rule_set_version FROM detected_spam")
+	require.NoError(t, err)
+	require.Len(t, savedMsgs, 1)
+	assert.Equal(t, "duplicates", savedMsgs[0].SignalSource)
+	assert.Equal(t, 2.0, savedMsgs[0].Score)
+	assert.Equal(t, 7, savedMsgs[0].RuleSetVersion)
+	assert.JSONEq(t, `["duplicates","openai"]`, savedMsgs[0].MatchedRulesJSON)
 }
 
 func TestMakeSpamLogWriter(t *testing.T) {

@@ -804,56 +804,86 @@ func makeSpamLogger(ctx context.Context, gid string, wr io.Writer, dataDB *engin
 		return nil, fmt.Errorf("can't make approved users store, %w", auErr)
 	}
 
-	logWr := events.SpamLoggerFunc(func(msg *bot.Message, response *bot.Response) {
-		userID := msg.From.ID
-		userName := msg.From.Username
-		if msg.SenderChat.ID != 0 {
-			userID = msg.SenderChat.ID
-			userName = msg.SenderChat.UserName
-		}
-		if userName == "" {
-			userName = msg.From.DisplayName
-		}
-		// write to log file
-		text := strings.ReplaceAll(msg.Text, "\n", " ")
-		text = strings.TrimSpace(text)
-		log.Printf("[DEBUG] spam detected from %v, text: %s", msg.From, text)
-		m := struct {
-			TimeStamp   string `json:"ts"`
-			DisplayName string `json:"display_name"`
-			UserName    string `json:"user_name"`
-			UserID      int64  `json:"user_id"`
-			Text        string `json:"text"`
-		}{
-			TimeStamp:   time.Now().In(time.Local).Format(time.RFC3339),
-			DisplayName: msg.From.DisplayName,
-			UserName:    userName,
-			UserID:      userID,
-			Text:        text,
-		}
-		line, err := json.Marshal(&m)
-		if err != nil {
-			log.Printf("[WARN] can't marshal json, %v", err)
-			return
-		}
-		if _, err := wr.Write(append(line, '\n')); err != nil {
-			log.Printf("[WARN] can't write to log, %v", err)
-		}
+	return auditSpamLogger{ctx: ctx, gid: gid, wr: wr, store: detectedSpamStore}, nil
+}
 
-		// write to db store
-		rec := storage.DetectedSpamInfo{
-			Text:      text,
-			UserID:    userID,
-			UserName:  userName,
-			Timestamp: time.Now().In(time.Local),
-			GID:       gid,
-		}
-		if err := detectedSpamStore.Write(ctx, rec, response.CheckResults); err != nil {
-			log.Printf("[WARN] can't write to db, %v", err)
-		}
-	})
+type auditSpamLogger struct {
+	ctx   context.Context
+	gid   string
+	wr    io.Writer
+	store *storage.DetectedSpam
+}
 
-	return logWr, nil
+func (l auditSpamLogger) Save(msg *bot.Message, response *bot.Response) {
+	entry := l.baseEntry(msg)
+	if err := l.writeLog(entry, msg.From.DisplayName); err != nil {
+		log.Printf("[WARN] %v", err)
+		return
+	}
+	if err := l.store.Write(l.ctx, entry, response.CheckResults); err != nil {
+		log.Printf("[WARN] can't write to db, %v", err)
+	}
+}
+
+func (l auditSpamLogger) SaveAudit(ctx context.Context, record events.AuditRecord) error {
+	entry := l.baseEntry(record.Message)
+	entry.SignalSource = events.SignalSource(record.Response.CheckResults)
+	entry.Score = record.Decision.Score
+	entry.MatchedRules = events.MatchedRules(record.Response.CheckResults)
+	entry.RuleSetVersion = record.RuleSetVersion
+	if err := l.writeLog(entry, record.Message.From.DisplayName); err != nil {
+		return err
+	}
+	if err := l.store.Write(ctx, entry, record.Response.CheckResults); err != nil {
+		return fmt.Errorf("can't write to db: %w", err)
+	}
+	return nil
+}
+
+func (l auditSpamLogger) baseEntry(msg *bot.Message) storage.DetectedSpamInfo {
+	userID := msg.From.ID
+	userName := msg.From.Username
+	if msg.SenderChat.ID != 0 {
+		userID = msg.SenderChat.ID
+		userName = msg.SenderChat.UserName
+	}
+	if userName == "" {
+		userName = msg.From.DisplayName
+	}
+	text := strings.ReplaceAll(msg.Text, "\n", " ")
+	text = strings.TrimSpace(text)
+	log.Printf("[DEBUG] spam detected from %v, text: %s", msg.From, text)
+	return storage.DetectedSpamInfo{
+		Text:      text,
+		UserID:    userID,
+		UserName:  userName,
+		Timestamp: time.Now().In(time.Local),
+		GID:       l.gid,
+	}
+}
+
+func (l auditSpamLogger) writeLog(entry storage.DetectedSpamInfo, displayName string) error {
+	m := struct {
+		TimeStamp   string `json:"ts"`
+		DisplayName string `json:"display_name"`
+		UserName    string `json:"user_name"`
+		UserID      int64  `json:"user_id"`
+		Text        string `json:"text"`
+	}{
+		TimeStamp:   time.Now().In(time.Local).Format(time.RFC3339),
+		DisplayName: displayName,
+		UserName:    entry.UserName,
+		UserID:      entry.UserID,
+		Text:        entry.Text,
+	}
+	line, err := json.Marshal(&m)
+	if err != nil {
+		return fmt.Errorf("can't marshal json: %w", err)
+	}
+	if _, err := l.wr.Write(append(line, '\n')); err != nil {
+		return fmt.Errorf("can't write to log: %w", err)
+	}
+	return nil
 }
 
 // makeSpamLogWriter creates spam log writer to keep reports about spam messages

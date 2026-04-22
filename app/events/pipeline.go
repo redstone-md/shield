@@ -372,13 +372,14 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 				AppliedAt:     time.Now().UTC(),
 			}
 			if err := l.AuditWriter.Write(ctx, AuditRecord{
-				Event:        event,
-				Message:      msg,
-				Response:     resp,
-				Decision:     policyOutcome.Decision,
-				ActionResult: actionResult,
-				ChatID:       fromChat,
-				SpamUserID:   spamUserID,
+				Event:          event,
+				Message:        msg,
+				Response:       resp,
+				Decision:       policyOutcome.Decision,
+				ActionResult:   actionResult,
+				RuleSetVersion: l.RuleSetVersion,
+				ChatID:         fromChat,
+				SpamUserID:     spamUserID,
 			}); err != nil {
 				errs = multierror.Append(errs, fmt.Errorf("audit write failed: %w", err))
 			}
@@ -446,13 +447,14 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 		}
 
 		if err := l.AuditWriter.Write(ctx, AuditRecord{
-			Event:        event,
-			Message:      msg,
-			Response:     resp,
-			Decision:     policyOutcome.Decision,
-			ActionResult: actionResult,
-			ChatID:       fromChat,
-			SpamUserID:   spamUserID,
+			Event:          event,
+			Message:        msg,
+			Response:       resp,
+			Decision:       policyOutcome.Decision,
+			ActionResult:   actionResult,
+			RuleSetVersion: l.RuleSetVersion,
+			ChatID:         fromChat,
+			SpamUserID:     spamUserID,
 		}); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("audit write failed: %w", err))
 		}

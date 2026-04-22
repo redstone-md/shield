@@ -48,6 +48,7 @@ type TelegramListener struct {
 	IncomingEvents          IncomingEvents
 	ModerationActions       ModerationActions
 	DetectedSpamCounter     DetectedSpamCounter
+	RuleSetVersion          int
 	ModerationConfig        ModerationConfig
 	ReportConfig            ReportConfig // user spam reporting configuration
 	DisableAdminSpamForward bool         // disable forwarding spam reports to admin chat support

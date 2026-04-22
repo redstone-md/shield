@@ -27,21 +27,30 @@ type DetectedSpam struct {
 
 // DetectedSpamInfo represents information about a detected spam entry.
 type DetectedSpamInfo struct {
-	ID         int64                `db:"id"`
-	GID        string               `db:"gid"`
-	Text       string               `db:"text"`
-	UserID     int64                `db:"user_id"`
-	UserName   string               `db:"user_name"`
-	Timestamp  time.Time            `db:"timestamp"`
-	Added      bool                 `db:"added"`  // added to samples
-	ChecksJSON string               `db:"checks"` // store as JSON
-	Checks     []spamcheck.Response `db:"-"`      // don't store in DB directly
+	ID               int64                `db:"id"`
+	GID              string               `db:"gid"`
+	Text             string               `db:"text"`
+	UserID           int64                `db:"user_id"`
+	UserName         string               `db:"user_name"`
+	Timestamp        time.Time            `db:"timestamp"`
+	Added            bool                 `db:"added"`  // added to samples
+	ChecksJSON       string               `db:"checks"` // store as JSON
+	Checks           []spamcheck.Response `db:"-"`      // don't store in DB directly
+	SignalSource     string               `db:"signal_source"`
+	Score            float64              `db:"score"`
+	MatchedRulesJSON string               `db:"matched_rules"`
+	MatchedRules     []string             `db:"-"`
+	RuleSetVersion   int                  `db:"rule_set_version"`
 }
 
 // detected spam query commands
 const (
 	CmdCreateDetectedSpamTable engine.DBCmd = iota + 200
 	CmdCreateDetectedSpamIndexes
+	CmdAddDetectedSpamSignalSourceColumn
+	CmdAddDetectedSpamScoreColumn
+	CmdAddDetectedSpamMatchedRulesColumn
+	CmdAddDetectedSpamRuleSetVersionColumn
 )
 
 // queries holds all detected spam queries
@@ -55,7 +64,11 @@ var detectedSpamQueries = engine.NewQueryMap().
             user_name TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             added BOOLEAN DEFAULT 0,
-            checks TEXT
+            checks TEXT,
+            signal_source TEXT DEFAULT '',
+            score REAL DEFAULT 0,
+            matched_rules TEXT DEFAULT '[]',
+            rule_set_version INTEGER DEFAULT 0
         )`,
 		Postgres: `CREATE TABLE IF NOT EXISTS detected_spam (
             id SERIAL PRIMARY KEY,
@@ -65,7 +78,11 @@ var detectedSpamQueries = engine.NewQueryMap().
             user_name TEXT,
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             added BOOLEAN DEFAULT false,
-            checks TEXT
+            checks TEXT,
+            signal_source TEXT DEFAULT '',
+            score DOUBLE PRECISION DEFAULT 0,
+            matched_rules TEXT DEFAULT '[]',
+            rule_set_version INTEGER DEFAULT 0
         )`,
 	}).
 	AddSame(CmdCreateDetectedSpamIndexes, `
@@ -74,6 +91,22 @@ var detectedSpamQueries = engine.NewQueryMap().
 		CREATE INDEX IF NOT EXISTS idx_spam_gid_time ON detected_spam(gid, timestamp DESC);
         CREATE INDEX IF NOT EXISTS idx_detected_spam_gid ON detected_spam(gid)`,
 	).
+	Add(CmdAddDetectedSpamSignalSourceColumn, engine.Query{
+		Sqlite:   "ALTER TABLE detected_spam ADD COLUMN signal_source TEXT DEFAULT ''",
+		Postgres: "ALTER TABLE detected_spam ADD COLUMN IF NOT EXISTS signal_source TEXT DEFAULT ''",
+	}).
+	Add(CmdAddDetectedSpamScoreColumn, engine.Query{
+		Sqlite:   "ALTER TABLE detected_spam ADD COLUMN score REAL DEFAULT 0",
+		Postgres: "ALTER TABLE detected_spam ADD COLUMN IF NOT EXISTS score DOUBLE PRECISION DEFAULT 0",
+	}).
+	Add(CmdAddDetectedSpamMatchedRulesColumn, engine.Query{
+		Sqlite:   "ALTER TABLE detected_spam ADD COLUMN matched_rules TEXT DEFAULT '[]'",
+		Postgres: "ALTER TABLE detected_spam ADD COLUMN IF NOT EXISTS matched_rules TEXT DEFAULT '[]'",
+	}).
+	Add(CmdAddDetectedSpamRuleSetVersionColumn, engine.Query{
+		Sqlite:   "ALTER TABLE detected_spam ADD COLUMN rule_set_version INTEGER DEFAULT 0",
+		Postgres: "ALTER TABLE detected_spam ADD COLUMN IF NOT EXISTS rule_set_version INTEGER DEFAULT 0",
+	}).
 	Add(CmdAddGIDColumn, engine.Query{
 		Sqlite:   "ALTER TABLE detected_spam ADD COLUMN gid TEXT DEFAULT ''",
 		Postgres: "ALTER TABLE detected_spam ADD COLUMN IF NOT EXISTS gid TEXT DEFAULT ''",
@@ -111,9 +144,17 @@ func (ds *DetectedSpam) Write(ctx context.Context, entry DetectedSpamInfo, check
 	if err != nil {
 		return fmt.Errorf("failed to marshal checks: %w", err)
 	}
+	matchedRulesJSON, err := json.Marshal(entry.MatchedRules)
+	if err != nil {
+		return fmt.Errorf("failed to marshal matched rules: %w", err)
+	}
 
-	query := ds.Adopt("INSERT INTO detected_spam (gid, text, user_id, user_name, timestamp, checks) VALUES (?, ?, ?, ?, ?, ?)")
-	_, err = ds.ExecContext(ctx, query, entry.GID, entry.Text, entry.UserID, entry.UserName, entry.Timestamp, string(checksJSON))
+	query := ds.Adopt(`INSERT INTO detected_spam
+		(gid, text, user_id, user_name, timestamp, checks, signal_source, score, matched_rules, rule_set_version)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	_, err = ds.ExecContext(ctx, query,
+		entry.GID, entry.Text, entry.UserID, entry.UserName, entry.Timestamp, string(checksJSON),
+		entry.SignalSource, entry.Score, string(matchedRulesJSON), entry.RuleSetVersion)
 	if err != nil {
 		return fmt.Errorf("failed to insert detected spam entry: %w", err)
 	}
@@ -152,7 +193,14 @@ func (ds *DetectedSpam) Read(ctx context.Context) ([]DetectedSpamInfo, error) {
 		if err := json.Unmarshal([]byte(entry.ChecksJSON), &checks); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal checks for entry %d: %w", i, err)
 		}
+		var matchedRules []string
+		if entry.MatchedRulesJSON != "" {
+			if err := json.Unmarshal([]byte(entry.MatchedRulesJSON), &matchedRules); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal matched rules for entry %d: %w", i, err)
+			}
+		}
 		entries[i].Checks = checks
+		entries[i].MatchedRules = matchedRules
 		entries[i].Timestamp = entry.Timestamp.Local()
 	}
 	return entries, nil
@@ -178,7 +226,14 @@ func (ds *DetectedSpam) FindByUserID(ctx context.Context, userID int64) (*Detect
 	if err := json.Unmarshal([]byte(entry.ChecksJSON), &checks); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal checks for entry: %w", err)
 	}
+	var matchedRules []string
+	if entry.MatchedRulesJSON != "" {
+		if err := json.Unmarshal([]byte(entry.MatchedRulesJSON), &matchedRules); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal matched rules for entry: %w", err)
+		}
+	}
 	entry.Checks = checks
+	entry.MatchedRules = matchedRules
 	entry.Timestamp = entry.Timestamp.Local()
 	return &entry, nil
 }
@@ -199,7 +254,7 @@ func (ds *DetectedSpam) CountByUserID(ctx context.Context, userID int64) (int, e
 func (ds *DetectedSpam) migrate(ctx context.Context, tx *sqlx.Tx, gid string) error {
 	// try to select with new structure, if works - already migrated
 	var count int
-	err := tx.GetContext(ctx, &count, "SELECT COUNT(*) FROM detected_spam WHERE gid = ''")
+	err := tx.GetContext(ctx, &count, "SELECT COUNT(*) FROM detected_spam WHERE gid = '' AND signal_source = ''")
 	if err == nil {
 		log.Printf("[DEBUG] detected_spam table already migrated")
 		return nil
@@ -214,6 +269,21 @@ func (ds *DetectedSpam) migrate(ctx context.Context, tx *sqlx.Tx, gid string) er
 	_, err = tx.ExecContext(ctx, addGIDQuery)
 	if err != nil && !strings.Contains(err.Error(), "duplicate column") {
 		return fmt.Errorf("failed to add gid column: %w", err)
+	}
+
+	for _, cmd := range []engine.DBCmd{
+		CmdAddDetectedSpamSignalSourceColumn,
+		CmdAddDetectedSpamScoreColumn,
+		CmdAddDetectedSpamMatchedRulesColumn,
+		CmdAddDetectedSpamRuleSetVersionColumn,
+	} {
+		query, qErr := detectedSpamQueries.Pick(ds.Type(), cmd)
+		if qErr != nil {
+			return fmt.Errorf("failed to get migration query: %w", qErr)
+		}
+		if _, execErr := tx.ExecContext(ctx, query); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
+			return fmt.Errorf("failed to apply detected spam migration %d: %w", cmd, execErr)
+		}
 	}
 
 	// update existing records with provided gid

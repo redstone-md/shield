@@ -114,11 +114,15 @@ func (s *StorageTestSuite) TestDetectedSpam_Write() {
 			defer db.Exec("DROP TABLE detected_spam")
 
 			spamEntry := DetectedSpamInfo{
-				Text:      "spam message",
-				UserID:    1,
-				UserName:  "Spammer",
-				Timestamp: time.Now(),
-				GID:       "group123",
+				Text:           "spam message",
+				UserID:         1,
+				UserName:       "Spammer",
+				Timestamp:      time.Now(),
+				GID:            "group123",
+				SignalSource:   "duplicates",
+				Score:          2,
+				MatchedRules:   []string{"duplicates", "openai"},
+				RuleSetVersion: 3,
 			}
 
 			checks := []spamcheck.Response{
@@ -136,6 +140,13 @@ func (s *StorageTestSuite) TestDetectedSpam_Write() {
 			err = db.Get(&count, "SELECT COUNT(*) FROM detected_spam")
 			s.Require().NoError(err)
 			s.Equal(1, count)
+
+			var saved DetectedSpamInfo
+			err = db.Get(&saved, "SELECT * FROM detected_spam LIMIT 1")
+			s.Require().NoError(err)
+			s.Equal("duplicates", saved.SignalSource)
+			s.Equal(2.0, saved.Score)
+			s.Equal(3, saved.RuleSetVersion)
 		})
 	}
 }
@@ -194,11 +205,15 @@ func (s *StorageTestSuite) TestDetectedSpam_Read() {
 
 			// add a sample first
 			entry := DetectedSpamInfo{
-				GID:       "gr1", // use the store's GID here
-				Text:      "test spam",
-				UserID:    456,
-				UserName:  "spammer",
-				Timestamp: time.Now().UTC().Truncate(time.Second), // ensure consistent time comparison
+				GID:            "gr1", // use the store's GID here
+				Text:           "test spam",
+				UserID:         456,
+				UserName:       "spammer",
+				Timestamp:      time.Now().UTC().Truncate(time.Second), // ensure consistent time comparison
+				SignalSource:   "duplicates",
+				Score:          2,
+				MatchedRules:   []string{"duplicates", "openai"},
+				RuleSetVersion: 4,
 			}
 			checks := []spamcheck.Response{{Name: "test", Spam: true, Details: "test details"}}
 
@@ -214,6 +229,10 @@ func (s *StorageTestSuite) TestDetectedSpam_Read() {
 			s.Equal(entry.UserID, entries[0].UserID)
 			s.Equal(entry.UserName, entries[0].UserName)
 			s.Equal(checks, entries[0].Checks)
+			s.Equal(entry.SignalSource, entries[0].SignalSource)
+			s.Equal(entry.Score, entries[0].Score)
+			s.Equal(entry.MatchedRules, entries[0].MatchedRules)
+			s.Equal(entry.RuleSetVersion, entries[0].RuleSetVersion)
 		})
 	}
 }
@@ -263,11 +282,15 @@ func (s *StorageTestSuite) TestDetectedSpam() {
 				{
 					name: "basic spam entry",
 					entry: DetectedSpamInfo{
-						GID:       "gr1", // use the store's GID here
-						Text:      "spam message",
-						UserID:    1,
-						UserName:  "Spammer",
-						Timestamp: time.Now(),
+						GID:            "gr1", // use the store's GID here
+						Text:           "spam message",
+						UserID:         1,
+						UserName:       "Spammer",
+						Timestamp:      time.Now(),
+						SignalSource:   "duplicates",
+						Score:          1,
+						MatchedRules:   []string{"duplicates"},
+						RuleSetVersion: 1,
 					},
 					checks: []spamcheck.Response{{
 						Name:    "Check1",
@@ -339,11 +362,15 @@ func (s *StorageTestSuite) TestDetectedSpam_FindByUserID() {
 			s.Run("basic case", func() {
 				ts := time.Now().UTC().Truncate(time.Second) // explicit UTC time
 				expected := DetectedSpamInfo{
-					GID:       db.GID(),
-					Text:      "test spam",
-					UserID:    456,
-					UserName:  "spammer",
-					Timestamp: ts,
+					GID:            db.GID(),
+					Text:           "test spam",
+					UserID:         456,
+					UserName:       "spammer",
+					Timestamp:      ts,
+					SignalSource:   "duplicates",
+					Score:          2,
+					MatchedRules:   []string{"duplicates", "openai"},
+					RuleSetVersion: 9,
 				}
 				checks := []spamcheck.Response{{
 					Name:    "test",
@@ -362,6 +389,10 @@ func (s *StorageTestSuite) TestDetectedSpam_FindByUserID() {
 				s.Equal(expected.UserID, entry.UserID)
 				s.Equal(expected.UserName, entry.UserName)
 				s.Equal(checks, entry.Checks)
+				s.Equal(expected.SignalSource, entry.SignalSource)
+				s.Equal(expected.Score, entry.Score)
+				s.Equal(expected.MatchedRules, entry.MatchedRules)
+				s.Equal(expected.RuleSetVersion, entry.RuleSetVersion)
 				s.Equal(ts.Unix(), entry.Timestamp.UTC().Unix()) // ensure UTC comparison
 			})
 
