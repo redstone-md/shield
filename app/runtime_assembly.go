@@ -9,6 +9,7 @@ import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
 	"github.com/umputun/tg-spam/app/bot"
+	"github.com/umputun/tg-spam/app/controlplane"
 	"github.com/umputun/tg-spam/app/events"
 	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
@@ -29,16 +30,19 @@ type runtimeAssembly struct {
 	ModerationActionsStore *storage.ModerationActions
 	ReportsStore           *storage.Reports
 	DetectedSpamStore      *storage.DetectedSpam
+	WorkspacesStore        *storage.Workspaces
+	RuleSetService         *controlplane.RuleSetService
 	TelegramListener       *events.TelegramListener
 	Web                    webRuntimeAssembly
 }
 
 type webRuntimeAssembly struct {
-	Detector      webapi.Detector
-	SpamFilter    webapi.SpamFilter
-	Locator       webapi.Locator
-	StorageEngine webapi.StorageEngine
-	BotUsername   string
+	Detector       webapi.Detector
+	SpamFilter     webapi.SpamFilter
+	Locator        webapi.Locator
+	StorageEngine  webapi.StorageEngine
+	RuleSetService *controlplane.RuleSetService
+	BotUsername    string
 }
 
 func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error) {
@@ -121,6 +125,12 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		return nil, fmt.Errorf("can't make detected spam store, %w", err)
 	}
 
+	workspacesStore, err := storage.NewWorkspaces(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make workspaces store, %w", err)
+	}
+	ruleSetService := controlplane.NewRuleSetService(ruleSets)
+
 	assembly := &runtimeAssembly{
 		DataDB:                 dataDB,
 		SpamBot:                spamBot,
@@ -133,11 +143,14 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		ModerationActionsStore: moderationActionsStore,
 		ReportsStore:           reportsStore,
 		DetectedSpamStore:      detectedSpamStore,
+		WorkspacesStore:        workspacesStore,
+		RuleSetService:         ruleSetService,
 		Web: webRuntimeAssembly{
-			Detector:      spamBot.Detector,
-			SpamFilter:    spamBot,
-			Locator:       locator,
-			StorageEngine: dataDB,
+			Detector:       spamBot.Detector,
+			SpamFilter:     spamBot,
+			Locator:        locator,
+			StorageEngine:  dataDB,
+			RuleSetService: ruleSetService,
 		},
 	}
 
