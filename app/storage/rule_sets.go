@@ -207,6 +207,89 @@ func (rs *RuleSets) Active(ctx context.Context, workspaceID string) (rules.RuleS
 	return ruleSet, nil
 }
 
+// Update persists a new version of the RuleSet and makes it active.
+// Returns the new version number.
+func (rs *RuleSets) Update(ctx context.Context, ruleSet rules.RuleSet) (int, error) {
+	if ruleSet.WorkspaceID == "" {
+		return 0, fmt.Errorf("workspace id is required")
+	}
+
+	rs.Lock()
+	defer rs.Unlock()
+
+	var currentVersion int
+	query := rs.Adopt(`SELECT active_version FROM rule_sets WHERE workspace_id = ? AND gid = ?`)
+	err := rs.GetContext(ctx, &currentVersion, query, ruleSet.WorkspaceID, rs.GID())
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return 0, fmt.Errorf("failed to query current rule set version: %w", err)
+	}
+	newVersion := currentVersion + 1
+
+	payload, err := json.Marshal(ruleSet)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal rule set: %w", err)
+	}
+
+	tx, err := rs.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	insertVersion := rs.Adopt(`INSERT INTO rule_set_versions (workspace_id, gid, version, source, payload, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)`)
+	if _, err = tx.ExecContext(ctx, insertVersion, ruleSet.WorkspaceID, rs.GID(), newVersion, ruleSet.Source, string(payload), time.Now()); err != nil {
+		return 0, fmt.Errorf("failed to insert rule set version %d: %w", newVersion, err)
+	}
+
+	upsertActive := upsertRuleSetQuery(rs.Type())
+	if _, err = tx.ExecContext(ctx, upsertActive, ruleSet.WorkspaceID, rs.GID(), newVersion, time.Now()); err != nil {
+		return 0, fmt.Errorf("failed to upsert active rule set: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit rule set update: %w", err)
+	}
+	return newVersion, nil
+}
+
+// History returns recent versions for a workspace, ordered by version descending.
+func (rs *RuleSets) History(ctx context.Context, workspaceID string, limit int) ([]rules.RuleSet, error) {
+	rs.RLock()
+	defer rs.RUnlock()
+
+	if limit <= 0 {
+		limit = 10
+	}
+	query := rs.Adopt(`SELECT version, source, payload, created_at
+		FROM rule_set_versions
+		WHERE workspace_id = ? AND gid = ?
+		ORDER BY version DESC LIMIT ?`)
+
+	var rows []struct {
+		Version   int       `db:"version"`
+		Source    string    `db:"source"`
+		Payload   string    `db:"payload"`
+		CreatedAt time.Time `db:"created_at"`
+	}
+	if err := rs.SelectContext(ctx, &rows, query, workspaceID, rs.GID(), limit); err != nil {
+		return nil, fmt.Errorf("failed to get rule set history: %w", err)
+	}
+
+	result := make([]rules.RuleSet, 0, len(rows))
+	for _, row := range rows {
+		var rs_ rules.RuleSet
+		if err := json.Unmarshal([]byte(row.Payload), &rs_); err != nil {
+			return nil, fmt.Errorf("failed to decode rule set version %d: %w", row.Version, err)
+		}
+		rs_.Version = row.Version
+		rs_.Source = row.Source
+		rs_.CreatedAt = row.CreatedAt
+		result = append(result, rs_)
+	}
+	return result, nil
+}
+
 func upsertRuleSetQuery(dbType engine.Type) string {
 	if dbType == engine.Postgres {
 		return `INSERT INTO rule_sets (workspace_id, gid, active_version, updated_at)
