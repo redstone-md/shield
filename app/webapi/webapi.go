@@ -30,6 +30,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/events"
 	"github.com/umputun/tg-spam/app/observability"
+	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/approved"
@@ -74,6 +75,7 @@ type Config struct {
 	Dictionary      Dictionary      // dictionary for stop phrases and ignored words
 	StorageEngine   StorageEngine   // database engine access for backups
 	DMUsersProvider DMUsersProvider // provider for recent DM users
+	RuleSetProvider RuleSetProvider // control plane rule set service
 	AuthPasswd      string          // basic auth password for user "tg-spam"
 	AuthHash        string          // basic auth bcrypt hash for user "tg-spam", takes precedence over AuthPasswd
 	Dbg             bool            // debug mode
@@ -193,6 +195,12 @@ type Dictionary interface {
 // DMUsersProvider provides access to recent DM users for the admin UI
 type DMUsersProvider interface {
 	GetDMUsers() []events.DMUser
+}
+
+// RuleSetProvider provides access to the active rule set and allows runtime updates.
+type RuleSetProvider interface {
+	Get(ctx context.Context, workspaceID string) (rules.RuleSet, error)
+	Update(ctx context.Context, workspaceID string, source string, rs rules.RuleSet) (rules.RuleSet, error)
 }
 
 // NewServer creates a new web API server.
@@ -318,6 +326,11 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 		})
 
 		authApi.HandleFunc("GET /settings", s.getSettingsHandler) // get application settings
+
+		authApi.Mount("/rules").Route(func(r *routegroup.Bundle) {
+			r.HandleFunc("GET /", s.getRuleSetHandler)    // get active rule set
+			r.HandleFunc("PUT /", s.updateRuleSetHandler) // update rule set
+		})
 
 		authApi.Mount("/dictionary").Route(func(r *routegroup.Bundle) { // manage dictionary
 			// add stop phrase or ignored word
@@ -622,9 +635,43 @@ func (s *Server) getApprovedUsersHandler(w http.ResponseWriter, _ *http.Request)
 
 // getSettingsHandler returns application settings, including the list of available Lua plugins
 func (s *Server) getSettingsHandler(w http.ResponseWriter, _ *http.Request) {
-	// get the list of available Lua plugins before returning settings
 	s.Settings.LuaAvailablePlugins = s.Detector.GetLuaPluginNames()
 	rest.RenderJSON(w, s.Settings)
+}
+
+func (s *Server) getRuleSetHandler(w http.ResponseWriter, r *http.Request) {
+	if s.RuleSetProvider == nil {
+		_ = rest.EncodeJSON(w, http.StatusNotImplemented, rest.JSON{"error": "rule set service not available"})
+		return
+	}
+	workspaceID := s.Settings.InstanceID
+	rs, err := s.RuleSetProvider.Get(r.Context(), workspaceID)
+	if err != nil {
+		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get rule set", "details": err.Error()})
+		return
+	}
+	rest.RenderJSON(w, rs)
+}
+
+func (s *Server) updateRuleSetHandler(w http.ResponseWriter, r *http.Request) {
+	if s.RuleSetProvider == nil {
+		_ = rest.EncodeJSON(w, http.StatusNotImplemented, rest.JSON{"error": "rule set service not available"})
+		return
+	}
+
+	var rs rules.RuleSet
+	if err := json.NewDecoder(r.Body).Decode(&rs); err != nil {
+		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "can't decode request", "details": err.Error()})
+		return
+	}
+
+	workspaceID := s.Settings.InstanceID
+	updated, err := s.RuleSetProvider.Update(r.Context(), workspaceID, "api", rs)
+	if err != nil {
+		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't update rule set", "details": err.Error()})
+		return
+	}
+	rest.RenderJSON(w, updated)
 }
 
 // getDictionaryEntriesHandler handles GET /dictionary request. It returns stop phrases and ignored words.

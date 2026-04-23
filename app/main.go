@@ -529,6 +529,7 @@ func activateServer(ctx context.Context, opts options, web webRuntimeAssembly, d
 		Dictionary:      dictionaryStore,
 		StorageEngine:   db, // add database engine for backup functionality
 		DMUsersProvider: dmUsersProvider,
+		RuleSetProvider: web.RuleSetService,
 		AuthPasswd:      authPassswd,
 		AuthHash:        opts.Server.AuthHash,
 		Version:         revision,
