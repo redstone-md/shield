@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -16,6 +18,7 @@ const (
 	CmdCreateModerationActionsIndexes
 	CmdAddModerationAction
 	CmdGetLatestModerationAction
+	CmdAddModerationActionsGIDColumn
 )
 
 var moderationActionsQueries = engine.NewQueryMap().
@@ -60,12 +63,16 @@ var moderationActionsQueries = engine.NewQueryMap().
 		(gid, event_id, correlation_id, idempotency_key, command, status, chat_id, subject_id, message_id, attempt, last_error, created_at)
 		VALUES (:gid, :event_id, :correlation_id, :idempotency_key, :command, :status, :chat_id, :subject_id, :message_id, :attempt, :last_error, :created_at)`).
 	AddSame(CmdGetLatestModerationAction, `SELECT
-			id, gid, event_id, correlation_id, idempotency_key, command, status,
-			chat_id, subject_id, message_id, attempt, last_error, created_at
-		FROM moderation_actions
-		WHERE gid = ? AND idempotency_key = ? AND command = ? AND chat_id = ? AND subject_id = ? AND message_id = ?
-		ORDER BY attempt DESC, id DESC
-		LIMIT 1`)
+	id, gid, event_id, correlation_id, idempotency_key, command, status,
+	chat_id, subject_id, message_id, attempt, last_error, created_at
+	FROM moderation_actions
+	WHERE gid = ? AND idempotency_key = ? AND command = ? AND chat_id = ? AND subject_id = ? AND message_id = ?
+	ORDER BY attempt DESC, id DESC
+	LIMIT 1`).
+	Add(CmdAddModerationActionsGIDColumn, engine.Query{
+		Sqlite:   "ALTER TABLE moderation_actions ADD COLUMN gid TEXT NOT NULL DEFAULT ''",
+		Postgres: "ALTER TABLE moderation_actions ADD COLUMN IF NOT EXISTS gid TEXT NOT NULL DEFAULT ''",
+	})
 
 // ModerationActionEntry stores one executor command attempt.
 type ModerationActionEntry struct {
@@ -126,7 +133,26 @@ func NewModerationActions(ctx context.Context, db *engine.SQL) (*ModerationActio
 	return res, nil
 }
 
-func (m *ModerationActions) migrate(_ context.Context, _ *sqlx.Tx, _ string) error {
+func (m *ModerationActions) migrate(ctx context.Context, tx *sqlx.Tx, gid string) error {
+	var count int
+	err := tx.GetContext(ctx, &count, "SELECT COUNT(*) FROM moderation_actions WHERE gid = ''")
+	if err == nil {
+		return nil
+	}
+
+	addGIDQuery, qErr := moderationActionsQueries.Pick(m.Type(), CmdAddModerationActionsGIDColumn)
+	if qErr != nil {
+		return fmt.Errorf("failed to get add GID query: %w", qErr)
+	}
+	if _, execErr := tx.ExecContext(ctx, addGIDQuery); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
+		return fmt.Errorf("failed to add gid column to moderation_actions: %w", execErr)
+	}
+
+	if _, err = tx.ExecContext(ctx, "UPDATE moderation_actions SET gid = ? WHERE gid = ''", gid); err != nil {
+		return fmt.Errorf("failed to update gid for existing moderation_actions: %w", err)
+	}
+
+	log.Printf("[DEBUG] moderation_actions table migrated")
 	return nil
 }
 

@@ -171,6 +171,7 @@ classDiagram
 - Audit enrichment coverage is in [app/storage/detected_spam_test.go](../app/storage/detected_spam_test.go), [app/events/audit_writer_test.go](../app/events/audit_writer_test.go), and [app/main_test.go](../app/main_test.go), which prove enriched audit data including `idempotency_key` persists through the runtime spam logger into `detected_spam`.
 - Retry-recovery integration coverage is in [app/storage/incoming_events_test.go](../app/storage/incoming_events_test.go) and [app/events/listener_test.go](../app/events/listener_test.go), which prove processed duplicates are suppressed, failed Telegram actions stay retryable, and retries do not create duplicate final audit entries.
 - Shared warn-executor coverage is in [app/events/action_executor_test.go](../app/events/action_executor_test.go), [app/events/admin_test.go](../app/events/admin_test.go), and [app/events/listener_test.go](../app/events/listener_test.go), which prove `WarnUser` is journaled and runtime `/warn` flows reuse the shared action executor.
+- Schema migration coverage for phase-1 tables is in [app/storage/rule_sets_test.go](../app/storage/rule_sets_test.go), [app/storage/incoming_events_test.go](../app/storage/incoming_events_test.go), and [app/storage/moderation_actions_test.go](../app/storage/moderation_actions_test.go), which prove pre-gid old-schema databases upgrade correctly via `ALTER TABLE ADD COLUMN` probes and backfill, and new databases are created with the full DDL from the start.
 
 ## 4) Dependency rules
 

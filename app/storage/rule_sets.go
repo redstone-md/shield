@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -17,6 +19,8 @@ import (
 const (
 	CmdCreateRuleSetsTables engine.DBCmd = iota + 500
 	CmdCreateRuleSetsIndexes
+	CmdAddRuleSetsGIDColumn
+	CmdAddRuleSetVersionsGIDColumn
 )
 
 var ruleSetQueries = engine.NewQueryMap().
@@ -54,15 +58,23 @@ var ruleSetQueries = engine.NewQueryMap().
 	}).
 	Add(CmdCreateRuleSetsIndexes, engine.Query{
 		Sqlite: `
-			CREATE INDEX IF NOT EXISTS idx_rule_sets_gid ON rule_sets(gid);
-			CREATE INDEX IF NOT EXISTS idx_rule_set_versions_gid ON rule_set_versions(gid);
-			CREATE INDEX IF NOT EXISTS idx_rule_set_versions_workspace_created
-				ON rule_set_versions(workspace_id, created_at DESC)`,
+	CREATE INDEX IF NOT EXISTS idx_rule_sets_gid ON rule_sets(gid);
+	CREATE INDEX IF NOT EXISTS idx_rule_set_versions_gid ON rule_set_versions(gid);
+	CREATE INDEX IF NOT EXISTS idx_rule_set_versions_workspace_created
+	ON rule_set_versions(workspace_id, created_at DESC)`,
 		Postgres: `
-			CREATE INDEX IF NOT EXISTS idx_rule_sets_gid ON rule_sets(gid);
-			CREATE INDEX IF NOT EXISTS idx_rule_set_versions_gid ON rule_set_versions(gid);
-			CREATE INDEX IF NOT EXISTS idx_rule_set_versions_workspace_created
-				ON rule_set_versions(workspace_id, created_at DESC)`,
+	CREATE INDEX IF NOT EXISTS idx_rule_sets_gid ON rule_sets(gid);
+	CREATE INDEX IF NOT EXISTS idx_rule_set_versions_gid ON rule_set_versions(gid);
+	CREATE INDEX IF NOT EXISTS idx_rule_set_versions_workspace_created
+	ON rule_set_versions(workspace_id, created_at DESC)`,
+	}).
+	Add(CmdAddRuleSetsGIDColumn, engine.Query{
+		Sqlite:   "ALTER TABLE rule_sets ADD COLUMN gid TEXT NOT NULL DEFAULT ''",
+		Postgres: "ALTER TABLE rule_sets ADD COLUMN IF NOT EXISTS gid TEXT NOT NULL DEFAULT ''",
+	}).
+	Add(CmdAddRuleSetVersionsGIDColumn, engine.Query{
+		Sqlite:   "ALTER TABLE rule_set_versions ADD COLUMN gid TEXT NOT NULL DEFAULT ''",
+		Postgres: "ALTER TABLE rule_set_versions ADD COLUMN IF NOT EXISTS gid TEXT NOT NULL DEFAULT ''",
 	})
 
 // RuleSets stores active and versioned moderation rule sets.
@@ -90,7 +102,31 @@ func NewRuleSets(ctx context.Context, db *engine.SQL) (*RuleSets, error) {
 	return res, nil
 }
 
-func (rs *RuleSets) migrate(_ context.Context, _ *sqlx.Tx, _ string) error {
+func (rs *RuleSets) migrate(ctx context.Context, tx *sqlx.Tx, gid string) error {
+	var count int
+	err := tx.GetContext(ctx, &count, "SELECT COUNT(*) FROM rule_sets WHERE gid = ''")
+	if err == nil {
+		return nil
+	}
+
+	for _, cmd := range []engine.DBCmd{CmdAddRuleSetsGIDColumn, CmdAddRuleSetVersionsGIDColumn} {
+		query, qErr := ruleSetQueries.Pick(rs.Type(), cmd)
+		if qErr != nil {
+			return fmt.Errorf("failed to get rule sets migration query %d: %w", cmd, qErr)
+		}
+		if _, execErr := tx.ExecContext(ctx, query); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
+			return fmt.Errorf("failed to apply rule sets migration %d: %w", cmd, execErr)
+		}
+	}
+
+	if _, err = tx.ExecContext(ctx, "UPDATE rule_sets SET gid = ? WHERE gid = ''", gid); err != nil {
+		return fmt.Errorf("failed to update gid for existing rule_sets: %w", err)
+	}
+	if _, err = tx.ExecContext(ctx, "UPDATE rule_set_versions SET gid = ? WHERE gid = ''", gid); err != nil {
+		return fmt.Errorf("failed to update gid for existing rule_set_versions: %w", err)
+	}
+
+	log.Printf("[DEBUG] rule_sets and rule_set_versions tables migrated")
 	return nil
 }
 
