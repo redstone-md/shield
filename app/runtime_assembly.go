@@ -296,6 +296,28 @@ func activateWebRuntime(ctx context.Context, opts options, web webRuntimeAssembl
 	return activateServer(ctx, opts, web, dmUsersProvider)
 }
 
+func (a *runtimeAssembly) wireLiveReload(opts options) {
+	a.RuleSetService.OnChange(func(rs rules.RuleSet) {
+		log.Printf("[INFO] rule set changed: version=%d, applying live reload", rs.Version)
+
+		if a.TelegramListener != nil {
+			a.TelegramListener.ApplyRuleSet(rs)
+		}
+
+		detector, ok := a.SpamBot.Detector.(*tgspam.Detector)
+		if ok {
+			cfg := buildDetectorConfig(opts, rs)
+			detector.UpdateConfig(cfg)
+			detector.ReplaceMetaChecks(buildMetaChecks(rs, opts.MinMsgLen)...)
+		}
+
+		a.SpamBot.ApplyRuleSet(rs)
+		a.ActiveRuleSet = rs
+
+		log.Printf("[INFO] live reload applied: version=%d", rs.Version)
+	})
+}
+
 func (a *runtimeAssembly) close() {
 	if a.LoggerWriter != nil {
 		_ = a.LoggerWriter.Close()

@@ -20,6 +20,7 @@ import (
 	"github.com/umputun/tg-spam/app/events/mocks"
 	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/observability"
+	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/spamcheck"
@@ -5129,3 +5130,102 @@ func TestTelegramListener_DMUsersMethods(t *testing.T) {
 	assert.Empty(t, users)
 	assert.NotNil(t, users)
 }
+
+func TestTelegramListener_ApplyRuleSet(t *testing.T) {
+	l := &TelegramListener{
+		RuleSetVersion: 1,
+		ModerationConfig: ModerationConfig{
+			FirstStrike:  10 * time.Minute,
+			SecondStrike: time.Hour,
+		},
+		ReportConfig: ReportConfig{
+			Storage:   nil,
+			Enabled:   true,
+			Threshold: 2,
+		},
+		SoftBanMode:  false,
+		Dry:          false,
+		TrainingMode: false,
+	}
+
+	rs := rules.RuleSet{
+		Version: 3,
+		Moderation: rules.ModerationRules{
+			FirstStrike:  5 * time.Minute,
+			SecondStrike: 30 * time.Minute,
+			SoftBan:      true,
+			DryRun:       true,
+		},
+		Reports: rules.ReportRules{
+			Enabled:         false,
+			Threshold:       5,
+			AutoBanThreshold: 10,
+			RateLimit:       3,
+			RatePeriod:      2 * time.Minute,
+		},
+	}
+
+	l.ApplyRuleSet(rs)
+
+	assert.Equal(t, 3, l.RuleSetVersion)
+	assert.Equal(t, 5*time.Minute, l.ModerationConfig.FirstStrike)
+	assert.Equal(t, 30*time.Minute, l.ModerationConfig.SecondStrike)
+	assert.False(t, l.ReportConfig.Enabled)
+	assert.Equal(t, 5, l.ReportConfig.Threshold)
+	assert.True(t, l.SoftBanMode)
+	assert.True(t, l.Dry)
+}
+
+func TestTelegramListener_ApplyRuleSet_propagatesToSubHandlers(t *testing.T) {
+	l := &TelegramListener{
+		RuleSetVersion: 1,
+		ModerationConfig: ModerationConfig{
+			FirstStrike:  10 * time.Minute,
+			SecondStrike: time.Hour,
+		},
+		ReportConfig: ReportConfig{
+			Storage:   nil,
+			Enabled:   true,
+			Threshold: 2,
+		},
+		SoftBanMode:  false,
+		Dry:          false,
+		TrainingMode: false,
+	}
+
+	l.adminHandler = &admin{
+		softBan: false,
+		dry:     false,
+	}
+	l.reportsHandler = &userReports{
+		ReportConfig: ReportConfig{Enabled: true, Threshold: 2},
+		moderation:   ModerationConfig{FirstStrike: 10 * time.Minute, SecondStrike: time.Hour},
+		softBanMode:  false,
+		dry:          false,
+	}
+
+	rs := rules.RuleSet{
+		Version: 2,
+		Moderation: rules.ModerationRules{
+			FirstStrike:  1 * time.Minute,
+			SecondStrike: 5 * time.Minute,
+			SoftBan:      true,
+			DryRun:       true,
+		},
+		Reports: rules.ReportRules{
+			Enabled:   false,
+			Threshold: 7,
+		},
+	}
+
+	l.ApplyRuleSet(rs)
+
+	assert.True(t, l.adminHandler.softBan)
+	assert.True(t, l.adminHandler.dry)
+	assert.False(t, l.reportsHandler.ReportConfig.Enabled)
+	assert.Equal(t, 7, l.reportsHandler.ReportConfig.Threshold)
+	assert.Equal(t, 1*time.Minute, l.reportsHandler.moderation.FirstStrike)
+	assert.True(t, l.reportsHandler.softBanMode)
+	assert.True(t, l.reportsHandler.dry)
+}
+

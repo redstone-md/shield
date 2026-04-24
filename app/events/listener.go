@@ -21,6 +21,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
+	"github.com/umputun/tg-spam/app/rules"
 )
 
 // TelegramListener listens to tg update, forward to bots and send back responses
@@ -78,6 +79,40 @@ type TelegramListener struct {
 // GetDMUsers returns the list of recent DM senders
 func (l *TelegramListener) GetDMUsers() []DMUser {
 	return l.dmUsers.List()
+}
+
+// ApplyRuleSet updates the listener's runtime config from a new RuleSet.
+// It updates the listener fields and propagates changes to the admin and reports sub-handlers.
+func (l *TelegramListener) ApplyRuleSet(rs rules.RuleSet) {
+	l.RuleSetVersion = rs.Version
+	l.ModerationConfig = ModerationConfig{
+		FirstStrike:  rs.Moderation.FirstStrike,
+		SecondStrike: rs.Moderation.SecondStrike,
+	}
+	l.ReportConfig = ReportConfig{
+		Storage:         l.ReportConfig.Storage,
+		Enabled:         rs.Reports.Enabled,
+		Threshold:       rs.Reports.Threshold,
+		AutoBanThreshold: rs.Reports.AutoBanThreshold,
+		RateLimit:       rs.Reports.RateLimit,
+		RatePeriod:      rs.Reports.RatePeriod,
+	}
+	l.SoftBanMode = rs.Moderation.SoftBan
+	l.Dry = rs.Moderation.DryRun
+
+	if l.adminHandler != nil {
+		l.adminHandler.softBan = rs.Moderation.SoftBan
+		l.adminHandler.dry = rs.Moderation.DryRun
+	}
+	if l.reportsHandler != nil {
+		l.reportsHandler.ReportConfig = l.ReportConfig
+		l.reportsHandler.moderation = l.ModerationConfig
+		l.reportsHandler.softBanMode = rs.Moderation.SoftBan
+		l.reportsHandler.dry = rs.Moderation.DryRun
+	}
+
+	log.Printf("[INFO] listener config updated from rule set: version=%d, soft_ban=%v, dry=%v",
+		rs.Version, rs.Moderation.SoftBan, rs.Moderation.DryRun)
 }
 
 // Do process all events, blocked call

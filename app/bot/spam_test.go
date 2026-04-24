@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/umputun/tg-spam/app/bot/mocks"
+	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/lib/approved"
 	"github.com/umputun/tg-spam/lib/spamcheck"
@@ -1140,4 +1141,26 @@ func TestSpamFilter_RemoveDynamicSamples(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSpamFilter_ApplyRuleSet(t *testing.T) {
+	det := &mocks.DetectorMock{
+		CheckFunc: func(request spamcheck.Request) (bool, []spamcheck.Response) {
+			return false, nil
+		},
+		UpdateConfigFunc:        func(cfg tgspam.Config) {},
+		ReplaceMetaChecksFunc:  func(mc ...tgspam.MetaCheck) {},
+	}
+	sf := NewSpamFilter(det, SpamConfig{Dry: false})
+	assert.False(t, sf.params.Dry)
+
+	sf.ApplyRuleSet(rules.RuleSet{
+		Moderation: rules.ModerationRules{DryRun: true},
+	})
+	assert.True(t, sf.params.Dry, "dry mode should be updated from rule set")
+
+	sf.ApplyRuleSet(rules.RuleSet{
+		Moderation: rules.ModerationRules{DryRun: false},
+	})
+	assert.False(t, sf.params.Dry, "dry mode should be toggled back")
 }

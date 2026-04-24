@@ -47,6 +47,12 @@ import (
 //			RemoveSpamFunc: func(msg string) error {
 //				panic("mock out the RemoveSpam method")
 //			},
+//			ReplaceMetaChecksFunc: func(mc ...tgspam.MetaCheck)  {
+//				panic("mock out the ReplaceMetaChecks method")
+//			},
+//			UpdateConfigFunc: func(cfg tgspam.Config)  {
+//				panic("mock out the UpdateConfig method")
+//			},
 //			UpdateHamFunc: func(msg string) error {
 //				panic("mock out the UpdateHam method")
 //			},
@@ -89,6 +95,12 @@ type DetectorMock struct {
 
 	// RemoveSpamFunc mocks the RemoveSpam method.
 	RemoveSpamFunc func(msg string) error
+
+	// ReplaceMetaChecksFunc mocks the ReplaceMetaChecks method.
+	ReplaceMetaChecksFunc func(mc ...tgspam.MetaCheck)
+
+	// UpdateConfigFunc mocks the UpdateConfig method.
+	UpdateConfigFunc func(cfg tgspam.Config)
 
 	// UpdateHamFunc mocks the UpdateHam method.
 	UpdateHamFunc func(msg string) error
@@ -148,6 +160,16 @@ type DetectorMock struct {
 			// Msg is the msg argument value.
 			Msg string
 		}
+		// ReplaceMetaChecks holds details about calls to the ReplaceMetaChecks method.
+		ReplaceMetaChecks []struct {
+			// Mc is the mc argument value.
+			Mc []tgspam.MetaCheck
+		}
+		// UpdateConfig holds details about calls to the UpdateConfig method.
+		UpdateConfig []struct {
+			// Cfg is the cfg argument value.
+			Cfg tgspam.Config
+		}
 		// UpdateHam holds details about calls to the UpdateHam method.
 		UpdateHam []struct {
 			// Msg is the msg argument value.
@@ -169,6 +191,8 @@ type DetectorMock struct {
 	lockRemoveApprovedUser sync.RWMutex
 	lockRemoveHam          sync.RWMutex
 	lockRemoveSpam         sync.RWMutex
+	lockReplaceMetaChecks  sync.RWMutex
+	lockUpdateConfig       sync.RWMutex
 	lockUpdateHam          sync.RWMutex
 	lockUpdateSpam         sync.RWMutex
 }
@@ -561,6 +585,84 @@ func (mock *DetectorMock) ResetRemoveSpamCalls() {
 	mock.lockRemoveSpam.Unlock()
 }
 
+// ReplaceMetaChecks calls ReplaceMetaChecksFunc.
+func (mock *DetectorMock) ReplaceMetaChecks(mc ...tgspam.MetaCheck) {
+	if mock.ReplaceMetaChecksFunc == nil {
+		panic("DetectorMock.ReplaceMetaChecksFunc: method is nil but Detector.ReplaceMetaChecks was just called")
+	}
+	callInfo := struct {
+		Mc []tgspam.MetaCheck
+	}{
+		Mc: mc,
+	}
+	mock.lockReplaceMetaChecks.Lock()
+	mock.calls.ReplaceMetaChecks = append(mock.calls.ReplaceMetaChecks, callInfo)
+	mock.lockReplaceMetaChecks.Unlock()
+	mock.ReplaceMetaChecksFunc(mc...)
+}
+
+// ReplaceMetaChecksCalls gets all the calls that were made to ReplaceMetaChecks.
+// Check the length with:
+//
+//	len(mockedDetector.ReplaceMetaChecksCalls())
+func (mock *DetectorMock) ReplaceMetaChecksCalls() []struct {
+	Mc []tgspam.MetaCheck
+} {
+	var calls []struct {
+		Mc []tgspam.MetaCheck
+	}
+	mock.lockReplaceMetaChecks.RLock()
+	calls = mock.calls.ReplaceMetaChecks
+	mock.lockReplaceMetaChecks.RUnlock()
+	return calls
+}
+
+// ResetReplaceMetaChecksCalls reset all the calls that were made to ReplaceMetaChecks.
+func (mock *DetectorMock) ResetReplaceMetaChecksCalls() {
+	mock.lockReplaceMetaChecks.Lock()
+	mock.calls.ReplaceMetaChecks = nil
+	mock.lockReplaceMetaChecks.Unlock()
+}
+
+// UpdateConfig calls UpdateConfigFunc.
+func (mock *DetectorMock) UpdateConfig(cfg tgspam.Config) {
+	if mock.UpdateConfigFunc == nil {
+		panic("DetectorMock.UpdateConfigFunc: method is nil but Detector.UpdateConfig was just called")
+	}
+	callInfo := struct {
+		Cfg tgspam.Config
+	}{
+		Cfg: cfg,
+	}
+	mock.lockUpdateConfig.Lock()
+	mock.calls.UpdateConfig = append(mock.calls.UpdateConfig, callInfo)
+	mock.lockUpdateConfig.Unlock()
+	mock.UpdateConfigFunc(cfg)
+}
+
+// UpdateConfigCalls gets all the calls that were made to UpdateConfig.
+// Check the length with:
+//
+//	len(mockedDetector.UpdateConfigCalls())
+func (mock *DetectorMock) UpdateConfigCalls() []struct {
+	Cfg tgspam.Config
+} {
+	var calls []struct {
+		Cfg tgspam.Config
+	}
+	mock.lockUpdateConfig.RLock()
+	calls = mock.calls.UpdateConfig
+	mock.lockUpdateConfig.RUnlock()
+	return calls
+}
+
+// ResetUpdateConfigCalls reset all the calls that were made to UpdateConfig.
+func (mock *DetectorMock) ResetUpdateConfigCalls() {
+	mock.lockUpdateConfig.Lock()
+	mock.calls.UpdateConfig = nil
+	mock.lockUpdateConfig.Unlock()
+}
+
 // UpdateHam calls UpdateHamFunc.
 func (mock *DetectorMock) UpdateHam(msg string) error {
 	if mock.UpdateHamFunc == nil {
@@ -680,6 +782,14 @@ func (mock *DetectorMock) ResetCalls() {
 	mock.lockRemoveSpam.Lock()
 	mock.calls.RemoveSpam = nil
 	mock.lockRemoveSpam.Unlock()
+
+	mock.lockReplaceMetaChecks.Lock()
+	mock.calls.ReplaceMetaChecks = nil
+	mock.lockReplaceMetaChecks.Unlock()
+
+	mock.lockUpdateConfig.Lock()
+	mock.calls.UpdateConfig = nil
+	mock.lockUpdateConfig.Unlock()
 
 	mock.lockUpdateHam.Lock()
 	mock.calls.UpdateHam = nil

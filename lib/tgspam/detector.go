@@ -600,6 +600,31 @@ func (d *Detector) WithMetaChecks(mc ...MetaCheck) {
 	d.metaChecks = append(d.metaChecks, mc...)
 }
 
+// ReplaceMetaChecks replaces the entire list of meta-checkers.
+func (d *Detector) ReplaceMetaChecks(mc ...MetaCheck) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	d.metaChecks = mc
+}
+
+// UpdateConfig updates mutable detector configuration fields under write lock.
+// Fields that cannot change after construction (CAS API, HTTP client, LLM checkers, Lua, history size)
+// are left untouched. DuplicateDetection causes the duplicateDetector to be recreated.
+func (d *Detector) UpdateConfig(cfg Config) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	d.SimilarityThreshold = cfg.SimilarityThreshold
+	d.MinMsgLen = cfg.MinMsgLen
+	d.MaxAllowedEmoji = cfg.MaxAllowedEmoji
+	d.MinSpamProbability = cfg.MinSpamProbability
+	d.MultiLangWords = cfg.MultiLangWords
+	d.AbnormalSpacing = cfg.AbnormalSpacing
+	if cfg.DuplicateDetection.Threshold != d.DuplicateDetection.Threshold || cfg.DuplicateDetection.Window != d.DuplicateDetection.Window {
+		d.duplicateDetector = newDuplicateDetector(cfg.DuplicateDetection.Threshold, cfg.DuplicateDetection.Window)
+		d.DuplicateDetection = cfg.DuplicateDetection
+	}
+}
+
 // WithSpamUpdater sets a SampleUpdater for spam samples.
 func (d *Detector) WithSpamUpdater(s SampleUpdater) { d.spamSamplesUpd = s }
 

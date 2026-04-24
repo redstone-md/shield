@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/umputun/tg-spam/app/observability"
+	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/lib/approved"
 	"github.com/umputun/tg-spam/lib/spamcheck"
@@ -52,7 +53,9 @@ type Detector interface {
 	RemoveApprovedUser(id string) error
 	ApprovedUsers() (res []approved.UserInfo)
 	IsApprovedUser(userID string) bool
-	GetLuaPluginNames() []string // Returns the list of available Lua plugin names
+	GetLuaPluginNames() []string
+	UpdateConfig(cfg tgspam.Config)
+	ReplaceMetaChecks(mc ...tgspam.MetaCheck)
 }
 
 // SamplesStore is a storage for spam samples
@@ -344,4 +347,11 @@ func (s *SpamFilter) RemoveDynamicHamSample(sample string) error {
 		return fmt.Errorf("can't remove hma sample %q: %w", sample, err)
 	}
 	return nil
+}
+
+// ApplyRuleSet updates the spam filter's runtime config from a new rule set.
+// It updates the dry-run flag and propagates detector-level config changes.
+func (s *SpamFilter) ApplyRuleSet(rs rules.RuleSet) {
+	s.params.Dry = rs.Moderation.DryRun
+	log.Printf("[INFO] spam filter config updated: dry=%v", rs.Moderation.DryRun)
 }

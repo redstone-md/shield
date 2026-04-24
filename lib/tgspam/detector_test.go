@@ -3446,3 +3446,68 @@ func findResponseByName(responses []spamcheck.Response, name string) *spamcheck.
 	}
 	return nil
 }
+
+func TestDetector_UpdateConfig(t *testing.T) {
+	d := NewDetector(Config{
+		MinMsgLen:          50,
+		SimilarityThreshold: 0.5,
+		FirstMessageOnly:   true,
+		FirstMessagesCount: 1,
+		DuplicateDetection: struct {
+			Threshold int
+			Window    time.Duration
+		}{Threshold: 2, Window: time.Hour},
+	})
+
+	assert.Equal(t, 50, d.MinMsgLen)
+	assert.Equal(t, 0.5, d.SimilarityThreshold)
+	assert.NotNil(t, d.duplicateDetector)
+
+	d.UpdateConfig(Config{
+		MinMsgLen:           100,
+		SimilarityThreshold: 0.8,
+		MinSpamProbability:  60,
+		FirstMessageOnly:    true,
+		FirstMessagesCount:  1,
+		DuplicateDetection: struct {
+			Threshold int
+			Window    time.Duration
+		}{Threshold: 5, Window: 2 * time.Hour},
+	})
+
+	assert.Equal(t, 100, d.MinMsgLen)
+	assert.Equal(t, 0.8, d.SimilarityThreshold)
+	assert.Equal(t, float64(60), d.MinSpamProbability)
+	assert.NotNil(t, d.duplicateDetector)
+
+	_, cr := d.Check(spamcheck.Request{Msg: "test", UserID: "123"})
+	assert.NotNil(t, findResponseByName(cr, "duplicate"))
+
+	d.UpdateConfig(Config{
+		MinMsgLen:          100,
+		SimilarityThreshold: 0.8,
+		FirstMessageOnly:   true,
+		FirstMessagesCount: 1,
+		DuplicateDetection: struct {
+			Threshold int
+			Window    time.Duration
+		}{Threshold: 0, Window: 0},
+	})
+
+	assert.Nil(t, d.duplicateDetector)
+}
+
+func TestDetector_ReplaceMetaChecks(t *testing.T) {
+	d := NewDetector(Config{MinMsgLen: 50})
+
+	d.WithMetaChecks(LinksCheck(3), ImagesCheck(50))
+	_, cr := d.Check(spamcheck.Request{Msg: "test http://example.com", UserID: "1"})
+	assert.NotNil(t, findResponseByName(cr, "links"))
+	assert.NotNil(t, findResponseByName(cr, "images"))
+
+	d.ReplaceMetaChecks(MentionsCheck(5))
+	_, cr = d.Check(spamcheck.Request{Msg: "test http://example.com", UserID: "2"})
+	assert.Nil(t, findResponseByName(cr, "links"))
+	assert.Nil(t, findResponseByName(cr, "images"))
+	assert.NotNil(t, findResponseByName(cr, "mentions"))
+}

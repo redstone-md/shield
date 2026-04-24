@@ -333,6 +333,7 @@ func execute(ctx context.Context, opts options) error {
 
 	tgListener := assembly.makeTelegramListener(opts, tbAPI)
 	logListenerConfig(tgListener)
+	assembly.wireLiveReload(opts)
 
 	// activate web server if enabled, with DM users provider from the telegram listener
 	if opts.Server.Enabled {
@@ -552,47 +553,7 @@ func makeDetector(opts options) *tgspam.Detector {
 }
 
 func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detector {
-	detectorConfig := tgspam.Config{
-		MaxAllowedEmoji:     opts.MaxEmoji,
-		MinMsgLen:           opts.MinMsgLen,
-		SimilarityThreshold: opts.SimilarityThreshold,
-		MinSpamProbability:  opts.MinSpamProbability,
-		CasAPI:              opts.CAS.API,
-		CasUserAgent:        opts.CAS.UserAgent,
-		HTTPClient:          &http.Client{Timeout: opts.CAS.Timeout},
-		FirstMessageOnly:    !opts.ParanoidMode,
-		FirstMessagesCount:  opts.FirstMessagesCount,
-		OpenAIVeto:          ruleSet.OpenAI.Veto,
-		OpenAIHistorySize:   ruleSet.OpenAI.HistorySize, // how many last requests sent to openai
-		GeminiVeto:          ruleSet.Gemini.Veto,
-		GeminiHistorySize:   ruleSet.Gemini.HistorySize, // how many last requests sent to gemini
-		LLMConsensus:        tgspam.LLMConsensusMode(opts.LLM.Consensus),
-		LLMRequestTimeout:   opts.LLM.RequestTimeout,
-		MultiLangWords:      opts.MultiLangWords,
-		HistorySize:         opts.HistorySize, // how many last request stored in memory
-	}
-
-	// FirstMessagesCount and ParanoidMode are mutually exclusive.
-	// ParanoidMode still here for backward compatibility only.
-	if opts.FirstMessagesCount > 0 { // if FirstMessagesCount is set, FirstMessageOnly is enforced
-		detectorConfig.FirstMessageOnly = true
-	}
-	if opts.ParanoidMode { // if ParanoidMode is set, FirstMessagesCount is ignored
-		detectorConfig.FirstMessageOnly = false
-		detectorConfig.FirstMessagesCount = 0
-	}
-	if opts.StorageTimeout > 0 { // if StorageTimeout is non-zero, set it. If zero, storage timeout is disabled
-		detectorConfig.StorageTimeout = opts.StorageTimeout
-	}
-
-	// set duplicate detection config
-	detectorConfig.DuplicateDetection.Threshold = ruleSet.Duplicates.Threshold
-	detectorConfig.DuplicateDetection.Window = ruleSet.Duplicates.Window
-	if ruleSet.Duplicates.Threshold > 0 {
-		log.Printf("[INFO] duplicate messages check enabled, threshold: %d, window: %v",
-			ruleSet.Duplicates.Threshold, ruleSet.Duplicates.Window)
-	}
-
+	detectorConfig := buildDetectorConfig(opts, ruleSet)
 	detector := tgspam.NewDetector(detectorConfig)
 
 	if ruleSet.OpenAI.Enabled && (opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "") {
@@ -621,17 +582,17 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 	if ruleSet.Gemini.Enabled && opts.Gemini.Token != "" {
 		log.Printf("[WARN] gemini enabled")
 		geminiConfig := tgspam.GeminiConfig{
-			SystemPrompt:       opts.Gemini.Prompt,
-			CustomPrompts:      opts.Gemini.CustomPrompts,
-			Model:              ruleSet.Gemini.Model,
-			MaxOutputTokens:    opts.Gemini.MaxTokensResponse,
-			MaxSymbolsRequest:  opts.Gemini.MaxSymbolsRequest,
-			RetryCount:         opts.Gemini.RetryCount,
+			SystemPrompt:      opts.Gemini.Prompt,
+			CustomPrompts:     opts.Gemini.CustomPrompts,
+			Model:             ruleSet.Gemini.Model,
+			MaxOutputTokens:   opts.Gemini.MaxTokensResponse,
+			MaxSymbolsRequest: opts.Gemini.MaxSymbolsRequest,
+			RetryCount:        opts.Gemini.RetryCount,
 			CheckShortMessages: ruleSet.Gemini.CheckShortMessages,
 		}
 
 		client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
-			APIKey:  opts.Gemini.Token,
+			APIKey: opts.Gemini.Token,
 			Backend: genai.BackendGeminiAPI,
 		})
 		if err != nil {
@@ -641,73 +602,16 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 		detector.WithGeminiChecker(client.Models, geminiConfig)
 	}
 
-	if ruleSet.AbnormalSpacing.Enabled {
-		log.Printf("[INFO] words spacing check enabled")
-		detector.AbnormalSpacing.Enabled = true
-		detector.AbnormalSpacing.ShortWordLen = ruleSet.AbnormalSpacing.ShortWordLen
-		detector.AbnormalSpacing.ShortWordRatioThreshold = ruleSet.AbnormalSpacing.ShortWordRatioThreshold
-		detector.AbnormalSpacing.SpaceRatioThreshold = ruleSet.AbnormalSpacing.SpaceRatioThreshold
-		detector.AbnormalSpacing.MinWordsCount = ruleSet.AbnormalSpacing.MinWords
-	}
-
-	metaChecks := []tgspam.MetaCheck{}
-	if ruleSet.Meta.ImageOnly {
-		log.Printf("[INFO] image only check enabled, min text len: %d", opts.MinMsgLen)
-		metaChecks = append(metaChecks, tgspam.ImagesCheck(opts.MinMsgLen))
-	}
-	if ruleSet.Meta.VideosOnly {
-		log.Printf("[INFO] videos only check enabled, min text len: %d", opts.MinMsgLen)
-		metaChecks = append(metaChecks, tgspam.VideosCheck(opts.MinMsgLen))
-	}
-	if ruleSet.Meta.AudiosOnly {
-		log.Printf("[INFO] audio only check enabled, min text len: %d", opts.MinMsgLen)
-		metaChecks = append(metaChecks, tgspam.AudioCheck(opts.MinMsgLen))
-	}
-	if ruleSet.Meta.LinksLimit >= 0 {
-		log.Printf("[INFO] links check enabled, limit: %d", ruleSet.Meta.LinksLimit)
-		metaChecks = append(metaChecks, tgspam.LinksCheck(ruleSet.Meta.LinksLimit))
-	}
-	if ruleSet.Meta.MentionsLimit >= 0 {
-		log.Printf("[INFO] mentions check enabled, limit: %d", ruleSet.Meta.MentionsLimit)
-		metaChecks = append(metaChecks, tgspam.MentionsCheck(ruleSet.Meta.MentionsLimit))
-	}
-	if ruleSet.Meta.LinksOnly {
-		log.Printf("[INFO] links only check enabled")
-		metaChecks = append(metaChecks, tgspam.LinkOnlyCheck())
-	}
-	if ruleSet.Meta.Forwarded {
-		log.Printf("[INFO] forward check enabled")
-		metaChecks = append(metaChecks, tgspam.ForwardedCheck())
-	}
-	if ruleSet.Meta.Keyboard {
-		log.Printf("[INFO] keyboard check enabled")
-		metaChecks = append(metaChecks, tgspam.KeyboardCheck())
-	}
-	if ruleSet.Meta.ContactOnly {
-		log.Printf("[INFO] contact only check enabled")
-		metaChecks = append(metaChecks, tgspam.ContactCheck())
-	}
-	if ruleSet.Meta.UsernameSymbols != "" {
-		log.Printf("[INFO] username symbols check enabled, prohibited symbols: %q", ruleSet.Meta.UsernameSymbols)
-		metaChecks = append(metaChecks, tgspam.UsernameSymbolsCheck(ruleSet.Meta.UsernameSymbols))
-	}
-	if ruleSet.Meta.Giveaway {
-		log.Printf("[INFO] giveaway check enabled")
-		metaChecks = append(metaChecks, tgspam.GiveawayCheck())
-	}
-	detector.WithMetaChecks(metaChecks...)
-
+	detector.WithMetaChecks(buildMetaChecks(ruleSet, opts.MinMsgLen)...)
 	log.Printf("[DEBUG] detector config: %+v", detectorConfig)
 
 	// initialize Lua plugins if enabled
 	if opts.LuaPlugins.Enabled {
-		// copy Lua plugin settings to detector config
 		detector.LuaPlugins.Enabled = true
 		detector.LuaPlugins.PluginsDir = opts.LuaPlugins.PluginsDir
 		detector.LuaPlugins.EnabledPlugins = opts.LuaPlugins.EnabledPlugins
 		detector.LuaPlugins.DynamicReload = opts.LuaPlugins.DynamicReload
 
-		// create and initialize the plugin engine
 		luaEngine := plugin.NewChecker()
 		if err := detector.WithLuaEngine(luaEngine); err != nil {
 			log.Printf("[WARN] failed to initialize Lua plugins: %v", err)
@@ -727,6 +631,89 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 
 	return detector
 }
+
+func buildDetectorConfig(opts options, ruleSet rules.RuleSet) tgspam.Config {
+	cfg := tgspam.Config{
+		MaxAllowedEmoji:     opts.MaxEmoji,
+		MinMsgLen:           opts.MinMsgLen,
+		SimilarityThreshold: opts.SimilarityThreshold,
+		MinSpamProbability:  opts.MinSpamProbability,
+		CasAPI:              opts.CAS.API,
+		CasUserAgent:        opts.CAS.UserAgent,
+		HTTPClient:          &http.Client{Timeout: opts.CAS.Timeout},
+		FirstMessageOnly:    !opts.ParanoidMode,
+		FirstMessagesCount:  opts.FirstMessagesCount,
+		OpenAIVeto:          ruleSet.OpenAI.Veto,
+		OpenAIHistorySize:   ruleSet.OpenAI.HistorySize,
+		GeminiVeto:          ruleSet.Gemini.Veto,
+		GeminiHistorySize:   ruleSet.Gemini.HistorySize,
+		LLMConsensus:        tgspam.LLMConsensusMode(opts.LLM.Consensus),
+		LLMRequestTimeout:   opts.LLM.RequestTimeout,
+		MultiLangWords:      opts.MultiLangWords,
+		HistorySize:         opts.HistorySize,
+	}
+
+	if opts.FirstMessagesCount > 0 {
+		cfg.FirstMessageOnly = true
+	}
+	if opts.ParanoidMode {
+		cfg.FirstMessageOnly = false
+		cfg.FirstMessagesCount = 0
+	}
+	if opts.StorageTimeout > 0 {
+		cfg.StorageTimeout = opts.StorageTimeout
+	}
+
+	cfg.DuplicateDetection.Threshold = ruleSet.Duplicates.Threshold
+	cfg.DuplicateDetection.Window = ruleSet.Duplicates.Window
+
+	cfg.AbnormalSpacing.Enabled = ruleSet.AbnormalSpacing.Enabled
+	cfg.AbnormalSpacing.ShortWordLen = ruleSet.AbnormalSpacing.ShortWordLen
+	cfg.AbnormalSpacing.ShortWordRatioThreshold = ruleSet.AbnormalSpacing.ShortWordRatioThreshold
+	cfg.AbnormalSpacing.SpaceRatioThreshold = ruleSet.AbnormalSpacing.SpaceRatioThreshold
+	cfg.AbnormalSpacing.MinWordsCount = ruleSet.AbnormalSpacing.MinWords
+
+	return cfg
+}
+
+func buildMetaChecks(ruleSet rules.RuleSet, minMsgLen int) []tgspam.MetaCheck {
+	var mc []tgspam.MetaCheck
+	if ruleSet.Meta.ImageOnly {
+		mc = append(mc, tgspam.ImagesCheck(minMsgLen))
+	}
+	if ruleSet.Meta.VideosOnly {
+		mc = append(mc, tgspam.VideosCheck(minMsgLen))
+	}
+	if ruleSet.Meta.AudiosOnly {
+		mc = append(mc, tgspam.AudioCheck(minMsgLen))
+	}
+	if ruleSet.Meta.LinksLimit >= 0 {
+		mc = append(mc, tgspam.LinksCheck(ruleSet.Meta.LinksLimit))
+	}
+	if ruleSet.Meta.MentionsLimit >= 0 {
+		mc = append(mc, tgspam.MentionsCheck(ruleSet.Meta.MentionsLimit))
+	}
+	if ruleSet.Meta.LinksOnly {
+		mc = append(mc, tgspam.LinkOnlyCheck())
+	}
+	if ruleSet.Meta.Forwarded {
+		mc = append(mc, tgspam.ForwardedCheck())
+	}
+	if ruleSet.Meta.Keyboard {
+		mc = append(mc, tgspam.KeyboardCheck())
+	}
+	if ruleSet.Meta.ContactOnly {
+		mc = append(mc, tgspam.ContactCheck())
+	}
+	if ruleSet.Meta.UsernameSymbols != "" {
+		mc = append(mc, tgspam.UsernameSymbolsCheck(ruleSet.Meta.UsernameSymbols))
+	}
+	if ruleSet.Meta.Giveaway {
+		mc = append(mc, tgspam.GiveawayCheck())
+	}
+	return mc
+}
+
 
 func makeSpamBot(ctx context.Context, opts options, ruleSet rules.RuleSet, dataDB *engine.SQL, detector *tgspam.Detector) (*bot.SpamFilter, error) {
 	if dataDB == nil || detector == nil {
@@ -1137,6 +1124,7 @@ func backupDB(dbFile, version string, maxBackups int) error {
 	}
 	return nil
 }
+
 
 func setupLog(dbg bool, secrets ...string) {
 	logOpts := []lgr.Option{lgr.Msec, lgr.LevelBraces, lgr.StackTraceOnError}
