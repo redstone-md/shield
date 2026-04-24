@@ -1,30 +1,15 @@
 package tgspam
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"io"
-	"iter"
 	"log"
-	"math"
 	"net/http"
-	"sort"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
-	"unicode"
-
-	"github.com/forPelevin/gomoji"
-	"github.com/go-pkgz/repeater"
-	"github.com/go-pkgz/repeater/strategy"
 
 	"github.com/umputun/tg-spam/lib/approved"
 	"github.com/umputun/tg-spam/lib/spamcheck"
-	"github.com/umputun/tg-spam/lib/textnorm"
 	"github.com/umputun/tg-spam/lib/tgspam/plugin"
 )
 
@@ -37,17 +22,17 @@ import (
 // It uses a set of checks to determine if a message is spam, and also keeps a list of approved users.
 type Detector struct {
 	Config
-	classifier        classifier
-	openaiChecker     *openAIChecker
-	geminiChecker     *geminiChecker
+	classifier       classifier
+	openaiChecker    *openAIChecker
+	geminiChecker    *geminiChecker
 	duplicateDetector *duplicateDetector
-	metaChecks        []MetaCheck
-	luaChecks         []plugin.Check // separate field for Lua plugin checks
-	tokenizedSpam     []map[string]int
-	approvedUsers     map[string]approved.UserInfo
-	stopWords         []string
-	excludedTokens    map[string]struct{}
-	luaEngine         LuaPluginEngine
+	metaChecks       []MetaCheck
+	luaChecks        []plugin.Check // separate field for Lua plugin checks
+	tokenizedSpam    []map[string]int
+	approvedUsers    map[string]approved.UserInfo
+	stopWords        []string
+	excludedTokens   map[string]struct{}
+	luaEngine        LuaPluginEngine
 
 	spamSamplesUpd SampleUpdater
 	hamSamplesUpd  SampleUpdater
@@ -70,19 +55,19 @@ const (
 	// LLMConsensusAny flips the base decision if any eligible LLM agrees.
 	LLMConsensusAny LLMConsensusMode = "any"
 	// LLMConsensusAll flips the base decision only if all eligible LLMs agree.
-	LLMConsensusAll    LLMConsensusMode = "all"
-	llmChatContextSize                  = 5
-	llmUserContextSize                  = 5
+	LLMConsensusAll LLMConsensusMode = "all"
+	llmChatContextSize = 5
+	llmUserContextSize = 5
 )
 
 // detectorLLMCheck describes how a single LLM provider participates in Detector.Check.
 type detectorLLMCheck struct {
-	name    string // provider name used in logs
-	enabled bool   // whether this provider is configured
+	name string // provider name used in logs
+	enabled bool // whether this provider is configured
 	// whether short messages should still be sent to the provider
 	checkShortMessages bool
 	// whether the provider confirms spam instead of checking clean messages
-	veto  bool
+	veto bool
 	check func(context.Context, string, llmContext) (bool, spamcheck.Response) // provider check function
 }
 
@@ -93,19 +78,19 @@ type detectorLLMResult struct {
 
 // Config is a set of parameters for Detector.
 type Config struct {
-	SimilarityThreshold float64          // threshold for spam similarity, 0.0 - 1.0
-	MinMsgLen           int              // minimum message length to check
-	MaxAllowedEmoji     int              // maximum number of emojis allowed in a message
-	CasAPI              string           // CAS API URL
-	CasUserAgent        string           // CAS API User-Agent header value, set only if non-empty
-	FirstMessageOnly    bool             // if true, only the first message from a user is checked
-	FirstMessagesCount  int              // number of first messages to check for spam
-	HTTPClient          HTTPClient       // http client to use for requests
-	MinSpamProbability  float64          // minimum spam probability to consider a message spam with classifier, if 0 - ignored
-	OpenAIVeto          bool             // if true, openai vetos spam, otherwise vetos ham
-	OpenAIHistorySize   int              // history size for openai
-	GeminiVeto          bool             // if true, gemini vetos spam, otherwise vetos ham
-	GeminiHistorySize   int              // history size for gemini
+	SimilarityThreshold float64 // threshold for spam similarity, 0.0 - 1.0
+	MinMsgLen           int     // minimum message length to check
+	MaxAllowedEmoji     int     // maximum number of emojis allowed in a message
+	CasAPI              string  // CAS API URL
+	CasUserAgent        string  // CAS API User-Agent header value, set only if non-empty
+	FirstMessageOnly    bool    // if true, only the first message from a user is checked
+	FirstMessagesCount  int     // number of first messages to check for spam
+	HTTPClient          HTTPClient // http client to use for requests
+	MinSpamProbability  float64    // minimum spam probability to consider a message spam with classifier, if 0 - ignored
+	OpenAIVeto          bool // if true, openai vetos spam, otherwise vetos ham
+	OpenAIHistorySize   int  // history size for openai
+	GeminiVeto          bool // if true, gemini vetos spam, otherwise vetos ham
+	GeminiHistorySize   int  // history size for gemini
 	LLMConsensus        LLMConsensusMode // how eligible LLM checks flip the base decision
 	LLMRequestTimeout   time.Duration    // timeout for individual LLM requests, if not set - 30s default
 	MultiLangWords      int              // if true, check for number of multi-lingual words
@@ -119,11 +104,11 @@ type Config struct {
 	}
 
 	AbnormalSpacing struct {
-		Enabled                 bool    // if true, enable check for abnormal spacing
-		MinWordsCount           int     // the minimum number of words in the message to be considered
-		ShortWordLen            int     // the length of the word to be considered short (in rune characters)
-		ShortWordRatioThreshold float64 // the ratio of short words to all words in the message
-		SpaceRatioThreshold     float64 // the ratio of spaces to all characters in the message
+		Enabled                  bool    // if true, enable check for abnormal spacing
+		MinWordsCount            int     // the minimum number of words in the message to be considered
+		ShortWordLen             int     // the length of the word to be considered short (in rune characters)
+		ShortWordRatioThreshold  float64 // the ratio of short words to all words in the message
+		SpaceRatioThreshold      float64 // the ratio of spaces to all characters in the message
 	}
 
 	DuplicateDetection struct {
@@ -144,8 +129,8 @@ type SampleUpdater interface {
 // UserStorage is an interface for approved users storage.
 type UserStorage interface {
 	Read(ctx context.Context) ([]approved.UserInfo, error) // read approved users from storage
-	Write(ctx context.Context, au approved.UserInfo) error // write approved user to storage
-	Delete(ctx context.Context, id string) error           // delete approved user from storage
+	Write(ctx context.Context, au approved.UserInfo) error  // write approved user to storage
+	Delete(ctx context.Context, id string) error            // delete approved user from storage
 }
 
 // HTTPClient is an interface for http client, satisfied by http.Client.
@@ -155,12 +140,12 @@ type HTTPClient interface {
 
 // LuaPluginEngine defines an interface for the Lua plugin system
 type LuaPluginEngine interface {
-	LoadScript(path string) error               // loads a single Lua script
-	ReloadScript(path string) error             // reloads a single Lua script
-	LoadDirectory(dir string) error             // loads all Lua scripts from a directory
-	GetCheck(name string) (plugin.Check, error) // returns a specific named plugin check
-	GetAllChecks() map[string]plugin.Check      // returns all loaded plugin checks
-	Close()                                     // cleans up resources
+	LoadScript(path string) error                       // loads a single Lua script
+	ReloadScript(path string) error                     // reloads a single Lua script
+	LoadDirectory(dir string) error                     // loads all Lua scripts from a directory
+	GetCheck(name string) (plugin.Check, error)         // returns a specific named plugin check
+	GetAllChecks() map[string]plugin.Check              // returns all loaded plugin checks
+	Close()                                             // cleans up resources
 }
 
 // LoadResult is a result of loading samples.
@@ -306,9 +291,9 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 	spamDetected := baseSpam
 
 	// we hit eligible LLMs in three cases:
-	//  - short message with short-message checking enabled (ignores veto mode since there's no decision to veto)
-	//  - all checks passed (ham) and veto is false - improves false negative rate
-	//  - checks failed (spam) and veto is true - improves false positive rate
+	// - short message with short-message checking enabled (ignores veto mode since there's no decision to veto)
+	// - all checks passed (ham) and veto is false - improves false negative rate
+	// - checks failed (spam) and veto is true - improves false positive rate
 	if d.hasLLMEnabled() {
 		llmResults := make([]detectorLLMResult, 0, 2)
 		llmChecks := []detectorLLMCheck{
@@ -505,792 +490,4 @@ func (d *Detector) Reset() {
 	}
 }
 
-// WithOpenAIChecker sets an openAIChecker for spam checking.
-func (d *Detector) WithOpenAIChecker(client openAIClient, config OpenAIConfig) {
-	d.openaiChecker = newOpenAIChecker(client, config)
-}
 
-// WithGeminiChecker sets a geminiChecker for spam checking.
-func (d *Detector) WithGeminiChecker(client geminiClient, config GeminiConfig) {
-	d.geminiChecker = newGeminiChecker(client, config)
-}
-
-// WithLuaEngine sets a Lua plugin engine and loads plugins
-func (d *Detector) WithLuaEngine(engine LuaPluginEngine) error {
-	d.luaEngine = engine
-
-	if !d.LuaPlugins.Enabled || d.LuaPlugins.PluginsDir == "" {
-		return nil
-	}
-
-	// load all plugins from the directory
-	if err := d.luaEngine.LoadDirectory(d.LuaPlugins.PluginsDir); err != nil {
-		return fmt.Errorf("failed to load Lua plugins: %w", err)
-	}
-
-	// register enabled plugins as Lua checks
-	if len(d.LuaPlugins.EnabledPlugins) > 0 {
-		for _, name := range d.LuaPlugins.EnabledPlugins {
-			pluginCheck, err := d.luaEngine.GetCheck(name)
-			if err != nil {
-				return fmt.Errorf("failed to get Lua check %q: %w", name, err)
-			}
-			// add to luaChecks
-			d.luaChecks = append(d.luaChecks, pluginCheck)
-		}
-	} else {
-		// if no specific plugins are enabled, load all
-		allChecks := d.luaEngine.GetAllChecks()
-		for _, pluginCheck := range allChecks {
-			// add to luaChecks
-			d.luaChecks = append(d.luaChecks, pluginCheck)
-		}
-	}
-
-	// set up a watcher for dynamic plugin reloading if enabled
-	if d.LuaPlugins.DynamicReload {
-		// we need to cast the luaEngine to a *plugin.Checker to access the watcher methods
-		checker, ok := d.luaEngine.(*plugin.Checker)
-		if !ok {
-			log.Printf("[WARN] dynamic Lua plugin reloading enabled but engine doesn't support it")
-			return nil
-		}
-
-		// create a watcher for the plugins directory
-		watcher, err := plugin.NewWatcher(checker, d.LuaPlugins.PluginsDir)
-		if err != nil {
-			return fmt.Errorf("failed to create watcher for Lua plugins: %w", err)
-		}
-
-		// set the watcher on the checker
-		checker.SetWatcher(watcher)
-
-		// start the watcher
-		if err := watcher.Start(); err != nil {
-			return fmt.Errorf("failed to start watcher for Lua plugins: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// WithUserStorage sets a UserStorage for approved users and loads approved users from it.
-func (d *Detector) WithUserStorage(storage UserStorage) (count int, err error) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	d.approvedUsers = make(map[string]approved.UserInfo) // reset approved users
-	d.userStorage = storage
-
-	ctx, cancel := d.ctxWithStoreTimeout()
-	defer cancel()
-
-	users, err := d.userStorage.Read(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("failed to read approved users from storage: %w", err)
-	}
-	for _, user := range users {
-		user.Count = d.FirstMessagesCount + 1 // +1 to skip first message check if count is 0
-		d.approvedUsers[user.UserID] = user
-	}
-	return len(users), nil
-}
-
-// WithMetaChecks sets a list of meta-checkers.
-func (d *Detector) WithMetaChecks(mc ...MetaCheck) {
-	d.metaChecks = append(d.metaChecks, mc...)
-}
-
-// ReplaceMetaChecks replaces the entire list of meta-checkers.
-func (d *Detector) ReplaceMetaChecks(mc ...MetaCheck) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	d.metaChecks = mc
-}
-
-// UpdateConfig updates mutable detector configuration fields under write lock.
-// Fields that cannot change after construction (CAS API, HTTP client, LLM checkers, Lua, history size)
-// are left untouched. DuplicateDetection causes the duplicateDetector to be recreated.
-func (d *Detector) UpdateConfig(cfg Config) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	d.SimilarityThreshold = cfg.SimilarityThreshold
-	d.MinMsgLen = cfg.MinMsgLen
-	d.MaxAllowedEmoji = cfg.MaxAllowedEmoji
-	d.MinSpamProbability = cfg.MinSpamProbability
-	d.MultiLangWords = cfg.MultiLangWords
-	d.AbnormalSpacing = cfg.AbnormalSpacing
-	if cfg.DuplicateDetection.Threshold != d.DuplicateDetection.Threshold || cfg.DuplicateDetection.Window != d.DuplicateDetection.Window {
-		d.duplicateDetector = newDuplicateDetector(cfg.DuplicateDetection.Threshold, cfg.DuplicateDetection.Window)
-		d.DuplicateDetection = cfg.DuplicateDetection
-	}
-}
-
-// WithSpamUpdater sets a SampleUpdater for spam samples.
-func (d *Detector) WithSpamUpdater(s SampleUpdater) { d.spamSamplesUpd = s }
-
-// WithHamUpdater sets a SampleUpdater for ham samples.
-func (d *Detector) WithHamUpdater(s SampleUpdater) { d.hamSamplesUpd = s }
-
-// ApprovedUsers returns a list of approved users.
-func (d *Detector) ApprovedUsers() (res []approved.UserInfo) {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-	res = make([]approved.UserInfo, 0, len(d.approvedUsers))
-	for _, info := range d.approvedUsers {
-		res = append(res, info)
-	}
-	sort.Slice(res, func(i, j int) bool {
-		return res[i].Timestamp.After(res[j].Timestamp)
-	})
-	return res
-}
-
-// IsApprovedUser checks if a given user ID is approved.
-// It uses memory cache for approved users and compares the count of messages sent by the user.
-func (d *Detector) IsApprovedUser(userID string) bool {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-
-	ui, ok := d.approvedUsers[userID]
-	if !ok {
-		return false
-	}
-	return ui.Count > d.FirstMessagesCount
-}
-
-// AddApprovedUser adds user IDs to the list of approved users.
-func (d *Detector) AddApprovedUser(user approved.UserInfo) error {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	ts := user.Timestamp
-	if ts.IsZero() {
-		ts = time.Now()
-	}
-	d.approvedUsers[user.UserID] = approved.UserInfo{
-		UserID:    user.UserID,
-		UserName:  user.UserName,
-		Count:     d.FirstMessagesCount + 1, // +1 to skip first message check if count is 0
-		Timestamp: ts,
-	}
-
-	if d.userStorage != nil {
-		ctx, cancel := d.ctxWithStoreTimeout()
-		defer cancel()
-		if err := d.userStorage.Write(ctx, user); err != nil {
-			return fmt.Errorf("failed to write approved user %+v to storage: %w", user, err)
-		}
-	}
-	return nil
-}
-
-// RemoveApprovedUser removes approved user for given IDs
-func (d *Detector) RemoveApprovedUser(id string) error {
-	d.lock.Lock()
-	delete(d.approvedUsers, id)
-	d.lock.Unlock()
-
-	if d.userStorage != nil {
-		ctx, cancel := d.ctxWithStoreTimeout()
-		defer cancel()
-		if err := d.userStorage.Delete(ctx, id); err != nil {
-			return fmt.Errorf("failed to delete approved user %s from storage: %w", id, err)
-		}
-	}
-	return nil
-}
-
-// GetLuaPluginNames returns the list of available Lua plugin names.
-func (d *Detector) GetLuaPluginNames() []string {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-
-	if d.luaEngine == nil || !d.LuaPlugins.Enabled {
-		return []string{}
-	}
-
-	allChecks := d.luaEngine.GetAllChecks()
-	result := make([]string, 0, len(allChecks))
-
-	for name := range allChecks {
-		result = append(result, name)
-	}
-
-	// sort the result for consistent output
-	sort.Strings(result)
-	return result
-}
-
-// LoadSamples loads spam samples from a reader and updates the classifier.
-// Reset spam, ham samples/classifier, and excluded tokens.
-func (d *Detector) LoadSamples(exclReader io.Reader, spamReaders, hamReaders []io.Reader) (LoadResult, error) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	d.tokenizedSpam = []map[string]int{}
-	d.excludedTokens = map[string]struct{}{}
-	d.classifier.reset()
-
-	// excluded tokens should be loaded before spam samples to exclude them from spam tokenization
-	for t := range d.readerIterator(exclReader) {
-		d.excludedTokens[strings.ToLower(t)] = struct{}{}
-	}
-	lr := LoadResult{ExcludedTokens: len(d.excludedTokens)}
-
-	// load spam samples and update the classifier with them
-	docs := make([]document, 0) //nolint:prealloc // iterator size unknown
-	for token := range d.readerIterator(spamReaders...) {
-		tokenizedSpam := d.tokenize(token)
-		d.tokenizedSpam = append(d.tokenizedSpam, tokenizedSpam) // add to list of samples
-		tokens := make([]string, 0, len(tokenizedSpam))
-		for token := range tokenizedSpam {
-			tokens = append(tokens, token)
-		}
-		docs = append(docs, newDocument(ClassSpam, tokens...))
-		lr.SpamSamples++
-	}
-
-	// load ham samples and update the classifier with them
-	for token := range d.readerIterator(hamReaders...) {
-		tokenizedSpam := d.tokenize(token)
-		tokens := make([]string, 0, len(tokenizedSpam))
-		for token := range tokenizedSpam {
-			tokens = append(tokens, token)
-		}
-		docs = append(docs, document{spamClass: ClassHam, tokens: tokens})
-		lr.HamSamples++
-	}
-
-	d.classifier.learn(docs...)
-	return lr, nil
-}
-
-// LoadStopWords loads stop words from a reader. Reset stop words list before loading.
-func (d *Detector) LoadStopWords(readers ...io.Reader) (LoadResult, error) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	d.stopWords = []string{}
-	for t := range d.readerIterator(readers...) {
-		d.stopWords = append(d.stopWords, strings.ToLower(t))
-	}
-	return LoadResult{StopWords: len(d.stopWords)}, nil
-}
-
-// UpdateSpam appends a message to the spam samples file and updates the classifier
-func (d *Detector) UpdateSpam(msg string) error {
-	return d.updateSample(msg, d.spamSamplesUpd, ClassSpam)
-}
-
-// UpdateHam appends a message to the ham samples file and updates the classifier
-func (d *Detector) UpdateHam(msg string) error {
-	return d.updateSample(msg, d.hamSamplesUpd, ClassHam)
-}
-
-// RemoveSpam removes a message from the spam samples file and updates the classifier by unlearning
-func (d *Detector) RemoveSpam(msg string) error {
-	return d.removeSample(msg, d.spamSamplesUpd, ClassSpam)
-}
-
-// RemoveHam removes a message from the ham samples file and updates the classifier by unlearning
-func (d *Detector) RemoveHam(msg string) error {
-	return d.removeSample(msg, d.hamSamplesUpd, ClassHam)
-}
-
-// updateSample appends a message to the samples store and updates the classifier
-// doesn't reset state, update append samples
-func (d *Detector) updateSample(msg string, upd SampleUpdater, sc spamClass) error {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	if upd == nil {
-		return nil
-	}
-
-	// write to dynamic samples storage
-	if err := upd.Append(msg); err != nil {
-		return fmt.Errorf("can't update %s samples: %w", sc, err)
-	}
-
-	// load samples and update the classifier with them
-	docs := d.buildDocs(msg, sc)
-	d.classifier.learn(docs...)
-
-	// update tokenized spam samples for similarity check
-	if sc == ClassSpam {
-		tokenizedSpam := d.tokenize(msg)
-		d.tokenizedSpam = append(d.tokenizedSpam, tokenizedSpam)
-	}
-
-	return nil
-}
-
-// removeSample removes a message from the spam samples file and updates the classifier by unlearning
-func (d *Detector) removeSample(msg string, upd SampleUpdater, sc spamClass) error {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	if upd == nil {
-		return nil
-	}
-
-	// first validate that we can unlearn this sample
-	docs := d.buildDocs(msg, sc)
-	if err := d.classifier.unlearn(docs...); err != nil {
-		return fmt.Errorf("can't unlearn %s samples: %w", sc, err)
-	}
-
-	// if unlearn succeeded, remove from storage
-	if err := upd.Remove(msg); err != nil {
-		// try to relearn since storage update failed
-		d.classifier.learn(docs...)
-		return fmt.Errorf("can't remove %s samples: %w", sc, err)
-	}
-	return nil
-}
-
-// buildDocs builds a list of classifier documents from a message
-func (d *Detector) buildDocs(msg string, sc spamClass) []document {
-	docs := make([]document, 0) //nolint:prealloc // iterator size unknown
-	for token := range d.readerIterator(bytes.NewBufferString(msg)) {
-		tokenizedSample := d.tokenize(token)
-		tokens := make([]string, 0, len(tokenizedSample))
-		for token := range tokenizedSample {
-			tokens = append(tokens, token)
-		}
-		docs = append(docs, document{spamClass: sc, tokens: tokens})
-	}
-	return docs
-}
-
-// readerIterator parses readers and returns an iterator of data elements, each line is an element.
-func (d *Detector) readerIterator(readers ...io.Reader) iter.Seq[string] {
-	return func(yield func(string) bool) {
-		for _, reader := range readers {
-			scanner := bufio.NewScanner(reader)
-			for scanner.Scan() {
-				line := scanner.Text()
-				// each line with a single element
-				cleanToken := strings.Trim(line, " \n\r\t")
-				if cleanToken != "" {
-					if !yield(cleanToken) {
-						return
-					}
-				}
-			}
-
-			if err := scanner.Err(); err != nil {
-				log.Printf("[WARN] failed to read tokens, error=%v", err)
-			}
-		}
-	}
-}
-
-// tokenize takes a string and returns a map where the keys are unique words (tokens)
-// and the values are the frequencies of those words in the string.
-// exclude tokens representing common words.
-func (d *Detector) tokenize(inp string) map[string]int {
-	isExcludedToken := func(token string) bool {
-		if _, ok := d.excludedTokens[strings.ToLower(token)]; ok {
-			return true
-		}
-		return false
-	}
-
-	tokenFrequency := make(map[string]int)
-	for token := range strings.FieldsSeq(inp) {
-		if isExcludedToken(token) {
-			continue
-		}
-		token = cleanEmoji(token)
-		token = strings.Trim(token, ".,!?-:;()#")
-		token = strings.ToLower(token)
-		if len([]rune(token)) < 3 {
-			continue
-		}
-		tokenFrequency[strings.ToLower(token)]++
-	}
-	return tokenFrequency
-}
-
-// isSpam checks if a given message is similar to any of the known bad messages
-func (d *Detector) isSpamSimilarityHigh(msg string) spamcheck.Response {
-	// check for spam similarity
-	tokenizedMessage := d.tokenize(msg)
-	maxSimilarity := 0.0
-	for _, spam := range d.tokenizedSpam {
-		similarity := d.cosineSimilarity(tokenizedMessage, spam)
-		if similarity > maxSimilarity {
-			maxSimilarity = similarity
-		}
-		if similarity >= d.SimilarityThreshold {
-			return spamcheck.Response{Spam: true, Name: "similarity",
-				Details: fmt.Sprintf("%0.2f/%0.2f", maxSimilarity, d.SimilarityThreshold)}
-		}
-	}
-	return spamcheck.Response{Spam: false, Name: "similarity",
-		Details: fmt.Sprintf("%0.2f/%0.2f", maxSimilarity, d.SimilarityThreshold)}
-}
-
-// cosineSimilarity calculates the cosine similarity between two token frequency maps.
-func (d *Detector) cosineSimilarity(a, b map[string]int) float64 {
-	if len(a) == 0 || len(b) == 0 {
-		return 0.0
-	}
-
-	dotProduct := 0      // sum of product of corresponding frequencies
-	normA, normB := 0, 0 // square root of sum of squares of frequencies
-
-	for key, val := range a {
-		dotProduct += val * b[key]
-		normA += val * val
-	}
-	for _, val := range b {
-		normB += val * val
-	}
-
-	if normA == 0 || normB == 0 {
-		return 0.0
-	}
-
-	// cosine similarity formula
-	return float64(dotProduct) / (math.Sqrt(float64(normA)) * math.Sqrt(float64(normB)))
-}
-
-// isCasSpam checks if a given user ID is a spammer with CAS API.
-func (d *Detector) isCasSpam(msgID string) spamcheck.Response {
-	if msgID == "" {
-		return spamcheck.Response{Spam: false, Name: "cas", Details: "check disabled"}
-	}
-	if _, err := strconv.ParseInt(msgID, 10, 64); err != nil {
-		return spamcheck.Response{Spam: false, Name: "cas", Details: fmt.Sprintf("invalid user id %q", msgID)}
-	}
-	reqURL := fmt.Sprintf("%s/check?user_id=%s", d.CasAPI, msgID)
-	req, err := http.NewRequest("GET", reqURL, http.NoBody)
-	if err != nil {
-		return spamcheck.Response{Spam: false, Name: "cas", Details: fmt.Sprintf("failed to make request %s: %v", reqURL, err)}
-	}
-
-	if d.CasUserAgent != "" {
-		req.Header.Set("User-Agent", d.CasUserAgent)
-	}
-
-	var resp *http.Response
-	// wrap HTTP call with retry logic: 3 attempts, 500ms initial delay, exponential backoff with jitter
-	rptr := repeater.New(&strategy.Backoff{
-		Repeats:  3,
-		Duration: 500 * time.Millisecond,
-		Factor:   2.0,
-		Jitter:   true,
-	})
-
-	err = rptr.Do(context.Background(), func() error {
-		var httpErr error
-		resp, httpErr = d.HTTPClient.Do(req)
-		if httpErr != nil {
-			return fmt.Errorf("http request failed: %w", httpErr) // retry on network errors
-		}
-
-		// retry on 5xx server errors
-		if resp.StatusCode >= 500 {
-			_ = resp.Body.Close() // ignore close error on retry
-			return fmt.Errorf("server error: %d", resp.StatusCode)
-		}
-
-		// retry on non-200 status
-		if resp.StatusCode != http.StatusOK {
-			_ = resp.Body.Close()
-			return fmt.Errorf("unexpected status: %d", resp.StatusCode)
-		}
-
-		// retry on HTML responses (issue #325)
-		contentType := resp.Header.Get("Content-Type")
-		if contentType != "" && !strings.Contains(contentType, "application/json") {
-			_ = resp.Body.Close()
-			return fmt.Errorf("unexpected content type: %s", contentType)
-		}
-
-		return nil // success - exit retry loop
-	})
-
-	if err != nil {
-		log.Printf("[WARN] CAS API request failed for user %s after retries: %v", msgID, err)
-		return spamcheck.Response{Spam: false, Name: "cas", Details: fmt.Sprintf("failed to send request %s: %v", reqURL, err)}
-	}
-	defer resp.Body.Close()
-
-	respData := struct {
-		OK          bool   `json:"ok"` // ok means user is a spammer
-		Description string `json:"description"`
-	}{}
-
-	if err := json.NewDecoder(resp.Body).Decode(&respData); err != nil {
-		log.Printf("[WARN] CAS API response parse error for user %s: %v", msgID, err)
-		return spamcheck.Response{Spam: false, Name: "cas", Details: fmt.Sprintf("failed to parse response from %s: %v", reqURL, err)}
-	}
-	respData.Description = strings.ToLower(respData.Description)
-	respData.Description = strings.TrimSuffix(respData.Description, ".")
-
-	if respData.OK {
-		// may return empty description on detected spam
-		if respData.Description == "" {
-			respData.Description = "spam detected"
-		}
-		return spamcheck.Response{Name: "cas", Spam: true, Details: respData.Description}
-	}
-	details := respData.Description
-	if details == "" {
-		details = "not found"
-	}
-	return spamcheck.Response{Name: "cas", Spam: false, Details: details}
-}
-
-// isSpamClassified classify tokens from a document
-func (d *Detector) isSpamClassified(msg string) spamcheck.Response {
-	tm := d.tokenize(msg)
-	tokens := make([]string, 0, len(tm))
-	for token := range tm {
-		tokens = append(tokens, token)
-	}
-	class, prob, certain := d.classifier.classify(tokens...)
-	isSpam := class == ClassSpam && certain && (d.MinSpamProbability == 0 || prob >= d.MinSpamProbability)
-
-	// handle NaN or infinite probability values
-	probStr := "0.00"
-	if !math.IsNaN(prob) && !math.IsInf(prob, 0) {
-		probStr = fmt.Sprintf("%.2f", prob)
-	}
-
-	return spamcheck.Response{Name: "classifier", Spam: isSpam,
-		Details: fmt.Sprintf("probability of %s: %s%%", class, probStr)}
-}
-
-// isStopWord checks if a given message or username contains any of the stop words.
-// stop words prefixed with "=" require exact match (whole text equals the word),
-// otherwise substring match is used.
-func (d *Detector) isStopWord(msg string, req spamcheck.Request) spamcheck.Response {
-	// check message text
-	cleanMsg := normalizeLookupText(cleanEmoji(msg))
-	for _, word := range d.stopWords { // stop words are already lowercased
-		if matchStopWord(cleanMsg, word) {
-			return spamcheck.Response{Name: "stopword", Spam: true, Details: strings.TrimPrefix(word, "=")}
-		}
-	}
-
-	// check username and user id if they are not empty for stop words
-	names := []string{}
-	if req.UserName != "" {
-		names = append(names, req.UserName)
-	}
-	if req.UserID != "" {
-		names = append(names, req.UserID)
-	}
-	for _, name := range names {
-		normalizedName := normalizeLookupText(name)
-		for _, word := range d.stopWords {
-			if matchStopWord(normalizedName, word) {
-				return spamcheck.Response{Name: "stopword", Spam: true, Details: strings.TrimPrefix(word, "=")}
-			}
-		}
-	}
-
-	return spamcheck.Response{Name: "stopword", Spam: false, Details: "not found"}
-}
-
-// matchStopWord checks if text matches a stop word.
-// if word starts with "=", exact match is required (text must equal word).
-// otherwise, substring match is used (text must contain word).
-func matchStopWord(text, word string) bool {
-	if checkWord, found := strings.CutPrefix(word, "="); found {
-		// exact match: text must equal the word (without prefix)
-		if checkWord == "" {
-			return false // skip invalid "=" only pattern
-		}
-		normalizedWord := normalizeLookupText(checkWord) // word already lowercased at load time
-		return text == normalizedWord
-	}
-	// substring match
-	normalizedWord := normalizeLookupText(word) // word already lowercased at load time
-	return strings.Contains(text, normalizedWord)
-}
-
-// isManyEmojis checks if a given message contains more than MaxAllowedEmoji emojis.
-func (d *Detector) isManyEmojis(msg string) spamcheck.Response {
-	count := countEmoji(msg)
-	return spamcheck.Response{Name: "emoji", Spam: count > d.MaxAllowedEmoji,
-		Details: fmt.Sprintf("%d/%d", count, d.MaxAllowedEmoji)}
-}
-
-// isMultiLang checks if a given message contains more than MultiLangWords multi-lingual words.
-func (d *Detector) isMultiLang(msg string) spamcheck.Response {
-	isMultiLingual := func(word string) bool {
-		scripts := make(map[string]bool)
-		for _, r := range word {
-			if r == 'i' || unicode.IsSpace(r) || unicode.IsNumber(r) { // skip 'i' (common in many langs) and spaces
-				continue
-			}
-
-			scriptFound := false
-			for name, table := range unicode.Scripts {
-				if unicode.Is(table, r) {
-					if name != "Common" && name != "Inherited" {
-						scripts[name] = true
-						if len(scripts) > 1 {
-							return true
-						}
-						scriptFound = true
-					}
-					break
-				}
-			}
-
-			// if no specific script was found, it might be a symbol or punctuation
-			if !scriptFound {
-				// check for mathematical alphanumeric symbols and letterlike symbols
-				if unicode.In(r, unicode.Other_Math, unicode.Other_Alphabetic) ||
-					(r >= '\U0001D400' && r <= '\U0001D7FF') || // mathematical Alphanumeric Symbols
-					(r >= '\u2100' && r <= '\u214F') { // letterlike Symbols
-					scripts["Mathematical"] = true
-					if len(scripts) > 1 {
-						return true
-					}
-				} else if !unicode.IsPunct(r) && !unicode.IsSymbol(r) {
-					// if it's not punctuation or a symbol, count it as "Other"
-					scripts["Other"] = true
-					if len(scripts) > 1 {
-						return true
-					}
-				}
-			}
-		}
-		return false
-	}
-
-	count := 0
-	words := strings.FieldsFunc(msg, func(r rune) bool {
-		return unicode.IsSpace(r) || r == '-'
-	})
-	for _, word := range words {
-		if isMultiLingual(word) {
-			count++
-		}
-	}
-	if count >= d.MultiLangWords {
-		return spamcheck.Response{Name: "multi-lingual", Spam: true, Details: fmt.Sprintf("%d/%d", count, d.MultiLangWords)}
-	}
-	return spamcheck.Response{Name: "multi-lingual", Spam: false, Details: fmt.Sprintf("%d/%d", count, d.MultiLangWords)}
-}
-
-// isAbnormalSpacing detects abnormal spacing patterns used to evade filters
-// things like this: "w o r d s p a c i n g some thing he re blah blah"
-func (d *Detector) isAbnormalSpacing(msg string) spamcheck.Response {
-	text := strings.ToUpper(msg)
-
-	// quick check for empty or very short text
-	if len(text) < 10 {
-		return spamcheck.Response{
-			Name:    "word-spacing",
-			Spam:    false,
-			Details: "too short",
-		}
-	}
-
-	words := strings.Fields(text)
-	// check for minimum number of words
-	if len(words) < d.AbnormalSpacing.MinWordsCount {
-		return spamcheck.Response{
-			Name:    "word-spacing",
-			Spam:    false,
-			Details: fmt.Sprintf("too few words (%d)", len(words)),
-		}
-	}
-
-	// count letters and spaces in original text
-	var totalChars, spaces int
-	for _, r := range text {
-		if unicode.IsLetter(r) {
-			totalChars++
-		} else if unicode.IsSpace(r) {
-			spaces++
-		}
-	}
-
-	// look for suspicious word lengths and spacing patterns
-	shortWords := 0
-	if d.AbnormalSpacing.ShortWordLen > 0 { // if ShortWordLen is 0, skip short word detection
-		for _, word := range words {
-			wordRunes := []rune(word)
-			if len(wordRunes) <= d.AbnormalSpacing.ShortWordLen && len(wordRunes) > 0 {
-				shortWords++
-			}
-		}
-	}
-
-	// safety check
-	if spaces == 0 || totalChars == 0 {
-		return spamcheck.Response{
-			Name:    "word-spacing",
-			Spam:    false,
-			Details: "no spaces or letters",
-		}
-	}
-
-	// calculate ratios
-	spaceRatio := float64(spaces) / float64(totalChars)
-	shortWordRatio := float64(shortWords) / float64(len(words))
-	if shortWordRatio > d.AbnormalSpacing.ShortWordRatioThreshold || spaceRatio > d.AbnormalSpacing.SpaceRatioThreshold {
-		return spamcheck.Response{
-			Name:    "word-spacing",
-			Spam:    true,
-			Details: fmt.Sprintf("abnormal (ratio: %.2f, short: %.0f%%)", spaceRatio, shortWordRatio*100),
-		}
-	}
-
-	return spamcheck.Response{
-		Name:    "word-spacing",
-		Spam:    false,
-		Details: fmt.Sprintf("normal (ratio: %.2f, short: %.0f%%)", spaceRatio, shortWordRatio*100),
-	}
-}
-
-// cleanText removes control and format characters from a given text
-func (d *Detector) cleanText(text string) string {
-	return textnorm.New(textnorm.Options{StripInvisible: true}).Normalize(text)
-}
-
-func (d *Detector) ctxWithStoreTimeout() (context.Context, context.CancelFunc) {
-	if d.StorageTimeout == 0 {
-		return context.Background(), func() {}
-	}
-	return context.WithTimeout(context.Background(), d.StorageTimeout)
-}
-
-const defaultLLMRequestTimeout = 30 * time.Second
-
-func (d *Detector) ctxWithLLMTimeout() (context.Context, context.CancelFunc) {
-	timeout := d.LLMRequestTimeout
-	if timeout == 0 {
-		timeout = defaultLLMRequestTimeout
-	}
-	return context.WithTimeout(context.Background(), timeout)
-}
-
-func cleanEmoji(s string) string {
-	return gomoji.RemoveEmojis(s)
-}
-
-func countEmoji(s string) int {
-	return len(gomoji.CollectAll(s))
-}
-
-// normalizeSpaces collapses multiple consecutive spaces into a single space
-func normalizeSpaces(s string) string {
-	return textnorm.New(textnorm.Options{Trim: true, CanonicalWhitespace: true}).Normalize(s)
-}
-
-func normalizeLookupText(text string) string {
-	return textnorm.New(textnorm.Options{
-		LowerCase:           true,
-		Trim:                true,
-		CanonicalWhitespace: true,
-	}).Normalize(text)
-}
