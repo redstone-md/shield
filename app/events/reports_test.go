@@ -270,7 +270,7 @@ func TestUserReports_DirectUserReport(t *testing.T) {
 		assert.Len(t, mockBot.UpdateSpamCalls(), 1)
 		assert.Empty(t, mockReports.AddCalls(), "should not store report when llm already confirmed spam")
 		assert.GreaterOrEqual(t, len(mockAPI.RequestCalls()), 2, "should delete command and original message")
-		assert.Len(t, mockAPI.SendCalls(), 1, "should notify admin chat")
+		assert.Len(t, mockAPI.SendCalls(), 2, "should notify admin chat and send confirmation")
 	})
 
 	t.Run("reporter is superuser - should return error", func(t *testing.T) {
