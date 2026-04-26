@@ -26,6 +26,7 @@
 - [x] Добавлена acceptance-проверка: `RuleSetService.Update` обновляет listener и detector в текущем процессе.
 - [x] Добавлен `app/controlplane.WorkspaceService` с ролями `owner`, `admin`, `viewer`.
 - [x] Runtime bootstraps single workspace из `InstanceID` и owner membership для текущего Basic Auth пользователя.
+- [x] Добавлен role-based authorizer для control plane endpoints: viewer получает read-only доступ, admin/owner получают write access.
 
 ## Критерий завершения
 

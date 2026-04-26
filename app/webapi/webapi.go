@@ -57,82 +57,83 @@ type Server struct {
 
 // Config defines server parameters
 type Config struct {
-	Version          string         // version to show in /ping
-	ListenAddr       string         // listen address
-	Detector         Detector       // spam detector
-	SpamFilter       SpamFilter     // spam filter (bot)
-	DetectedSpam     DetectedSpam   // detected spam accessor
-	Locator          Locator        // locator for user info
-	Dictionary       Dictionary     // dictionary for stop phrases and ignored words
-	StorageEngine    StorageEngine  // database engine access for backups
-	DMUsersProvider  DMUsersProvider  // provider for recent DM users
-	RuleSetProvider  RuleSetProvider // control plane rule set service
-	AuthPasswd       string         // basic auth password for user "tg-spam"
-	AuthHash         string         // basic auth bcrypt hash for user "tg-spam", takes precedence over AuthPasswd
-	Dbg              bool           // debug mode
-	Settings         Settings       // application settings
+	Version          string                 // version to show in /ping
+	ListenAddr       string                 // listen address
+	Detector         Detector               // spam detector
+	SpamFilter       SpamFilter             // spam filter (bot)
+	DetectedSpam     DetectedSpam           // detected spam accessor
+	Locator          Locator                // locator for user info
+	Dictionary       Dictionary             // dictionary for stop phrases and ignored words
+	StorageEngine    StorageEngine          // database engine access for backups
+	DMUsersProvider  DMUsersProvider        // provider for recent DM users
+	RuleSetProvider  RuleSetProvider        // control plane rule set service
+	ControlPlaneAuth ControlPlaneAuthorizer // role authorizer for control plane endpoints
+	AuthPasswd       string                 // basic auth password for user "tg-spam"
+	AuthHash         string                 // basic auth bcrypt hash for user "tg-spam", takes precedence over AuthPasswd
+	Dbg              bool                   // debug mode
+	Settings         Settings               // application settings
 }
 
 // Settings contains all application settings
 type Settings struct {
-	InstanceID                string        `json:"instance_id"`
-	BotUsername               string        `json:"bot_username"`
-	PrimaryGroup              string        `json:"primary_group"`
-	AdminGroup                string        `json:"admin_group"`
-	DisableAdminSpamForward   bool          `json:"disable_admin_spam_forward"`
-	LoggerEnabled             bool          `json:"logger_enabled"`
-	SuperUsers                []string      `json:"super_users"`
-	NoSpamReply               bool          `json:"no_spam_reply"`
-	CasEnabled                bool          `json:"cas_enabled"`
-	MetaEnabled               bool          `json:"meta_enabled"`
-	MetaLinksLimit            int           `json:"meta_links_limit"`
-	MetaMentionsLimit         int           `json:"meta_mentions_limit"`
-	MetaLinksOnly             bool          `json:"meta_links_only"`
-	MetaImageOnly             bool          `json:"meta_image_only"`
-	MetaVideoOnly             bool          `json:"meta_video_only"`
-	MetaAudioOnly             bool          `json:"meta_audio_only"`
-	MetaForwarded             bool          `json:"meta_forwarded"`
-	MetaKeyboard              bool          `json:"meta_keyboard"`
-	MetaContactOnly           bool          `json:"meta_contact_only"`
-	MetaUsernameSymbols       string        `json:"meta_username_symbols"`
-	MetaGiveaway              bool          `json:"meta_giveaway"`
-	MultiLangLimit            int           `json:"multi_lang_limit"`
-	LLMConsensus              string        `json:"llm_consensus"`
-	OpenAIEnabled             bool          `json:"openai_enabled"`
-	OpenAIVeto                bool          `json:"openai_veto"`
-	OpenAIHistorySize         int           `json:"openai_history_size"`
-	OpenAIModel               string        `json:"openai_model"`
-	OpenAICheckShortMessages  bool          `json:"openai_check_short_messages"`
-	OpenAICustomPrompts       []string      `json:"openai_custom_prompts"`
-	GeminiEnabled             bool          `json:"gemini_enabled"`
-	GeminiVeto                bool          `json:"gemini_veto"`
-	GeminiHistorySize         int           `json:"gemini_history_size"`
-	GeminiModel               string        `json:"gemini_model"`
-	GeminiCheckShortMessages  bool          `json:"gemini_check_short_messages"`
-	GeminiCustomPrompts       []string      `json:"gemini_custom_prompts"`
-	LuaPluginsEnabled         bool          `json:"lua_plugins_enabled"`
-	LuaPluginsDir             string        `json:"lua_plugins_dir"`
-	LuaEnabledPlugins         []string      `json:"lua_enabled_plugins"`
-	LuaDynamicReload          bool          `json:"lua_dynamic_reload"`
-	LuaAvailablePlugins       []string      `json:"lua_available_plugins"` // the list of all available Lua plugins
-	SamplesDataPath           string        `json:"samples_data_path"`
-	DynamicDataPath           string        `json:"dynamic_data_path"`
-	WatchIntervalSecs         int           `json:"watch_interval_secs"`
-	SimilarityThreshold       float64       `json:"similarity_threshold"`
-	MinMsgLen                 int           `json:"min_msg_len"`
-	MaxEmoji                  int           `json:"max_emoji"`
-	MinSpamProbability        float64       `json:"min_spam_probability"`
-	ParanoidMode              bool          `json:"paranoid_mode"`
-	FirstMessagesCount        int           `json:"first_messages_count"`
-	StartupMessageEnabled     bool          `json:"startup_message_enabled"`
-	TrainingEnabled           bool          `json:"training_enabled"`
-	StorageTimeout            time.Duration `json:"storage_timeout"`
-	SoftBanEnabled            bool          `json:"soft_ban_enabled"`
-	AbnormalSpacingEnabled    bool          `json:"abnormal_spacing_enabled"`
-	HistorySize               int           `json:"history_size"`
-	DebugModeEnabled          bool          `json:"debug_mode_enabled"`
-	DryModeEnabled            bool          `json:"dry_mode_enabled"`
-	TGDebugModeEnabled        bool          `json:"tg_debug_mode_enabled"`
+	InstanceID               string        `json:"instance_id"`
+	BotUsername              string        `json:"bot_username"`
+	PrimaryGroup             string        `json:"primary_group"`
+	AdminGroup               string        `json:"admin_group"`
+	DisableAdminSpamForward  bool          `json:"disable_admin_spam_forward"`
+	LoggerEnabled            bool          `json:"logger_enabled"`
+	SuperUsers               []string      `json:"super_users"`
+	NoSpamReply              bool          `json:"no_spam_reply"`
+	CasEnabled               bool          `json:"cas_enabled"`
+	MetaEnabled              bool          `json:"meta_enabled"`
+	MetaLinksLimit           int           `json:"meta_links_limit"`
+	MetaMentionsLimit        int           `json:"meta_mentions_limit"`
+	MetaLinksOnly            bool          `json:"meta_links_only"`
+	MetaImageOnly            bool          `json:"meta_image_only"`
+	MetaVideoOnly            bool          `json:"meta_video_only"`
+	MetaAudioOnly            bool          `json:"meta_audio_only"`
+	MetaForwarded            bool          `json:"meta_forwarded"`
+	MetaKeyboard             bool          `json:"meta_keyboard"`
+	MetaContactOnly          bool          `json:"meta_contact_only"`
+	MetaUsernameSymbols      string        `json:"meta_username_symbols"`
+	MetaGiveaway             bool          `json:"meta_giveaway"`
+	MultiLangLimit           int           `json:"multi_lang_limit"`
+	LLMConsensus             string        `json:"llm_consensus"`
+	OpenAIEnabled            bool          `json:"openai_enabled"`
+	OpenAIVeto               bool          `json:"openai_veto"`
+	OpenAIHistorySize        int           `json:"openai_history_size"`
+	OpenAIModel              string        `json:"openai_model"`
+	OpenAICheckShortMessages bool          `json:"openai_check_short_messages"`
+	OpenAICustomPrompts      []string      `json:"openai_custom_prompts"`
+	GeminiEnabled            bool          `json:"gemini_enabled"`
+	GeminiVeto               bool          `json:"gemini_veto"`
+	GeminiHistorySize        int           `json:"gemini_history_size"`
+	GeminiModel              string        `json:"gemini_model"`
+	GeminiCheckShortMessages bool          `json:"gemini_check_short_messages"`
+	GeminiCustomPrompts      []string      `json:"gemini_custom_prompts"`
+	LuaPluginsEnabled        bool          `json:"lua_plugins_enabled"`
+	LuaPluginsDir            string        `json:"lua_plugins_dir"`
+	LuaEnabledPlugins        []string      `json:"lua_enabled_plugins"`
+	LuaDynamicReload         bool          `json:"lua_dynamic_reload"`
+	LuaAvailablePlugins      []string      `json:"lua_available_plugins"` // the list of all available Lua plugins
+	SamplesDataPath          string        `json:"samples_data_path"`
+	DynamicDataPath          string        `json:"dynamic_data_path"`
+	WatchIntervalSecs        int           `json:"watch_interval_secs"`
+	SimilarityThreshold      float64       `json:"similarity_threshold"`
+	MinMsgLen                int           `json:"min_msg_len"`
+	MaxEmoji                 int           `json:"max_emoji"`
+	MinSpamProbability       float64       `json:"min_spam_probability"`
+	ParanoidMode             bool          `json:"paranoid_mode"`
+	FirstMessagesCount       int           `json:"first_messages_count"`
+	StartupMessageEnabled    bool          `json:"startup_message_enabled"`
+	TrainingEnabled          bool          `json:"training_enabled"`
+	StorageTimeout           time.Duration `json:"storage_timeout"`
+	SoftBanEnabled           bool          `json:"soft_ban_enabled"`
+	AbnormalSpacingEnabled   bool          `json:"abnormal_spacing_enabled"`
+	HistorySize              int           `json:"history_size"`
+	DebugModeEnabled         bool          `json:"debug_mode_enabled"`
+	DryModeEnabled           bool          `json:"dry_mode_enabled"`
+	TGDebugModeEnabled       bool          `json:"tg_debug_mode_enabled"`
 }
 
 // Detector is a spam detector interface.
@@ -192,6 +193,11 @@ type DMUsersProvider interface {
 type RuleSetProvider interface {
 	Get(ctx context.Context, workspaceID string) (rules.RuleSet, error)
 	Update(ctx context.Context, workspaceID string, source string, rs rules.RuleSet) (rules.RuleSet, error)
+}
+
+// ControlPlaneAuthorizer checks workspace role permissions for control plane endpoints.
+type ControlPlaneAuthorizer interface {
+	Authorize(ctx context.Context, workspaceID string, userID string, access string) error
 }
 
 // NewServer creates a new web API server.
@@ -277,13 +283,13 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 	// auth api routes
 	router.Group().Route(func(authApi *routegroup.Bundle) {
 		authApi.Use(s.authMiddleware(rest.BasicAuthWithUserPasswd("tg-spam", s.AuthPasswd)))
-		authApi.HandleFunc("POST /check", s.checkMsgHandler) // check a message for spam
+		authApi.HandleFunc("POST /check", s.checkMsgHandler)         // check a message for spam
 		authApi.HandleFunc("GET /check/{user_id}", s.checkIDHandler) // check user id for spam
 
 		authApi.Mount("/update").Route(func(r *routegroup.Bundle) {
 			// update spam/ham samples
 			r.HandleFunc("POST /spam", s.updateSampleHandler(s.SpamFilter.UpdateSpam)) // update spam samples
-			r.HandleFunc("POST /ham", s.updateSampleHandler(s.SpamFilter.UpdateHam)) // update ham samples
+			r.HandleFunc("POST /ham", s.updateSampleHandler(s.SpamFilter.UpdateHam))   // update ham samples
 		})
 
 		authApi.Mount("/delete").Route(func(r *routegroup.Bundle) {
@@ -304,7 +310,7 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 			r.HandleFunc("GET /export-to-postgres", s.downloadExportToPostgresHandler)
 		})
 
-		authApi.HandleFunc("GET /samples", s.getDynamicSamplesHandler) // get dynamic samples
+		authApi.HandleFunc("GET /samples", s.getDynamicSamplesHandler)    // get dynamic samples
 		authApi.HandleFunc("PUT /samples", s.reloadDynamicSamplesHandler) // reload samples
 
 		authApi.Mount("/users").Route(func(r *routegroup.Bundle) { // manage approved users
@@ -319,7 +325,8 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 		authApi.HandleFunc("GET /settings", s.getSettingsHandler) // get application settings
 
 		authApi.Mount("/rules").Route(func(r *routegroup.Bundle) {
-			r.HandleFunc("GET /", s.getRuleSetHandler) // get active rule set
+			r.Use(s.controlPlaneAuthMiddleware)
+			r.HandleFunc("GET /", s.getRuleSetHandler)    // get active rule set
 			r.HandleFunc("PUT /", s.updateRuleSetHandler) // update rule set
 		})
 
@@ -335,14 +342,14 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 
 	router.Group().Route(func(webUI *routegroup.Bundle) {
 		webUI.Use(s.authMiddleware(rest.BasicAuthWithPrompt("tg-spam", s.AuthPasswd)))
-		webUI.HandleFunc("GET /", s.htmlSpamCheckHandler) // serve template for webUI UI
-		webUI.HandleFunc("GET /manage_samples", s.htmlManageSamplesHandler) // serve manage samples page
-		webUI.HandleFunc("GET /manage_users", s.htmlManageUsersHandler) // serve manage users page
+		webUI.HandleFunc("GET /", s.htmlSpamCheckHandler)                         // serve template for webUI UI
+		webUI.HandleFunc("GET /manage_samples", s.htmlManageSamplesHandler)       // serve manage samples page
+		webUI.HandleFunc("GET /manage_users", s.htmlManageUsersHandler)           // serve manage users page
 		webUI.HandleFunc("GET /manage_dictionary", s.htmlManageDictionaryHandler) // serve manage dictionary page
-		webUI.HandleFunc("GET /detected_spam", s.htmlDetectedSpamHandler) // serve detected spam page
-		webUI.HandleFunc("GET /list_settings", s.htmlSettingsHandler) // serve settings
+		webUI.HandleFunc("GET /detected_spam", s.htmlDetectedSpamHandler)         // serve detected spam page
+		webUI.HandleFunc("GET /list_settings", s.htmlSettingsHandler)             // serve settings
 		webUI.HandleFunc("POST /detected_spam/add", s.htmlAddDetectedSpamHandler) // add detected spam to samples
-		webUI.HandleFunc("GET /dm-users", s.getDMUsersHandler) // get recent DM users (HTMX/JSON)
+		webUI.HandleFunc("GET /dm-users", s.getDMUsersHandler)                    // get recent DM users (HTMX/JSON)
 
 		// handle logout - force Basic Auth re-authentication
 		webUI.HandleFunc("GET /logout", func(w http.ResponseWriter, _ *http.Request) {
@@ -372,4 +379,28 @@ func (s *Server) authMiddleware(mw func(next http.Handler) http.Handler) func(ne
 	return func(next http.Handler) http.Handler {
 		return mw(next)
 	}
+}
+
+func (s *Server) controlPlaneAuthMiddleware(next http.Handler) http.Handler {
+	if s.ControlPlaneAuth == nil {
+		return next
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, _, ok := r.BasicAuth()
+		if !ok || strings.TrimSpace(userID) == "" {
+			_ = rest.EncodeJSON(w, http.StatusUnauthorized, rest.JSON{"error": "control plane authentication required"})
+			return
+		}
+
+		access := "read"
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			access = "write"
+		}
+		if err := s.ControlPlaneAuth.Authorize(r.Context(), s.Settings.InstanceID, userID, access); err != nil {
+			_ = rest.EncodeJSON(w, http.StatusForbidden, rest.JSON{"error": "control plane access denied"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

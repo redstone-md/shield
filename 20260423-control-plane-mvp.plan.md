@@ -84,3 +84,16 @@ Focused verification passed:
 
 - `go test ./app/controlplane ./app`
 - `make test`
+
+## Current iteration — Slice 4 role-based control plane auth
+
+1. [x] Add `RoleAuthorizer` in `app/controlplane` with read/write decisions over workspace membership.
+2. [x] Wire role authorization into `/rules` webapi routes while keeping existing Basic Auth as authentication.
+3. [x] Add controlplane and webapi tests for owner/admin/viewer permissions and denial paths.
+4. [x] Update roadmap progress for completed role auth foundation.
+5. [x] Run focused tests and `make test`.
+
+Focused verification passed:
+
+- `go test ./app/controlplane ./app/webapi ./app`
+- `make test`

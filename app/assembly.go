@@ -147,19 +147,19 @@ func activateServer(ctx context.Context, opts options, web webRuntimeAssembly, d
 		MetaEnabled: opts.Meta.ImageOnly || opts.Meta.LinksLimit >= 0 || opts.Meta.MentionsLimit >= 0 ||
 			opts.Meta.LinksOnly || opts.Meta.VideosOnly || opts.Meta.AudiosOnly || opts.Meta.ContactOnly ||
 			opts.Meta.Forward || opts.Meta.Keyboard || opts.Meta.UsernameSymbols != "" || opts.Meta.Giveaway,
-		MetaLinksLimit:     opts.Meta.LinksLimit,
-		MetaMentionsLimit:  opts.Meta.MentionsLimit,
-		MetaLinksOnly:      opts.Meta.LinksOnly,
-		MetaImageOnly:      opts.Meta.ImageOnly,
-		MetaVideoOnly:      opts.Meta.VideosOnly,
-		MetaAudioOnly:      opts.Meta.AudiosOnly,
-		MetaForwarded:      opts.Meta.Forward,
-		MetaKeyboard:       opts.Meta.Keyboard,
-		MetaContactOnly:    opts.Meta.ContactOnly,
-		MetaUsernameSymbols: opts.Meta.UsernameSymbols,
-		MetaGiveaway:       opts.Meta.Giveaway,
-		MultiLangLimit:     opts.MultiLangWords,
-		LLMConsensus:       opts.LLM.Consensus,
+		MetaLinksLimit:           opts.Meta.LinksLimit,
+		MetaMentionsLimit:        opts.Meta.MentionsLimit,
+		MetaLinksOnly:            opts.Meta.LinksOnly,
+		MetaImageOnly:            opts.Meta.ImageOnly,
+		MetaVideoOnly:            opts.Meta.VideosOnly,
+		MetaAudioOnly:            opts.Meta.AudiosOnly,
+		MetaForwarded:            opts.Meta.Forward,
+		MetaKeyboard:             opts.Meta.Keyboard,
+		MetaContactOnly:          opts.Meta.ContactOnly,
+		MetaUsernameSymbols:      opts.Meta.UsernameSymbols,
+		MetaGiveaway:             opts.Meta.Giveaway,
+		MultiLangLimit:           opts.MultiLangWords,
+		LLMConsensus:             opts.LLM.Consensus,
 		OpenAIEnabled:            opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "",
 		OpenAIVeto:               opts.OpenAI.Veto,
 		OpenAIHistorySize:        opts.OpenAI.HistorySize,
@@ -172,44 +172,45 @@ func activateServer(ctx context.Context, opts options, web webRuntimeAssembly, d
 		GeminiModel:              opts.Gemini.Model,
 		GeminiCheckShortMessages: opts.Gemini.CheckShortMessages,
 		GeminiCustomPrompts:      opts.Gemini.CustomPrompts,
-		LuaPluginsEnabled:   opts.LuaPlugins.Enabled,
-		LuaPluginsDir:       opts.LuaPlugins.PluginsDir,
-		LuaEnabledPlugins:   opts.LuaPlugins.EnabledPlugins,
-		LuaDynamicReload:    opts.LuaPlugins.DynamicReload,
-		SamplesDataPath:     opts.Files.SamplesDataPath,
-		DynamicDataPath:     opts.Files.DynamicDataPath,
-		WatchIntervalSecs:   int(opts.Files.WatchInterval.Seconds()),
-		SimilarityThreshold: opts.SimilarityThreshold,
-		MinMsgLen:           opts.MinMsgLen,
-		MaxEmoji:            opts.MaxEmoji,
-		MinSpamProbability:  opts.MinSpamProbability,
-		ParanoidMode:        opts.ParanoidMode,
-		FirstMessagesCount:  opts.FirstMessagesCount,
-		StartupMessageEnabled: opts.Message.Startup != "",
-		TrainingEnabled:       opts.Training,
-		SoftBanEnabled:        opts.SoftBan,
-		AbnormalSpacingEnabled: opts.AbnormalSpacing.Enabled,
-		HistorySize:           opts.HistorySize,
-		DebugModeEnabled:      opts.Dbg,
-		DryModeEnabled:        opts.Dry,
-		TGDebugModeEnabled:    opts.TGDbg,
+		LuaPluginsEnabled:        opts.LuaPlugins.Enabled,
+		LuaPluginsDir:            opts.LuaPlugins.PluginsDir,
+		LuaEnabledPlugins:        opts.LuaPlugins.EnabledPlugins,
+		LuaDynamicReload:         opts.LuaPlugins.DynamicReload,
+		SamplesDataPath:          opts.Files.SamplesDataPath,
+		DynamicDataPath:          opts.Files.DynamicDataPath,
+		WatchIntervalSecs:        int(opts.Files.WatchInterval.Seconds()),
+		SimilarityThreshold:      opts.SimilarityThreshold,
+		MinMsgLen:                opts.MinMsgLen,
+		MaxEmoji:                 opts.MaxEmoji,
+		MinSpamProbability:       opts.MinSpamProbability,
+		ParanoidMode:             opts.ParanoidMode,
+		FirstMessagesCount:       opts.FirstMessagesCount,
+		StartupMessageEnabled:    opts.Message.Startup != "",
+		TrainingEnabled:          opts.Training,
+		SoftBanEnabled:           opts.SoftBan,
+		AbnormalSpacingEnabled:   opts.AbnormalSpacing.Enabled,
+		HistorySize:              opts.HistorySize,
+		DebugModeEnabled:         opts.Dbg,
+		DryModeEnabled:           opts.Dry,
+		TGDebugModeEnabled:       opts.TGDbg,
 	}
 
 	srv := webapi.Server{Config: webapi.Config{
-		ListenAddr:      opts.Server.ListenAddr,
-		Detector:        web.Detector,
-		SpamFilter:      web.SpamFilter,
-		Locator:         web.Locator,
-		DetectedSpam:    detectedSpamStore,
-		Dictionary:      dictionaryStore,
-		StorageEngine:   db, // add database engine for backup functionality
-		DMUsersProvider: dmUsersProvider,
-		RuleSetProvider: web.RuleSetService,
-		AuthPasswd:      authPassswd,
-		AuthHash:        opts.Server.AuthHash,
-		Version:         revision,
-		Dbg:             opts.Dbg,
-		Settings:        settings,
+		ListenAddr:       opts.Server.ListenAddr,
+		Detector:         web.Detector,
+		SpamFilter:       web.SpamFilter,
+		Locator:          web.Locator,
+		DetectedSpam:     detectedSpamStore,
+		Dictionary:       dictionaryStore,
+		StorageEngine:    db, // add database engine for backup functionality
+		DMUsersProvider:  dmUsersProvider,
+		RuleSetProvider:  web.RuleSetService,
+		ControlPlaneAuth: web.RoleAuthorizer,
+		AuthPasswd:       authPassswd,
+		AuthHash:         opts.Server.AuthHash,
+		Version:          revision,
+		Dbg:              opts.Dbg,
+		Settings:         settings,
 	}}
 
 	go func() {
@@ -233,14 +234,14 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 	if ruleSet.OpenAI.Enabled && (opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "") {
 		log.Printf("[WARN] openai enabled")
 		openAIConfig := tgspam.OpenAIConfig{
-			SystemPrompt:                opts.OpenAI.Prompt,
-			CustomPrompts:               opts.OpenAI.CustomPrompts,
-			Model:                       ruleSet.OpenAI.Model,
-			MaxTokensResponse:           opts.OpenAI.MaxTokensResponse,
-			MaxTokensRequest:            opts.OpenAI.MaxTokensRequest,
-			MaxSymbolsRequest:           opts.OpenAI.MaxSymbolsRequest,
-			RetryCount:                  opts.OpenAI.RetryCount,
-			ReasoningEffort:             opts.OpenAI.ReasoningEffort,
+			SystemPrompt:                 opts.OpenAI.Prompt,
+			CustomPrompts:                opts.OpenAI.CustomPrompts,
+			Model:                        ruleSet.OpenAI.Model,
+			MaxTokensResponse:            opts.OpenAI.MaxTokensResponse,
+			MaxTokensRequest:             opts.OpenAI.MaxTokensRequest,
+			MaxSymbolsRequest:            opts.OpenAI.MaxSymbolsRequest,
+			RetryCount:                   opts.OpenAI.RetryCount,
+			ReasoningEffort:              opts.OpenAI.ReasoningEffort,
 			CheckShortMessagesWithOpenAI: ruleSet.OpenAI.CheckShortMessages,
 		}
 
@@ -256,17 +257,17 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 	if ruleSet.Gemini.Enabled && opts.Gemini.Token != "" {
 		log.Printf("[WARN] gemini enabled")
 		geminiConfig := tgspam.GeminiConfig{
-			SystemPrompt:      opts.Gemini.Prompt,
-			CustomPrompts:     opts.Gemini.CustomPrompts,
-			Model:             ruleSet.Gemini.Model,
-			MaxOutputTokens:   opts.Gemini.MaxTokensResponse,
-			MaxSymbolsRequest: opts.Gemini.MaxSymbolsRequest,
-			RetryCount:        opts.Gemini.RetryCount,
+			SystemPrompt:       opts.Gemini.Prompt,
+			CustomPrompts:      opts.Gemini.CustomPrompts,
+			Model:              ruleSet.Gemini.Model,
+			MaxOutputTokens:    opts.Gemini.MaxTokensResponse,
+			MaxSymbolsRequest:  opts.Gemini.MaxSymbolsRequest,
+			RetryCount:         opts.Gemini.RetryCount,
 			CheckShortMessages: ruleSet.Gemini.CheckShortMessages,
 		}
 
 		client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
-			APIKey: opts.Gemini.Token,
+			APIKey:  opts.Gemini.Token,
 			Backend: genai.BackendGeminiAPI,
 		})
 		if err != nil {
@@ -308,23 +309,23 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 
 func buildDetectorConfig(opts options, ruleSet rules.RuleSet) tgspam.Config {
 	cfg := tgspam.Config{
-		MaxAllowedEmoji:    opts.MaxEmoji,
-		MinMsgLen:          opts.MinMsgLen,
+		MaxAllowedEmoji:     opts.MaxEmoji,
+		MinMsgLen:           opts.MinMsgLen,
 		SimilarityThreshold: opts.SimilarityThreshold,
-		MinSpamProbability: opts.MinSpamProbability,
-		CasAPI:             opts.CAS.API,
-		CasUserAgent:       opts.CAS.UserAgent,
-		HTTPClient:         &http.Client{Timeout: opts.CAS.Timeout},
-		FirstMessageOnly:   !opts.ParanoidMode,
-		FirstMessagesCount: opts.FirstMessagesCount,
-		OpenAIVeto:         ruleSet.OpenAI.Veto,
-		OpenAIHistorySize:  ruleSet.OpenAI.HistorySize,
-		GeminiVeto:         ruleSet.Gemini.Veto,
-		GeminiHistorySize:  ruleSet.Gemini.HistorySize,
-		LLMConsensus:       tgspam.LLMConsensusMode(opts.LLM.Consensus),
-		LLMRequestTimeout:  opts.LLM.RequestTimeout,
-		MultiLangWords:     opts.MultiLangWords,
-		HistorySize:        opts.HistorySize,
+		MinSpamProbability:  opts.MinSpamProbability,
+		CasAPI:              opts.CAS.API,
+		CasUserAgent:        opts.CAS.UserAgent,
+		HTTPClient:          &http.Client{Timeout: opts.CAS.Timeout},
+		FirstMessageOnly:    !opts.ParanoidMode,
+		FirstMessagesCount:  opts.FirstMessagesCount,
+		OpenAIVeto:          ruleSet.OpenAI.Veto,
+		OpenAIHistorySize:   ruleSet.OpenAI.HistorySize,
+		GeminiVeto:          ruleSet.Gemini.Veto,
+		GeminiHistorySize:   ruleSet.Gemini.HistorySize,
+		LLMConsensus:        tgspam.LLMConsensusMode(opts.LLM.Consensus),
+		LLMRequestTimeout:   opts.LLM.RequestTimeout,
+		MultiLangWords:      opts.MultiLangWords,
+		HistorySize:         opts.HistorySize,
 	}
 
 	if opts.FirstMessagesCount > 0 {
@@ -388,7 +389,6 @@ func buildMetaChecks(ruleSet rules.RuleSet, minMsgLen int) []tgspam.MetaCheck {
 	return mc
 }
 
-
 func makeSpamBot(ctx context.Context, opts options, ruleSet rules.RuleSet, dataDB *engine.SQL, detector *tgspam.Detector) (*bot.SpamFilter, error) {
 	if dataDB == nil || detector == nil {
 		return nil, errors.New("nil datadb or detector")
@@ -413,12 +413,12 @@ func makeSpamBot(ctx context.Context, opts options, ruleSet rules.RuleSet, dataD
 	}
 
 	spamBotParams := bot.SpamConfig{
-		GroupID:       opts.InstanceID,
-		SamplesStore:  samplesStore,
-		DictStore:     dictionaryStore,
-		SpamMsg:       opts.Message.Spam,
-		SpamDryMsg:    opts.Message.Dry,
-		Dry:           ruleSet.Moderation.DryRun,
+		GroupID:      opts.InstanceID,
+		SamplesStore: samplesStore,
+		DictStore:    dictionaryStore,
+		SpamMsg:      opts.Message.Spam,
+		SpamDryMsg:   opts.Message.Dry,
+		Dry:          ruleSet.Moderation.DryRun,
 	}
 	spamBot := bot.NewSpamFilter(detector, spamBotParams)
 	log.Printf("[DEBUG] spam bot config: %+v", spamBotParams)

@@ -33,6 +33,7 @@ type runtimeAssembly struct {
 	DetectedSpamStore      *storage.DetectedSpam
 	WorkspacesStore        *storage.Workspaces
 	WorkspaceService       *controlplane.WorkspaceService
+	RoleAuthorizer         *controlplane.RoleAuthorizer
 	RuleSetService         *controlplane.RuleSetService
 	TelegramListener       *events.TelegramListener
 	Web                    webRuntimeAssembly
@@ -44,6 +45,7 @@ type webRuntimeAssembly struct {
 	Locator        webapi.Locator
 	StorageEngine  webapi.StorageEngine
 	RuleSetService *controlplane.RuleSetService
+	RoleAuthorizer *controlplane.RoleAuthorizer
 	BotUsername    string
 }
 
@@ -138,6 +140,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	}); err != nil {
 		return nil, fmt.Errorf("can't bootstrap workspace, %w", err)
 	}
+	roleAuthorizer := controlplane.NewRoleAuthorizer(workspacesStore)
 	ruleSetService := controlplane.NewRuleSetService(ruleSets)
 
 	assembly := &runtimeAssembly{
@@ -155,6 +158,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		DetectedSpamStore:      detectedSpamStore,
 		WorkspacesStore:        workspacesStore,
 		WorkspaceService:       workspaceService,
+		RoleAuthorizer:         roleAuthorizer,
 		RuleSetService:         ruleSetService,
 		Web: webRuntimeAssembly{
 			Detector:       detector,
@@ -162,6 +166,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 			Locator:        locator,
 			StorageEngine:  dataDB,
 			RuleSetService: ruleSetService,
+			RoleAuthorizer: roleAuthorizer,
 		},
 	}
 
