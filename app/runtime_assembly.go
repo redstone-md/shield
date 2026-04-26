@@ -32,6 +32,7 @@ type runtimeAssembly struct {
 	ReportsStore           *storage.Reports
 	DetectedSpamStore      *storage.DetectedSpam
 	WorkspacesStore        *storage.Workspaces
+	WorkspaceService       *controlplane.WorkspaceService
 	RuleSetService         *controlplane.RuleSetService
 	TelegramListener       *events.TelegramListener
 	Web                    webRuntimeAssembly
@@ -130,6 +131,13 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	if err != nil {
 		return nil, fmt.Errorf("can't make workspaces store, %w", err)
 	}
+	workspaceService := controlplane.NewWorkspaceService(workspacesStore)
+	if _, err = workspaceService.EnsureDefaultWorkspace(ctx, controlplane.WorkspaceBootstrap{
+		Name:    opts.InstanceID,
+		OwnerID: "tg-spam",
+	}); err != nil {
+		return nil, fmt.Errorf("can't bootstrap workspace, %w", err)
+	}
 	ruleSetService := controlplane.NewRuleSetService(ruleSets)
 
 	assembly := &runtimeAssembly{
@@ -146,6 +154,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		ReportsStore:           reportsStore,
 		DetectedSpamStore:      detectedSpamStore,
 		WorkspacesStore:        workspacesStore,
+		WorkspaceService:       workspaceService,
 		RuleSetService:         ruleSetService,
 		Web: webRuntimeAssembly{
 			Detector:       detector,

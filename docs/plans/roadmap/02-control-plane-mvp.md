@@ -24,6 +24,8 @@
 - [x] Подключен in-process cache contract для `RuleSetService` с invalidation после обновления.
 - [x] Runtime подписан на изменения `RuleSetService` и применяет новые detector/listener/spam-filter настройки без рестарта.
 - [x] Добавлена acceptance-проверка: `RuleSetService.Update` обновляет listener и detector в текущем процессе.
+- [x] Добавлен `app/controlplane.WorkspaceService` с ролями `owner`, `admin`, `viewer`.
+- [x] Runtime bootstraps single workspace из `InstanceID` и owner membership для текущего Basic Auth пользователя.
 
 ## Критерий завершения
 

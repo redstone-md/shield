@@ -71,3 +71,16 @@ Focused verification passed:
 
 - `go test ./app/controlplane ./app/webapi ./app`
 - `make test`
+
+## Current iteration — Slice 3 workspace bootstrap
+
+1. [x] Add `WorkspaceService` in `app/controlplane` with typed roles and single-workspace bootstrap.
+2. [x] Wire `WorkspaceService.EnsureDefaultWorkspace` into runtime assembly startup.
+3. [x] Add tests for service validation, bootstrap idempotency, membership bootstrap, and runtime assembly wiring.
+4. [x] Update roadmap progress for completed workspace foundation.
+5. [x] Run focused tests and `make test`.
+
+Focused verification passed:
+
+- `go test ./app/controlplane ./app`
+- `make test`
