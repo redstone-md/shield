@@ -1,0 +1,398 @@
+package events
+
+import (
+	"context"
+	tbapi "github.com/OvyFlash/telegram-bot-api"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/umputun/tg-spam/app/bot"
+	"github.com/umputun/tg-spam/app/events/mocks"
+	"github.com/umputun/tg-spam/app/observability"
+	"github.com/umputun/tg-spam/app/storage"
+	"github.com/umputun/tg-spam/lib/spamcheck"
+	"testing"
+)
+
+func TestAdmin_DirectCommands(t *testing.T) {
+
+	setupTest := func() (*mocks.TbAPIMock, *mocks.BotMock, *admin, func()) {
+		mockAPI := &mocks.TbAPIMock{
+			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+
+				return &tbapi.APIResponse{Ok: true}, nil
+			},
+			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+
+				switch v := c.(type) {
+				case tbapi.MessageConfig:
+					return tbapi.Message{Text: v.Text}, nil
+				case tbapi.EditMessageTextConfig:
+					return tbapi.Message{Text: v.Text}, nil
+				default:
+					return tbapi.Message{}, nil
+				}
+			},
+		}
+
+		botMock := &mocks.BotMock{
+			RemoveApprovedUserFunc: func(id int64) error {
+				return nil
+			},
+			OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+				return bot.Response{
+					CheckResults: []spamcheck.Response{
+						{Name: "test", Spam: true, Details: "test details"},
+					},
+				}
+			},
+			UpdateSpamFunc: func(msg string) error {
+				return nil
+			},
+		}
+
+		locatorMock := &mocks.LocatorMock{
+			MessageFunc: func(ctx context.Context, msg string) (storage.MsgMeta, bool) {
+				return storage.MsgMeta{}, true
+			},
+			SpamFunc: func(ctx context.Context, userID int64) (storage.SpamData, bool) {
+				return storage.SpamData{}, true
+			},
+			UserNameByIDFunc: func(ctx context.Context, userID int64) string {
+				return "testuser"
+			},
+		}
+
+		adm := &admin{
+			tbAPI:       mockAPI,
+			bot:         botMock,
+			primChatID:  123,
+			adminChatID: 456,
+			locator:     locatorMock,
+			superUsers:  SuperUsers{"superuser"},
+			warnMsg:     "please follow our rules",
+		}
+
+		teardown := func() {}
+		return mockAPI, botMock, adm, teardown
+	}
+
+	verifyDirectReportResults := func(t *testing.T, mockAPI *mocks.TbAPIMock, botMock *mocks.BotMock) {
+
+		require.GreaterOrEqual(t, len(mockAPI.RequestCalls()), 3)
+
+		assert.Equal(t, 999, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
+
+		assert.Equal(t, 789, mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).MessageID)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		adminMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Equal(t, int64(456), adminMsg.ChatID)
+		assert.Contains(t, adminMsg.Text, "original detection results for spammer (222)")
+		assert.Contains(t, adminMsg.Text, "the user banned by")
+
+		require.Len(t, botMock.RemoveApprovedUserCalls(), 1)
+		assert.Equal(t, int64(222), botMock.RemoveApprovedUserCalls()[0].ID)
+
+		require.Len(t, botMock.OnMessageCalls(), 1)
+		assert.Equal(t, "spam message text", botMock.OnMessageCalls()[0].Msg.Text)
+		assert.Equal(t, int64(222), botMock.OnMessageCalls()[0].Msg.From.ID)
+		assert.True(t, botMock.OnMessageCalls()[0].CheckOnly)
+	}
+
+	createReplyUpdate := func(adminName string, adminID int64, spammerName string, spammerID int64, text string) tbapi.Update {
+		return tbapi.Update{
+			Message: &tbapi.Message{
+				MessageID: 789,
+				Chat:      tbapi.Chat{ID: 123},
+				From:      &tbapi.User{UserName: adminName, ID: adminID},
+				ReplyToMessage: &tbapi.Message{
+					MessageID: 999,
+					From:      &tbapi.User{UserName: spammerName, ID: spammerID},
+					Text:      text,
+				},
+			},
+		}
+	}
+
+	t.Run("DirectBanReport", func(t *testing.T) {
+		mockAPI, botMock, adm, teardown := setupTest()
+		defer teardown()
+
+		update := createReplyUpdate("admin", 111, "spammer", 222, "spam message text")
+
+		err := adm.DirectBanReport(update)
+		require.NoError(t, err)
+
+		verifyDirectReportResults(t, mockAPI, botMock)
+
+		assert.Empty(t, botMock.UpdateSpamCalls())
+	})
+
+	t.Run("DirectSpamReport", func(t *testing.T) {
+		mockAPI, botMock, adm, teardown := setupTest()
+		defer teardown()
+
+		update := createReplyUpdate("admin", 111, "spammer", 222, "spam message text")
+
+		err := adm.DirectSpamReport(update)
+		require.NoError(t, err)
+
+		verifyDirectReportResults(t, mockAPI, botMock)
+
+		require.Len(t, botMock.UpdateSpamCalls(), 1)
+		assert.Equal(t, "spam message text", botMock.UpdateSpamCalls()[0].Msg)
+	})
+
+	t.Run("DirectReport_DryMode", func(t *testing.T) {
+		mockAPI, botMock, adm, teardown := setupTest()
+		defer teardown()
+		adm.dry = true
+
+		update := createReplyUpdate("admin", 111, "spammer", 222, "spam message text")
+
+		err := adm.DirectSpamReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		adminMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Equal(t, int64(456), adminMsg.ChatID)
+		assert.Contains(t, adminMsg.Text, "original detection results for spammer (222)")
+
+		assert.Empty(t, mockAPI.RequestCalls())
+		assert.Empty(t, botMock.UpdateSpamCalls())
+	})
+
+	t.Run("DirectWarnReport", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		update := createReplyUpdate("admin", 111, "user", 222, "inappropriate message")
+
+		err := adm.DirectWarnReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.RequestCalls(), 2)
+
+		assert.Equal(t, 999, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
+
+		assert.Equal(t, 789, mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).MessageID)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		warnMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Equal(t, int64(123), warnMsg.ChatID)
+		assert.Contains(t, warnMsg.Text, "warning from admin")
+		assert.Contains(t, warnMsg.Text, "@user please follow our rules")
+	})
+
+	t.Run("DirectWarnReport_UsesActionExecutor", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		actionSpy := &actionExecutorSpy{}
+		adm.actions = actionSpy
+
+		update := createReplyUpdate("admin", 111, "user", 222, "inappropriate message")
+		err := adm.DirectWarnReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, actionSpy.deleteMessageCalls, 2)
+		assert.Equal(t, 999, actionSpy.deleteMessageCalls[0].MsgID)
+		assert.Equal(t, 789, actionSpy.deleteMessageCalls[1].MsgID)
+
+		require.Len(t, actionSpy.warnCalls, 1)
+		assert.Equal(t, int64(123), actionSpy.warnCalls[0].chatID)
+		assert.Equal(t, int64(222), actionSpy.warnCalls[0].subjectID)
+		assert.Equal(t, 999, actionSpy.warnCalls[0].messageID)
+		assert.Contains(t, actionSpy.warnCalls[0].text, "warning from admin")
+		assert.Contains(t, actionSpy.warnCalls[0].text, "@user please follow our rules")
+
+		meta, ok := observability.MetadataFromContext(actionSpy.warnCtxs[0])
+		require.True(t, ok)
+		assert.Equal(t, "warn-123-999", meta.EventID)
+		assert.Equal(t, "corr-warn-999", meta.CorrelationID)
+		assert.Equal(t, "warn:chat:123:msg:999:cmd:789", meta.IdempotencyKey)
+
+		assert.Empty(t, mockAPI.RequestCalls())
+		assert.Empty(t, mockAPI.SendCalls())
+	})
+
+	t.Run("DirectSpamReport_ChannelMessage", func(t *testing.T) {
+		mockAPI, botMock, adm, teardown := setupTest()
+		defer teardown()
+
+		update := tbapi.Update{
+			Message: &tbapi.Message{
+				MessageID: 789,
+				Chat:      tbapi.Chat{ID: 123},
+				From:      &tbapi.User{UserName: "admin", ID: 111},
+				ReplyToMessage: &tbapi.Message{
+					MessageID:  999,
+					From:       &tbapi.User{UserName: "Channel_Bot", ID: 136817688},
+					SenderChat: &tbapi.Chat{ID: 12345, UserName: "spam_channel"},
+					Text:       "spam message text",
+				},
+			},
+		}
+
+		err := adm.DirectSpamReport(update)
+		require.NoError(t, err)
+
+		// verify ban used BanChatSenderChatConfig with channel ID, not BanChatMemberConfig
+		var foundChannelBan bool
+		for _, call := range mockAPI.RequestCalls() {
+			if banCfg, ok := call.C.(tbapi.BanChatSenderChatConfig); ok {
+				foundChannelBan = true
+				assert.Equal(t, int64(12345), banCfg.SenderChatID)
+				assert.Equal(t, int64(123), banCfg.ChatID)
+			}
+		}
+		assert.True(t, foundChannelBan, "expected BanChatSenderChatConfig for channel message")
+
+		for _, call := range mockAPI.RequestCalls() {
+			_, isMemberBan := call.C.(tbapi.BanChatMemberConfig)
+			assert.False(t, isMemberBan, "should not use BanChatMemberConfig for channel message")
+		}
+
+		require.Len(t, botMock.UpdateSpamCalls(), 1)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		adminMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Contains(t, adminMsg.Text, "spam\\_channel")
+		assert.Contains(t, adminMsg.Text, "12345")
+		assert.NotContains(t, adminMsg.Text, "Channel\\_Bot")
+		assert.NotContains(t, adminMsg.Text, "136817688")
+	})
+
+	t.Run("DirectSpamReport_AnonymousAdmin", func(t *testing.T) {
+		mockAPI, botMock, adm, teardown := setupTest()
+		defer teardown()
+
+		update := tbapi.Update{
+			Message: &tbapi.Message{
+				MessageID: 789,
+				Chat:      tbapi.Chat{ID: 123},
+				From:      &tbapi.User{UserName: "admin", ID: 111},
+				ReplyToMessage: &tbapi.Message{
+					MessageID:  999,
+					From:       &tbapi.User{UserName: "GroupLinkedChannel", ID: 136817688},
+					SenderChat: &tbapi.Chat{ID: 123, UserName: "the_group"},
+					Text:       "admin message",
+				},
+			},
+		}
+
+		err := adm.DirectSpamReport(update)
+		require.NoError(t, err)
+
+		for _, call := range mockAPI.RequestCalls() {
+			_, isChannelBan := call.C.(tbapi.BanChatSenderChatConfig)
+			assert.False(t, isChannelBan, "should not use BanChatSenderChatConfig for anonymous admin post")
+		}
+
+		require.Len(t, botMock.UpdateSpamCalls(), 1)
+	})
+
+	t.Run("DirectWarnReport_ChannelMessage", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		update := tbapi.Update{
+			Message: &tbapi.Message{
+				MessageID: 789,
+				Chat:      tbapi.Chat{ID: 123},
+				From:      &tbapi.User{UserName: "admin", ID: 111},
+				ReplyToMessage: &tbapi.Message{
+					MessageID:  999,
+					From:       &tbapi.User{UserName: "Channel_Bot", ID: 136817688},
+					SenderChat: &tbapi.Chat{ID: -100999888, UserName: "spam_channel"},
+					Text:       "inappropriate channel message",
+				},
+			},
+		}
+
+		err := adm.DirectWarnReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		warnMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Equal(t, int64(123), warnMsg.ChatID)
+		assert.Contains(t, warnMsg.Text, "@spam\\_channel")
+		assert.NotContains(t, warnMsg.Text, "@Channel\\_Bot")
+		assert.Contains(t, warnMsg.Text, "please follow our rules")
+	})
+
+	t.Run("DirectWarnReport_ChannelMessage_TitleOnly", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		update := tbapi.Update{
+			Message: &tbapi.Message{
+				MessageID: 789,
+				Chat:      tbapi.Chat{ID: 123},
+				From:      &tbapi.User{UserName: "admin", ID: 111},
+				ReplyToMessage: &tbapi.Message{
+					MessageID:  999,
+					From:       &tbapi.User{UserName: "Channel_Bot", ID: 136817688},
+					SenderChat: &tbapi.Chat{ID: -100999888, Title: "Spam Channel"},
+					Text:       "inappropriate channel message",
+				},
+			},
+		}
+
+		err := adm.DirectWarnReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		warnMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Equal(t, int64(123), warnMsg.ChatID)
+
+		assert.Contains(t, warnMsg.Text, "Spam Channel")
+		assert.NotContains(t, warnMsg.Text, "@Spam Channel")
+		assert.NotContains(t, warnMsg.Text, "@Channel")
+		assert.Contains(t, warnMsg.Text, "please follow our rules")
+	})
+
+	t.Run("DirectSpamReport_ChannelMessage_TitleOnly", func(t *testing.T) {
+		mockAPI, botMock, adm, teardown := setupTest()
+		defer teardown()
+
+		update := tbapi.Update{
+			Message: &tbapi.Message{
+				MessageID: 789,
+				Chat:      tbapi.Chat{ID: 123},
+				From:      &tbapi.User{UserName: "admin", ID: 111},
+				ReplyToMessage: &tbapi.Message{
+					MessageID:  999,
+					From:       &tbapi.User{UserName: "Channel_Bot", ID: 136817688},
+					SenderChat: &tbapi.Chat{ID: 12345, Title: "Spam Channel"},
+					Text:       "spam message text",
+				},
+			},
+		}
+
+		err := adm.DirectSpamReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		adminMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Contains(t, adminMsg.Text, "Spam Channel")
+		assert.Contains(t, adminMsg.Text, "12345")
+		assert.NotContains(t, adminMsg.Text, "Channel\\_Bot")
+
+		require.Len(t, botMock.UpdateSpamCalls(), 1)
+	})
+
+	t.Run("DirectWarnReport_SuperUser", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		update := createReplyUpdate("admin", 111, "superuser", 222, "inappropriate message")
+
+		err := adm.DirectWarnReport(update)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "warn message is from super-user")
+
+		assert.Empty(t, mockAPI.RequestCalls())
+		assert.Empty(t, mockAPI.SendCalls())
+	})
+}
