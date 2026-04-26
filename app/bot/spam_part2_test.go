@@ -37,7 +37,7 @@ func TestSpamFilter_UpdateSpam(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			det := &mocks.DetectorMock{
+			updater := &mocks.SampleUpdaterMock{
 				UpdateSpamFunc: func(msg string) error { return tc.updateErr },
 			}
 
@@ -48,7 +48,7 @@ func TestSpamFilter_UpdateSpam(t *testing.T) {
 				},
 			}
 
-			s := NewSpamFilter(det, SpamConfig{
+			s := NewSpamFilterWithRoles(nil, nil, updater, nil, SpamConfig{
 				SamplesStore: samplesStore,
 				DictStore:    dictStore,
 				GroupID:      "gr1",
@@ -60,8 +60,8 @@ func TestSpamFilter_UpdateSpam(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Len(t, det.UpdateSpamCalls(), 1)
-			assert.Equal(t, strings.ReplaceAll(tc.message, "\n", " "), det.UpdateSpamCalls()[0].Msg)
+			assert.Len(t, updater.UpdateSpamCalls(), 1)
+			assert.Equal(t, strings.ReplaceAll(tc.message, "\n", " "), updater.UpdateSpamCalls()[0].Msg)
 		})
 	}
 }
@@ -88,7 +88,7 @@ func TestSpamFilter_UpdateHam(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			det := &mocks.DetectorMock{
+			updater := &mocks.SampleUpdaterMock{
 				UpdateHamFunc: func(msg string) error { return tc.updateErr },
 			}
 
@@ -99,7 +99,7 @@ func TestSpamFilter_UpdateHam(t *testing.T) {
 				},
 			}
 
-			s := NewSpamFilter(det, SpamConfig{
+			s := NewSpamFilterWithRoles(nil, nil, updater, nil, SpamConfig{
 				SamplesStore: samplesStore,
 				DictStore:    dictStore,
 				GroupID:      "gr1",
@@ -111,8 +111,8 @@ func TestSpamFilter_UpdateHam(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Len(t, det.UpdateHamCalls(), 1)
-			assert.Equal(t, strings.ReplaceAll(tc.message, "\n", " "), det.UpdateHamCalls()[0].Msg)
+			assert.Len(t, updater.UpdateHamCalls(), 1)
+			assert.Equal(t, strings.ReplaceAll(tc.message, "\n", " "), updater.UpdateHamCalls()[0].Msg)
 		})
 	}
 }
@@ -158,7 +158,7 @@ func TestSpamFilter_ApprovedUsers(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			det := &mocks.DetectorMock{
+			approvedUsers := &mocks.ApprovedUsersMock{
 				AddApprovedUserFunc: func(user approved.UserInfo) error {
 					if tc.operationErr != nil {
 						return tc.operationErr
@@ -194,7 +194,7 @@ func TestSpamFilter_ApprovedUsers(t *testing.T) {
 				},
 			}
 
-			s := NewSpamFilter(det, SpamConfig{
+			s := NewSpamFilterWithRoles(nil, nil, nil, approvedUsers, SpamConfig{
 				SamplesStore: samplesStore,
 				DictStore:    dictStore,
 				GroupID:      "gr1",
@@ -268,7 +268,7 @@ func TestSpamFilter_ReloadSamples(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			det := &mocks.DetectorMock{
+			loader := &mocks.SampleLoaderMock{
 				LoadSamplesFunc: func(exclReader io.Reader, spamReaders []io.Reader, hamReaders []io.Reader) (tgspam.LoadResult, error) {
 					return tgspam.LoadResult{SpamSamples: 10, HamSamples: 5}, tc.loadErr
 				},
@@ -295,7 +295,7 @@ func TestSpamFilter_ReloadSamples(t *testing.T) {
 				},
 			}
 
-			s := NewSpamFilter(det, SpamConfig{
+			s := NewSpamFilterWithRoles(nil, loader, nil, nil, SpamConfig{
 				SamplesStore: samplesStore,
 				DictStore:    dictStore,
 				GroupID:      "gr1",
@@ -308,8 +308,8 @@ func TestSpamFilter_ReloadSamples(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			assert.Len(t, det.LoadSamplesCalls(), 1)
-			assert.Len(t, det.LoadStopWordsCalls(), 1)
+			assert.Len(t, loader.LoadSamplesCalls(), 1)
+			assert.Len(t, loader.LoadStopWordsCalls(), 1)
 			assert.Len(t, samplesStore.StatsCalls(), 1)
 		})
 	}
@@ -337,13 +337,7 @@ func TestSpamFilter_RemoveDynamicSample(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			det := &mocks.DetectorMock{
-				LoadSamplesFunc: func(exclReader io.Reader, spamReaders []io.Reader, hamReaders []io.Reader) (tgspam.LoadResult, error) {
-					return tgspam.LoadResult{}, tc.loadErr
-				},
-				LoadStopWordsFunc: func(readers ...io.Reader) (tgspam.LoadResult, error) {
-					return tgspam.LoadResult{}, nil
-				},
+			updater := &mocks.SampleUpdaterMock{
 				RemoveSpamFunc: func(msg string) error {
 					assert.Equal(t, tc.sample, msg)
 					return tc.deleteErr
@@ -362,7 +356,7 @@ func TestSpamFilter_RemoveDynamicSample(t *testing.T) {
 				},
 			}
 
-			s := NewSpamFilter(det, SpamConfig{
+			s := NewSpamFilterWithRoles(nil, nil, updater, nil, SpamConfig{
 				SamplesStore: samplesStore,
 				DictStore:    dictStore,
 				GroupID:      "gr1",
@@ -374,8 +368,8 @@ func TestSpamFilter_RemoveDynamicSample(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Len(t, det.RemoveSpamCalls(), 1)
-			assert.Equal(t, tc.sample, det.RemoveSpamCalls()[0].Msg)
+			assert.Len(t, updater.RemoveSpamCalls(), 1)
+			assert.Equal(t, tc.sample, updater.RemoveSpamCalls()[0].Msg)
 		})
 	}
 }
@@ -403,17 +397,17 @@ func TestSpamFilter_IsApprovedUser(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			det := &mocks.DetectorMock{
+			approvedUsers := &mocks.ApprovedUsersMock{
 				IsApprovedUserFunc: func(userID string) bool {
 					assert.Equal(t, tc.expectedCall, userID)
 					return tc.want
 				},
 			}
 
-			s := NewSpamFilter(det, SpamConfig{})
+			s := NewSpamFilterWithRoles(nil, nil, nil, approvedUsers, SpamConfig{})
 			got := s.IsApprovedUser(tc.userID)
 			assert.Equal(t, tc.want, got)
-			assert.Len(t, det.IsApprovedUserCalls(), 1)
+			assert.Len(t, approvedUsers.IsApprovedUserCalls(), 1)
 		})
 	}
 }

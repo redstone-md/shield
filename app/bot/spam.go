@@ -18,15 +18,21 @@ import (
 	"github.com/umputun/tg-spam/lib/tgspam"
 )
 
-//go:generate moq --out mocks/detector.go --pkg mocks --skip-ensure --with-resets . Detector
-//go:generate moq --out mocks/samples.go --pkg mocks --skip-ensure --with-resets . SamplesStore
-//go:generate moq --out mocks/dictionary.go --pkg mocks --skip-ensure --with-resets . DictStore
+//go:generate go run github.com/matryer/moq@latest --out mocks/message_checker.go --pkg mocks --skip-ensure --with-resets . MessageChecker
+//go:generate go run github.com/matryer/moq@latest --out mocks/sample_loader.go --pkg mocks --skip-ensure --with-resets . SampleLoader
+//go:generate go run github.com/matryer/moq@latest --out mocks/sample_updater.go --pkg mocks --skip-ensure --with-resets . SampleUpdater
+//go:generate go run github.com/matryer/moq@latest --out mocks/approved_users.go --pkg mocks --skip-ensure --with-resets . ApprovedUsers
+//go:generate go run github.com/matryer/moq@latest --out mocks/samples.go --pkg mocks --skip-ensure --with-resets . SamplesStore
+//go:generate go run github.com/matryer/moq@latest --out mocks/dictionary.go --pkg mocks --skip-ensure --with-resets . DictStore
 
 // SpamFilter bot checks if a user is a spammer using lib.Detector
 // Reloads spam samples, stop words and excluded tokens on file change.
 type SpamFilter struct {
-	Detector
-	params SpamConfig
+	checker  MessageChecker
+	loader   SampleLoader
+	updater  SampleUpdater
+	approved ApprovedUsers
+	params   SpamConfig
 }
 
 // SpamConfig is a full set of parameters for spam bot
@@ -40,22 +46,39 @@ type SpamConfig struct {
 	Dry        bool
 }
 
-// Detector is a spam detector interface
+// Detector is a full detector interface used by production wiring.
 type Detector interface {
+	MessageChecker
+	SampleLoader
+	SampleUpdater
+	ApprovedUsers
+}
+
+// MessageChecker checks a message for spam.
+type MessageChecker interface {
 	Check(request spamcheck.Request) (spam bool, cr []spamcheck.Response)
+}
+
+// SampleLoader reloads detector samples and stop words.
+type SampleLoader interface {
 	LoadSamples(exclReader io.Reader, spamReaders, hamReaders []io.Reader) (tgspam.LoadResult, error)
 	LoadStopWords(readers ...io.Reader) (tgspam.LoadResult, error)
+}
+
+// SampleUpdater updates detector training samples.
+type SampleUpdater interface {
 	UpdateSpam(msg string) error
 	UpdateHam(msg string) error
 	RemoveHam(msg string) error
 	RemoveSpam(msg string) error
+}
+
+// ApprovedUsers manages detector approved users.
+type ApprovedUsers interface {
 	AddApprovedUser(user approved.UserInfo) error
 	RemoveApprovedUser(id string) error
 	ApprovedUsers() (res []approved.UserInfo)
 	IsApprovedUser(userID string) bool
-	GetLuaPluginNames() []string
-	UpdateConfig(cfg tgspam.Config)
-	ReplaceMetaChecks(mc ...tgspam.MetaCheck)
 }
 
 // SamplesStore is a storage for spam samples
@@ -70,9 +93,24 @@ type DictStore interface {
 	Reader(ctx context.Context, t storage.DictionaryType) (io.ReadCloser, error)
 }
 
-// NewSpamFilter creates new spam filter
-func NewSpamFilter(detector Detector, params SpamConfig) *SpamFilter {
-	return &SpamFilter{Detector: detector, params: params}
+// NewSpamFilter creates new spam filter.
+func NewSpamFilter(detector MessageChecker, params SpamConfig) *SpamFilter {
+	res := NewSpamFilterWithRoles(detector, nil, nil, nil, params)
+	if loader, ok := detector.(SampleLoader); ok {
+		res.loader = loader
+	}
+	if updater, ok := detector.(SampleUpdater); ok {
+		res.updater = updater
+	}
+	if approved, ok := detector.(ApprovedUsers); ok {
+		res.approved = approved
+	}
+	return res
+}
+
+// NewSpamFilterWithRoles creates a spam filter from role-specific detector dependencies.
+func NewSpamFilterWithRoles(checker MessageChecker, loader SampleLoader, updater SampleUpdater, approved ApprovedUsers, params SpamConfig) *SpamFilter {
+	return &SpamFilter{checker: checker, loader: loader, updater: updater, approved: approved, params: params}
 }
 
 // OnMessage checks if user already approved and if not checks if user is a spammer
@@ -157,7 +195,7 @@ func (s *SpamFilter) OnMessageWithContext(ctx context.Context, msg Message, chec
 			}
 		}
 	}
-	isSpam, checkResults := s.Check(spamReq)
+	isSpam, checkResults := s.checker.Check(spamReq)
 	crs := make([]string, 0, len(checkResults))
 	for _, cr := range checkResults {
 		crs = append(crs, fmt.Sprintf("{name: %s, spam: %v, details: %s}", cr.Name, cr.Spam, cr.Details))
@@ -204,7 +242,10 @@ func spamVerdictText(results []spamcheck.Response, fallback string) string {
 func (s *SpamFilter) UpdateSpam(msg string) error {
 	cleanMsg := strings.ReplaceAll(msg, "\n", " ")
 	log.Printf("[DEBUG] update spam samples with %q", cleanMsg)
-	if err := s.Detector.UpdateSpam(cleanMsg); err != nil {
+	if s.updater == nil {
+		return fmt.Errorf("sample updater not configured")
+	}
+	if err := s.updater.UpdateSpam(cleanMsg); err != nil {
 		return fmt.Errorf("can't update spam samples: %w", err)
 	}
 	log.Printf("[INFO] updated spam samples with %q", cleanMsg)
@@ -215,7 +256,10 @@ func (s *SpamFilter) UpdateSpam(msg string) error {
 func (s *SpamFilter) UpdateHam(msg string) error {
 	cleanMsg := strings.ReplaceAll(msg, "\n", " ")
 	log.Printf("[DEBUG] update ham samples with %q", cleanMsg)
-	if err := s.Detector.UpdateHam(cleanMsg); err != nil {
+	if s.updater == nil {
+		return fmt.Errorf("sample updater not configured")
+	}
+	if err := s.updater.UpdateHam(cleanMsg); err != nil {
 		return fmt.Errorf("can't update ham samples: %w", err)
 	}
 	log.Printf("[INFO] updated ham samples with %q", cleanMsg)
@@ -224,13 +268,16 @@ func (s *SpamFilter) UpdateHam(msg string) error {
 
 // IsApprovedUser checks if user is in the list of approved users
 func (s *SpamFilter) IsApprovedUser(userID int64) bool {
-	return s.Detector.IsApprovedUser(fmt.Sprintf("%d", userID))
+	return s.approved != nil && s.approved.IsApprovedUser(fmt.Sprintf("%d", userID))
 }
 
 // AddApprovedUser adds users to the list of approved users, to both the detector and the storage
 func (s *SpamFilter) AddApprovedUser(id int64, name string) error {
 	log.Printf("[INFO] add aproved user: id:%d, name:%q", id, name)
-	if err := s.Detector.AddApprovedUser(approved.UserInfo{UserID: fmt.Sprintf("%d", id), UserName: name}); err != nil {
+	if s.approved == nil {
+		return fmt.Errorf("approved users store not configured")
+	}
+	if err := s.approved.AddApprovedUser(approved.UserInfo{UserID: fmt.Sprintf("%d", id), UserName: name}); err != nil {
 		return fmt.Errorf("failed to write approved user to storage: %w", err)
 	}
 	return nil
@@ -239,7 +286,10 @@ func (s *SpamFilter) AddApprovedUser(id int64, name string) error {
 // RemoveApprovedUser removes users from the list of approved users in both the detector and the storage
 func (s *SpamFilter) RemoveApprovedUser(id int64) error {
 	log.Printf("[INFO] remove aproved user: %d", id)
-	if err := s.Detector.RemoveApprovedUser(fmt.Sprintf("%d", id)); err != nil {
+	if s.approved == nil {
+		return fmt.Errorf("approved users store not configured")
+	}
+	if err := s.approved.RemoveApprovedUser(fmt.Sprintf("%d", id)); err != nil {
 		return fmt.Errorf("failed to delete approved user from storage: %w", err)
 	}
 	return nil
@@ -248,6 +298,9 @@ func (s *SpamFilter) RemoveApprovedUser(id int64) error {
 // ReloadSamples reloads samples and stop-words
 func (s *SpamFilter) ReloadSamples() (err error) {
 	log.Printf("[DEBUG] reloading samples")
+	if s.loader == nil {
+		return fmt.Errorf("sample loader not configured")
+	}
 
 	var exclReader, spamReader, hamReader, stopWordsReader, spamDynamicReader, hamDynamicReader io.ReadCloser
 	ctx := context.TODO()
@@ -294,13 +347,13 @@ func (s *SpamFilter) ReloadSamples() (err error) {
 	defer exclReader.Close()
 
 	// reload samples and stop-words. note: we don't need reset as LoadSamples and LoadStopWords clear the state first
-	lr, err := s.LoadSamples(exclReader, []io.Reader{spamReader, spamDynamicReader},
+	lr, err := s.loader.LoadSamples(exclReader, []io.Reader{spamReader, spamDynamicReader},
 		[]io.Reader{hamReader, hamDynamicReader})
 	if err != nil {
 		return fmt.Errorf("failed to reload samples: %w", err)
 	}
 
-	ls, err := s.LoadStopWords(stopWordsReader)
+	ls, err := s.loader.LoadStopWords(stopWordsReader)
 	if err != nil {
 		return fmt.Errorf("failed to reload stop words: %w", err)
 	}
@@ -333,7 +386,10 @@ func (s *SpamFilter) DynamicSamples() (spam, ham []string, err error) {
 func (s *SpamFilter) RemoveDynamicSpamSample(sample string) error {
 	cleanMsg := strings.ReplaceAll(sample, "\n", " ")
 	log.Printf("[INFO] remove dynamic spam sample: %q", sample)
-	if err := s.RemoveSpam(cleanMsg); err != nil {
+	if s.updater == nil {
+		return fmt.Errorf("sample updater not configured")
+	}
+	if err := s.updater.RemoveSpam(cleanMsg); err != nil {
 		return fmt.Errorf("can't remove spam sample %q: %w", sample, err)
 	}
 	return nil
@@ -343,7 +399,10 @@ func (s *SpamFilter) RemoveDynamicSpamSample(sample string) error {
 func (s *SpamFilter) RemoveDynamicHamSample(sample string) error {
 	cleanMsg := strings.ReplaceAll(sample, "\n", " ")
 	log.Printf("[INFO] remove dynamic ham sample: %q", sample)
-	if err := s.RemoveHam(cleanMsg); err != nil {
+	if s.updater == nil {
+		return fmt.Errorf("sample updater not configured")
+	}
+	if err := s.updater.RemoveHam(cleanMsg); err != nil {
 		return fmt.Errorf("can't remove hma sample %q: %w", sample, err)
 	}
 	return nil

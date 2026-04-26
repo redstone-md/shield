@@ -17,7 +17,7 @@ type spamFilterOnMessageCase struct {
 }
 
 func runSpamFilterOnMessageCase(t *testing.T, tc spamFilterOnMessageCase) {
-	det := &mocks.DetectorMock{
+	det := &mocks.MessageCheckerMock{
 		CheckFunc: func(req spamcheck.Request) (bool, []spamcheck.Response) {
 			if tc.wantRequest != (spamcheck.Request{}) {
 				assert.Equal(t, tc.wantRequest, req)

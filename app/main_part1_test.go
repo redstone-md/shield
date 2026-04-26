@@ -15,7 +15,6 @@ import (
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/spamcheck"
-	"github.com/umputun/tg-spam/lib/tgspam"
 	"io"
 	"os"
 	"path"
@@ -413,11 +412,10 @@ func TestAssembleRuntimeUsesActiveRuleSet(t *testing.T) {
 	defer assembly.close()
 
 	assert.Equal(t, 2, assembly.ActiveRuleSet.Version)
-	detector, ok := assembly.SpamBot.Detector.(*tgspam.Detector)
-	require.True(t, ok)
-	assert.Equal(t, 4, detector.DuplicateDetection.Threshold)
-	assert.True(t, detector.AbnormalSpacing.Enabled)
-	assert.Equal(t, 3, detector.OpenAIHistorySize)
+	require.NotNil(t, assembly.Detector)
+	assert.Equal(t, 4, assembly.Detector.DuplicateDetection.Threshold)
+	assert.True(t, assembly.Detector.AbnormalSpacing.Enabled)
+	assert.Equal(t, 3, assembly.Detector.OpenAIHistorySize)
 
 	tbAPI := &tbapi.BotAPI{Self: tbapi.User{UserName: "bot"}}
 	listener := assembly.makeTelegramListener(opts, tbAPI)

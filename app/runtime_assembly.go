@@ -20,6 +20,7 @@ import (
 
 type runtimeAssembly struct {
 	DataDB                 *engine.SQL
+	Detector               *tgspam.Detector
 	SpamBot                *bot.SpamFilter
 	SpamLogger             events.SpamLogger
 	LoggerWriter           io.Closer
@@ -133,6 +134,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 
 	assembly := &runtimeAssembly{
 		DataDB:                 dataDB,
+		Detector:               detector,
 		SpamBot:                spamBot,
 		SpamLogger:             spamLogger,
 		LoggerWriter:           loggerWr,
@@ -146,7 +148,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		WorkspacesStore:        workspacesStore,
 		RuleSetService:         ruleSetService,
 		Web: webRuntimeAssembly{
-			Detector:       spamBot.Detector,
+			Detector:       detector,
 			SpamFilter:     spamBot,
 			Locator:        locator,
 			StorageEngine:  dataDB,
@@ -304,11 +306,10 @@ func (a *runtimeAssembly) wireLiveReload(opts options) {
 			a.TelegramListener.ApplyRuleSet(rs)
 		}
 
-		detector, ok := a.SpamBot.Detector.(*tgspam.Detector)
-		if ok {
+		if a.Detector != nil {
 			cfg := buildDetectorConfig(opts, rs)
-			detector.UpdateConfig(cfg)
-			detector.ReplaceMetaChecks(buildMetaChecks(rs, opts.MinMsgLen)...)
+			a.Detector.UpdateConfig(cfg)
+			a.Detector.ReplaceMetaChecks(buildMetaChecks(rs, opts.MinMsgLen)...)
 		}
 
 		a.SpamBot.ApplyRuleSet(rs)

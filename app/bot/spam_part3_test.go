@@ -8,8 +8,6 @@ import (
 	"github.com/umputun/tg-spam/app/bot/mocks"
 	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/lib/spamcheck"
-	"github.com/umputun/tg-spam/lib/tgspam"
 	"testing"
 )
 
@@ -52,7 +50,7 @@ func TestSpamFilter_DynamicSamples(t *testing.T) {
 				},
 			}
 
-			s := NewSpamFilter(&mocks.DetectorMock{}, SpamConfig{
+			s := NewSpamFilterWithRoles(nil, nil, nil, nil, SpamConfig{
 				SamplesStore: samplesStore,
 			})
 
@@ -112,7 +110,7 @@ func TestSpamFilter_RemoveDynamicSamples(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			det := &mocks.DetectorMock{
+			updater := &mocks.SampleUpdaterMock{
 				RemoveHamFunc: func(msg string) error {
 					assert.Equal(t, tc.sample, msg)
 					return tc.deleteErr
@@ -127,7 +125,7 @@ func TestSpamFilter_RemoveDynamicSamples(t *testing.T) {
 
 			dictStore := &mocks.DictStoreMock{}
 
-			s := NewSpamFilter(det, SpamConfig{
+			s := NewSpamFilterWithRoles(nil, nil, updater, nil, SpamConfig{
 				SamplesStore: samplesStore,
 				DictStore:    dictStore,
 				GroupID:      "gr1",
@@ -147,26 +145,19 @@ func TestSpamFilter_RemoveDynamicSamples(t *testing.T) {
 			}
 			require.NoError(t, err)
 			if tc.sampleType == "spam" {
-				assert.Len(t, det.RemoveSpamCalls(), 1)
-				assert.Equal(t, tc.sample, det.RemoveSpamCalls()[0].Msg)
+				assert.Len(t, updater.RemoveSpamCalls(), 1)
+				assert.Equal(t, tc.sample, updater.RemoveSpamCalls()[0].Msg)
 			}
 			if tc.sampleType == "ham" {
-				assert.Len(t, det.RemoveHamCalls(), 1)
-				assert.Equal(t, tc.sample, det.RemoveHamCalls()[0].Msg)
+				assert.Len(t, updater.RemoveHamCalls(), 1)
+				assert.Equal(t, tc.sample, updater.RemoveHamCalls()[0].Msg)
 			}
 		})
 	}
 }
 
 func TestSpamFilter_ApplyRuleSet(t *testing.T) {
-	det := &mocks.DetectorMock{
-		CheckFunc: func(request spamcheck.Request) (bool, []spamcheck.Response) {
-			return false, nil
-		},
-		UpdateConfigFunc:      func(cfg tgspam.Config) {},
-		ReplaceMetaChecksFunc: func(mc ...tgspam.MetaCheck) {},
-	}
-	sf := NewSpamFilter(det, SpamConfig{Dry: false})
+	sf := NewSpamFilterWithRoles(nil, nil, nil, nil, SpamConfig{Dry: false})
 	assert.False(t, sf.params.Dry)
 
 	sf.ApplyRuleSet(rules.RuleSet{
