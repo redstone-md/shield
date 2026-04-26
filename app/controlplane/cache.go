@@ -64,3 +64,11 @@ func (c *memoryCache) Invalidate(ctx context.Context, workspaceID string) {
 
 	c.invalidated[workspaceID] = time.Now()
 }
+
+func (c *memoryCache) InvalidateAll(ctx context.Context) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.ruleSets = make(map[string]cachedRuleSet)
+	c.invalidated = make(map[string]time.Time)
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
@@ -12,32 +13,40 @@ import (
 
 type RuleSetService struct {
 	store       *storage.RuleSets
+	cache       RuleSetCache
 	mu          sync.RWMutex
-	cached      rules.RuleSet
 	subscribers []func(rules.RuleSet)
 }
 
+type RuleSetCache interface {
+	Get(ctx context.Context, workspaceID string) (rules.RuleSet, bool)
+	Set(ctx context.Context, workspaceID string, ruleSet rules.RuleSet)
+	Invalidate(ctx context.Context, workspaceID string)
+	InvalidateAll(ctx context.Context)
+}
+
 func NewRuleSetService(store *storage.RuleSets) *RuleSetService {
-	return &RuleSetService{store: store}
+	return NewRuleSetServiceWithCache(store, newMemoryCache(5*time.Minute))
+}
+
+func NewRuleSetServiceWithCache(store *storage.RuleSets, cache RuleSetCache) *RuleSetService {
+	if cache == nil {
+		cache = newMemoryCache(5 * time.Minute)
+	}
+	return &RuleSetService{store: store, cache: cache}
 }
 
 func (s *RuleSetService) Get(ctx context.Context, workspaceID string) (rules.RuleSet, error) {
-	s.mu.RLock()
-	if s.cached.WorkspaceID == workspaceID && s.cached.Version > 0 {
-		cached := s.cached
-		s.mu.RUnlock()
+	if cached, ok := s.cache.Get(ctx, workspaceID); ok {
 		return cached, nil
 	}
-	s.mu.RUnlock()
 
 	rs, err := s.store.Active(ctx, workspaceID)
 	if err != nil {
 		return rules.RuleSet{}, fmt.Errorf("failed to load active rule set: %w", err)
 	}
 
-	s.mu.Lock()
-	s.cached = rs
-	s.mu.Unlock()
+	s.cache.Set(ctx, workspaceID, rs)
 	return rs, nil
 }
 
@@ -55,9 +64,7 @@ func (s *RuleSetService) Update(ctx context.Context, workspaceID string, source 
 		return rules.RuleSet{}, fmt.Errorf("failed to reload rule set after update (version %d): %w", newVersion, err)
 	}
 
-	s.mu.Lock()
-	s.cached = updated
-	s.mu.Unlock()
+	s.cache.Invalidate(ctx, workspaceID)
 
 	s.notify(updated)
 	log.Printf("[INFO] rule set updated: workspace=%s version=%d source=%s", workspaceID, updated.Version, source)
@@ -71,9 +78,7 @@ func (s *RuleSetService) OnChange(fn func(rules.RuleSet)) {
 }
 
 func (s *RuleSetService) Invalidate() {
-	s.mu.Lock()
-	s.cached = rules.RuleSet{}
-	s.mu.Unlock()
+	s.cache.InvalidateAll(context.Background())
 }
 
 func (s *RuleSetService) notify(rs rules.RuleSet) {

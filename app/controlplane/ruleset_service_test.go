@@ -78,6 +78,57 @@ func TestRuleSetService_Update(t *testing.T) {
 	assert.Equal(t, 2, cached.Version, "cache should be updated after Update")
 }
 
+func TestRuleSetService_UsesCacheAndInvalidatesOnUpdate(t *testing.T) {
+	db, err := engine.NewSqlite(":memory:", "gr1")
+	require.NoError(t, err)
+	defer db.Close()
+
+	store, err := storage.NewRuleSets(context.Background(), db)
+	require.NoError(t, err)
+
+	_, err = store.EnsureBootstrap(context.Background(), rules.RuleSet{
+		WorkspaceID: "gr1",
+		Source:      "bootstrap",
+		Meta:        rules.MetaRules{LinksLimit: 1},
+	})
+	require.NoError(t, err)
+
+	cache := newMemoryCache(time.Hour)
+	svc := NewRuleSetServiceWithCache(store, cache)
+
+	first, err := svc.Get(context.Background(), "gr1")
+	require.NoError(t, err)
+	assert.Equal(t, 1, first.Version)
+
+	_, err = store.Update(context.Background(), rules.RuleSet{
+		WorkspaceID: "gr1",
+		Source:      "external",
+		Meta:        rules.MetaRules{LinksLimit: 9},
+	})
+	require.NoError(t, err)
+
+	cached, err := svc.Get(context.Background(), "gr1")
+	require.NoError(t, err)
+	assert.Equal(t, 1, cached.Version, "service should keep serving cached active rules until invalidated")
+	assert.Equal(t, 1, cached.Meta.LinksLimit)
+
+	svc.Invalidate()
+	reloaded, err := svc.Get(context.Background(), "gr1")
+	require.NoError(t, err)
+	assert.Equal(t, 2, reloaded.Version)
+	assert.Equal(t, 9, reloaded.Meta.LinksLimit)
+
+	_, err = svc.Update(context.Background(), "gr1", "api", rules.RuleSet{
+		Meta: rules.MetaRules{LinksLimit: 11},
+	})
+	require.NoError(t, err)
+
+	afterUpdate, err := svc.Get(context.Background(), "gr1")
+	require.NoError(t, err)
+	assert.Equal(t, 3, afterUpdate.Version)
+	assert.Equal(t, 11, afterUpdate.Meta.LinksLimit)
+}
+
 func TestRuleSetService_OnChange(t *testing.T) {
 	db, err := engine.NewSqlite(":memory:", "gr1")
 	require.NoError(t, err)

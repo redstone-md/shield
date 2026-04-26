@@ -425,3 +425,74 @@ func TestAssembleRuntimeUsesActiveRuleSet(t *testing.T) {
 	assert.Equal(t, 5, listener.ReportConfig.Threshold)
 	assert.Equal(t, 6, listener.ReportConfig.AutoBanThreshold)
 }
+
+func TestRuleSetServiceUpdateAppliesRuntimeWithoutRestart(t *testing.T) {
+	ctx := t.Context()
+	tmpDir := t.TempDir()
+
+	var opts options
+	opts.InstanceID = "gr1"
+	opts.DataBaseURL = fmt.Sprintf("sqlite://%s", path.Join(tmpDir, "tg-spam.db"))
+	opts.Files.SamplesDataPath = tmpDir
+	opts.Files.DynamicDataPath = tmpDir
+	opts.Moderation.FirstStrike = 30 * time.Minute
+	opts.Moderation.SecondStrike = 6 * time.Hour
+	opts.Report.Threshold = 2
+	opts.Report.AutoBanThreshold = 3
+	opts.Meta.LinksLimit = 1
+	opts.Duplicates.Threshold = 2
+	opts.Duplicates.Window = time.Minute
+	opts.Dry = false
+	opts.SoftBan = false
+
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, "spam-samples.txt"), []byte("spam1\n"), 0o600))
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, "ham-samples.txt"), []byte("ham1\n"), 0o600))
+
+	assembly, err := assembleRuntime(ctx, opts)
+	require.NoError(t, err)
+	defer assembly.close()
+
+	tbAPI := &tbapi.BotAPI{Self: tbapi.User{UserName: "bot"}}
+	listener := assembly.makeTelegramListener(opts, tbAPI)
+	assembly.wireLiveReload(opts)
+
+	require.Equal(t, 1, assembly.ActiveRuleSet.Version)
+	assert.Equal(t, 30*time.Minute, listener.ModerationConfig.FirstStrike)
+	assert.False(t, listener.Dry)
+	assert.Equal(t, 2, listener.ReportConfig.Threshold)
+	assert.Equal(t, 2, assembly.Detector.DuplicateDetection.Threshold)
+
+	updated, err := assembly.RuleSetService.Update(ctx, opts.InstanceID, "api", rules.RuleSet{
+		Meta: rules.MetaRules{LinksLimit: 7},
+		Duplicates: rules.DuplicateRules{
+			Threshold: 9,
+			Window:    2 * time.Minute,
+		},
+		Moderation: rules.ModerationRules{
+			FirstStrike:  10 * time.Minute,
+			SecondStrike: time.Hour,
+			SoftBan:      true,
+			DryRun:       true,
+		},
+		Reports: rules.ReportRules{
+			Enabled:          true,
+			Threshold:        5,
+			AutoBanThreshold: 6,
+			RateLimit:        4,
+			RatePeriod:       2 * time.Minute,
+		},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, 2, updated.Version)
+	assert.Equal(t, 2, assembly.ActiveRuleSet.Version)
+	assert.Equal(t, 10*time.Minute, listener.ModerationConfig.FirstStrike)
+	assert.Equal(t, time.Hour, listener.ModerationConfig.SecondStrike)
+	assert.True(t, listener.SoftBanMode)
+	assert.True(t, listener.Dry)
+	assert.Equal(t, 5, listener.ReportConfig.Threshold)
+	assert.Equal(t, 6, listener.ReportConfig.AutoBanThreshold)
+	assert.Equal(t, 2, listener.RuleSetVersion)
+	assert.Equal(t, 9, assembly.Detector.DuplicateDetection.Threshold)
+	assert.Equal(t, 2*time.Minute, assembly.Detector.DuplicateDetection.Window)
+}

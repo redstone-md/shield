@@ -17,6 +17,14 @@
 - [ ] Добавить acceptance-тесты на обновление правил без рестарта воркера и на почти мгновенное применение обновлений в runtime.
 - [ ] Обновить документацию по admin flows и runtime config lifecycle.
 
+## Прогресс
+
+- [x] Создан `app/controlplane.RuleSetService` для чтения и обновления активного `RuleSet`.
+- [x] Добавлены `GET /api/rules` и `PUT /api/rules` поверх `RuleSetService`.
+- [x] Подключен in-process cache contract для `RuleSetService` с invalidation после обновления.
+- [x] Runtime подписан на изменения `RuleSetService` и применяет новые detector/listener/spam-filter настройки без рестарта.
+- [x] Добавлена acceptance-проверка: `RuleSetService.Update` обновляет listener и detector в текущем процессе.
+
 ## Критерий завершения
 
 - [ ] Администратор меняет правила через web API/UI без редактирования env и без перезапуска процесса.
