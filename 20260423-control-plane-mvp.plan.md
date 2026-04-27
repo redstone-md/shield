@@ -58,7 +58,7 @@
 - Each slice: unit tests + integration test through webapi
 - Slice 1+2 combined: acceptance test — update RuleSet via API, verify new events use updated rules without restart
 
-## Current iteration — finish Slice 1+2 tracer bullet
+## Current iteration — Slice 1+2 tracer bullet
 
 1. [x] Replace the ad-hoc single cached rule set in `RuleSetService` with the existing in-process cache contract.
 2. [x] Add focused tests for cache hit, invalidation, and update notification.
@@ -97,3 +97,18 @@ Focused verification passed:
 
 - `go test ./app/controlplane ./app/webapi ./app`
 - `make test`
+
+## Current iteration — Slice 5 approved users under control plane
+
+1. [x] Add `ApprovedUsersService` in `app/controlplane/approved_users_service.go` with `List/Add/Remove` + `OnChange` pub/sub.
+2. [x] Add `ApprovedUsersProvider` interface in `app/webapi` with `List/Add/Remove` methods and `detectorApprovedUsersAdapter` fallback.
+3. [x] Refactor webapi `/users` handlers to route through `ApprovedUsersProvider` instead of calling Detector directly.
+4. [x] Wire `ApprovedUsersService` in runtime assembly and pass to webapi Config.
+5. [x] Add unit tests for `ApprovedUsersService`: Add, Remove, validation, OnChange, List error.
+6. [x] Update existing webapi test helpers for new `func(ctx, UserInfo) error` signature.
+7. [x] Run focused tests and `make test`.
+
+Focused verification passed:
+
+- `go test ./app/controlplane ./app/webapi ./app`
+- `make test` (pre-existing race in `lib/tgspam` unrelated)

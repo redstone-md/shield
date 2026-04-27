@@ -35,18 +35,20 @@ type runtimeAssembly struct {
 	WorkspaceService       *controlplane.WorkspaceService
 	RoleAuthorizer         *controlplane.RoleAuthorizer
 	RuleSetService         *controlplane.RuleSetService
+	ApprovedUsersService  *controlplane.ApprovedUsersService
 	TelegramListener       *events.TelegramListener
 	Web                    webRuntimeAssembly
 }
 
 type webRuntimeAssembly struct {
-	Detector       webapi.Detector
-	SpamFilter     webapi.SpamFilter
-	Locator        webapi.Locator
-	StorageEngine  webapi.StorageEngine
-	RuleSetService *controlplane.RuleSetService
-	RoleAuthorizer *controlplane.RoleAuthorizer
-	BotUsername    string
+	Detector              webapi.Detector
+	SpamFilter            webapi.SpamFilter
+	Locator               webapi.Locator
+	StorageEngine         webapi.StorageEngine
+	RuleSetService        *controlplane.RuleSetService
+	ApprovedUsersService  *controlplane.ApprovedUsersService
+	RoleAuthorizer        *controlplane.RoleAuthorizer
+	BotUsername           string
 }
 
 func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error) {
@@ -99,7 +101,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	if err != nil {
 		return nil, err
 	}
-	_ = approvedUsersStore
+	approvedUsersSvc := controlplane.NewApprovedUsersService(approvedUsersStore, detector)
 	log.Printf("[DEBUG] approved users loaded: %d", count)
 
 	locator, err := storage.NewLocator(ctx, opts.HistoryDuration, opts.HistoryMinSize, dataDB)
@@ -160,13 +162,15 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		WorkspaceService:       workspaceService,
 		RoleAuthorizer:         roleAuthorizer,
 		RuleSetService:         ruleSetService,
+		ApprovedUsersService: approvedUsersSvc,
 		Web: webRuntimeAssembly{
-			Detector:       detector,
-			SpamFilter:     spamBot,
-			Locator:        locator,
-			StorageEngine:  dataDB,
-			RuleSetService: ruleSetService,
-			RoleAuthorizer: roleAuthorizer,
+			Detector:            detector,
+			SpamFilter:          spamBot,
+			Locator:             locator,
+			StorageEngine:       dataDB,
+			RuleSetService:      ruleSetService,
+			RoleAuthorizer:      roleAuthorizer,
+			ApprovedUsersService: approvedUsersSvc,
 		},
 	}
 

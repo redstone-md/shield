@@ -27,6 +27,8 @@
 - [x] Добавлен `app/controlplane.WorkspaceService` с ролями `owner`, `admin`, `viewer`.
 - [x] Runtime bootstraps single workspace из `InstanceID` и owner membership для текущего Basic Auth пользователя.
 - [x] Добавлен role-based authorizer для control plane endpoints: viewer получает read-only доступ, admin/owner получают write access.
+- [x] Добавлен `app/controlplane.ApprovedUsersService`: обёртка над storage/detector с pub/sub для cache invalidation.
+- [x] Webapi `/users` handlers переведены с прямых вызовов `Detector.AddApprovedUser/RemoveApprovedUser/ApprovedUsers` на `ApprovedUsersProvider` (сервис или adapter fallback).
 
 ## Критерий завершения
 

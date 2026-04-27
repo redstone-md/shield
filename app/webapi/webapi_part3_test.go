@@ -198,6 +198,7 @@ func TestServer_updateApprovedUsersHandler(t *testing.T) {
 	}
 
 	server := NewServer(Config{Detector: mockDetector, Locator: locatorMock})
+	addFn := func(_ context.Context, ui approved.UserInfo) error { return server.Detector.AddApprovedUser(ui) }
 
 	t.Run("successful update by name", func(t *testing.T) {
 		mockDetector.ResetCalls()
@@ -207,7 +208,7 @@ func TestServer_updateApprovedUsersHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(server.updateApprovedUsersHandler(server.Detector.AddApprovedUser))
+		handler := http.HandlerFunc(server.updateApprovedUsersHandler(addFn))
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code, "handler returned wrong status code")
@@ -240,7 +241,7 @@ func TestServer_updateApprovedUsersHandler(t *testing.T) {
 		req.Form.Set("user_name", "user1")
 
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(server.updateApprovedUsersHandler(server.Detector.AddApprovedUser))
+		handler := http.HandlerFunc(server.updateApprovedUsersHandler(addFn))
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code, "handler returned wrong status code")
@@ -262,7 +263,7 @@ func TestServer_updateApprovedUsersHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(server.updateApprovedUsersHandler(server.Detector.AddApprovedUser))
+		handler := http.HandlerFunc(server.updateApprovedUsersHandler(addFn))
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code, "handler returned wrong status code")
@@ -287,7 +288,7 @@ func TestServer_updateApprovedUsersHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(server.updateApprovedUsersHandler(server.Detector.AddApprovedUser))
+		handler := http.HandlerFunc(server.updateApprovedUsersHandler(addFn))
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code, "handler returned wrong status code")

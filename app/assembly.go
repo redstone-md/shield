@@ -196,21 +196,22 @@ func activateServer(ctx context.Context, opts options, web webRuntimeAssembly, d
 	}
 
 	srv := webapi.Server{Config: webapi.Config{
-		ListenAddr:       opts.Server.ListenAddr,
-		Detector:         web.Detector,
-		SpamFilter:       web.SpamFilter,
-		Locator:          web.Locator,
-		DetectedSpam:     detectedSpamStore,
-		Dictionary:       dictionaryStore,
-		StorageEngine:    db, // add database engine for backup functionality
-		DMUsersProvider:  dmUsersProvider,
-		RuleSetProvider:  web.RuleSetService,
-		ControlPlaneAuth: web.RoleAuthorizer,
-		AuthPasswd:       authPassswd,
-		AuthHash:         opts.Server.AuthHash,
-		Version:          revision,
-		Dbg:              opts.Dbg,
-		Settings:         settings,
+		ListenAddr:           opts.Server.ListenAddr,
+		Detector:             web.Detector,
+		SpamFilter:           web.SpamFilter,
+		Locator:              web.Locator,
+		DetectedSpam:         detectedSpamStore,
+		Dictionary:           dictionaryStore,
+		StorageEngine:        db,
+		DMUsersProvider:      dmUsersProvider,
+		RuleSetProvider:      web.RuleSetService,
+		ControlPlaneAuth:     web.RoleAuthorizer,
+		ApprovedUsersProvider: web.ApprovedUsersService,
+		AuthPasswd:           authPassswd,
+		AuthHash:             opts.Server.AuthHash,
+		Version:              revision,
+		Dbg:                  opts.Dbg,
+		Settings:             settings,
 	}}
 
 	go func() {

@@ -5,11 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/app/events"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/app/webapi/mocks"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +12,14 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/umputun/tg-spam/app/events"
+	"github.com/umputun/tg-spam/app/storage"
+	"github.com/umputun/tg-spam/app/webapi/mocks"
+	"github.com/umputun/tg-spam/lib/approved"
 )
 
 func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
@@ -333,7 +336,9 @@ func TestServer_ErrorResponseContentType(t *testing.T) {
 		req := httptest.NewRequest("POST", "/users/add", bytes.NewBuffer(reqBody))
 		rr := httptest.NewRecorder()
 
-		handler := server.updateApprovedUsersHandler(mockDetector.AddApprovedUser)
+		handler := server.updateApprovedUsersHandler(func(_ context.Context, ui approved.UserInfo) error {
+			return mockDetector.AddApprovedUser(ui)
+		})
 		handler(rr, req)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)

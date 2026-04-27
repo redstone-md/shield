@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,8 +18,6 @@ import (
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
-// checkMsgHandler handles POST /check request.
-// it gets message text and user id from request body and returns spam status and check results.
 func (s *Server) checkMsgHandler(w http.ResponseWriter, r *http.Request) {
 	type CheckResultDisplay struct {
 		Spam   bool
@@ -29,14 +28,12 @@ func (s *Server) checkMsgHandler(w http.ResponseWriter, r *http.Request) {
 
 	req := spamcheck.Request{CheckOnly: true}
 	if !isHtmxRequest {
-		// API request
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "can't decode request", "details": err.Error()})
 			observability.Logf(r.Context(), "[WARN] can't decode request: %v", err)
 			return
 		}
 	} else {
-		// for hx-request (HTMX) we need to get the values from the form
 		req.UserID = r.FormValue("user_id")
 		req.UserName = r.FormValue("user_name")
 		req.Msg = r.FormValue("msg")
@@ -44,7 +41,6 @@ func (s *Server) checkMsgHandler(w http.ResponseWriter, r *http.Request) {
 
 	spam, cr := s.Detector.Check(req)
 	if !isHtmxRequest {
-		// for API request return JSON
 		rest.RenderJSON(w, rest.JSON{"spam": spam, "checks": cr})
 		return
 	}
@@ -55,22 +51,13 @@ func (s *Server) checkMsgHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// render result for HTMX request
-	resultDisplay := CheckResultDisplay{
-		Spam:   spam,
-		Checks: cr,
-	}
-
+	resultDisplay := CheckResultDisplay{Spam: spam, Checks: cr}
 	if err := tmpl.ExecuteTemplate(w, "check_results", resultDisplay); err != nil {
 		observability.Logf(r.Context(), "[WARN] can't execute result template: %v", err)
 		http.Error(w, "Error rendering result", http.StatusInternalServerError)
-		return
 	}
 }
 
-// checkIDHandler handles GET /check/{user_id} request.
-// it returns JSON with the status "spam" or "ham" for a given user id.
-// if user is spammer, it also returns check results.
 func (s *Server) checkIDHandler(w http.ResponseWriter, r *http.Request) {
 	type info struct {
 		UserName  string              `json:"user_name,omitempty"`
@@ -81,9 +68,7 @@ func (s *Server) checkIDHandler(w http.ResponseWriter, r *http.Request) {
 	resp := struct {
 		Status string `json:"status"`
 		Info   *info  `json:"info,omitempty"`
-	}{
-		Status: "ham",
-	}
+	}{Status: "ham"}
 
 	userID, err := strconv.ParseInt(r.PathValue("user_id"), 10, 64)
 	if err != nil {
@@ -108,7 +93,6 @@ func (s *Server) checkIDHandler(w http.ResponseWriter, r *http.Request) {
 	rest.RenderJSON(w, resp)
 }
 
-// getDynamicSamplesHandler handles GET /samples request. It returns dynamic samples both for spam and ham.
 func (s *Server) getDynamicSamplesHandler(w http.ResponseWriter, _ *http.Request) {
 	spam, ham, err := s.SpamFilter.DynamicSamples()
 	if err != nil {
@@ -118,8 +102,6 @@ func (s *Server) getDynamicSamplesHandler(w http.ResponseWriter, _ *http.Request
 	rest.RenderJSON(w, rest.JSON{"spam": spam, "ham": ham})
 }
 
-// downloadSampleHandler handles GET /download/spam|ham request.
-// It returns dynamic samples both for spam and ham.
 func (s *Server) downloadSampleHandler(pickFn func(spam, ham []string) ([]string, string)) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		spam, ham, err := s.SpamFilter.DynamicSamples()
@@ -137,15 +119,12 @@ func (s *Server) downloadSampleHandler(pickFn func(spam, ham []string) ([]string
 	}
 }
 
-// updateSampleHandler handles POST /update/spam|ham request. It updates dynamic samples both for spam and ham.
 func (s *Server) updateSampleHandler(updFn func(msg string) error) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Msg string `json:"msg"`
 		}
-
 		isHtmxRequest := r.Header.Get("HX-Request") == "true"
-
 		if isHtmxRequest {
 			req.Msg = r.FormValue("msg")
 		} else {
@@ -154,13 +133,10 @@ func (s *Server) updateSampleHandler(updFn func(msg string) error) func(w http.R
 				return
 			}
 		}
-
-		err := updFn(req.Msg)
-		if err != nil {
+		if err := updFn(req.Msg); err != nil {
 			_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't update samples", "details": err.Error()})
 			return
 		}
-
 		if isHtmxRequest {
 			s.renderSamples(w, "samples_list")
 		} else {
@@ -169,7 +145,6 @@ func (s *Server) updateSampleHandler(updFn func(msg string) error) func(w http.R
 	}
 }
 
-// deleteSampleHandler handles DELETE /samples request. It deletes dynamic samples both for spam and ham.
 func (s *Server) deleteSampleHandler(delFn func(msg string) error) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -184,12 +159,10 @@ func (s *Server) deleteSampleHandler(delFn func(msg string) error) func(w http.R
 				return
 			}
 		}
-
 		if err := delFn(req.Msg); err != nil {
 			_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't delete sample", "details": err.Error()})
 			return
 		}
-
 		if isHtmxRequest {
 			s.renderSamples(w, "samples_list")
 		} else {
@@ -198,7 +171,6 @@ func (s *Server) deleteSampleHandler(delFn func(msg string) error) func(w http.R
 	}
 }
 
-// reloadDynamicSamplesHandler handles PUT /samples request. It reloads dynamic samples from db storage.
 func (s *Server) reloadDynamicSamplesHandler(w http.ResponseWriter, _ *http.Request) {
 	if err := s.SpamFilter.ReloadSamples(); err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't reload samples", "details": err.Error()})
@@ -207,8 +179,7 @@ func (s *Server) reloadDynamicSamplesHandler(w http.ResponseWriter, _ *http.Requ
 	rest.RenderJSON(w, rest.JSON{"reloaded": true})
 }
 
-// updateApprovedUsersHandler handles POST /users/add and /users/delete requests, it adds or removes users from approved list.
-func (s *Server) updateApprovedUsersHandler(updFn func(ui approved.UserInfo) error) func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) updateApprovedUsersHandler(updFn func(ctx context.Context, ui approved.UserInfo) error) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		req := approved.UserInfo{}
 		isHtmxRequest := r.Header.Get("HX-Request") == "true"
@@ -222,7 +193,6 @@ func (s *Server) updateApprovedUsersHandler(updFn func(ui approved.UserInfo) err
 			}
 		}
 
-		// try to get userID from request and fallback to userName lookup if it's empty
 		if req.UserID == "" {
 			req.UserID = strconv.FormatInt(s.Locator.UserIDByName(r.Context(), req.UserName), 10)
 		}
@@ -237,15 +207,14 @@ func (s *Server) updateApprovedUsersHandler(updFn func(ui approved.UserInfo) err
 			return
 		}
 
-		// add or remove user from the approved list of detector
-		if err := updFn(req); err != nil {
+		if err := updFn(r.Context(), req); err != nil {
 			_ = rest.EncodeJSON(w, http.StatusInternalServerError,
 				rest.JSON{"error": "can't update approved users", "details": err.Error()})
 			return
 		}
 
 		if isHtmxRequest {
-			users := s.Detector.ApprovedUsers()
+			users, _ := s.approvedUsers().List(r.Context())
 			tmplData := struct {
 				ApprovedUsers      []approved.UserInfo
 				TotalApprovedUsers int
@@ -253,32 +222,51 @@ func (s *Server) updateApprovedUsersHandler(updFn func(ui approved.UserInfo) err
 				ApprovedUsers:      users,
 				TotalApprovedUsers: len(users),
 			}
-
 			if err := tmpl.ExecuteTemplate(w, "users_list", tmplData); err != nil {
 				http.Error(w, "Error executing template", http.StatusInternalServerError)
 				return
 			}
-
 		} else {
 			rest.RenderJSON(w, rest.JSON{"updated": true, "user_id": req.UserID, "user_name": req.UserName})
 		}
 	}
 }
 
-// removeApprovedUser is adopter for updateApprovedUsersHandler updFn
-func (s *Server) removeApprovedUser(req approved.UserInfo) error {
-	if err := s.Detector.RemoveApprovedUser(req.UserID); err != nil {
+func (s *Server) removeApprovedUserAdapter(ctx context.Context, req approved.UserInfo) error {
+	if err := s.approvedUsers().Remove(ctx, req.UserID); err != nil {
 		return fmt.Errorf("failed to remove approved user %s: %w", req.UserID, err)
 	}
 	return nil
 }
 
-// getApprovedUsersHandler handles GET /users request. It returns list of approved users.
-func (s *Server) getApprovedUsersHandler(w http.ResponseWriter, _ *http.Request) {
-	rest.RenderJSON(w, rest.JSON{"user_ids": s.Detector.ApprovedUsers()})
+func (s *Server) getApprovedUsersHandler(w http.ResponseWriter, r *http.Request) {
+	users, _ := s.approvedUsers().List(r.Context())
+	rest.RenderJSON(w, rest.JSON{"user_ids": users})
 }
 
-// getSettingsHandler returns application settings, including the list of available Lua plugins
+func (s *Server) approvedUsers() ApprovedUsersProvider {
+	if s.ApprovedUsersProvider != nil {
+		return s.ApprovedUsersProvider
+	}
+	return detectorApprovedUsersAdapter{detector: s.Detector}
+}
+
+type detectorApprovedUsersAdapter struct {
+	detector Detector
+}
+
+func (a detectorApprovedUsersAdapter) List(_ context.Context) ([]approved.UserInfo, error) {
+	return a.detector.ApprovedUsers(), nil
+}
+
+func (a detectorApprovedUsersAdapter) Add(_ context.Context, user approved.UserInfo) error {
+	return a.detector.AddApprovedUser(user)
+}
+
+func (a detectorApprovedUsersAdapter) Remove(_ context.Context, id string) error {
+	return a.detector.RemoveApprovedUser(id)
+}
+
 func (s *Server) getSettingsHandler(w http.ResponseWriter, _ *http.Request) {
 	s.Settings.LuaAvailablePlugins = s.Detector.GetLuaPluginNames()
 	rest.RenderJSON(w, s.Settings)
@@ -289,8 +277,7 @@ func (s *Server) getRuleSetHandler(w http.ResponseWriter, r *http.Request) {
 		_ = rest.EncodeJSON(w, http.StatusNotImplemented, rest.JSON{"error": "rule set service not available"})
 		return
 	}
-	workspaceID := s.Settings.InstanceID
-	rs, err := s.RuleSetProvider.Get(r.Context(), workspaceID)
+	rs, err := s.RuleSetProvider.Get(r.Context(), s.Settings.InstanceID)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get rule set", "details": err.Error()})
 		return
@@ -303,15 +290,12 @@ func (s *Server) updateRuleSetHandler(w http.ResponseWriter, r *http.Request) {
 		_ = rest.EncodeJSON(w, http.StatusNotImplemented, rest.JSON{"error": "rule set service not available"})
 		return
 	}
-
 	var rs rules.RuleSet
 	if err := json.NewDecoder(r.Body).Decode(&rs); err != nil {
 		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "can't decode request", "details": err.Error()})
 		return
 	}
-
-	workspaceID := s.Settings.InstanceID
-	updated, err := s.RuleSetProvider.Update(r.Context(), workspaceID, "api", rs)
+	updated, err := s.RuleSetProvider.Update(r.Context(), s.Settings.InstanceID, "api", rs)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't update rule set", "details": err.Error()})
 		return
@@ -319,32 +303,26 @@ func (s *Server) updateRuleSetHandler(w http.ResponseWriter, r *http.Request) {
 	rest.RenderJSON(w, updated)
 }
 
-// getDictionaryEntriesHandler handles GET /dictionary request. It returns stop phrases and ignored words.
 func (s *Server) getDictionaryEntriesHandler(w http.ResponseWriter, r *http.Request) {
 	stopPhrases, err := s.Dictionary.Read(r.Context(), storage.DictionaryTypeStopPhrase)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get stop phrases", "details": err.Error()})
 		return
 	}
-
 	ignoredWords, err := s.Dictionary.Read(r.Context(), storage.DictionaryTypeIgnoredWord)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get ignored words", "details": err.Error()})
 		return
 	}
-
 	rest.RenderJSON(w, rest.JSON{"stop_phrases": stopPhrases, "ignored_words": ignoredWords})
 }
 
-// addDictionaryEntryHandler handles POST /dictionary/add request. It adds a stop phrase or ignored word.
 func (s *Server) addDictionaryEntryHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Type string `json:"type"`
 		Data string `json:"data"`
 	}
-
 	isHtmxRequest := r.Header.Get("HX-Request") == "true"
-
 	if isHtmxRequest {
 		req.Type = r.FormValue("type")
 		req.Data = r.FormValue("data")
@@ -381,7 +359,6 @@ func (s *Server) addDictionaryEntryHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// reload samples to apply dictionary changes immediately
 	if err := s.SpamFilter.ReloadSamples(); err != nil {
 		observability.Logf(r.Context(), "[WARN] failed to reload samples after dictionary add: %v", err)
 		if !isHtmxRequest {
@@ -389,7 +366,6 @@ func (s *Server) addDictionaryEntryHandler(w http.ResponseWriter, r *http.Reques
 				rest.JSON{"error": "entry added but reload failed", "details": err.Error()})
 			return
 		}
-		// for HTMX, log but continue rendering (entry was added successfully)
 	}
 
 	if isHtmxRequest {
@@ -399,14 +375,11 @@ func (s *Server) addDictionaryEntryHandler(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// deleteDictionaryEntryHandler handles POST /dictionary/delete request. It deletes an entry by data.
 func (s *Server) deleteDictionaryEntryHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID int64 `json:"id"`
 	}
-
 	isHtmxRequest := r.Header.Get("HX-Request") == "true"
-
 	if isHtmxRequest {
 		idStr := r.FormValue("id")
 		var err error
@@ -428,7 +401,6 @@ func (s *Server) deleteDictionaryEntryHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// reload samples to apply dictionary changes immediately
 	if err := s.SpamFilter.ReloadSamples(); err != nil {
 		observability.Logf(r.Context(), "[WARN] failed to reload samples after dictionary delete: %v", err)
 		if !isHtmxRequest {
@@ -436,7 +408,6 @@ func (s *Server) deleteDictionaryEntryHandler(w http.ResponseWriter, r *http.Req
 				rest.JSON{"error": "entry deleted but reload failed", "details": err.Error()})
 			return
 		}
-		// for HTMX, log but continue rendering (entry was deleted successfully)
 	}
 
 	if isHtmxRequest {

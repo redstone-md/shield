@@ -66,8 +66,9 @@ type Config struct {
 	Dictionary       Dictionary             // dictionary for stop phrases and ignored words
 	StorageEngine    StorageEngine          // database engine access for backups
 	DMUsersProvider  DMUsersProvider        // provider for recent DM users
-	RuleSetProvider  RuleSetProvider        // control plane rule set service
-	ControlPlaneAuth ControlPlaneAuthorizer // role authorizer for control plane endpoints
+	RuleSetProvider       RuleSetProvider        // control plane rule set service
+	ControlPlaneAuth      ControlPlaneAuthorizer // role authorizer for control plane endpoints
+	ApprovedUsersProvider ApprovedUsersProvider  // control plane approved users service
 	AuthPasswd       string                 // basic auth password for user "tg-spam"
 	AuthHash         string                 // basic auth bcrypt hash for user "tg-spam", takes precedence over AuthPasswd
 	Dbg              bool                   // debug mode
@@ -187,6 +188,13 @@ type Dictionary interface {
 // DMUsersProvider provides access to recent DM users for the admin UI
 type DMUsersProvider interface {
 	GetDMUsers() []events.DMUser
+}
+
+// ApprovedUsersProvider provides access to approved users through the control plane service layer.
+type ApprovedUsersProvider interface {
+	List(ctx context.Context) ([]approved.UserInfo, error)
+	Add(ctx context.Context, user approved.UserInfo) error
+	Remove(ctx context.Context, id string) error
 }
 
 // RuleSetProvider provides access to the active rule set and allows runtime updates.
@@ -313,12 +321,10 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 		authApi.HandleFunc("GET /samples", s.getDynamicSamplesHandler)    // get dynamic samples
 		authApi.HandleFunc("PUT /samples", s.reloadDynamicSamplesHandler) // reload samples
 
-		authApi.Mount("/users").Route(func(r *routegroup.Bundle) { // manage approved users
-			// add user to the approved list and storage
-			r.HandleFunc("POST /add", s.updateApprovedUsersHandler(s.Detector.AddApprovedUser))
-			// remove user from an approved list and storage
-			r.HandleFunc("POST /delete", s.updateApprovedUsersHandler(s.removeApprovedUser))
-			// get approved users
+		authApi.Mount("/users").Route(func(r *routegroup.Bundle) {
+			au := s.approvedUsers()
+			r.HandleFunc("POST /add", s.updateApprovedUsersHandler(au.Add))
+			r.HandleFunc("POST /delete", s.updateApprovedUsersHandler(s.removeApprovedUserAdapter))
 			r.HandleFunc("GET /", s.getApprovedUsersHandler)
 		})
 
