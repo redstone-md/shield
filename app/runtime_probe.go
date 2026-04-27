@@ -12,21 +12,21 @@ import (
 )
 
 type runtimeProbe struct {
-	instanceID string
-	revision   string
-	ready      atomic.Bool
+	tenantID string
+	revision string
+	ready    atomic.Bool
 }
 
 type probeResponse struct {
-	Status     string `json:"status"`
-	InstanceID string `json:"instance_id,omitempty"`
-	Revision   string `json:"revision,omitempty"`
+	Status   string `json:"status"`
+	TenantID string `json:"tenant_id,omitempty"`
+	Revision string `json:"revision,omitempty"`
 }
 
-func newRuntimeProbe(instanceID, revision string) *runtimeProbe {
+func newRuntimeProbe(tenantID, revision string) *runtimeProbe {
 	return &runtimeProbe{
-		instanceID: strings.TrimSpace(instanceID),
-		revision:   strings.TrimSpace(revision),
+		tenantID: strings.TrimSpace(tenantID),
+		revision: strings.TrimSpace(revision),
 	}
 }
 
@@ -38,7 +38,7 @@ func (p *runtimeProbe) Handler(ctx context.Context) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		status := http.StatusOK
-		resp := probeResponse{Status: "ok", InstanceID: p.instanceID, Revision: p.revision}
+		resp := probeResponse{Status: "ok", TenantID: p.tenantID, Revision: p.revision}
 		if ctx.Err() != nil {
 			status = http.StatusServiceUnavailable
 			resp.Status = "shutting_down"
@@ -47,7 +47,7 @@ func (p *runtimeProbe) Handler(ctx context.Context) http.Handler {
 	})
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
 		status := http.StatusOK
-		resp := probeResponse{Status: "ready", InstanceID: p.instanceID, Revision: p.revision}
+		resp := probeResponse{Status: "ready", TenantID: p.tenantID, Revision: p.revision}
 		if ctx.Err() != nil || !p.ready.Load() {
 			status = http.StatusServiceUnavailable
 			resp.Status = "not_ready"

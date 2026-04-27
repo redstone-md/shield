@@ -260,7 +260,7 @@ func TestTelegramListener_DuplicateRetryDoesNotRepeatSuccessfulActionOrAudit(t *
 		ActionExecutor: actionSpy,
 		AuditWriter:    auditSpy,
 		Group:          "123",
-		InstanceID:     "tg-spam",
+		TenantID:       "tg-spam",
 		chatID:         123,
 	}
 
@@ -328,7 +328,7 @@ func TestTelegramListener_DuplicateRetryRecoversAfterTelegramActionFailure(t *te
 		ActionExecutor: actionSpy,
 		AuditWriter:    auditSpy,
 		Group:          "123",
-		InstanceID:     "tg-spam",
+		TenantID:       "tg-spam",
 		chatID:         123,
 	}
 

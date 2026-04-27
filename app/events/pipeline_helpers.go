@@ -29,7 +29,7 @@ func (l *TelegramListener) makeIncomingEvent(update tbapi.Update, msg *bot.Messa
 	return moderation.IncomingEvent{
 		EventID:        l.nextEventID(),
 		CorrelationID:  l.currentCorrelationID(),
-		TenantID:       l.InstanceID,
+		TenantID:       l.TenantID,
 		Source:         "telegram.update",
 		UpdateID:       update.UpdateID,
 		ChatID:         msg.ChatID,
@@ -57,11 +57,11 @@ func telegramIdempotencyKey(updateID int, chatID int64, messageID, editedMessage
 
 func (l *TelegramListener) nextEventID() string {
 	seq := atomic.AddUint64(&l.pipeline.eventID, 1)
-	return fmt.Sprintf("evt-%s-%d", strings.TrimSpace(l.InstanceID), seq)
+	return fmt.Sprintf("evt-%s-%d", strings.TrimSpace(l.TenantID), seq)
 }
 
 func (l *TelegramListener) currentCorrelationID() string {
-	return fmt.Sprintf("corr-%s", strings.TrimSpace(l.InstanceID))
+	return fmt.Sprintf("corr-%s", strings.TrimSpace(l.TenantID))
 }
 
 func incomingEventAttributes(msg *bot.Message) map[string]string {

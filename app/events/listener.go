@@ -28,7 +28,7 @@ type TelegramListener struct {
 	SpamLogger       SpamLogger       // logger to save spam to files and db
 	Bot              Bot              // bot to handle messages
 	BotUsername      string           // telegram bot username (without "@" prefix)
-	InstanceID       string           // storage gid / instance id
+	TenantID         string           // storage tenant id
 	Group            string           // can be int64 or public group username (without "@" prefix)
 	AdminGroup       string           // can be int64 or public group username (without "@" prefix)
 	IdleDuration     time.Duration    // idle timeout to send "idle" message to bots
@@ -176,7 +176,7 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 	l.reportsHandler = &userReports{
 		ReportConfig: l.ReportConfig, tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers,
 		actions: l.ActionExecutor,
-		detectedSpam: l.DetectedSpamCounter, gid: l.InstanceID, moderation: l.ModerationConfig,
+		detectedSpam: l.DetectedSpamCounter, tenantID: l.TenantID, moderation: l.ModerationConfig,
 		primChatID: l.chatID, adminChatID: l.adminChatID,
 		trainingMode: l.TrainingMode, softBanMode: l.SoftBanMode, dry: l.Dry,
 	}

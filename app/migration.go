@@ -30,21 +30,21 @@ func (n nopWriteCloser) Close() error { return nil }
 
 // makeSpamLogger creates spam logger to keep reports about spam messages
 // it writes json lines to the provided writer
-func makeSpamLogger(ctx context.Context, gid string, wr io.Writer, dataDB *engine.SQL) (events.SpamLogger, error) {
+func makeSpamLogger(ctx context.Context, tenantID string, wr io.Writer, dataDB *engine.SQL) (events.SpamLogger, error) {
 	// make store and load approved users
 	detectedSpamStore, auErr := storage.NewDetectedSpam(ctx, dataDB)
 	if auErr != nil {
 		return nil, fmt.Errorf("can't make approved users store, %w", auErr)
 	}
 
-	return auditSpamLogger{ctx: ctx, gid: gid, wr: wr, store: detectedSpamStore}, nil
+	return auditSpamLogger{ctx: ctx, tenantID: tenantID, wr: wr, store: detectedSpamStore}, nil
 }
 
 type auditSpamLogger struct {
-	ctx   context.Context
-	gid   string
-	wr    io.Writer
-	store *storage.DetectedSpam
+	ctx      context.Context
+	tenantID string
+	wr       io.Writer
+	store    *storage.DetectedSpam
 }
 
 func (l auditSpamLogger) Save(msg *bot.Message, response *bot.Response) {
@@ -92,7 +92,7 @@ func (l auditSpamLogger) baseEntry(msg *bot.Message) storage.DetectedSpamInfo {
 		UserID:    userID,
 		UserName:  userName,
 		Timestamp: time.Now().In(time.Local),
-		GID:       l.gid,
+		GID:       l.tenantID,
 	}
 }
 

@@ -128,7 +128,7 @@ func TestSpamFilter_RemoveDynamicSamples(t *testing.T) {
 			s := NewSpamFilterWithRoles(nil, nil, updater, nil, SpamConfig{
 				SamplesStore: samplesStore,
 				DictStore:    dictStore,
-				GroupID:      "gr1",
+				TenantID:      "gr1",
 			})
 
 			var err error

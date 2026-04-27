@@ -28,7 +28,7 @@ func TestRuntimeProbeHandler(t *testing.T) {
 		var resp probeResponse
 		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
 		assert.Equal(t, "ok", resp.Status)
-		assert.Equal(t, "inst", resp.InstanceID)
+		assert.Equal(t, "inst", resp.TenantID)
 		assert.Equal(t, "rev", resp.Revision)
 	})
 

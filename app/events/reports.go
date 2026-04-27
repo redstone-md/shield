@@ -40,7 +40,7 @@ type userReports struct {
 	bot           Bot
 	locator       Locator
 	detectedSpam  DetectedSpamCounter
-	gid           string
+	tenantID      string
 	superUsers    SuperUsers
 	actions       ActionExecutor
 	primChatID    int64
@@ -296,7 +296,7 @@ func (r *userReports) recordDetectedSpam(ctx context.Context, origMsg *tbapi.Mes
 		text = strings.TrimSpace(strings.ReplaceAll(msgTextFromMessage(origMsg), "\n", " "))
 	}
 	rec := storage.DetectedSpamInfo{
-		GID:       r.gid,
+		GID:       r.tenantID,
 		Text:      text,
 		UserID:    userID,
 		UserName:  userName,

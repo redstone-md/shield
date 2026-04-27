@@ -42,7 +42,7 @@ type SpamConfig struct {
 
 	SpamMsg    string
 	SpamDryMsg string
-	GroupID    string
+	TenantID    string
 	Dry        bool
 }
 
