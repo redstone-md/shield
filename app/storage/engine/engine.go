@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq" // postgres driver loaded here
+	_ "github.com/lib/pq"  // postgres driver loaded here
 	_ "modernc.org/sqlite" // sqlite driver loaded here
 )
 
@@ -21,18 +21,19 @@ type Type string
 
 // enum of supported database engines
 const (
-	Unknown Type = ""
-	Sqlite  Type = "sqlite"
+	Unknown  Type = ""
+	Sqlite   Type = "sqlite"
 	Postgres Type = "postgres"
-	Mysql   Type = "mysql"
+	Mysql    Type = "mysql"
 )
 
 // SQL is a wrapper for sqlx.DB with type.
 // Type allows distinguishing between different database engines.
 type SQL struct {
 	sqlx.DB
-	gid    string // group id, to allow per-group storage in the same database
-	dbType Type   // type of the database engine
+	gid      string // group id, to allow per-group storage in the same database
+	tenantID string // tenant id, for multi-tenant isolation
+	dbType   Type   // type of the database engine
 }
 
 // New creates a new database engine with a connection URL and group id.
@@ -123,6 +124,11 @@ func NewPostgres(ctx context.Context, connURL, gid string) (*SQL, error) {
 
 // GID returns the group id
 func (e *SQL) GID() string {
+	return e.gid
+}
+
+// TenantID returns the tenant id. Falls back to gid for backward compatibility.
+func (e *SQL) TenantID() string {
 	return e.gid
 }
 
@@ -219,11 +225,11 @@ func setSqlitePragma(db *sqlx.DB) error {
 
 // TableConfig represents configuration for table initialization
 type TableConfig struct {
-	Name         string
-	CreateTable  DBCmd
+	Name          string
+	CreateTable   DBCmd
 	CreateIndexes DBCmd
-	MigrateFunc  func(ctx context.Context, tx *sqlx.Tx, gid string) error
-	QueriesMap   *QueryMap
+	MigrateFunc   func(ctx context.Context, tx *sqlx.Tx, gid string) error
+	QueriesMap    *QueryMap
 }
 
 // InitTable initializes database table with schema and handles migration in a transaction
