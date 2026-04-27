@@ -34,9 +34,10 @@
 - [x] Добавлен `app/controlplane.DetectedSpamService`: read model над detected spam storage с pub/sub для cache invalidation.
 - [x] Webapi detected spam handlers переведены с прямых вызовов `s.DetectedSpam` на `DetectedSpamProvider` (сервис или store fallback).
 - [x] Подключены `OnChange` подписчики в `wireLiveReload`: approved users, dictionary и detected spam сервисы логируют изменения и инвалидируют rule set cache. Acceptance-тест покрывает все три потока.
+- [x] Integration-тесты подтверждают, что webapi HTTP-маршруты проходят через control plane провайдеры: approved users, dictionary, detected spam — без прямых вызовов detector/storage.
 
 ## Критерий завершения
 
-- [ ] Администратор меняет правила через web API/UI без редактирования env и без перезапуска процесса.
-- [ ] Worker получает новую конфигурацию через cache refresh и применяет её к новым событиям.
-- [ ] `app/webapi` больше не ходит напрямую в detector для настроек, а работает через `controlplane` сервисы.
+- [x] Администратор меняет правила через web API/UI без редактирования env и без перезапуска процесса.
+- [x] Worker получает новую конфигурацию через cache refresh и применяет её к новым событиям.
+- [x] `app/webapi` больше не ходит напрямую в detector для настроек, а работает через `controlplane` сервисы.
