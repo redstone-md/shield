@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,11 +29,16 @@ func newMemoryCache(ttl time.Duration) *memoryCache {
 	}
 }
 
-func (c *memoryCache) Get(ctx context.Context, workspaceID string) (rules.RuleSet, bool) {
+func cacheKey(tenantID, workspaceID string) string {
+	return tenantID + ":" + workspaceID
+}
+
+func (c *memoryCache) Get(ctx context.Context, tenantID, workspaceID string) (rules.RuleSet, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	entry, ok := c.ruleSets[workspaceID]
+	key := cacheKey(tenantID, workspaceID)
+	entry, ok := c.ruleSets[key]
 	if !ok {
 		return rules.RuleSet{}, false
 	}
@@ -41,34 +47,45 @@ func (c *memoryCache) Get(ctx context.Context, workspaceID string) (rules.RuleSe
 		return rules.RuleSet{}, false
 	}
 
-	if invalidatedAt, ok := c.invalidated[workspaceID]; ok && invalidatedAt.After(entry.cachedAt) {
+	if invalidatedAt, ok := c.invalidated[key]; ok && invalidatedAt.After(entry.cachedAt) {
 		return rules.RuleSet{}, false
 	}
 
 	return entry.ruleSet, true
 }
 
-func (c *memoryCache) Set(ctx context.Context, workspaceID string, ruleSet rules.RuleSet) {
+func (c *memoryCache) Set(ctx context.Context, tenantID, workspaceID string, ruleSet rules.RuleSet) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.ruleSets[workspaceID] = cachedRuleSet{
+	key := cacheKey(tenantID, workspaceID)
+	c.ruleSets[key] = cachedRuleSet{
 		ruleSet:  ruleSet,
 		cachedAt: time.Now(),
 	}
 }
 
-func (c *memoryCache) Invalidate(ctx context.Context, workspaceID string) {
+func (c *memoryCache) Invalidate(ctx context.Context, tenantID, workspaceID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.invalidated[workspaceID] = time.Now()
+	key := cacheKey(tenantID, workspaceID)
+	c.invalidated[key] = time.Now()
 }
 
-func (c *memoryCache) InvalidateAll(ctx context.Context) {
+func (c *memoryCache) InvalidateAll(ctx context.Context, tenantID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.ruleSets = make(map[string]cachedRuleSet)
-	c.invalidated = make(map[string]time.Time)
+	prefix := tenantID + ":"
+	for k := range c.ruleSets {
+		if strings.HasPrefix(k, prefix) {
+			delete(c.ruleSets, k)
+		}
+	}
+	for k := range c.invalidated {
+		if strings.HasPrefix(k, prefix) {
+			delete(c.invalidated, k)
+		}
+	}
 }

@@ -21,7 +21,7 @@ func TestRuleSetService_Get(t *testing.T) {
 	store, err := storage.NewRuleSets(context.Background(), db)
 	require.NoError(t, err)
 
-	svc := NewRuleSetService(store)
+	svc := NewRuleSetService(store, "gr1")
 
 	_, err = svc.Get(context.Background(), "gr1")
 	assert.Error(t, err, "no rule set yet")
@@ -59,7 +59,7 @@ func TestRuleSetService_Update(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	svc := NewRuleSetService(store)
+	svc := NewRuleSetService(store, "gr1")
 
 	updated, err := svc.Update(context.Background(), "gr1", "api", rules.RuleSet{
 		Meta: rules.MetaRules{LinksLimit: 5},
@@ -94,7 +94,7 @@ func TestRuleSetService_UsesCacheAndInvalidatesOnUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	cache := newMemoryCache(time.Hour)
-	svc := NewRuleSetServiceWithCache(store, cache)
+	svc := NewRuleSetServiceWithCache(store, "gr1", cache)
 
 	first, err := svc.Get(context.Background(), "gr1")
 	require.NoError(t, err)
@@ -143,7 +143,7 @@ func TestRuleSetService_OnChange(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	svc := NewRuleSetService(store)
+	svc := NewRuleSetService(store, "gr1")
 
 	var notified rules.RuleSet
 	svc.OnChange(func(rs rules.RuleSet) {
@@ -175,7 +175,7 @@ func TestRuleSetService_Invalidate(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	svc := NewRuleSetService(store)
+	svc := NewRuleSetService(store, "gr1")
 
 	rs, err := svc.Get(context.Background(), "gr1")
 	require.NoError(t, err)

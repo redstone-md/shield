@@ -154,7 +154,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		return nil, fmt.Errorf("can't bootstrap workspace, %w", err)
 	}
 	roleAuthorizer := controlplane.NewRoleAuthorizer(workspacesStore)
-	ruleSetService := controlplane.NewRuleSetService(ruleSets)
+	ruleSetService := controlplane.NewRuleSetService(ruleSets, opts.InstanceID)
 
 	assembly := &runtimeAssembly{
 		DataDB:                 dataDB,
