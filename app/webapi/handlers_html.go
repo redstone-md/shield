@@ -41,10 +41,10 @@ func (s *Server) htmlManageSamplesHandler(w http.ResponseWriter, _ *http.Request
 func (s *Server) htmlManageUsersHandler(w http.ResponseWriter, r *http.Request) {
 	users := s.Detector.ApprovedUsers()
 	tmplData := struct {
-		ApprovedUsers    []approved.UserInfo
+		ApprovedUsers      []approved.UserInfo
 		TotalApprovedUsers int
 	}{
-		ApprovedUsers:    users,
+		ApprovedUsers:      users,
 		TotalApprovedUsers: len(users),
 	}
 	tmplData.TotalApprovedUsers = len(tmplData.ApprovedUsers)

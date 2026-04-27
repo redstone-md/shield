@@ -71,9 +71,9 @@ func TestServer_routes(t *testing.T) {
 	}
 
 	server := NewServer(Config{
-		Detector:         detectorMock,
-		SpamFilter:       spamFilterMock,
-		Locator:          locatorMock,
+		Detector:          detectorMock,
+		SpamFilter:        spamFilterMock,
+		Locator:           locatorMock,
 		DetectedSpamStore: detectedSpamMock,
 	})
 	ts := httptest.NewServer(server.routes(routegroup.New(http.NewServeMux())))

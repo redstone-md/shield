@@ -36,17 +36,17 @@ func (s approvedUsersProviderSpy) Remove(ctx context.Context, id string) error {
 }
 
 type dictionaryProviderSpy struct {
-	add        func(ctx context.Context, t storage.DictionaryType, data string) error
-	delete     func(ctx context.Context, id int64) error
-	read       func(ctx context.Context, t storage.DictionaryType) ([]string, error)
+	add         func(ctx context.Context, t storage.DictionaryType, data string) error
+	delete      func(ctx context.Context, id int64) error
+	read        func(ctx context.Context, t storage.DictionaryType) ([]string, error)
 	readWithIDs func(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error)
-	stats      func(ctx context.Context) (*storage.DictionaryStats, error)
+	stats       func(ctx context.Context) (*storage.DictionaryStats, error)
 }
 
 func (s dictionaryProviderSpy) Add(ctx context.Context, t storage.DictionaryType, data string) error {
 	return s.add(ctx, t, data)
 }
-func (s dictionaryProviderSpy) Delete(ctx context.Context, id int64) error       { return s.delete(ctx, id) }
+func (s dictionaryProviderSpy) Delete(ctx context.Context, id int64) error { return s.delete(ctx, id) }
 func (s dictionaryProviderSpy) Read(ctx context.Context, t storage.DictionaryType) ([]string, error) {
 	return s.read(ctx, t)
 }

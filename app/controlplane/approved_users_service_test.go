@@ -14,9 +14,9 @@ import (
 )
 
 type mockApprovedDetector struct {
-	store    *storage.ApprovedUsers
-	added    []approved.UserInfo
-	removed  []string
+	store   *storage.ApprovedUsers
+	added   []approved.UserInfo
+	removed []string
 }
 
 func (m *mockApprovedDetector) AddApprovedUser(user approved.UserInfo) error {

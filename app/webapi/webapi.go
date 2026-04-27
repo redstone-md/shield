@@ -57,24 +57,24 @@ type Server struct {
 
 // Config defines server parameters
 type Config struct {
-	Version          string                 // version to show in /ping
-	ListenAddr       string                 // listen address
-	Detector         Detector               // spam detector
-	SpamFilter       SpamFilter             // spam filter (bot)
-	DetectedSpamStore      DetectedSpam           // detected spam storage (fallback when DetectedSpamProvider is nil)
-	DetectedSpamProvider   DetectedSpamProvider   // control plane detected spam service
-	Locator          Locator                // locator for user info
+	Version               string                 // version to show in /ping
+	ListenAddr            string                 // listen address
+	Detector              Detector               // spam detector
+	SpamFilter            SpamFilter             // spam filter (bot)
+	DetectedSpamStore     DetectedSpam           // detected spam storage (fallback when DetectedSpamProvider is nil)
+	DetectedSpamProvider  DetectedSpamProvider   // control plane detected spam service
+	Locator               Locator                // locator for user info
 	DictionaryStore       Dictionary             // dictionary storage (fallback when DictionaryProvider is nil)
-	DictionaryProvider   DictionaryProvider     // control plane dictionary service (takes precedence over DictionaryStore)
-	StorageEngine        StorageEngine          // database engine access for backups
-	DMUsersProvider  DMUsersProvider        // provider for recent DM users
+	DictionaryProvider    DictionaryProvider     // control plane dictionary service (takes precedence over DictionaryStore)
+	StorageEngine         StorageEngine          // database engine access for backups
+	DMUsersProvider       DMUsersProvider        // provider for recent DM users
 	RuleSetProvider       RuleSetProvider        // control plane rule set service
 	ControlPlaneAuth      ControlPlaneAuthorizer // role authorizer for control plane endpoints
 	ApprovedUsersProvider ApprovedUsersProvider  // control plane approved users service
-	AuthPasswd       string                 // basic auth password for user "tg-spam"
-	AuthHash         string                 // basic auth bcrypt hash for user "tg-spam", takes precedence over AuthPasswd
-	Dbg              bool                   // debug mode
-	Settings         Settings               // application settings
+	AuthPasswd            string                 // basic auth password for user "tg-spam"
+	AuthHash              string                 // basic auth bcrypt hash for user "tg-spam", takes precedence over AuthPasswd
+	Dbg                   bool                   // debug mode
+	Settings              Settings               // application settings
 }
 
 // Settings contains all application settings

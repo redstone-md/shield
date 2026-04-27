@@ -32,13 +32,13 @@ func (s *Server) downloadDetectedSpamHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	type jsonSpamInfo struct {
-		ID        int64               `json:"id"`
-		GID       string              `json:"gid"`
-		Text      string              `json:"text"`
-		UserID    int64               `json:"user_id"`
-		UserName  string              `json:"user_name"`
-		Timestamp time.Time           `json:"timestamp"`
-		Added     bool                `json:"added"`
+		ID        int64                `json:"id"`
+		GID       string               `json:"gid"`
+		Text      string               `json:"text"`
+		UserID    int64                `json:"user_id"`
+		UserName  string               `json:"user_name"`
+		Timestamp time.Time            `json:"timestamp"`
+		Added     bool                 `json:"added"`
 		Checks    []spamcheck.Response `json:"checks"`
 	}
 
@@ -237,9 +237,9 @@ func (s *Server) renderDictionary(ctx context.Context, w http.ResponseWriter, tm
 	}
 
 	tmplData := struct {
-		StopPhrases      []storage.DictionaryEntry
-		IgnoredWords     []storage.DictionaryEntry
-		TotalStopPhrases int
+		StopPhrases       []storage.DictionaryEntry
+		IgnoredWords      []storage.DictionaryEntry
+		TotalStopPhrases  int
 		TotalIgnoredWords int
 	}{
 		StopPhrases:       stopPhrases,
@@ -262,7 +262,7 @@ type staticFS struct {
 
 // staticFileMapping defines a mapping between URL path and filesystem path
 type staticFileMapping struct {
-	urlPath    string
+	urlPath     string
 	filesysPath string
 }
 

@@ -35,24 +35,24 @@ type runtimeAssembly struct {
 	WorkspaceService       *controlplane.WorkspaceService
 	RoleAuthorizer         *controlplane.RoleAuthorizer
 	RuleSetService         *controlplane.RuleSetService
-	ApprovedUsersService  *controlplane.ApprovedUsersService
-	DictionaryService     *controlplane.DictionaryService
-	DetectedSpamService   *controlplane.DetectedSpamService
-	TelegramListener      *events.TelegramListener
+	ApprovedUsersService   *controlplane.ApprovedUsersService
+	DictionaryService      *controlplane.DictionaryService
+	DetectedSpamService    *controlplane.DetectedSpamService
+	TelegramListener       *events.TelegramListener
 	Web                    webRuntimeAssembly
 }
 
 type webRuntimeAssembly struct {
-	Detector              webapi.Detector
-	SpamFilter            webapi.SpamFilter
-	Locator               webapi.Locator
-	StorageEngine         webapi.StorageEngine
-	RuleSetService        *controlplane.RuleSetService
-	ApprovedUsersService  *controlplane.ApprovedUsersService
-	DictionaryService     *controlplane.DictionaryService
-	DetectedSpamService   *controlplane.DetectedSpamService
-	RoleAuthorizer        *controlplane.RoleAuthorizer
-	BotUsername           string
+	Detector             webapi.Detector
+	SpamFilter           webapi.SpamFilter
+	Locator              webapi.Locator
+	StorageEngine        webapi.StorageEngine
+	RuleSetService       *controlplane.RuleSetService
+	ApprovedUsersService *controlplane.ApprovedUsersService
+	DictionaryService    *controlplane.DictionaryService
+	DetectedSpamService  *controlplane.DetectedSpamService
+	RoleAuthorizer       *controlplane.RoleAuthorizer
+	BotUsername          string
 }
 
 func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error) {
@@ -174,18 +174,18 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		RoleAuthorizer:         roleAuthorizer,
 		RuleSetService:         ruleSetService,
 		ApprovedUsersService:   approvedUsersSvc,
-		DictionaryService:     dictSvc,
-		DetectedSpamService:   detectedSpamSvc,
+		DictionaryService:      dictSvc,
+		DetectedSpamService:    detectedSpamSvc,
 		Web: webRuntimeAssembly{
-			Detector:              detector,
-			SpamFilter:            spamBot,
-			Locator:               locator,
-			StorageEngine:         dataDB,
-			RuleSetService:        ruleSetService,
-			RoleAuthorizer:        roleAuthorizer,
-			ApprovedUsersService:  approvedUsersSvc,
-			DictionaryService:     dictSvc,
-			DetectedSpamService:   detectedSpamSvc,
+			Detector:             detector,
+			SpamFilter:           spamBot,
+			Locator:              locator,
+			StorageEngine:        dataDB,
+			RuleSetService:       ruleSetService,
+			RoleAuthorizer:       roleAuthorizer,
+			ApprovedUsersService: approvedUsersSvc,
+			DictionaryService:    dictSvc,
+			DetectedSpamService:  detectedSpamSvc,
 		},
 	}
 

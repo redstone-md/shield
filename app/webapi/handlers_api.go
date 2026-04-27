@@ -60,8 +60,8 @@ func (s *Server) checkMsgHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) checkIDHandler(w http.ResponseWriter, r *http.Request) {
 	type info struct {
-		UserName  string              `json:"user_name,omitempty"`
-		Message   string              `json:"message,omitempty"`
+		UserName  string               `json:"user_name,omitempty"`
+		Message   string               `json:"message,omitempty"`
 		Timestamp time.Time            `json:"timestamp,omitzero"`
 		Checks    []spamcheck.Response `json:"checks,omitempty"`
 	}
@@ -279,7 +279,7 @@ func (s *Server) dictionary() DictionaryProvider {
 		return s.DictionaryProvider
 	}
 	return dictionaryStoreAdapter{
-		store: s.DictionaryStore,
+		store:      s.DictionaryStore,
 		spamFilter: s.SpamFilter,
 	}
 }
