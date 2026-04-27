@@ -350,6 +350,26 @@ func (a *runtimeAssembly) wireLiveReload(opts options) {
 
 		log.Printf("[INFO] live reload applied: version=%d", rs.Version)
 	})
+
+	if a.ApprovedUsersService != nil {
+		a.ApprovedUsersService.OnChange(func() {
+			log.Printf("[INFO] approved users changed, invalidating rule set cache")
+			a.RuleSetService.Invalidate()
+		})
+	}
+
+	if a.DictionaryService != nil {
+		a.DictionaryService.OnChange(func() {
+			log.Printf("[INFO] dictionary changed, invalidating rule set cache")
+			a.RuleSetService.Invalidate()
+		})
+	}
+
+	if a.DetectedSpamService != nil {
+		a.DetectedSpamService.OnChange(func() {
+			log.Printf("[INFO] detected spam changed")
+		})
+	}
 }
 
 func (a *runtimeAssembly) close() {

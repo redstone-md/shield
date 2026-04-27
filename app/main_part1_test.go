@@ -14,6 +14,7 @@ import (
 	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
+	"github.com/umputun/tg-spam/lib/approved"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 	"io"
 	"os"
@@ -495,4 +496,45 @@ func TestRuleSetServiceUpdateAppliesRuntimeWithoutRestart(t *testing.T) {
 	assert.Equal(t, 2, listener.RuleSetVersion)
 	assert.Equal(t, 9, assembly.Detector.DuplicateDetection.Threshold)
 	assert.Equal(t, 2*time.Minute, assembly.Detector.DuplicateDetection.Window)
+}
+
+func TestCacheInvalidationOnControlPlaneChanges(t *testing.T) {
+	ctx := t.Context()
+	tmpDir := t.TempDir()
+
+	var opts options
+	opts.InstanceID = "gr1"
+	opts.DataBaseURL = fmt.Sprintf("sqlite://%s", path.Join(tmpDir, "tg-spam.db"))
+	opts.Files.SamplesDataPath = tmpDir
+	opts.Files.DynamicDataPath = tmpDir
+	opts.Meta.LinksLimit = 1
+
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, "spam-samples.txt"), []byte("spam1\n"), 0o600))
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, "ham-samples.txt"), []byte("ham1\n"), 0o600))
+
+	assembly, err := assembleRuntime(ctx, opts)
+	require.NoError(t, err)
+	defer assembly.close()
+
+	tbAPI := &tbapi.BotAPI{Self: tbapi.User{UserName: "bot"}}
+	assembly.makeTelegramListener(opts, tbAPI)
+	assembly.wireLiveReload(opts)
+
+	approvedNotified := 0
+	assembly.ApprovedUsersService.OnChange(func() { approvedNotified++ })
+
+	dictNotified := 0
+	assembly.DictionaryService.OnChange(func() { dictNotified++ })
+
+	spamNotified := 0
+	assembly.DetectedSpamService.OnChange(func() { spamNotified++ })
+
+	require.NoError(t, assembly.ApprovedUsersService.Add(ctx, approved.UserInfo{UserID: "u1", UserName: "user1"}))
+	assert.Equal(t, 1, approvedNotified)
+
+	require.NoError(t, assembly.DictionaryService.Add(ctx, storage.DictionaryTypeStopPhrase, "test phrase"))
+	assert.Equal(t, 1, dictNotified)
+
+	require.NoError(t, assembly.DetectedSpamService.SetAddedToSamplesFlag(ctx, 999))
+	assert.Equal(t, 1, spamNotified)
 }

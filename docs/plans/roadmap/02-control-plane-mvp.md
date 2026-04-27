@@ -33,6 +33,7 @@
 - [x] Webapi `/dictionary` handlers переведены с прямых вызовов `s.Dictionary` + `s.SpamFilter.ReloadSamples()` на `DictionaryProvider` (сервис или adapter fallback).
 - [x] Добавлен `app/controlplane.DetectedSpamService`: read model над detected spam storage с pub/sub для cache invalidation.
 - [x] Webapi detected spam handlers переведены с прямых вызовов `s.DetectedSpam` на `DetectedSpamProvider` (сервис или store fallback).
+- [x] Подключены `OnChange` подписчики в `wireLiveReload`: approved users, dictionary и detected spam сервисы логируют изменения и инвалидируют rule set cache. Acceptance-тест покрывает все три потока.
 
 ## Критерий завершения
 
