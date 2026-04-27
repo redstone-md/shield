@@ -25,7 +25,7 @@ func NewDetectedSpamService(store DetectedSpamStore) *DetectedSpamService {
 	return &DetectedSpamService{store: store}
 }
 
-func (s *DetectedSpamService) Read(ctx context.Context) ([]storage.DetectedSpamInfo, error) {
+func (s *DetectedSpamService) Read(ctx context.Context, _ string) ([]storage.DetectedSpamInfo, error) {
 	if s.store == nil {
 		return nil, fmt.Errorf("detected spam store is nil")
 	}
@@ -36,7 +36,7 @@ func (s *DetectedSpamService) Read(ctx context.Context) ([]storage.DetectedSpamI
 	return entries, nil
 }
 
-func (s *DetectedSpamService) FindByUserID(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error) {
+func (s *DetectedSpamService) FindByUserID(ctx context.Context, _ string, userID int64) (*storage.DetectedSpamInfo, error) {
 	if s.store == nil {
 		return nil, fmt.Errorf("detected spam store is nil")
 	}
@@ -47,7 +47,7 @@ func (s *DetectedSpamService) FindByUserID(ctx context.Context, userID int64) (*
 	return entry, nil
 }
 
-func (s *DetectedSpamService) SetAddedToSamplesFlag(ctx context.Context, id int64) error {
+func (s *DetectedSpamService) SetAddedToSamplesFlag(ctx context.Context, _ string, id int64) error {
 	if s.store == nil {
 		return fmt.Errorf("detected spam store is nil")
 	}

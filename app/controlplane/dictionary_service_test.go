@@ -33,11 +33,11 @@ func TestDictionaryService_Add(t *testing.T) {
 	rl := &mockSampleReloader{}
 	svc := NewDictionaryService(dict, rl)
 
-	err = svc.Add(context.Background(), storage.DictionaryTypeStopPhrase, "buy now")
+	err = svc.Add(context.Background(), "t1", storage.DictionaryTypeStopPhrase, "buy now")
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), rl.reloadCalled.Load())
 
-	entries, err := svc.Read(context.Background(), storage.DictionaryTypeStopPhrase)
+	entries, err := svc.Read(context.Background(), "t1", storage.DictionaryTypeStopPhrase)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"buy now"}, entries)
 }
@@ -53,18 +53,18 @@ func TestDictionaryService_Delete(t *testing.T) {
 	rl := &mockSampleReloader{}
 	svc := NewDictionaryService(dict, rl)
 
-	err = svc.Add(context.Background(), storage.DictionaryTypeStopPhrase, "buy now")
+	err = svc.Add(context.Background(), "t1", storage.DictionaryTypeStopPhrase, "buy now")
 	require.NoError(t, err)
 
-	withIDs, err := svc.ReadWithIDs(context.Background(), storage.DictionaryTypeStopPhrase)
+	withIDs, err := svc.ReadWithIDs(context.Background(), "t1", storage.DictionaryTypeStopPhrase)
 	require.NoError(t, err)
 	require.Len(t, withIDs, 1)
 
-	err = svc.Delete(context.Background(), withIDs[0].ID)
+	err = svc.Delete(context.Background(), "t1", withIDs[0].ID)
 	require.NoError(t, err)
 	assert.Equal(t, int32(2), rl.reloadCalled.Load())
 
-	entries, err := svc.Read(context.Background(), storage.DictionaryTypeStopPhrase)
+	entries, err := svc.Read(context.Background(), "t1", storage.DictionaryTypeStopPhrase)
 	require.NoError(t, err)
 	assert.Len(t, entries, 0)
 }
@@ -72,10 +72,10 @@ func TestDictionaryService_Delete(t *testing.T) {
 func TestDictionaryService_Validation(t *testing.T) {
 	svc := NewDictionaryService(nil, nil)
 
-	err := svc.Add(context.Background(), storage.DictionaryTypeStopPhrase, "")
+	err := svc.Add(context.Background(), "t1", storage.DictionaryTypeStopPhrase, "")
 	assert.EqualError(t, err, "data cannot be empty")
 
-	err = svc.Add(context.Background(), storage.DictionaryType("invalid"), "data")
+	err = svc.Add(context.Background(), "t1", storage.DictionaryType("invalid"), "data")
 	assert.Error(t, err)
 }
 
@@ -94,15 +94,15 @@ func TestDictionaryService_OnChange(t *testing.T) {
 	svc.OnChange(func() { notified.Add(1) })
 	svc.OnChange(func() { notified.Add(10) })
 
-	err = svc.Add(context.Background(), storage.DictionaryTypeIgnoredWord, "the")
+	err = svc.Add(context.Background(), "t1", storage.DictionaryTypeIgnoredWord, "the")
 	require.NoError(t, err)
 	assert.Equal(t, int32(11), notified.Load())
 
-	withIDs, err := svc.ReadWithIDs(context.Background(), storage.DictionaryTypeIgnoredWord)
+	withIDs, err := svc.ReadWithIDs(context.Background(), "t1", storage.DictionaryTypeIgnoredWord)
 	require.NoError(t, err)
 	require.Len(t, withIDs, 1)
 
-	err = svc.Delete(context.Background(), withIDs[0].ID)
+	err = svc.Delete(context.Background(), "t1", withIDs[0].ID)
 	require.NoError(t, err)
 	assert.Equal(t, int32(22), notified.Load())
 }
@@ -117,14 +117,14 @@ func TestDictionaryService_Stats(t *testing.T) {
 
 	svc := NewDictionaryService(dict, &mockSampleReloader{})
 
-	err = svc.Add(context.Background(), storage.DictionaryTypeStopPhrase, "spam1")
+	err = svc.Add(context.Background(), "t1", storage.DictionaryTypeStopPhrase, "spam1")
 	require.NoError(t, err)
-	err = svc.Add(context.Background(), storage.DictionaryTypeStopPhrase, "spam2")
+	err = svc.Add(context.Background(), "t1", storage.DictionaryTypeStopPhrase, "spam2")
 	require.NoError(t, err)
-	err = svc.Add(context.Background(), storage.DictionaryTypeIgnoredWord, "the")
+	err = svc.Add(context.Background(), "t1", storage.DictionaryTypeIgnoredWord, "the")
 	require.NoError(t, err)
 
-	stats, err := svc.Stats(context.Background())
+	stats, err := svc.Stats(context.Background(), "t1")
 	require.NoError(t, err)
 	assert.Equal(t, 2, stats.TotalStopPhrases)
 	assert.Equal(t, 1, stats.TotalIgnoredWords)
@@ -133,12 +133,12 @@ func TestDictionaryService_Stats(t *testing.T) {
 func TestDictionaryService_NilStore(t *testing.T) {
 	svc := NewDictionaryService(nil, nil)
 
-	_, err := svc.Read(context.Background(), storage.DictionaryTypeStopPhrase)
+	_, err := svc.Read(context.Background(), "t1", storage.DictionaryTypeStopPhrase)
 	assert.Error(t, err)
 
-	_, err = svc.ReadWithIDs(context.Background(), storage.DictionaryTypeStopPhrase)
+	_, err = svc.ReadWithIDs(context.Background(), "t1", storage.DictionaryTypeStopPhrase)
 	assert.Error(t, err)
 
-	_, err = svc.Stats(context.Background())
+	_, err = svc.Stats(context.Background(), "t1")
 	assert.Error(t, err)
 }

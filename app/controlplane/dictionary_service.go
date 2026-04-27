@@ -32,7 +32,7 @@ func NewDictionaryService(store DictionaryStore, reloader SampleReloader) *Dicti
 	return &DictionaryService{store: store, reloader: reloader}
 }
 
-func (s *DictionaryService) Add(ctx context.Context, t storage.DictionaryType, data string) error {
+func (s *DictionaryService) Add(ctx context.Context, _ string, t storage.DictionaryType, data string) error {
 	if data == "" {
 		return fmt.Errorf("data cannot be empty")
 	}
@@ -47,7 +47,7 @@ func (s *DictionaryService) Add(ctx context.Context, t storage.DictionaryType, d
 	return nil
 }
 
-func (s *DictionaryService) Delete(ctx context.Context, id int64) error {
+func (s *DictionaryService) Delete(ctx context.Context, _ string, id int64) error {
 	if err := s.store.Delete(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete dictionary entry %d: %w", id, err)
 	}
@@ -56,21 +56,21 @@ func (s *DictionaryService) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *DictionaryService) Read(ctx context.Context, t storage.DictionaryType) ([]string, error) {
+func (s *DictionaryService) Read(ctx context.Context, _ string, t storage.DictionaryType) ([]string, error) {
 	if s.store == nil {
 		return nil, fmt.Errorf("dictionary store is nil")
 	}
 	return s.store.Read(ctx, t)
 }
 
-func (s *DictionaryService) ReadWithIDs(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+func (s *DictionaryService) ReadWithIDs(_ context.Context, _ string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
 	if s.store == nil {
 		return nil, fmt.Errorf("dictionary store is nil")
 	}
-	return s.store.ReadWithIDs(ctx, t)
+	return s.store.ReadWithIDs(context.Background(), t)
 }
 
-func (s *DictionaryService) Stats(ctx context.Context) (*storage.DictionaryStats, error) {
+func (s *DictionaryService) Stats(ctx context.Context, _ string) (*storage.DictionaryStats, error) {
 	if s.store == nil {
 		return nil, fmt.Errorf("dictionary store is nil")
 	}

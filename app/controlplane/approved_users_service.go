@@ -32,7 +32,7 @@ func NewApprovedUsersService(store ApprovedUsersStore, detector ApprovedUsersDet
 	return &ApprovedUsersService{store: store, detector: detector}
 }
 
-func (s *ApprovedUsersService) List(ctx context.Context) ([]approved.UserInfo, error) {
+func (s *ApprovedUsersService) List(ctx context.Context, _ string) ([]approved.UserInfo, error) {
 	if s.store == nil {
 		return nil, fmt.Errorf("approved users store is nil")
 	}
@@ -43,7 +43,7 @@ func (s *ApprovedUsersService) List(ctx context.Context) ([]approved.UserInfo, e
 	return users, nil
 }
 
-func (s *ApprovedUsersService) Add(ctx context.Context, user approved.UserInfo) error {
+func (s *ApprovedUsersService) Add(ctx context.Context, _ string, user approved.UserInfo) error {
 	if user.UserID == "" {
 		return fmt.Errorf("user id is required")
 	}
@@ -55,7 +55,7 @@ func (s *ApprovedUsersService) Add(ctx context.Context, user approved.UserInfo) 
 	return nil
 }
 
-func (s *ApprovedUsersService) Remove(ctx context.Context, id string) error {
+func (s *ApprovedUsersService) Remove(ctx context.Context, _ string, id string) error {
 	if id == "" {
 		return fmt.Errorf("user id is required")
 	}

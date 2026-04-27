@@ -22,7 +22,7 @@ func TestDetectedSpamService_Read(t *testing.T) {
 
 	svc := NewDetectedSpamService(store)
 
-	entries, err := svc.Read(context.Background())
+	entries, err := svc.Read(context.Background(), "t1")
 	require.NoError(t, err)
 	assert.Empty(t, entries)
 }
@@ -37,7 +37,7 @@ func TestDetectedSpamService_FindByUserID(t *testing.T) {
 
 	svc := NewDetectedSpamService(store)
 
-	entry, err := svc.FindByUserID(context.Background(), 999)
+	entry, err := svc.FindByUserID(context.Background(), "t1", 999)
 	require.NoError(t, err)
 	assert.Nil(t, entry)
 }
@@ -45,10 +45,10 @@ func TestDetectedSpamService_FindByUserID(t *testing.T) {
 func TestDetectedSpamService_NilStore(t *testing.T) {
 	svc := NewDetectedSpamService(nil)
 
-	_, err := svc.Read(context.Background())
+	_, err := svc.Read(context.Background(), "t1")
 	assert.Error(t, err)
 
-	_, err = svc.FindByUserID(context.Background(), 1)
+	_, err = svc.FindByUserID(context.Background(), "t1", 1)
 	assert.Error(t, err)
 }
 
@@ -65,6 +65,6 @@ func TestDetectedSpamService_OnChange(t *testing.T) {
 	var notified atomic.Int32
 	svc.OnChange(func() { notified.Add(1) })
 
-	require.NoError(t, svc.SetAddedToSamplesFlag(context.Background(), 42))
+	require.NoError(t, svc.SetAddedToSamplesFlag(context.Background(), "t1", 42))
 	assert.Equal(t, int32(1), notified.Load())
 }
