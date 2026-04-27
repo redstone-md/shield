@@ -79,7 +79,7 @@ type Config struct {
 
 // Settings contains all application settings
 type Settings struct {
-	InstanceID               string        `json:"instance_id"`
+	TenantID                 string        `json:"tenant_id"`
 	BotUsername              string        `json:"bot_username"`
 	PrimaryGroup             string        `json:"primary_group"`
 	AdminGroup               string        `json:"admin_group"`
@@ -166,9 +166,9 @@ type Locator interface {
 
 // DetectedSpam is a storage interface used to get detected spam messages and set added flag.
 type DetectedSpam interface {
-	Read(ctx context.Context) ([]storage.DetectedSpamInfo, error)
-	SetAddedToSamplesFlag(ctx context.Context, id int64) error
-	FindByUserID(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error)
+	Read(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error)
+	SetAddedToSamplesFlag(ctx context.Context, tenantID string, id int64) error
+	FindByUserID(ctx context.Context, tenantID string, userID int64) (*storage.DetectedSpamInfo, error)
 }
 
 // DetectedSpamProvider provides access to detected spam through the control plane service layer.
@@ -185,11 +185,11 @@ type StorageEngine interface {
 
 // Dictionary is a storage interface for managing stop phrases and ignored words
 type Dictionary interface {
-	Add(ctx context.Context, t storage.DictionaryType, data string) error
-	Delete(ctx context.Context, id int64) error
-	Read(ctx context.Context, t storage.DictionaryType) ([]string, error)
-	ReadWithIDs(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error)
-	Stats(ctx context.Context) (*storage.DictionaryStats, error)
+	Add(ctx context.Context, tenantID string, t storage.DictionaryType, data string) error
+	Delete(ctx context.Context, tenantID string, id int64) error
+	Read(ctx context.Context, tenantID string, t storage.DictionaryType) ([]string, error)
+	ReadWithIDs(ctx context.Context, tenantID string, t storage.DictionaryType) ([]storage.DictionaryEntry, error)
+	Stats(ctx context.Context, tenantID string) (*storage.DictionaryStats, error)
 }
 
 // DMUsersProvider provides access to recent DM users for the admin UI
@@ -199,9 +199,9 @@ type DMUsersProvider interface {
 
 // ApprovedUsersProvider provides access to approved users through the control plane service layer.
 type ApprovedUsersProvider interface {
-	List(ctx context.Context) ([]approved.UserInfo, error)
-	Add(ctx context.Context, user approved.UserInfo) error
-	Remove(ctx context.Context, id string) error
+	List(ctx context.Context, tenantID string) ([]approved.UserInfo, error)
+	Add(ctx context.Context, tenantID string, user approved.UserInfo) error
+	Remove(ctx context.Context, tenantID string, id string) error
 }
 
 // DictionaryProvider provides access to dictionary management through the control plane service layer.
@@ -278,7 +278,7 @@ func (s *Server) requestMetadataMiddleware(next http.Handler) http.Handler {
 
 func (s *Server) requestMetadata(r *http.Request) (eventID, correlationID string) {
 	seq := atomic.AddUint64(&requestSeq, 1)
-	instanceID := strings.TrimSpace(s.Settings.InstanceID)
+	instanceID := strings.TrimSpace(s.Settings.TenantID)
 	if instanceID == "" {
 		instanceID = "tg-spam"
 	}
@@ -415,7 +415,7 @@ func (s *Server) controlPlaneAuthMiddleware(next http.Handler) http.Handler {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			access = "write"
 		}
-		if err := s.ControlPlaneAuth.Authorize(r.Context(), s.Settings.InstanceID, userID, access); err != nil {
+		if err := s.ControlPlaneAuth.Authorize(r.Context(), s.Settings.TenantID, userID, access); err != nil {
 			_ = rest.EncodeJSON(w, http.StatusForbidden, rest.JSON{"error": "control plane access denied"})
 			return
 		}

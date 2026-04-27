@@ -26,7 +26,7 @@ func TestServer_downloadDetectedSpamHandler(t *testing.T) {
 
 	t.Run("successful download", func(t *testing.T) {
 		ds := &mocks.DetectedSpamMock{
-			ReadFunc: func(ctx context.Context) ([]storage.DetectedSpamInfo, error) {
+			ReadFunc: func(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error) {
 				return []storage.DetectedSpamInfo{
 					{
 						ID:        123,
@@ -83,7 +83,7 @@ func TestServer_downloadDetectedSpamHandler(t *testing.T) {
 
 	t.Run("multiple entries", func(t *testing.T) {
 		ds := &mocks.DetectedSpamMock{
-			ReadFunc: func(ctx context.Context) ([]storage.DetectedSpamInfo, error) {
+			ReadFunc: func(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error) {
 				return []storage.DetectedSpamInfo{
 					{ID: 1, Text: "first"},
 					{ID: 2, Text: "second"},
@@ -118,7 +118,7 @@ func TestServer_downloadDetectedSpamHandler(t *testing.T) {
 
 	t.Run("error handling", func(t *testing.T) {
 		ds := &mocks.DetectedSpamMock{
-			ReadFunc: func(ctx context.Context) ([]storage.DetectedSpamInfo, error) {
+			ReadFunc: func(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error) {
 				return nil, errors.New("test error")
 			},
 		}
@@ -315,7 +315,7 @@ func TestServer_logoutHandler(t *testing.T) {
 func TestServer_getDictionaryEntriesHandler(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			ReadFunc: func(ctx context.Context, t storage.DictionaryType) ([]string, error) {
+			ReadFunc: func(ctx context.Context, _ string, t storage.DictionaryType) ([]string, error) {
 				if t == storage.DictionaryTypeStopPhrase {
 					return []string{"spam word", "bad phrase"}, nil
 				}
@@ -341,7 +341,7 @@ func TestServer_getDictionaryEntriesHandler(t *testing.T) {
 
 	t.Run("error reading stop phrases", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			ReadFunc: func(ctx context.Context, t storage.DictionaryType) ([]string, error) {
+			ReadFunc: func(ctx context.Context, _ string, t storage.DictionaryType) ([]string, error) {
 				if t == storage.DictionaryTypeStopPhrase {
 					return nil, errors.New("db error")
 				}
@@ -366,7 +366,7 @@ func TestServer_getDictionaryEntriesHandler(t *testing.T) {
 
 	t.Run("error reading ignored words", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			ReadFunc: func(ctx context.Context, t storage.DictionaryType) ([]string, error) {
+			ReadFunc: func(ctx context.Context, _ string, t storage.DictionaryType) ([]string, error) {
 				if t == storage.DictionaryTypeStopPhrase {
 					return []string{"spam word"}, nil
 				}

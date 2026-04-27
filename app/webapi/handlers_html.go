@@ -61,7 +61,7 @@ func (s *Server) htmlManageDictionaryHandler(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) htmlDetectedSpamHandler(w http.ResponseWriter, r *http.Request) {
-	ds, err := s.detectedSpam().Read(r.Context())
+	ds, err := s.detectedSpam().Read(r.Context(), s.Settings.TenantID)
 	if err != nil {
 		observability.Logf(r.Context(), "[ERROR] Failed to fetch detected spam: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -203,7 +203,7 @@ func (s *Server) htmlAddDetectedSpamHandler(w http.ResponseWriter, r *http.Reque
 		return
 
 	}
-	if err := s.detectedSpam().SetAddedToSamplesFlag(r.Context(), id); err != nil {
+	if err := s.detectedSpam().SetAddedToSamplesFlag(r.Context(), s.Settings.TenantID, id); err != nil {
 		observability.Logf(r.Context(), "[WARN] failed to update detected spam: %v", err)
 		reportErr(fmt.Errorf("can't update detected spam: %v", err), http.StatusInternalServerError)
 		return
@@ -215,7 +215,7 @@ func (s *Server) htmlSettingsHandler(w http.ResponseWriter, r *http.Request) {
 	// get database information if StorageEngine is available
 	var dbInfo struct {
 		DatabaseType   string `json:"database_type"`
-		GID            string `json:"gid"`
+		TenantID       string `json:"tenant_id"`
 		DatabaseStatus string `json:"database_status"`
 	}
 
@@ -223,7 +223,7 @@ func (s *Server) htmlSettingsHandler(w http.ResponseWriter, r *http.Request) {
 		// try to cast to SQL engine to get type information
 		if sqlEngine, ok := s.StorageEngine.(*engine.SQL); ok {
 			dbInfo.DatabaseType = string(sqlEngine.Type())
-			dbInfo.GID = sqlEngine.GID()
+			dbInfo.TenantID = sqlEngine.TenantID()
 			dbInfo.DatabaseStatus = "Connected"
 		} else {
 			dbInfo.DatabaseType = "Unknown"
@@ -247,9 +247,9 @@ func (s *Server) htmlSettingsHandler(w http.ResponseWriter, r *http.Request) {
 		Settings
 		Version  string
 		Database struct {
-			Type   string
-			GID    string
-			Status string
+			Type     string
+			TenantID string
+			Status   string
 		}
 		Backup struct {
 			URL      string
@@ -262,13 +262,13 @@ func (s *Server) htmlSettingsHandler(w http.ResponseWriter, r *http.Request) {
 		Settings: s.Settings,
 		Version:  s.Version,
 		Database: struct {
-			Type   string
-			GID    string
-			Status string
+			Type     string
+			TenantID string
+			Status   string
 		}{
-			Type:   dbInfo.DatabaseType,
-			GID:    dbInfo.GID,
-			Status: dbInfo.DatabaseStatus,
+			Type:     dbInfo.DatabaseType,
+			TenantID: dbInfo.TenantID,
+			Status:   dbInfo.DatabaseStatus,
 		},
 		Backup: struct {
 			URL      string

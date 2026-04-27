@@ -18,7 +18,7 @@ import (
 func TestServer_addDictionaryEntryHandler(t *testing.T) {
 	t.Run("success json", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			AddFunc: func(ctx context.Context, t storage.DictionaryType, data string) error {
+			AddFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType, data string) error {
 				return nil
 			},
 		}
@@ -118,7 +118,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("error adding entry", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			AddFunc: func(ctx context.Context, t storage.DictionaryType, data string) error {
+			AddFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType, data string) error {
 				return errors.New("database error")
 			},
 		}
@@ -149,10 +149,10 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("success htmx", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			AddFunc: func(ctx context.Context, t storage.DictionaryType, data string) error {
+			AddFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType, data string) error {
 				return nil
 			},
-			ReadWithIDsFunc: func(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+			ReadWithIDsFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
 				return []storage.DictionaryEntry{{ID: 1, Data: "test phrase"}}, nil
 			},
 		}
@@ -236,7 +236,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("reload error json", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			AddFunc: func(ctx context.Context, t storage.DictionaryType, data string) error {
+			AddFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType, data string) error {
 				return nil
 			},
 		}
@@ -267,10 +267,10 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("reload error htmx", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			AddFunc: func(ctx context.Context, t storage.DictionaryType, data string) error {
+			AddFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType, data string) error {
 				return nil
 			},
-			ReadWithIDsFunc: func(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+			ReadWithIDsFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
 				return []storage.DictionaryEntry{{ID: 1, Data: "test phrase"}}, nil
 			},
 		}

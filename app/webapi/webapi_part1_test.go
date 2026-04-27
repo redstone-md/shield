@@ -55,9 +55,9 @@ func TestServer_RequestMetadataMiddlewarePropagatesToDetectedSpam(t *testing.T) 
 	var capturedCtx context.Context
 
 	server := NewServer(Config{
-		Settings: Settings{InstanceID: "inst"},
+		Settings: Settings{TenantID: "inst"},
 		DetectedSpamStore: &mocks.DetectedSpamMock{
-			FindByUserIDFunc: func(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error) {
+			FindByUserIDFunc: func(ctx context.Context, tenantID string, userID int64) (*storage.DetectedSpamInfo, error) {
 				capturedCtx = ctx
 				return &storage.DetectedSpamInfo{UserID: userID, UserName: "user"}, nil
 			},
@@ -93,7 +93,7 @@ func TestServer_CheckMsgHandlerLogsRequestMetadata(t *testing.T) {
 		log.SetFlags(oldFlags)
 	}()
 
-	server := NewServer(Config{Settings: Settings{InstanceID: "inst"}})
+	server := NewServer(Config{Settings: Settings{TenantID: "inst"}})
 	req := httptest.NewRequest(http.MethodPost, "/check", strings.NewReader("bad request"))
 	req.Header.Set("X-Request-ID", "req-456")
 	rr := httptest.NewRecorder()

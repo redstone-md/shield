@@ -38,7 +38,7 @@ func (s controlPlaneAuthorizerSpy) Authorize(ctx context.Context, workspaceID st
 
 func TestServer_getRuleSetHandler(t *testing.T) {
 	server := NewServer(Config{
-		Settings: Settings{InstanceID: "gr1"},
+		Settings: Settings{TenantID: "gr1"},
 		RuleSetProvider: ruleSetProviderSpy{
 			get: func(ctx context.Context, workspaceID string) (rules.RuleSet, error) {
 				assert.Equal(t, "gr1", workspaceID)
@@ -67,7 +67,7 @@ func TestServer_getRuleSetHandler(t *testing.T) {
 func TestServer_updateRuleSetHandler(t *testing.T) {
 	var captured rules.RuleSet
 	server := NewServer(Config{
-		Settings: Settings{InstanceID: "gr1"},
+		Settings: Settings{TenantID: "gr1"},
 		RuleSetProvider: ruleSetProviderSpy{
 			update: func(ctx context.Context, workspaceID string, source string, rs rules.RuleSet) (rules.RuleSet, error) {
 				assert.Equal(t, "gr1", workspaceID)
@@ -110,7 +110,7 @@ func TestServer_updateRuleSetHandler(t *testing.T) {
 
 func TestServer_updateRuleSetHandlerRejectsBadJSON(t *testing.T) {
 	server := NewServer(Config{
-		Settings:        Settings{InstanceID: "gr1"},
+		Settings:        Settings{TenantID: "gr1"},
 		RuleSetProvider: ruleSetProviderSpy{},
 	})
 
@@ -126,7 +126,7 @@ func TestServer_controlPlaneAuthMiddleware(t *testing.T) {
 	t.Run("allows read access", func(t *testing.T) {
 		called := false
 		server := NewServer(Config{
-			Settings: Settings{InstanceID: "gr1"},
+			Settings: Settings{TenantID: "gr1"},
 			ControlPlaneAuth: controlPlaneAuthorizerSpy{
 				authorize: func(ctx context.Context, workspaceID string, userID string, access string) error {
 					assert.Equal(t, "gr1", workspaceID)
@@ -152,7 +152,7 @@ func TestServer_controlPlaneAuthMiddleware(t *testing.T) {
 
 	t.Run("rejects missing authenticated user", func(t *testing.T) {
 		server := NewServer(Config{
-			Settings: Settings{InstanceID: "gr1"},
+			Settings: Settings{TenantID: "gr1"},
 			ControlPlaneAuth: controlPlaneAuthorizerSpy{
 				authorize: func(ctx context.Context, workspaceID string, userID string, access string) error {
 					t.Fatal("authorizer should not be called without basic auth")
@@ -173,7 +173,7 @@ func TestServer_controlPlaneAuthMiddleware(t *testing.T) {
 
 	t.Run("rejects write access denied by role", func(t *testing.T) {
 		server := NewServer(Config{
-			Settings: Settings{InstanceID: "gr1"},
+			Settings: Settings{TenantID: "gr1"},
 			ControlPlaneAuth: controlPlaneAuthorizerSpy{
 				authorize: func(ctx context.Context, workspaceID string, userID string, access string) error {
 					assert.Equal(t, "write", access)

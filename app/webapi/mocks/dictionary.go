@@ -15,19 +15,19 @@ import (
 //
 //		// make and configure a mocked webapi.Dictionary
 //		mockedDictionary := &DictionaryMock{
-//			AddFunc: func(ctx context.Context, t storage.DictionaryType, data string) error {
+//			AddFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType, data string) error {
 //				panic("mock out the Add method")
 //			},
-//			DeleteFunc: func(ctx context.Context, id int64) error {
+//			DeleteFunc: func(ctx context.Context, tenantID string, id int64) error {
 //				panic("mock out the Delete method")
 //			},
-//			ReadFunc: func(ctx context.Context, t storage.DictionaryType) ([]string, error) {
+//			ReadFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType) ([]string, error) {
 //				panic("mock out the Read method")
 //			},
-//			ReadWithIDsFunc: func(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+//			ReadWithIDsFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
 //				panic("mock out the ReadWithIDs method")
 //			},
-//			StatsFunc: func(ctx context.Context) (*storage.DictionaryStats, error) {
+//			StatsFunc: func(ctx context.Context, tenantID string) (*storage.DictionaryStats, error) {
 //				panic("mock out the Stats method")
 //			},
 //		}
@@ -38,19 +38,19 @@ import (
 //	}
 type DictionaryMock struct {
 	// AddFunc mocks the Add method.
-	AddFunc func(ctx context.Context, t storage.DictionaryType, data string) error
+	AddFunc func(ctx context.Context, tenantID string, t storage.DictionaryType, data string) error
 
 	// DeleteFunc mocks the Delete method.
-	DeleteFunc func(ctx context.Context, id int64) error
+	DeleteFunc func(ctx context.Context, tenantID string, id int64) error
 
 	// ReadFunc mocks the Read method.
-	ReadFunc func(ctx context.Context, t storage.DictionaryType) ([]string, error)
+	ReadFunc func(ctx context.Context, tenantID string, t storage.DictionaryType) ([]string, error)
 
 	// ReadWithIDsFunc mocks the ReadWithIDs method.
-	ReadWithIDsFunc func(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error)
+	ReadWithIDsFunc func(ctx context.Context, tenantID string, t storage.DictionaryType) ([]storage.DictionaryEntry, error)
 
 	// StatsFunc mocks the Stats method.
-	StatsFunc func(ctx context.Context) (*storage.DictionaryStats, error)
+	StatsFunc func(ctx context.Context, tenantID string) (*storage.DictionaryStats, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -58,6 +58,8 @@ type DictionaryMock struct {
 		Add []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// TenantID is the tenantID argument value.
+			TenantID string
 			// T is the t argument value.
 			T storage.DictionaryType
 			// Data is the data argument value.
@@ -67,6 +69,8 @@ type DictionaryMock struct {
 		Delete []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// TenantID is the tenantID argument value.
+			TenantID string
 			// ID is the id argument value.
 			ID int64
 		}
@@ -74,6 +78,8 @@ type DictionaryMock struct {
 		Read []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// TenantID is the tenantID argument value.
+			TenantID string
 			// T is the t argument value.
 			T storage.DictionaryType
 		}
@@ -81,6 +87,8 @@ type DictionaryMock struct {
 		ReadWithIDs []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// TenantID is the tenantID argument value.
+			TenantID string
 			// T is the t argument value.
 			T storage.DictionaryType
 		}
@@ -88,6 +96,8 @@ type DictionaryMock struct {
 		Stats []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// TenantID is the tenantID argument value.
+			TenantID string
 		}
 	}
 	lockAdd         sync.RWMutex
@@ -98,23 +108,25 @@ type DictionaryMock struct {
 }
 
 // Add calls AddFunc.
-func (mock *DictionaryMock) Add(ctx context.Context, t storage.DictionaryType, data string) error {
+func (mock *DictionaryMock) Add(ctx context.Context, tenantID string, t storage.DictionaryType, data string) error {
 	if mock.AddFunc == nil {
 		panic("DictionaryMock.AddFunc: method is nil but Dictionary.Add was just called")
 	}
 	callInfo := struct {
-		Ctx  context.Context
-		T    storage.DictionaryType
-		Data string
+		Ctx      context.Context
+		TenantID string
+		T        storage.DictionaryType
+		Data     string
 	}{
-		Ctx:  ctx,
-		T:    t,
-		Data: data,
+		Ctx:      ctx,
+		TenantID: tenantID,
+		T:        t,
+		Data:     data,
 	}
 	mock.lockAdd.Lock()
 	mock.calls.Add = append(mock.calls.Add, callInfo)
 	mock.lockAdd.Unlock()
-	return mock.AddFunc(ctx, t, data)
+	return mock.AddFunc(ctx, tenantID, t, data)
 }
 
 // AddCalls gets all the calls that were made to Add.
@@ -122,14 +134,16 @@ func (mock *DictionaryMock) Add(ctx context.Context, t storage.DictionaryType, d
 //
 //	len(mockedDictionary.AddCalls())
 func (mock *DictionaryMock) AddCalls() []struct {
-	Ctx  context.Context
-	T    storage.DictionaryType
-	Data string
+	Ctx      context.Context
+	TenantID string
+	T        storage.DictionaryType
+	Data     string
 } {
 	var calls []struct {
-		Ctx  context.Context
-		T    storage.DictionaryType
-		Data string
+		Ctx      context.Context
+		TenantID string
+		T        storage.DictionaryType
+		Data     string
 	}
 	mock.lockAdd.RLock()
 	calls = mock.calls.Add
@@ -145,21 +159,23 @@ func (mock *DictionaryMock) ResetAddCalls() {
 }
 
 // Delete calls DeleteFunc.
-func (mock *DictionaryMock) Delete(ctx context.Context, id int64) error {
+func (mock *DictionaryMock) Delete(ctx context.Context, tenantID string, id int64) error {
 	if mock.DeleteFunc == nil {
 		panic("DictionaryMock.DeleteFunc: method is nil but Dictionary.Delete was just called")
 	}
 	callInfo := struct {
-		Ctx context.Context
-		ID  int64
+		Ctx      context.Context
+		TenantID string
+		ID       int64
 	}{
-		Ctx: ctx,
-		ID:  id,
+		Ctx:      ctx,
+		TenantID: tenantID,
+		ID:       id,
 	}
 	mock.lockDelete.Lock()
 	mock.calls.Delete = append(mock.calls.Delete, callInfo)
 	mock.lockDelete.Unlock()
-	return mock.DeleteFunc(ctx, id)
+	return mock.DeleteFunc(ctx, tenantID, id)
 }
 
 // DeleteCalls gets all the calls that were made to Delete.
@@ -167,12 +183,14 @@ func (mock *DictionaryMock) Delete(ctx context.Context, id int64) error {
 //
 //	len(mockedDictionary.DeleteCalls())
 func (mock *DictionaryMock) DeleteCalls() []struct {
-	Ctx context.Context
-	ID  int64
+	Ctx      context.Context
+	TenantID string
+	ID       int64
 } {
 	var calls []struct {
-		Ctx context.Context
-		ID  int64
+		Ctx      context.Context
+		TenantID string
+		ID       int64
 	}
 	mock.lockDelete.RLock()
 	calls = mock.calls.Delete
@@ -188,21 +206,23 @@ func (mock *DictionaryMock) ResetDeleteCalls() {
 }
 
 // Read calls ReadFunc.
-func (mock *DictionaryMock) Read(ctx context.Context, t storage.DictionaryType) ([]string, error) {
+func (mock *DictionaryMock) Read(ctx context.Context, tenantID string, t storage.DictionaryType) ([]string, error) {
 	if mock.ReadFunc == nil {
 		panic("DictionaryMock.ReadFunc: method is nil but Dictionary.Read was just called")
 	}
 	callInfo := struct {
-		Ctx context.Context
-		T   storage.DictionaryType
+		Ctx      context.Context
+		TenantID string
+		T        storage.DictionaryType
 	}{
-		Ctx: ctx,
-		T:   t,
+		Ctx:      ctx,
+		TenantID: tenantID,
+		T:        t,
 	}
 	mock.lockRead.Lock()
 	mock.calls.Read = append(mock.calls.Read, callInfo)
 	mock.lockRead.Unlock()
-	return mock.ReadFunc(ctx, t)
+	return mock.ReadFunc(ctx, tenantID, t)
 }
 
 // ReadCalls gets all the calls that were made to Read.
@@ -210,12 +230,14 @@ func (mock *DictionaryMock) Read(ctx context.Context, t storage.DictionaryType) 
 //
 //	len(mockedDictionary.ReadCalls())
 func (mock *DictionaryMock) ReadCalls() []struct {
-	Ctx context.Context
-	T   storage.DictionaryType
+	Ctx      context.Context
+	TenantID string
+	T        storage.DictionaryType
 } {
 	var calls []struct {
-		Ctx context.Context
-		T   storage.DictionaryType
+		Ctx      context.Context
+		TenantID string
+		T        storage.DictionaryType
 	}
 	mock.lockRead.RLock()
 	calls = mock.calls.Read
@@ -231,21 +253,23 @@ func (mock *DictionaryMock) ResetReadCalls() {
 }
 
 // ReadWithIDs calls ReadWithIDsFunc.
-func (mock *DictionaryMock) ReadWithIDs(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+func (mock *DictionaryMock) ReadWithIDs(ctx context.Context, tenantID string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
 	if mock.ReadWithIDsFunc == nil {
 		panic("DictionaryMock.ReadWithIDsFunc: method is nil but Dictionary.ReadWithIDs was just called")
 	}
 	callInfo := struct {
-		Ctx context.Context
-		T   storage.DictionaryType
+		Ctx      context.Context
+		TenantID string
+		T        storage.DictionaryType
 	}{
-		Ctx: ctx,
-		T:   t,
+		Ctx:      ctx,
+		TenantID: tenantID,
+		T:        t,
 	}
 	mock.lockReadWithIDs.Lock()
 	mock.calls.ReadWithIDs = append(mock.calls.ReadWithIDs, callInfo)
 	mock.lockReadWithIDs.Unlock()
-	return mock.ReadWithIDsFunc(ctx, t)
+	return mock.ReadWithIDsFunc(ctx, tenantID, t)
 }
 
 // ReadWithIDsCalls gets all the calls that were made to ReadWithIDs.
@@ -253,12 +277,14 @@ func (mock *DictionaryMock) ReadWithIDs(ctx context.Context, t storage.Dictionar
 //
 //	len(mockedDictionary.ReadWithIDsCalls())
 func (mock *DictionaryMock) ReadWithIDsCalls() []struct {
-	Ctx context.Context
-	T   storage.DictionaryType
+	Ctx      context.Context
+	TenantID string
+	T        storage.DictionaryType
 } {
 	var calls []struct {
-		Ctx context.Context
-		T   storage.DictionaryType
+		Ctx      context.Context
+		TenantID string
+		T        storage.DictionaryType
 	}
 	mock.lockReadWithIDs.RLock()
 	calls = mock.calls.ReadWithIDs
@@ -274,19 +300,21 @@ func (mock *DictionaryMock) ResetReadWithIDsCalls() {
 }
 
 // Stats calls StatsFunc.
-func (mock *DictionaryMock) Stats(ctx context.Context) (*storage.DictionaryStats, error) {
+func (mock *DictionaryMock) Stats(ctx context.Context, tenantID string) (*storage.DictionaryStats, error) {
 	if mock.StatsFunc == nil {
 		panic("DictionaryMock.StatsFunc: method is nil but Dictionary.Stats was just called")
 	}
 	callInfo := struct {
-		Ctx context.Context
+		Ctx      context.Context
+		TenantID string
 	}{
-		Ctx: ctx,
+		Ctx:      ctx,
+		TenantID: tenantID,
 	}
 	mock.lockStats.Lock()
 	mock.calls.Stats = append(mock.calls.Stats, callInfo)
 	mock.lockStats.Unlock()
-	return mock.StatsFunc(ctx)
+	return mock.StatsFunc(ctx, tenantID)
 }
 
 // StatsCalls gets all the calls that were made to Stats.
@@ -294,10 +322,12 @@ func (mock *DictionaryMock) Stats(ctx context.Context) (*storage.DictionaryStats
 //
 //	len(mockedDictionary.StatsCalls())
 func (mock *DictionaryMock) StatsCalls() []struct {
-	Ctx context.Context
+	Ctx      context.Context
+	TenantID string
 } {
 	var calls []struct {
-		Ctx context.Context
+		Ctx      context.Context
+		TenantID string
 	}
 	mock.lockStats.RLock()
 	calls = mock.calls.Stats

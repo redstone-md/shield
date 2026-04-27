@@ -20,57 +20,59 @@ import (
 )
 
 type approvedUsersProviderSpy struct {
-	list   func(ctx context.Context) ([]approved.UserInfo, error)
-	add    func(ctx context.Context, user approved.UserInfo) error
-	remove func(ctx context.Context, id string) error
+	list   func(ctx context.Context, tenantID string) ([]approved.UserInfo, error)
+	add    func(ctx context.Context, tenantID string, user approved.UserInfo) error
+	remove func(ctx context.Context, tenantID string, id string) error
 }
 
-func (s approvedUsersProviderSpy) List(ctx context.Context) ([]approved.UserInfo, error) {
-	return s.list(ctx)
+func (s approvedUsersProviderSpy) List(ctx context.Context, tenantID string) ([]approved.UserInfo, error) {
+	return s.list(ctx, tenantID)
 }
-func (s approvedUsersProviderSpy) Add(ctx context.Context, user approved.UserInfo) error {
-	return s.add(ctx, user)
+func (s approvedUsersProviderSpy) Add(ctx context.Context, tenantID string, user approved.UserInfo) error {
+	return s.add(ctx, tenantID, user)
 }
-func (s approvedUsersProviderSpy) Remove(ctx context.Context, id string) error {
-	return s.remove(ctx, id)
+func (s approvedUsersProviderSpy) Remove(ctx context.Context, tenantID string, id string) error {
+	return s.remove(ctx, tenantID, id)
 }
 
 type dictionaryProviderSpy struct {
-	add         func(ctx context.Context, t storage.DictionaryType, data string) error
-	delete      func(ctx context.Context, id int64) error
-	read        func(ctx context.Context, t storage.DictionaryType) ([]string, error)
-	readWithIDs func(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error)
-	stats       func(ctx context.Context) (*storage.DictionaryStats, error)
+	add         func(ctx context.Context, tenantID string, t storage.DictionaryType, data string) error
+	delete      func(ctx context.Context, tenantID string, id int64) error
+	read        func(ctx context.Context, tenantID string, t storage.DictionaryType) ([]string, error)
+	readWithIDs func(ctx context.Context, tenantID string, t storage.DictionaryType) ([]storage.DictionaryEntry, error)
+	stats       func(ctx context.Context, tenantID string) (*storage.DictionaryStats, error)
 }
 
-func (s dictionaryProviderSpy) Add(ctx context.Context, t storage.DictionaryType, data string) error {
-	return s.add(ctx, t, data)
+func (s dictionaryProviderSpy) Add(ctx context.Context, tenantID string, t storage.DictionaryType, data string) error {
+	return s.add(ctx, tenantID, t, data)
 }
-func (s dictionaryProviderSpy) Delete(ctx context.Context, id int64) error { return s.delete(ctx, id) }
-func (s dictionaryProviderSpy) Read(ctx context.Context, t storage.DictionaryType) ([]string, error) {
-	return s.read(ctx, t)
+func (s dictionaryProviderSpy) Delete(ctx context.Context, tenantID string, id int64) error {
+	return s.delete(ctx, tenantID, id)
 }
-func (s dictionaryProviderSpy) ReadWithIDs(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
-	return s.readWithIDs(ctx, t)
+func (s dictionaryProviderSpy) Read(ctx context.Context, tenantID string, t storage.DictionaryType) ([]string, error) {
+	return s.read(ctx, tenantID, t)
 }
-func (s dictionaryProviderSpy) Stats(ctx context.Context) (*storage.DictionaryStats, error) {
-	return s.stats(ctx)
+func (s dictionaryProviderSpy) ReadWithIDs(ctx context.Context, tenantID string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+	return s.readWithIDs(ctx, tenantID, t)
+}
+func (s dictionaryProviderSpy) Stats(ctx context.Context, tenantID string) (*storage.DictionaryStats, error) {
+	return s.stats(ctx, tenantID)
 }
 
 type detectedSpamProviderSpy struct {
-	read              func(ctx context.Context) ([]storage.DetectedSpamInfo, error)
-	findByUserID      func(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error)
-	setAddedToSamples func(ctx context.Context, id int64) error
+	read              func(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error)
+	findByUserID      func(ctx context.Context, tenantID string, userID int64) (*storage.DetectedSpamInfo, error)
+	setAddedToSamples func(ctx context.Context, tenantID string, id int64) error
 }
 
-func (s detectedSpamProviderSpy) Read(ctx context.Context) ([]storage.DetectedSpamInfo, error) {
-	return s.read(ctx)
+func (s detectedSpamProviderSpy) Read(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error) {
+	return s.read(ctx, tenantID)
 }
-func (s detectedSpamProviderSpy) FindByUserID(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error) {
-	return s.findByUserID(ctx, userID)
+func (s detectedSpamProviderSpy) FindByUserID(ctx context.Context, tenantID string, userID int64) (*storage.DetectedSpamInfo, error) {
+	return s.findByUserID(ctx, tenantID, userID)
 }
-func (s detectedSpamProviderSpy) SetAddedToSamplesFlag(ctx context.Context, id int64) error {
-	return s.setAddedToSamples(ctx, id)
+func (s detectedSpamProviderSpy) SetAddedToSamplesFlag(ctx context.Context, _ string, id int64) error {
+	return s.setAddedToSamples(ctx, "", id)
 }
 
 func TestServer_routesThroughApprovedUsersProvider(t *testing.T) {
@@ -79,18 +81,18 @@ func TestServer_routesThroughApprovedUsersProvider(t *testing.T) {
 	listCalled := false
 
 	provider := approvedUsersProviderSpy{
-		add: func(ctx context.Context, user approved.UserInfo) error {
+		add: func(ctx context.Context, tenantID string, user approved.UserInfo) error {
 			addCalled = true
 			assert.Equal(t, "42", user.UserID)
 			assert.Equal(t, "alice", user.UserName)
 			return nil
 		},
-		remove: func(ctx context.Context, id string) error {
+		remove: func(ctx context.Context, tenantID string, id string) error {
 			removeCalled = true
 			assert.Equal(t, "42", id)
 			return nil
 		},
-		list: func(ctx context.Context) ([]approved.UserInfo, error) {
+		list: func(ctx context.Context, tenantID string) ([]approved.UserInfo, error) {
 			listCalled = true
 			return []approved.UserInfo{{UserID: "42", UserName: "alice"}}, nil
 		},
@@ -110,7 +112,7 @@ func TestServer_routesThroughApprovedUsersProvider(t *testing.T) {
 		Detector:              detectorMock,
 		SpamFilter:            spamFilterMock,
 		ApprovedUsersProvider: provider,
-		Settings:              Settings{InstanceID: "gr1"},
+		Settings:              Settings{TenantID: "gr1"},
 	})
 	ts := httptest.NewServer(server.routes(routegroup.New(http.NewServeMux())))
 	defer ts.Close()
@@ -153,25 +155,25 @@ func TestServer_routesThroughDictionaryProvider(t *testing.T) {
 	readCalled := false
 
 	provider := dictionaryProviderSpy{
-		add: func(ctx context.Context, dt storage.DictionaryType, data string) error {
+		add: func(ctx context.Context, _ string, dt storage.DictionaryType, data string) error {
 			addCalled = true
 			assert.Equal(t, storage.DictionaryTypeStopPhrase, dt)
 			assert.Equal(t, "bad word", data)
 			return nil
 		},
-		delete: func(ctx context.Context, id int64) error {
+		delete: func(ctx context.Context, _ string, id int64) error {
 			deleteCalled = true
 			assert.Equal(t, int64(7), id)
 			return nil
 		},
-		read: func(ctx context.Context, dt storage.DictionaryType) ([]string, error) {
+		read: func(ctx context.Context, _ string, dt storage.DictionaryType) ([]string, error) {
 			readCalled = true
 			return []string{"bad word"}, nil
 		},
-		readWithIDs: func(ctx context.Context, dt storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+		readWithIDs: func(ctx context.Context, _ string, dt storage.DictionaryType) ([]storage.DictionaryEntry, error) {
 			return nil, nil
 		},
-		stats: func(ctx context.Context) (*storage.DictionaryStats, error) {
+		stats: func(ctx context.Context, _ string) (*storage.DictionaryStats, error) {
 			return nil, nil
 		},
 	}
@@ -183,7 +185,7 @@ func TestServer_routesThroughDictionaryProvider(t *testing.T) {
 		GetLuaPluginNamesFunc: func() []string { return nil },
 	}
 	dictStoreMock := &mocks.DictionaryMock{
-		AddFunc: func(ctx context.Context, t storage.DictionaryType, data string) error {
+		AddFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType, data string) error {
 			return nil
 		},
 	}
@@ -196,7 +198,7 @@ func TestServer_routesThroughDictionaryProvider(t *testing.T) {
 		SpamFilter:         spamFilterMock,
 		DictionaryStore:    dictStoreMock,
 		DictionaryProvider: provider,
-		Settings:           Settings{InstanceID: "gr1"},
+		Settings:           Settings{TenantID: "gr1"},
 	})
 	ts := httptest.NewServer(server.routes(routegroup.New(http.NewServeMux())))
 	defer ts.Close()
@@ -236,7 +238,7 @@ func TestServer_routesThroughDetectedSpamProvider(t *testing.T) {
 	readCalled := false
 
 	provider := detectedSpamProviderSpy{
-		findByUserID: func(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error) {
+		findByUserID: func(ctx context.Context, tenantID string, userID int64) (*storage.DetectedSpamInfo, error) {
 			findCalled = true
 			assert.Equal(t, int64(123), userID)
 			return &storage.DetectedSpamInfo{
@@ -247,13 +249,13 @@ func TestServer_routesThroughDetectedSpamProvider(t *testing.T) {
 				Checks:   []spamcheck.Response{{Spam: true, Name: "test", Details: "detected"}},
 			}, nil
 		},
-		read: func(ctx context.Context) ([]storage.DetectedSpamInfo, error) {
+		read: func(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error) {
 			readCalled = true
 			return []storage.DetectedSpamInfo{
 				{ID: 1, UserID: 123, UserName: "spammer", Text: "spam text"},
 			}, nil
 		},
-		setAddedToSamples: func(ctx context.Context, id int64) error { return nil },
+		setAddedToSamples: func(ctx context.Context, tenantID string, id int64) error { return nil },
 	}
 
 	detectorMock := &mocks.DetectorMock{
@@ -263,10 +265,10 @@ func TestServer_routesThroughDetectedSpamProvider(t *testing.T) {
 		GetLuaPluginNamesFunc: func() []string { return nil },
 	}
 	detectedSpamStoreMock := &mocks.DetectedSpamMock{
-		FindByUserIDFunc: func(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error) {
+		FindByUserIDFunc: func(ctx context.Context, tenantID string, userID int64) (*storage.DetectedSpamInfo, error) {
 			return nil, nil
 		},
-		ReadFunc: func(ctx context.Context) ([]storage.DetectedSpamInfo, error) {
+		ReadFunc: func(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error) {
 			return nil, nil
 		},
 	}
@@ -279,7 +281,7 @@ func TestServer_routesThroughDetectedSpamProvider(t *testing.T) {
 		SpamFilter:           spamFilterMock,
 		DetectedSpamStore:    detectedSpamStoreMock,
 		DetectedSpamProvider: provider,
-		Settings:             Settings{InstanceID: "gr1"},
+		Settings:             Settings{TenantID: "gr1"},
 	})
 	ts := httptest.NewServer(server.routes(routegroup.New(http.NewServeMux())))
 	defer ts.Close()

@@ -25,7 +25,7 @@ import (
 func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
 	t.Run("success json", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			DeleteFunc: func(ctx context.Context, id int64) error {
+			DeleteFunc: func(ctx context.Context, tenantID string, id int64) error {
 				return nil
 			},
 		}
@@ -57,7 +57,7 @@ func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("error deleting", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			DeleteFunc: func(ctx context.Context, id int64) error {
+			DeleteFunc: func(ctx context.Context, tenantID string, id int64) error {
 				return errors.New("not found")
 			},
 		}
@@ -114,10 +114,10 @@ func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("success htmx", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			DeleteFunc: func(ctx context.Context, id int64) error {
+			DeleteFunc: func(ctx context.Context, tenantID string, id int64) error {
 				return nil
 			},
-			ReadWithIDsFunc: func(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+			ReadWithIDsFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
 				return []storage.DictionaryEntry{{ID: 2, Data: "remaining phrase"}}, nil
 			},
 		}
@@ -174,7 +174,7 @@ func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("reload error json", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			DeleteFunc: func(ctx context.Context, id int64) error {
+			DeleteFunc: func(ctx context.Context, tenantID string, id int64) error {
 				return nil
 			},
 		}
@@ -205,10 +205,10 @@ func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("reload error htmx", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{
-			DeleteFunc: func(ctx context.Context, id int64) error {
+			DeleteFunc: func(ctx context.Context, tenantID string, id int64) error {
 				return nil
 			},
-			ReadWithIDsFunc: func(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+			ReadWithIDsFunc: func(ctx context.Context, tenantID string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
 				return []storage.DictionaryEntry{{ID: 2, Data: "remaining phrase"}}, nil
 			},
 		}
@@ -267,7 +267,7 @@ func TestServer_ErrorResponseContentType(t *testing.T) {
 
 	t.Run("check id handler internal error", func(t *testing.T) {
 		mockDetectedSpam := &mocks.DetectedSpamMock{
-			FindByUserIDFunc: func(_ context.Context, _ int64) (*storage.DetectedSpamInfo, error) {
+			FindByUserIDFunc: func(_ context.Context, _ string, _ int64) (*storage.DetectedSpamInfo, error) {
 				return nil, assert.AnError
 			},
 		}
@@ -336,7 +336,7 @@ func TestServer_ErrorResponseContentType(t *testing.T) {
 		req := httptest.NewRequest("POST", "/users/add", bytes.NewBuffer(reqBody))
 		rr := httptest.NewRecorder()
 
-		handler := server.updateApprovedUsersHandler(func(_ context.Context, ui approved.UserInfo) error {
+		handler := server.updateApprovedUsersHandler(func(_ context.Context, _ string, ui approved.UserInfo) error {
 			return mockDetector.AddApprovedUser(ui)
 		})
 		handler(rr, req)

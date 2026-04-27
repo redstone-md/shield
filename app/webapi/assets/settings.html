@@ -27,7 +27,7 @@
                                 <tbody>
                                     <tr><th style="width: 30%">Version</th><td>{{.Version}}</td></tr>
                                     <tr><th>Uptime</th><td>{{.System.Uptime}}</td></tr>
-                                    <tr><th>Instance ID</th><td>{{.InstanceID}}</td></tr>
+                                    <tr><th>Tenant ID</th><td>{{.TenantID}}</td></tr>
                                     <tr><th>Primary Group</th><td>{{.PrimaryGroup}}</td></tr>
                                     <tr><th>Admin Group</th><td>{{.AdminGroup}}</td></tr>
                                 </tbody>
@@ -40,7 +40,7 @@
                                 </thead>
                                 <tbody>
                                     <tr><th style="width: 30%">Type</th><td>{{.Database.Type}}</td></tr>
-                                    <tr><th>Group ID</th><td>{{.Database.GID}}</td></tr>
+                                    <tr><th>Tenant ID</th><td>{{.Database.TenantID}}</td></tr>
                                     <tr><th>Status</th><td>
                                         {{if eq .Database.Status "Connected"}}
                                             <span class="badge" style="background-color: #28a745;">{{.Database.Status}}</span>

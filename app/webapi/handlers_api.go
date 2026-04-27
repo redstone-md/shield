@@ -76,7 +76,7 @@ func (s *Server) checkIDHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	si, err := s.detectedSpam().FindByUserID(r.Context(), userID)
+	si, err := s.detectedSpam().FindByUserID(r.Context(), s.Settings.TenantID, userID)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get user info", "details": err.Error()})
 		return
@@ -179,7 +179,7 @@ func (s *Server) reloadDynamicSamplesHandler(w http.ResponseWriter, _ *http.Requ
 	rest.RenderJSON(w, rest.JSON{"reloaded": true})
 }
 
-func (s *Server) updateApprovedUsersHandler(updFn func(ctx context.Context, ui approved.UserInfo) error) func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) updateApprovedUsersHandler(updFn func(ctx context.Context, tenantID string, ui approved.UserInfo) error) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		req := approved.UserInfo{}
 		isHtmxRequest := r.Header.Get("HX-Request") == "true"
@@ -207,14 +207,14 @@ func (s *Server) updateApprovedUsersHandler(updFn func(ctx context.Context, ui a
 			return
 		}
 
-		if err := updFn(r.Context(), req); err != nil {
+		if err := updFn(r.Context(), s.Settings.TenantID, req); err != nil {
 			_ = rest.EncodeJSON(w, http.StatusInternalServerError,
 				rest.JSON{"error": "can't update approved users", "details": err.Error()})
 			return
 		}
 
 		if isHtmxRequest {
-			users, _ := s.approvedUsers().List(r.Context())
+			users, _ := s.approvedUsers().List(r.Context(), s.Settings.TenantID)
 			tmplData := struct {
 				ApprovedUsers      []approved.UserInfo
 				TotalApprovedUsers int
@@ -232,15 +232,15 @@ func (s *Server) updateApprovedUsersHandler(updFn func(ctx context.Context, ui a
 	}
 }
 
-func (s *Server) removeApprovedUserAdapter(ctx context.Context, req approved.UserInfo) error {
-	if err := s.approvedUsers().Remove(ctx, req.UserID); err != nil {
+func (s *Server) removeApprovedUserAdapter(ctx context.Context, _ string, req approved.UserInfo) error {
+	if err := s.approvedUsers().Remove(ctx, s.Settings.TenantID, req.UserID); err != nil {
 		return fmt.Errorf("failed to remove approved user %s: %w", req.UserID, err)
 	}
 	return nil
 }
 
 func (s *Server) getApprovedUsersHandler(w http.ResponseWriter, r *http.Request) {
-	users, _ := s.approvedUsers().List(r.Context())
+	users, _ := s.approvedUsers().List(r.Context(), s.Settings.TenantID)
 	rest.RenderJSON(w, rest.JSON{"user_ids": users})
 }
 
@@ -255,15 +255,15 @@ type detectorApprovedUsersAdapter struct {
 	detector Detector
 }
 
-func (a detectorApprovedUsersAdapter) List(_ context.Context) ([]approved.UserInfo, error) {
+func (a detectorApprovedUsersAdapter) List(_ context.Context, _ string) ([]approved.UserInfo, error) {
 	return a.detector.ApprovedUsers(), nil
 }
 
-func (a detectorApprovedUsersAdapter) Add(_ context.Context, user approved.UserInfo) error {
+func (a detectorApprovedUsersAdapter) Add(_ context.Context, _ string, user approved.UserInfo) error {
 	return a.detector.AddApprovedUser(user)
 }
 
-func (a detectorApprovedUsersAdapter) Remove(_ context.Context, id string) error {
+func (a detectorApprovedUsersAdapter) Remove(_ context.Context, _ string, id string) error {
 	return a.detector.RemoveApprovedUser(id)
 }
 
@@ -289,24 +289,24 @@ type dictionaryStoreAdapter struct {
 	spamFilter SpamFilter
 }
 
-func (a dictionaryStoreAdapter) Read(ctx context.Context, t storage.DictionaryType) ([]string, error) {
-	return a.store.Read(ctx, t)
+func (a dictionaryStoreAdapter) Read(ctx context.Context, _ string, t storage.DictionaryType) ([]string, error) {
+	return a.store.Read(ctx, "", t)
 }
 
-func (a dictionaryStoreAdapter) ReadWithIDs(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
-	return a.store.ReadWithIDs(ctx, t)
+func (a dictionaryStoreAdapter) ReadWithIDs(ctx context.Context, _ string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+	return a.store.ReadWithIDs(ctx, "", t)
 }
 
-func (a dictionaryStoreAdapter) Add(ctx context.Context, t storage.DictionaryType, data string) error {
-	return a.store.Add(ctx, t, data)
+func (a dictionaryStoreAdapter) Add(ctx context.Context, _ string, t storage.DictionaryType, data string) error {
+	return a.store.Add(ctx, "", t, data)
 }
 
-func (a dictionaryStoreAdapter) Delete(ctx context.Context, id int64) error {
-	return a.store.Delete(ctx, id)
+func (a dictionaryStoreAdapter) Delete(ctx context.Context, _ string, id int64) error {
+	return a.store.Delete(ctx, "", id)
 }
 
-func (a dictionaryStoreAdapter) Stats(ctx context.Context) (*storage.DictionaryStats, error) {
-	return a.store.Stats(ctx)
+func (a dictionaryStoreAdapter) Stats(ctx context.Context, _ string) (*storage.DictionaryStats, error) {
+	return a.store.Stats(ctx, "")
 }
 
 func (s *Server) getSettingsHandler(w http.ResponseWriter, _ *http.Request) {
@@ -319,7 +319,7 @@ func (s *Server) getRuleSetHandler(w http.ResponseWriter, r *http.Request) {
 		_ = rest.EncodeJSON(w, http.StatusNotImplemented, rest.JSON{"error": "rule set service not available"})
 		return
 	}
-	rs, err := s.RuleSetProvider.Get(r.Context(), s.Settings.InstanceID)
+	rs, err := s.RuleSetProvider.Get(r.Context(), s.Settings.TenantID)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get rule set", "details": err.Error()})
 		return
@@ -337,7 +337,7 @@ func (s *Server) updateRuleSetHandler(w http.ResponseWriter, r *http.Request) {
 		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "can't decode request", "details": err.Error()})
 		return
 	}
-	updated, err := s.RuleSetProvider.Update(r.Context(), s.Settings.InstanceID, "api", rs)
+	updated, err := s.RuleSetProvider.Update(r.Context(), s.Settings.TenantID, "api", rs)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't update rule set", "details": err.Error()})
 		return
@@ -347,12 +347,12 @@ func (s *Server) updateRuleSetHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getDictionaryEntriesHandler(w http.ResponseWriter, r *http.Request) {
 	dict := s.dictionary()
-	stopPhrases, err := dict.Read(r.Context(), storage.DictionaryTypeStopPhrase)
+	stopPhrases, err := dict.Read(r.Context(), s.Settings.TenantID, storage.DictionaryTypeStopPhrase)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get stop phrases", "details": err.Error()})
 		return
 	}
-	ignoredWords, err := dict.Read(r.Context(), storage.DictionaryTypeIgnoredWord)
+	ignoredWords, err := dict.Read(r.Context(), s.Settings.TenantID, storage.DictionaryTypeIgnoredWord)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get ignored words", "details": err.Error()})
 		return
@@ -398,7 +398,7 @@ func (s *Server) addDictionaryEntryHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	dict := s.dictionary()
-	if err := dict.Add(r.Context(), dictType, req.Data); err != nil {
+	if err := dict.Add(r.Context(), s.Settings.TenantID, dictType, req.Data); err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't add entry", "details": err.Error()})
 		return
 	}
@@ -441,7 +441,7 @@ func (s *Server) deleteDictionaryEntryHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	dict := s.dictionary()
-	if err := dict.Delete(r.Context(), req.ID); err != nil {
+	if err := dict.Delete(r.Context(), s.Settings.TenantID, req.ID); err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't delete entry", "details": err.Error()})
 		return
 	}

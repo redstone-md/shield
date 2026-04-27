@@ -396,13 +396,13 @@ func TestAssembleRuntimeUsesActiveRuleSet(t *testing.T) {
 	db, err := engine.New(ctx, fmt.Sprintf("sqlite://%s", path.Join(tmpDir, "tg-spam.db")), opts.InstanceID)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx,
-		"INSERT INTO rule_set_versions (workspace_id, gid, version, source, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-		"gr1", opts.InstanceID, 2, "test", `{"workspace_id":"gr1","version":2,"source":"test","meta":{"links_limit":5,"mentions_limit":4},"duplicates":{"threshold":4,"window":60000000000},"abnormal_spacing":{"enabled":true,"space_ratio_threshold":0.25,"short_word_ratio_threshold":0.6,"short_word_len":5,"min_words":8},"moderation":{"first_strike":900000000000,"second_strike":21600000000000,"soft_ban":true,"dry_run":true},"reports":{"enabled":true,"threshold":5,"auto_ban_threshold":6,"rate_limit":2,"rate_period":120000000000},"openai":{"enabled":false,"veto":true,"model":"gpt-active","history_size":3,"check_short_messages":true},"gemini":{"enabled":false,"veto":false,"model":"gemini-active","history_size":7,"check_short_messages":false}}`,
+		"INSERT INTO rule_set_versions (workspace_id, gid, tenant_id, version, source, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		"gr1", opts.InstanceID, opts.InstanceID, 2, "test", `{"workspace_id":"gr1","version":2,"source":"test","meta":{"links_limit":5,"mentions_limit":4},"duplicates":{"threshold":4,"window":60000000000},"abnormal_spacing":{"enabled":true,"space_ratio_threshold":0.25,"short_word_ratio_threshold":0.6,"short_word_len":5,"min_words":8},"moderation":{"first_strike":900000000000,"second_strike":21600000000000,"soft_ban":true,"dry_run":true},"reports":{"enabled":true,"threshold":5,"auto_ban_threshold":6,"rate_limit":2,"rate_period":120000000000},"openai":{"enabled":false,"veto":true,"model":"gpt-active","history_size":3,"check_short_messages":true},"gemini":{"enabled":false,"veto":false,"model":"gemini-active","history_size":7,"check_short_messages":false}}`,
 		time.Now().UTC(),
 	)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx,
-		"UPDATE rule_sets SET active_version = ?, updated_at = ? WHERE workspace_id = ? AND gid = ?",
+		"UPDATE rule_sets SET active_version = ?, updated_at = ? WHERE workspace_id = ? AND tenant_id = ?",
 		2, time.Now().UTC(), "gr1", opts.InstanceID,
 	)
 	require.NoError(t, err)
@@ -529,12 +529,12 @@ func TestCacheInvalidationOnControlPlaneChanges(t *testing.T) {
 	spamNotified := 0
 	assembly.DetectedSpamService.OnChange(func() { spamNotified++ })
 
-	require.NoError(t, assembly.ApprovedUsersService.Add(ctx, approved.UserInfo{UserID: "u1", UserName: "user1"}))
+	require.NoError(t, assembly.ApprovedUsersService.Add(ctx, opts.InstanceID, approved.UserInfo{UserID: "u1", UserName: "user1"}))
 	assert.Equal(t, 1, approvedNotified)
 
-	require.NoError(t, assembly.DictionaryService.Add(ctx, storage.DictionaryTypeStopPhrase, "test phrase"))
+	require.NoError(t, assembly.DictionaryService.Add(ctx, opts.InstanceID, storage.DictionaryTypeStopPhrase, "test phrase"))
 	assert.Equal(t, 1, dictNotified)
 
-	require.NoError(t, assembly.DetectedSpamService.SetAddedToSamplesFlag(ctx, 999))
+	require.NoError(t, assembly.DetectedSpamService.SetAddedToSamplesFlag(ctx, opts.InstanceID, 999))
 	assert.Equal(t, 1, spamNotified)
 }

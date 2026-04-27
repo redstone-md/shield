@@ -40,7 +40,7 @@ func TestServer_routes(t *testing.T) {
 		},
 	}
 	detectedSpamMock := &mocks.DetectedSpamMock{
-		FindByUserIDFunc: func(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error) {
+		FindByUserIDFunc: func(ctx context.Context, tenantID string, userID int64) (*storage.DetectedSpamInfo, error) {
 			if userID == 123 {
 				return &storage.DetectedSpamInfo{
 					ID:        123,

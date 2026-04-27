@@ -198,7 +198,9 @@ func TestServer_updateApprovedUsersHandler(t *testing.T) {
 	}
 
 	server := NewServer(Config{Detector: mockDetector, Locator: locatorMock})
-	addFn := func(_ context.Context, ui approved.UserInfo) error { return server.Detector.AddApprovedUser(ui) }
+	addFn := func(_ context.Context, _ string, ui approved.UserInfo) error {
+		return server.Detector.AddApprovedUser(ui)
+	}
 
 	t.Run("successful update by name", func(t *testing.T) {
 		mockDetector.ResetCalls()
@@ -298,7 +300,7 @@ func TestServer_updateApprovedUsersHandler(t *testing.T) {
 func TestServer_htmlDetectedSpamHandler(t *testing.T) {
 	t.Run("successful rendering", func(t *testing.T) {
 		ds := &mocks.DetectedSpamMock{
-			ReadFunc: func(ctx context.Context) ([]storage.DetectedSpamInfo, error) {
+			ReadFunc: func(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error) {
 				ts := time.Now()
 				return []storage.DetectedSpamInfo{
 					{
@@ -342,7 +344,7 @@ func TestServer_htmlDetectedSpamHandler(t *testing.T) {
 
 	t.Run("read failure", func(t *testing.T) {
 		ds := &mocks.DetectedSpamMock{
-			ReadFunc: func(ctx context.Context) ([]storage.DetectedSpamInfo, error) {
+			ReadFunc: func(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error) {
 				return nil, errors.New("test error")
 			},
 		}
@@ -362,7 +364,7 @@ func TestServer_htmlDetectedSpamHandler(t *testing.T) {
 func TestServer_htmlAddDetectedSpamHandler(t *testing.T) {
 	t.Run("successful addition", func(t *testing.T) {
 		ds := &mocks.DetectedSpamMock{
-			SetAddedToSamplesFlagFunc: func(ctx context.Context, id int64) error {
+			SetAddedToSamplesFlagFunc: func(ctx context.Context, tenantID string, id int64) error {
 				return nil
 			},
 		}
@@ -441,7 +443,7 @@ func TestServer_htmlAddDetectedSpamHandler(t *testing.T) {
 
 	t.Run("set flag error", func(t *testing.T) {
 		ds := &mocks.DetectedSpamMock{
-			SetAddedToSamplesFlagFunc: func(ctx context.Context, id int64) error {
+			SetAddedToSamplesFlagFunc: func(ctx context.Context, tenantID string, id int64) error {
 				return errors.New("flag update error")
 			},
 		}

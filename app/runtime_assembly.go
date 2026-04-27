@@ -269,7 +269,7 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 	listener := &events.TelegramListener{
 		TbAPI:               tbAPI,
 		BotUsername:         tbAPI.Self.UserName,
-		InstanceID:          opts.InstanceID,
+		TenantID:            opts.InstanceID,
 		Group:               opts.Telegram.Group,
 		IdleDuration:        opts.Telegram.IdleDuration,
 		SuperUsers:          opts.SuperUsers,

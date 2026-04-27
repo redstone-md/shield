@@ -25,7 +25,7 @@ import (
 
 func (s *Server) downloadDetectedSpamHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	spam, err := s.detectedSpam().Read(ctx)
+	spam, err := s.detectedSpam().Read(ctx, s.Settings.TenantID)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get detected spam", "details": err.Error()})
 		return
@@ -224,13 +224,13 @@ func (s *Server) reverseSamples(spam, ham []string) (revSpam, revHam []string) {
 // renderDictionary renders dictionary entries for HTMX or full page request
 func (s *Server) renderDictionary(ctx context.Context, w http.ResponseWriter, tmplName string) {
 	dict := s.dictionary()
-	stopPhrases, err := dict.ReadWithIDs(ctx, storage.DictionaryTypeStopPhrase)
+	stopPhrases, err := dict.ReadWithIDs(ctx, s.Settings.TenantID, storage.DictionaryTypeStopPhrase)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't fetch stop phrases", "details": err.Error()})
 		return
 	}
 
-	ignoredWords, err := dict.ReadWithIDs(ctx, storage.DictionaryTypeIgnoredWord)
+	ignoredWords, err := dict.ReadWithIDs(ctx, s.Settings.TenantID, storage.DictionaryTypeIgnoredWord)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't fetch ignored words", "details": err.Error()})
 		return

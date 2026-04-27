@@ -227,7 +227,7 @@ func TestServer_getSettingsHandler(t *testing.T) {
 		}
 
 		settings := Settings{
-			InstanceID:        "test",
+			TenantID:        "test",
 			LuaPluginsEnabled: true,
 			LuaPluginsDir:     "/path/to/plugins",
 			LuaEnabledPlugins: []string{"plugin1", "plugin2"},
@@ -247,7 +247,7 @@ func TestServer_getSettingsHandler(t *testing.T) {
 		var respSettings Settings
 		err = json.Unmarshal(rr.Body.Bytes(), &respSettings)
 		require.NoError(t, err)
-		assert.Equal(t, settings.InstanceID, respSettings.InstanceID)
+		assert.Equal(t, settings.TenantID, respSettings.TenantID)
 		assert.Equal(t, settings.LuaPluginsEnabled, respSettings.LuaPluginsEnabled)
 		assert.Equal(t, settings.LuaPluginsDir, respSettings.LuaPluginsDir)
 		assert.Equal(t, settings.LuaEnabledPlugins, respSettings.LuaEnabledPlugins)
@@ -263,7 +263,7 @@ func TestServer_getSettingsHandler(t *testing.T) {
 		}
 
 		settings := Settings{
-			InstanceID:        "test",
+			TenantID:        "test",
 			LuaPluginsEnabled: false,
 		}
 
@@ -280,7 +280,7 @@ func TestServer_getSettingsHandler(t *testing.T) {
 		var respSettings Settings
 		err = json.Unmarshal(rr.Body.Bytes(), &respSettings)
 		require.NoError(t, err)
-		assert.Equal(t, settings.InstanceID, respSettings.InstanceID)
+		assert.Equal(t, settings.TenantID, respSettings.TenantID)
 		assert.Equal(t, settings.LuaPluginsEnabled, respSettings.LuaPluginsEnabled)
 		assert.Empty(t, respSettings.LuaAvailablePlugins)
 		assert.Len(t, detectorMock.GetLuaPluginNamesCalls(), 1)

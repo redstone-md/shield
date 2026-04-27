@@ -15,13 +15,13 @@ import (
 //
 //		// make and configure a mocked webapi.DetectedSpam
 //		mockedDetectedSpam := &DetectedSpamMock{
-//			FindByUserIDFunc: func(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error) {
+//			FindByUserIDFunc: func(ctx context.Context, tenantID string, userID int64) (*storage.DetectedSpamInfo, error) {
 //				panic("mock out the FindByUserID method")
 //			},
-//			ReadFunc: func(ctx context.Context) ([]storage.DetectedSpamInfo, error) {
+//			ReadFunc: func(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error) {
 //				panic("mock out the Read method")
 //			},
-//			SetAddedToSamplesFlagFunc: func(ctx context.Context, id int64) error {
+//			SetAddedToSamplesFlagFunc: func(ctx context.Context, tenantID string, id int64) error {
 //				panic("mock out the SetAddedToSamplesFlag method")
 //			},
 //		}
@@ -32,13 +32,13 @@ import (
 //	}
 type DetectedSpamMock struct {
 	// FindByUserIDFunc mocks the FindByUserID method.
-	FindByUserIDFunc func(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error)
+	FindByUserIDFunc func(ctx context.Context, tenantID string, userID int64) (*storage.DetectedSpamInfo, error)
 
 	// ReadFunc mocks the Read method.
-	ReadFunc func(ctx context.Context) ([]storage.DetectedSpamInfo, error)
+	ReadFunc func(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error)
 
 	// SetAddedToSamplesFlagFunc mocks the SetAddedToSamplesFlag method.
-	SetAddedToSamplesFlagFunc func(ctx context.Context, id int64) error
+	SetAddedToSamplesFlagFunc func(ctx context.Context, tenantID string, id int64) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -46,6 +46,8 @@ type DetectedSpamMock struct {
 		FindByUserID []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// TenantID is the tenantID argument value.
+			TenantID string
 			// UserID is the userID argument value.
 			UserID int64
 		}
@@ -53,11 +55,15 @@ type DetectedSpamMock struct {
 		Read []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// TenantID is the tenantID argument value.
+			TenantID string
 		}
 		// SetAddedToSamplesFlag holds details about calls to the SetAddedToSamplesFlag method.
 		SetAddedToSamplesFlag []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// TenantID is the tenantID argument value.
+			TenantID string
 			// ID is the id argument value.
 			ID int64
 		}
@@ -68,21 +74,23 @@ type DetectedSpamMock struct {
 }
 
 // FindByUserID calls FindByUserIDFunc.
-func (mock *DetectedSpamMock) FindByUserID(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error) {
+func (mock *DetectedSpamMock) FindByUserID(ctx context.Context, tenantID string, userID int64) (*storage.DetectedSpamInfo, error) {
 	if mock.FindByUserIDFunc == nil {
 		panic("DetectedSpamMock.FindByUserIDFunc: method is nil but DetectedSpam.FindByUserID was just called")
 	}
 	callInfo := struct {
-		Ctx    context.Context
-		UserID int64
+		Ctx      context.Context
+		TenantID string
+		UserID   int64
 	}{
-		Ctx:    ctx,
-		UserID: userID,
+		Ctx:      ctx,
+		TenantID: tenantID,
+		UserID:   userID,
 	}
 	mock.lockFindByUserID.Lock()
 	mock.calls.FindByUserID = append(mock.calls.FindByUserID, callInfo)
 	mock.lockFindByUserID.Unlock()
-	return mock.FindByUserIDFunc(ctx, userID)
+	return mock.FindByUserIDFunc(ctx, tenantID, userID)
 }
 
 // FindByUserIDCalls gets all the calls that were made to FindByUserID.
@@ -90,12 +98,14 @@ func (mock *DetectedSpamMock) FindByUserID(ctx context.Context, userID int64) (*
 //
 //	len(mockedDetectedSpam.FindByUserIDCalls())
 func (mock *DetectedSpamMock) FindByUserIDCalls() []struct {
-	Ctx    context.Context
-	UserID int64
+	Ctx      context.Context
+	TenantID string
+	UserID   int64
 } {
 	var calls []struct {
-		Ctx    context.Context
-		UserID int64
+		Ctx      context.Context
+		TenantID string
+		UserID   int64
 	}
 	mock.lockFindByUserID.RLock()
 	calls = mock.calls.FindByUserID
@@ -111,19 +121,21 @@ func (mock *DetectedSpamMock) ResetFindByUserIDCalls() {
 }
 
 // Read calls ReadFunc.
-func (mock *DetectedSpamMock) Read(ctx context.Context) ([]storage.DetectedSpamInfo, error) {
+func (mock *DetectedSpamMock) Read(ctx context.Context, tenantID string) ([]storage.DetectedSpamInfo, error) {
 	if mock.ReadFunc == nil {
 		panic("DetectedSpamMock.ReadFunc: method is nil but DetectedSpam.Read was just called")
 	}
 	callInfo := struct {
-		Ctx context.Context
+		Ctx      context.Context
+		TenantID string
 	}{
-		Ctx: ctx,
+		Ctx:      ctx,
+		TenantID: tenantID,
 	}
 	mock.lockRead.Lock()
 	mock.calls.Read = append(mock.calls.Read, callInfo)
 	mock.lockRead.Unlock()
-	return mock.ReadFunc(ctx)
+	return mock.ReadFunc(ctx, tenantID)
 }
 
 // ReadCalls gets all the calls that were made to Read.
@@ -131,10 +143,12 @@ func (mock *DetectedSpamMock) Read(ctx context.Context) ([]storage.DetectedSpamI
 //
 //	len(mockedDetectedSpam.ReadCalls())
 func (mock *DetectedSpamMock) ReadCalls() []struct {
-	Ctx context.Context
+	Ctx      context.Context
+	TenantID string
 } {
 	var calls []struct {
-		Ctx context.Context
+		Ctx      context.Context
+		TenantID string
 	}
 	mock.lockRead.RLock()
 	calls = mock.calls.Read
@@ -150,21 +164,23 @@ func (mock *DetectedSpamMock) ResetReadCalls() {
 }
 
 // SetAddedToSamplesFlag calls SetAddedToSamplesFlagFunc.
-func (mock *DetectedSpamMock) SetAddedToSamplesFlag(ctx context.Context, id int64) error {
+func (mock *DetectedSpamMock) SetAddedToSamplesFlag(ctx context.Context, tenantID string, id int64) error {
 	if mock.SetAddedToSamplesFlagFunc == nil {
 		panic("DetectedSpamMock.SetAddedToSamplesFlagFunc: method is nil but DetectedSpam.SetAddedToSamplesFlag was just called")
 	}
 	callInfo := struct {
-		Ctx context.Context
-		ID  int64
+		Ctx      context.Context
+		TenantID string
+		ID       int64
 	}{
-		Ctx: ctx,
-		ID:  id,
+		Ctx:      ctx,
+		TenantID: tenantID,
+		ID:       id,
 	}
 	mock.lockSetAddedToSamplesFlag.Lock()
 	mock.calls.SetAddedToSamplesFlag = append(mock.calls.SetAddedToSamplesFlag, callInfo)
 	mock.lockSetAddedToSamplesFlag.Unlock()
-	return mock.SetAddedToSamplesFlagFunc(ctx, id)
+	return mock.SetAddedToSamplesFlagFunc(ctx, tenantID, id)
 }
 
 // SetAddedToSamplesFlagCalls gets all the calls that were made to SetAddedToSamplesFlag.
@@ -172,12 +188,14 @@ func (mock *DetectedSpamMock) SetAddedToSamplesFlag(ctx context.Context, id int6
 //
 //	len(mockedDetectedSpam.SetAddedToSamplesFlagCalls())
 func (mock *DetectedSpamMock) SetAddedToSamplesFlagCalls() []struct {
-	Ctx context.Context
-	ID  int64
+	Ctx      context.Context
+	TenantID string
+	ID       int64
 } {
 	var calls []struct {
-		Ctx context.Context
-		ID  int64
+		Ctx      context.Context
+		TenantID string
+		ID       int64
 	}
 	mock.lockSetAddedToSamplesFlag.RLock()
 	calls = mock.calls.SetAddedToSamplesFlag
