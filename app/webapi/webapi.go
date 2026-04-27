@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/didip/tollbooth/v8"
 	log "github.com/go-pkgz/lgr"
 	"github.com/go-pkgz/rest"
 	"github.com/go-pkgz/rest/logger"
@@ -70,7 +69,9 @@ type Config struct {
 	DMUsersProvider       DMUsersProvider        // provider for recent DM users
 	RuleSetProvider       RuleSetProvider        // control plane rule set service
 	ControlPlaneAuth      ControlPlaneAuthorizer // role authorizer for control plane endpoints
-	ApprovedUsersProvider ApprovedUsersProvider  // control plane approved users service
+	ApprovedUsersProvider ApprovedUsersProvider   // control plane approved users service
+	TenantStatusProvider TenantStatusProvider    // checks if tenant is active (nil = skip check)
+	RateLimiter          *TenantRateLimiter      // per-tenant rate limiter (nil = unlimited)
 	AuthPasswd            string                 // basic auth password for user "tg-spam"
 	AuthHash              string                 // basic auth bcrypt hash for user "tg-spam", takes precedence over AuthPasswd
 	Dbg                   bool                   // debug mode
@@ -233,8 +234,9 @@ func (s *Server) Run(ctx context.Context) error {
 	router.Use(logger.New(logger.Log(log.Default()), logger.Prefix("[DEBUG]")).Handler)
 	router.Use(rest.Throttle(1000))
 	router.Use(rest.AppInfo("tg-spam", "umputun", s.Version), rest.Ping)
-	router.Use(tollbooth.HTTPMiddleware(tollbooth.NewLimiter(50, nil)))
-	router.Use(rest.SizeLimit(1024 * 1024)) // 1M max request size
+	router.Use(s.tenantRateLimitMiddleware())
+	router.Use(s.tenantAuthzMiddleware())
+	router.Use(rest.SizeLimit(1024 * 1024))
 
 	if s.AuthPasswd != "" || s.AuthHash != "" {
 		log.Printf("[INFO] basic auth enabled for webapi server")
@@ -397,6 +399,25 @@ func (s *Server) authMiddleware(mw func(next http.Handler) http.Handler) func(ne
 	return func(next http.Handler) http.Handler {
 		return mw(next)
 	}
+}
+
+func (s *Server) tenantAuthzMiddleware() func(next http.Handler) http.Handler {
+	if s.TenantStatusProvider == nil {
+		return func(next http.Handler) http.Handler {
+			return next
+		}
+	}
+	mw := &TenantStatusMiddleware{Checker: s.TenantStatusProvider, TenantID: s.Settings.TenantID}
+	return mw.Handler
+}
+
+func (s *Server) tenantRateLimitMiddleware() func(next http.Handler) http.Handler {
+	if s.RateLimiter == nil {
+		return func(next http.Handler) http.Handler {
+			return next
+		}
+	}
+	return s.RateLimiter.Middleware
 }
 
 func (s *Server) controlPlaneAuthMiddleware(next http.Handler) http.Handler {

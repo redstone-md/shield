@@ -4,7 +4,6 @@ go 1.25
 
 require (
 	github.com/OvyFlash/telegram-bot-api v0.0.0-20251112155921-e82db5fd534b
-	github.com/didip/tollbooth/v8 v8.0.1
 	github.com/fatih/color v1.18.0
 	github.com/forPelevin/gomoji v1.4.1
 	github.com/fsnotify/fsnotify v1.9.0
@@ -24,6 +23,7 @@ require (
 	github.com/sashabaranov/go-openai v1.41.2
 	github.com/stretchr/testify v1.10.0
 	github.com/yuin/gopher-lua v1.1.1
+	golang.org/x/time v0.11.0
 	google.golang.org/genai v1.52.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	modernc.org/sqlite v1.42.2
@@ -132,7 +132,6 @@ require (
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
-	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	google.golang.org/grpc v1.66.2 // indirect
 	google.golang.org/protobuf v1.35.2 // indirect
