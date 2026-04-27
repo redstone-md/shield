@@ -271,7 +271,7 @@ func TestServer_ErrorResponseContentType(t *testing.T) {
 				return nil, assert.AnError
 			},
 		}
-		server := NewServer(Config{DetectedSpam: mockDetectedSpam})
+		server := NewServer(Config{DetectedSpamStore: mockDetectedSpam})
 		req := httptest.NewRequest("GET", "/check/123", http.NoBody)
 		req.SetPathValue("user_id", "123")
 		rr := httptest.NewRecorder()

@@ -316,7 +316,7 @@ func TestServer_htmlDetectedSpamHandler(t *testing.T) {
 				}, nil
 			},
 		}
-		server := NewServer(Config{DetectedSpam: ds})
+		server := NewServer(Config{DetectedSpamStore: ds})
 
 		req, err := http.NewRequest("GET", "/detected_spam", http.NoBody)
 		require.NoError(t, err)
@@ -346,7 +346,7 @@ func TestServer_htmlDetectedSpamHandler(t *testing.T) {
 				return nil, errors.New("test error")
 			},
 		}
-		server := NewServer(Config{DetectedSpam: ds})
+		server := NewServer(Config{DetectedSpamStore: ds})
 
 		req, err := http.NewRequest("GET", "/detected_spam", http.NoBody)
 		require.NoError(t, err)
@@ -371,7 +371,7 @@ func TestServer_htmlAddDetectedSpamHandler(t *testing.T) {
 				return nil
 			},
 		}
-		server := NewServer(Config{DetectedSpam: ds, SpamFilter: sf})
+		server := NewServer(Config{DetectedSpamStore: ds, SpamFilter: sf})
 		req, err := http.NewRequest("POST", "/detected_spam/add?id=123&msg=blah", http.NoBody)
 		require.NoError(t, err)
 
@@ -390,7 +390,7 @@ func TestServer_htmlAddDetectedSpamHandler(t *testing.T) {
 	t.Run("bad request - missing ID", func(t *testing.T) {
 		ds := &mocks.DetectedSpamMock{}
 		sf := &mocks.SpamFilterMock{}
-		server := NewServer(Config{DetectedSpam: ds, SpamFilter: sf})
+		server := NewServer(Config{DetectedSpamStore: ds, SpamFilter: sf})
 
 		req, err := http.NewRequest("POST", "/detected_spam/add?msg=blah", http.NoBody)
 		require.NoError(t, err)
@@ -406,7 +406,7 @@ func TestServer_htmlAddDetectedSpamHandler(t *testing.T) {
 	t.Run("bad request - missing message", func(t *testing.T) {
 		ds := &mocks.DetectedSpamMock{}
 		sf := &mocks.SpamFilterMock{}
-		server := NewServer(Config{DetectedSpam: ds, SpamFilter: sf})
+		server := NewServer(Config{DetectedSpamStore: ds, SpamFilter: sf})
 
 		req, err := http.NewRequest("POST", "/detected_spam/add?id=123", http.NoBody)
 		require.NoError(t, err)
@@ -426,7 +426,7 @@ func TestServer_htmlAddDetectedSpamHandler(t *testing.T) {
 				return errors.New("update error")
 			},
 		}
-		server := NewServer(Config{DetectedSpam: ds, SpamFilter: sf})
+		server := NewServer(Config{DetectedSpamStore: ds, SpamFilter: sf})
 
 		req, err := http.NewRequest("POST", "/detected_spam/add?id=123&msg=blah", http.NoBody)
 		require.NoError(t, err)
@@ -450,7 +450,7 @@ func TestServer_htmlAddDetectedSpamHandler(t *testing.T) {
 				return nil
 			},
 		}
-		server := NewServer(Config{DetectedSpam: ds, SpamFilter: sf})
+		server := NewServer(Config{DetectedSpamStore: ds, SpamFilter: sf})
 
 		req, err := http.NewRequest("POST", "/detected_spam/add?id=123&msg=blah", http.NoBody)
 		require.NoError(t, err)

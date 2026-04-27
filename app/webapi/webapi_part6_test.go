@@ -41,7 +41,7 @@ func TestServer_downloadDetectedSpamHandler(t *testing.T) {
 			},
 		}
 
-		server := NewServer(Config{DetectedSpam: ds})
+		server := NewServer(Config{DetectedSpamStore: ds})
 		req, err := http.NewRequest("GET", "/download/detected_spam", http.NoBody)
 		require.NoError(t, err)
 
@@ -91,7 +91,7 @@ func TestServer_downloadDetectedSpamHandler(t *testing.T) {
 			},
 		}
 
-		server := NewServer(Config{DetectedSpam: ds})
+		server := NewServer(Config{DetectedSpamStore: ds})
 		req, err := http.NewRequest("GET", "/download/detected_spam", http.NoBody)
 		require.NoError(t, err)
 
@@ -123,7 +123,7 @@ func TestServer_downloadDetectedSpamHandler(t *testing.T) {
 			},
 		}
 
-		server := NewServer(Config{DetectedSpam: ds})
+		server := NewServer(Config{DetectedSpamStore: ds})
 		req, err := http.NewRequest("GET", "/download/detected_spam", http.NoBody)
 		require.NoError(t, err)
 

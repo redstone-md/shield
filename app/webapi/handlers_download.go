@@ -25,7 +25,7 @@ import (
 
 func (s *Server) downloadDetectedSpamHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	spam, err := s.DetectedSpam.Read(ctx)
+	spam, err := s.detectedSpam().Read(ctx)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get detected spam", "details": err.Error()})
 		return

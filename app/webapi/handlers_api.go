@@ -76,7 +76,7 @@ func (s *Server) checkIDHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	si, err := s.DetectedSpam.FindByUserID(r.Context(), userID)
+	si, err := s.detectedSpam().FindByUserID(r.Context(), userID)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get user info", "details": err.Error()})
 		return
@@ -265,6 +265,13 @@ func (a detectorApprovedUsersAdapter) Add(_ context.Context, user approved.UserI
 
 func (a detectorApprovedUsersAdapter) Remove(_ context.Context, id string) error {
 	return a.detector.RemoveApprovedUser(id)
+}
+
+func (s *Server) detectedSpam() DetectedSpam {
+	if s.DetectedSpamProvider != nil {
+		return s.DetectedSpamProvider
+	}
+	return s.DetectedSpamStore
 }
 
 func (s *Server) dictionary() DictionaryProvider {

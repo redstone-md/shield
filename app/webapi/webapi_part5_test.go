@@ -34,7 +34,7 @@ func TestServer_StaticFiles(t *testing.T) {
 		Version:      "1.0",
 		Detector:     mockDetector,
 		SpamFilter:   mockSpamFilter,
-		DetectedSpam: detectedSpamMock,
+		DetectedSpamStore: detectedSpamMock,
 	})
 	ts := httptest.NewServer(server.routes(routegroup.New(http.NewServeMux())))
 	defer ts.Close()

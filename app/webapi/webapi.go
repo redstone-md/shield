@@ -61,7 +61,8 @@ type Config struct {
 	ListenAddr       string                 // listen address
 	Detector         Detector               // spam detector
 	SpamFilter       SpamFilter             // spam filter (bot)
-	DetectedSpam     DetectedSpam           // detected spam accessor
+	DetectedSpamStore      DetectedSpam           // detected spam storage (fallback when DetectedSpamProvider is nil)
+	DetectedSpamProvider   DetectedSpamProvider   // control plane detected spam service
 	Locator          Locator                // locator for user info
 	DictionaryStore       Dictionary             // dictionary storage (fallback when DictionaryProvider is nil)
 	DictionaryProvider   DictionaryProvider     // control plane dictionary service (takes precedence over DictionaryStore)
@@ -168,6 +169,11 @@ type DetectedSpam interface {
 	Read(ctx context.Context) ([]storage.DetectedSpamInfo, error)
 	SetAddedToSamplesFlag(ctx context.Context, id int64) error
 	FindByUserID(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error)
+}
+
+// DetectedSpamProvider provides access to detected spam through the control plane service layer.
+type DetectedSpamProvider interface {
+	DetectedSpam
 }
 
 // StorageEngine provides access to the database engine for operations like backup

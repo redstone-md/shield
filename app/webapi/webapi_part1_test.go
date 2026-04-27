@@ -56,7 +56,7 @@ func TestServer_RequestMetadataMiddlewarePropagatesToDetectedSpam(t *testing.T) 
 
 	server := NewServer(Config{
 		Settings: Settings{InstanceID: "inst"},
-		DetectedSpam: &mocks.DetectedSpamMock{
+		DetectedSpamStore: &mocks.DetectedSpamMock{
 			FindByUserIDFunc: func(ctx context.Context, userID int64) (*storage.DetectedSpamInfo, error) {
 				capturedCtx = ctx
 				return &storage.DetectedSpamInfo{UserID: userID, UserName: "user"}, nil

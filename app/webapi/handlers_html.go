@@ -61,7 +61,7 @@ func (s *Server) htmlManageDictionaryHandler(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) htmlDetectedSpamHandler(w http.ResponseWriter, r *http.Request) {
-	ds, err := s.DetectedSpam.Read(r.Context())
+	ds, err := s.detectedSpam().Read(r.Context())
 	if err != nil {
 		observability.Logf(r.Context(), "[ERROR] Failed to fetch detected spam: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -203,7 +203,7 @@ func (s *Server) htmlAddDetectedSpamHandler(w http.ResponseWriter, r *http.Reque
 		return
 
 	}
-	if err := s.DetectedSpam.SetAddedToSamplesFlag(r.Context(), id); err != nil {
+	if err := s.detectedSpam().SetAddedToSamplesFlag(r.Context(), id); err != nil {
 		observability.Logf(r.Context(), "[WARN] failed to update detected spam: %v", err)
 		reportErr(fmt.Errorf("can't update detected spam: %v", err), http.StatusInternalServerError)
 		return

@@ -31,6 +31,8 @@
 - [x] Webapi `/users` handlers переведены с прямых вызовов `Detector.AddApprovedUser/RemoveApprovedUser/ApprovedUsers` на `ApprovedUsersProvider` (сервис или adapter fallback).
 - [x] Добавлен `app/controlplane.DictionaryService`: обёртка над dictionary storage/spam-filter reload с pub/sub для cache invalidation.
 - [x] Webapi `/dictionary` handlers переведены с прямых вызовов `s.Dictionary` + `s.SpamFilter.ReloadSamples()` на `DictionaryProvider` (сервис или adapter fallback).
+- [x] Добавлен `app/controlplane.DetectedSpamService`: read model над detected spam storage с pub/sub для cache invalidation.
+- [x] Webapi detected spam handlers переведены с прямых вызовов `s.DetectedSpam` на `DetectedSpamProvider` (сервис или store fallback).
 
 ## Критерий завершения
 

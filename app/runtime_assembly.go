@@ -37,6 +37,7 @@ type runtimeAssembly struct {
 	RuleSetService         *controlplane.RuleSetService
 	ApprovedUsersService  *controlplane.ApprovedUsersService
 	DictionaryService     *controlplane.DictionaryService
+	DetectedSpamService   *controlplane.DetectedSpamService
 	TelegramListener      *events.TelegramListener
 	Web                    webRuntimeAssembly
 }
@@ -49,6 +50,7 @@ type webRuntimeAssembly struct {
 	RuleSetService        *controlplane.RuleSetService
 	ApprovedUsersService  *controlplane.ApprovedUsersService
 	DictionaryService     *controlplane.DictionaryService
+	DetectedSpamService   *controlplane.DetectedSpamService
 	RoleAuthorizer        *controlplane.RoleAuthorizer
 	BotUsername           string
 }
@@ -138,6 +140,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	if err != nil {
 		return nil, fmt.Errorf("can't make detected spam store, %w", err)
 	}
+	detectedSpamSvc := controlplane.NewDetectedSpamService(detectedSpamStore)
 
 	workspacesStore, err := storage.NewWorkspaces(ctx, dataDB)
 	if err != nil {
@@ -172,6 +175,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		RuleSetService:         ruleSetService,
 		ApprovedUsersService:   approvedUsersSvc,
 		DictionaryService:     dictSvc,
+		DetectedSpamService:   detectedSpamSvc,
 		Web: webRuntimeAssembly{
 			Detector:              detector,
 			SpamFilter:            spamBot,
@@ -181,6 +185,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 			RoleAuthorizer:        roleAuthorizer,
 			ApprovedUsersService:  approvedUsersSvc,
 			DictionaryService:     dictSvc,
+			DetectedSpamService:   detectedSpamSvc,
 		},
 	}
 
