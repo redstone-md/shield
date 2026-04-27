@@ -428,9 +428,8 @@ func (s *StorageTestSuite) TestDetectedSpam_FindByUserID() {
 			})
 
 			s.Run("invalid checks json", func() {
-				// insert invalid json directly to db
-				query := db.Adopt("INSERT INTO detected_spam (gid, text, user_id, user_name, timestamp, checks) VALUES (?, ?, ?, ?, ?, ?)")
-				_, err := db.Exec(query, db.GID(), "test", 999, "test", time.Now(), "{invalid}")
+				query := db.Adopt("INSERT INTO detected_spam (gid, tenant_id, text, user_id, user_name, timestamp, checks) VALUES (?, ?, ?, ?, ?, ?, ?)")
+				_, err := db.Exec(query, db.GID(), db.TenantID(), "test", 999, "test", time.Now(), "{invalid}")
 				s.Require().NoError(err)
 
 				entry, err := ds.FindByUserID(ctx, 999)

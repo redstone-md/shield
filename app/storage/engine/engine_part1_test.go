@@ -397,18 +397,19 @@ func TestBackupPostgres(t *testing.T) {
 	_, err = db.Exec(`CREATE TABLE test_backup (
 		id SERIAL PRIMARY KEY,
 		gid TEXT NOT NULL,
+		tenant_id TEXT NOT NULL DEFAULT '',
 		name TEXT NOT NULL,
 		value TEXT,
 		created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`INSERT INTO test_backup (gid, name, value) VALUES ($1, $2, $3)`, "test_gid", "name1", "value1")
+	_, err = db.Exec(`INSERT INTO test_backup (gid, tenant_id, name, value) VALUES ($1, $2, $3, $4)`, "test_gid", "test_gid", "name1", "value1")
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO test_backup (gid, name, value) VALUES ($1, $2, $3)`, "test_gid", "name2", "value2")
+	_, err = db.Exec(`INSERT INTO test_backup (gid, tenant_id, name, value) VALUES ($1, $2, $3, $4)`, "test_gid", "test_gid", "name2", "value2")
 	require.NoError(t, err)
 
-	_, err = db.Exec(`INSERT INTO test_backup (gid, name, value) VALUES ($1, $2, $3)`, "other_gid", "name3", "value3")
+	_, err = db.Exec(`INSERT INTO test_backup (gid, tenant_id, name, value) VALUES ($1, $2, $3, $4)`, "other_gid", "other_gid", "name3", "value3")
 	require.NoError(t, err)
 
 	_, err = db.Exec(`CREATE INDEX idx_test_backup_gid ON test_backup(gid)`)

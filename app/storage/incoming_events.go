@@ -26,6 +26,7 @@ const (
 	CmdAddActionErrorColumn
 	CmdAddProcessedAtColumn
 	CmdCompleteIncomingEvent
+	CmdAddIncomingEventsTenantIDColumn
 )
 
 var incomingEventsQueries = engine.NewQueryMap().
@@ -50,7 +51,7 @@ var incomingEventsQueries = engine.NewQueryMap().
 			processed_at DATETIME,
 			received_at DATETIME NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE(gid, idempotency_key)
+			UNIQUE(tenant_id, idempotency_key)
 		)`,
 		Postgres: `CREATE TABLE IF NOT EXISTS incoming_events (
 			id SERIAL PRIMARY KEY,
@@ -72,13 +73,14 @@ var incomingEventsQueries = engine.NewQueryMap().
 			processed_at TIMESTAMP,
 			received_at TIMESTAMP NOT NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE(gid, idempotency_key)
+			UNIQUE(tenant_id, idempotency_key)
 		)`,
 	}).
 	AddSame(CmdCreateIncomingEventsIndexes, `
 		CREATE INDEX IF NOT EXISTS idx_incoming_events_gid_key ON incoming_events(gid, idempotency_key);
 		CREATE INDEX IF NOT EXISTS idx_incoming_events_gid_received ON incoming_events(gid, received_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_incoming_events_gid_event ON incoming_events(gid, event_id);
+		CREATE INDEX IF NOT EXISTS idx_incoming_events_tenant_id ON incoming_events(tenant_id);
 	`).
 	Add(CmdAddIncomingEvent, engine.Query{
 		Sqlite: `INSERT OR IGNORE INTO incoming_events
@@ -89,14 +91,14 @@ var incomingEventsQueries = engine.NewQueryMap().
 			(gid, event_id, correlation_id, tenant_id, source, update_id, chat_id, message_id, edited_message_id,
 			 idempotency_key, received_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-			ON CONFLICT (gid, idempotency_key) DO NOTHING`,
+			ON CONFLICT (tenant_id, idempotency_key) DO NOTHING`,
 	}).
 	AddSame(CmdGetIncomingEventByKey, `SELECT
 			id, gid, event_id, correlation_id, tenant_id, source, update_id, chat_id, message_id,
 			edited_message_id, idempotency_key, decision_action, decision_reason, decision_score,
 			action_applied, action_error, processed_at, received_at, created_at
 		FROM incoming_events
-		WHERE gid = ? AND idempotency_key = ?`).
+		WHERE tenant_id = ? AND idempotency_key = ?`).
 	Add(CmdAddDecisionActionColumn, engine.Query{
 		Sqlite:   "ALTER TABLE incoming_events ADD COLUMN decision_action TEXT DEFAULT ''",
 		Postgres: "ALTER TABLE incoming_events ADD COLUMN IF NOT EXISTS decision_action TEXT DEFAULT ''",
@@ -123,7 +125,11 @@ var incomingEventsQueries = engine.NewQueryMap().
 	}).
 	AddSame(CmdCompleteIncomingEvent, `UPDATE incoming_events
 		SET decision_action = ?, decision_reason = ?, decision_score = ?, action_applied = ?, action_error = ?, processed_at = ?
-		WHERE gid = ? AND idempotency_key = ? AND processed_at IS NULL`)
+		WHERE tenant_id = ? AND idempotency_key = ? AND processed_at IS NULL`).
+	Add(CmdAddIncomingEventsTenantIDColumn, engine.Query{
+		Sqlite:   "ALTER TABLE incoming_events ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''",
+		Postgres: "ALTER TABLE incoming_events ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT ''",
+	})
 
 // IncomingEventRecord stores one normalized Telegram ingress event.
 type IncomingEventRecord struct {
@@ -184,26 +190,27 @@ func NewIncomingEvents(ctx context.Context, db *engine.SQL) (*IncomingEvents, er
 func (s *IncomingEvents) migrate(ctx context.Context, tx *sqlx.Tx, _ string) error {
 	var count int
 	err := tx.GetContext(ctx, &count, "SELECT COUNT(*) FROM incoming_events WHERE processed_at IS NULL")
-	if err == nil {
-		return nil
+	if err != nil {
+		for _, cmd := range []engine.DBCmd{
+			CmdAddDecisionActionColumn,
+			CmdAddDecisionReasonColumn,
+			CmdAddDecisionScoreColumn,
+			CmdAddActionAppliedColumn,
+			CmdAddActionErrorColumn,
+			CmdAddProcessedAtColumn,
+		} {
+			query, pickErr := incomingEventsQueries.Pick(s.Type(), cmd)
+			if pickErr != nil {
+				return fmt.Errorf("failed to get migration query %d: %w", cmd, pickErr)
+			}
+			if _, execErr := tx.ExecContext(ctx, query); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
+				return fmt.Errorf("failed to apply incoming events migration %d: %w", cmd, execErr)
+			}
+		}
 	}
 
-	for _, cmd := range []engine.DBCmd{
-		CmdAddDecisionActionColumn,
-		CmdAddDecisionReasonColumn,
-		CmdAddDecisionScoreColumn,
-		CmdAddActionAppliedColumn,
-		CmdAddActionErrorColumn,
-		CmdAddProcessedAtColumn,
-	} {
-		query, pickErr := incomingEventsQueries.Pick(s.Type(), cmd)
-		if pickErr != nil {
-			return fmt.Errorf("failed to get migration query %d: %w", cmd, pickErr)
-		}
-		if _, execErr := tx.ExecContext(ctx, query); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
-			return fmt.Errorf("failed to apply incoming events migration %d: %w", cmd, execErr)
-		}
-	}
+	migrateTenantID(ctx, tx, s.Type(), "incoming_events")
+
 	return nil
 }
 
@@ -232,7 +239,7 @@ func (s *IncomingEvents) Record(ctx context.Context, event moderation.IncomingEv
 		s.GID(),
 		event.EventID,
 		event.CorrelationID,
-		event.TenantID,
+		s.TenantID(),
 		event.Source,
 		event.UpdateID,
 		event.ChatID,
@@ -329,7 +336,7 @@ func (s *IncomingEvents) Complete(ctx context.Context, idempotencyKey string,
 		actionResult.Applied,
 		actionResult.Error,
 		processedAtValue,
-		s.GID(),
+		s.TenantID(),
 		idempotencyKey,
 	)
 	if err != nil {
@@ -360,7 +367,7 @@ func (s *IncomingEvents) ByIdempotencyKey(ctx context.Context, key string) (Inco
 	query = s.Adopt(query)
 
 	var record IncomingEventRecord
-	if err := s.GetContext(ctx, &record, query, s.GID(), key); err != nil {
+	if err := s.GetContext(ctx, &record, query, s.TenantID(), key); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return IncomingEventRecord{}, err
 		}

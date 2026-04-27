@@ -81,12 +81,12 @@ func (e *SQL) backupPostgresTable(ctx context.Context, tx *sqlx.Tx, w io.Writer,
 		return err
 	}
 
-	hasGID, columns, err := e.getPostgresTableInfo(ctx, tx, table)
+	hasTenantID, columns, err := e.getPostgresTableInfo(ctx, tx, table)
 	if err != nil {
 		return err
 	}
 
-	if err := e.writePgTableData(ctx, tx, w, table, columns, hasGID); err != nil {
+	if err := e.writePgTableData(ctx, tx, w, table, columns, hasTenantID); err != nil {
 		if !strings.Contains(err.Error(), "no rows in result set") {
 			return err
 		}
@@ -133,17 +133,17 @@ GROUP BY table_name
 	return nil
 }
 
-func (e *SQL) getPostgresTableInfo(ctx context.Context, tx *sqlx.Tx, table string) (hasGID bool, coumns []string, err error) {
+func (e *SQL) getPostgresTableInfo(ctx context.Context, tx *sqlx.Tx, table string) (hasTenantID bool, coumns []string, err error) {
 	query := `
 SELECT EXISTS (
 SELECT 1
 FROM information_schema.columns
 WHERE table_name = $1
-AND column_name = 'gid'
+AND column_name = 'tenant_id'
 )
 `
-	if err := tx.GetContext(ctx, &hasGID, query, table); err != nil {
-		return false, nil, fmt.Errorf("failed to check if table %s has gid column: %w", table, err)
+	if err := tx.GetContext(ctx, &hasTenantID, query, table); err != nil {
+		return false, nil, fmt.Errorf("failed to check if table %s has tenant_id column: %w", table, err)
 	}
 
 	var columns []string
@@ -157,20 +157,20 @@ ORDER BY ordinal_position
 		return false, nil, fmt.Errorf("failed to get columns for table %s: %w", table, err)
 	}
 
-	return hasGID, columns, nil
+	return hasTenantID, columns, nil
 }
 
-func (e *SQL) writePgTableData(ctx context.Context, tx *sqlx.Tx, w io.Writer, tbl string, cols []string, hasGID bool) error {
+func (e *SQL) writePgTableData(ctx context.Context, tx *sqlx.Tx, w io.Writer, tbl string, cols []string, hasTenantID bool) error {
 	dataQuery := fmt.Sprintf("SELECT * FROM %s", tbl)
-	if hasGID {
-		dataQuery = fmt.Sprintf("SELECT * FROM %s WHERE gid = $1", tbl)
+	if hasTenantID {
+		dataQuery = fmt.Sprintf("SELECT * FROM %s WHERE tenant_id = $1", tbl)
 	}
 
 	var count int
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM (%s) as subq", dataQuery)
 	var err error
-	if hasGID {
-		err = tx.GetContext(ctx, &count, countQuery, e.gid)
+	if hasTenantID {
+		err = tx.GetContext(ctx, &count, countQuery, e.TenantID())
 	} else {
 		err = tx.GetContext(ctx, &count, countQuery)
 	}
@@ -191,8 +191,8 @@ func (e *SQL) writePgTableData(ctx context.Context, tx *sqlx.Tx, w io.Writer, tb
 	}
 
 	var rows *sqlx.Rows
-	if hasGID {
-		rows, err = tx.QueryxContext(ctx, dataQuery, e.gid)
+	if hasTenantID {
+		rows, err = tx.QueryxContext(ctx, dataQuery, e.TenantID())
 	} else {
 		rows, err = tx.QueryxContext(ctx, dataQuery)
 	}

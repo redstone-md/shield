@@ -25,6 +25,8 @@ const (
 	CmdAddGIDColumnSpam
 	CmdAddLocatorMessage
 	CmdAddLocatorSpam
+	CmdAddLocatorMessagesTenantIDColumn
+	CmdAddLocatorSpamTenantIDColumn
 )
 
 // locatorQueries holds all locator-related queries
@@ -33,6 +35,7 @@ var locatorQueries = engine.NewQueryMap().
 		Sqlite: `CREATE TABLE IF NOT EXISTS messages (
             hash TEXT PRIMARY KEY,
             gid TEXT NOT NULL DEFAULT '',
+            tenant_id TEXT NOT NULL DEFAULT '',
             time TIMESTAMP,
             chat_id INTEGER,
             user_id INTEGER,
@@ -42,12 +45,14 @@ var locatorQueries = engine.NewQueryMap().
         CREATE TABLE IF NOT EXISTS spam (
             user_id INTEGER PRIMARY KEY,
             gid TEXT NOT NULL DEFAULT '',
+            tenant_id TEXT NOT NULL DEFAULT '',
             time TIMESTAMP,
             checks TEXT
         )`,
 		Postgres: `CREATE TABLE IF NOT EXISTS messages (
             hash TEXT PRIMARY KEY,
             gid TEXT NOT NULL DEFAULT '',
+            tenant_id TEXT NOT NULL DEFAULT '',
             time TIMESTAMP,
             chat_id BIGINT,
             user_id BIGINT,
@@ -57,6 +62,7 @@ var locatorQueries = engine.NewQueryMap().
         CREATE TABLE IF NOT EXISTS spam (
             user_id BIGINT PRIMARY KEY,
             gid TEXT NOT NULL DEFAULT '',
+            tenant_id TEXT NOT NULL DEFAULT '',
             time TIMESTAMP,
             checks TEXT
         )`,
@@ -68,13 +74,17 @@ var locatorQueries = engine.NewQueryMap().
 			CREATE INDEX IF NOT EXISTS idx_spam_time ON spam(time);
 			CREATE INDEX IF NOT EXISTS idx_messages_gid ON messages(gid);
 			CREATE INDEX IF NOT EXISTS idx_messages_gid_user_id_time ON messages(gid, user_id, time DESC);
-			CREATE INDEX IF NOT EXISTS idx_spam_gid ON spam(gid) `,
+			CREATE INDEX IF NOT EXISTS idx_spam_gid ON spam(gid);
+			CREATE INDEX IF NOT EXISTS idx_messages_tenant_id ON messages(tenant_id);
+			CREATE INDEX IF NOT EXISTS idx_spam_tenant_id ON spam(tenant_id) `,
 		Postgres: `
 			CREATE INDEX IF NOT EXISTS idx_messages_gid_user_id ON messages(gid, user_id);
 			CREATE INDEX IF NOT EXISTS idx_messages_gid_user_id_time ON messages(gid, user_id, time DESC);
 			CREATE INDEX IF NOT EXISTS idx_messages_gid_user_name ON messages(gid, user_name);
 			CREATE INDEX IF NOT EXISTS idx_spam_gid_time ON spam(gid, time DESC);
-			CREATE INDEX IF NOT EXISTS idx_spam_user_id_gid ON spam(user_id, gid)`,
+			CREATE INDEX IF NOT EXISTS idx_spam_user_id_gid ON spam(user_id, gid);
+			CREATE INDEX IF NOT EXISTS idx_messages_tenant_id ON messages(tenant_id);
+			CREATE INDEX IF NOT EXISTS idx_spam_tenant_id ON spam(tenant_id)`,
 	}).
 	Add(CmdAddGIDColumnMessages, engine.Query{
 		Sqlite:   "ALTER TABLE messages ADD COLUMN gid TEXT DEFAULT ''",
@@ -85,12 +95,13 @@ var locatorQueries = engine.NewQueryMap().
 		Postgres: "ALTER TABLE spam ADD COLUMN IF NOT EXISTS gid TEXT DEFAULT ''",
 	}).
 	Add(CmdAddLocatorMessage, engine.Query{
-		Sqlite: `INSERT OR REPLACE INTO messages (hash, gid, time, chat_id, user_id, user_name, msg_id) 
-            VALUES (:hash, :gid, :time, :chat_id, :user_id, :user_name, :msg_id)`,
-		Postgres: `INSERT INTO messages (hash, gid, time, chat_id, user_id, user_name, msg_id) 
-            VALUES (:hash, :gid, :time, :chat_id, :user_id, :user_name, :msg_id)
+		Sqlite: `INSERT OR REPLACE INTO messages (hash, gid, tenant_id, time, chat_id, user_id, user_name, msg_id) 
+            VALUES (:hash, :gid, :tenant_id, :time, :chat_id, :user_id, :user_name, :msg_id)`,
+		Postgres: `INSERT INTO messages (hash, gid, tenant_id, time, chat_id, user_id, user_name, msg_id) 
+            VALUES (:hash, :gid, :tenant_id, :time, :chat_id, :user_id, :user_name, :msg_id)
             ON CONFLICT (hash) DO UPDATE SET 
             gid = :gid, 
+            tenant_id = :tenant_id,
             time = :time, 
             chat_id = :chat_id, 
             user_id = :user_id, 
@@ -98,14 +109,23 @@ var locatorQueries = engine.NewQueryMap().
             msg_id = :msg_id`,
 	}).
 	Add(CmdAddLocatorSpam, engine.Query{
-		Sqlite: `INSERT OR REPLACE INTO spam (user_id, gid, time, checks) 
-            VALUES (:user_id, :gid, :time, :checks)`,
-		Postgres: `INSERT INTO spam (user_id, gid, time, checks) 
-            VALUES (:user_id, :gid, :time, :checks)
+		Sqlite: `INSERT OR REPLACE INTO spam (user_id, gid, tenant_id, time, checks) 
+            VALUES (:user_id, :gid, :tenant_id, :time, :checks)`,
+		Postgres: `INSERT INTO spam (user_id, gid, tenant_id, time, checks) 
+            VALUES (:user_id, :gid, :tenant_id, :time, :checks)
             ON CONFLICT (user_id) DO UPDATE SET 
             gid = :gid, 
+            tenant_id = :tenant_id,
             time = :time, 
             checks = :checks`,
+	}).
+	Add(CmdAddLocatorMessagesTenantIDColumn, engine.Query{
+		Sqlite:   "ALTER TABLE messages ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''",
+		Postgres: "ALTER TABLE messages ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT ''",
+	}).
+	Add(CmdAddLocatorSpamTenantIDColumn, engine.Query{
+		Sqlite:   "ALTER TABLE spam ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''",
+		Postgres: "ALTER TABLE spam ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT ''",
 	})
 
 // Locator stores messages metadata and spam results for a given ttl period.
@@ -154,47 +174,42 @@ func NewLocator(ctx context.Context, ttl time.Duration, minSize int, db *engine.
 }
 
 func (l *Locator) migrate(ctx context.Context, tx *sqlx.Tx, gid string) error {
-	// try to select with new structure, if works - already migrated
 	var count int
 	err := tx.GetContext(ctx, &count, "SELECT COUNT(*) FROM messages WHERE gid = ''")
-	if err == nil {
-		log.Printf("[DEBUG] locator tables already migrated")
-		return nil
-	}
-
-	// add gid column to messages
-	addGIDMessagesQuery, err := locatorQueries.Pick(l.Type(), CmdAddGIDColumnMessages)
 	if err != nil {
-		return fmt.Errorf("failed to get add messages GID query: %w", err)
+		addGIDMessagesQuery, pickErr := locatorQueries.Pick(l.Type(), CmdAddGIDColumnMessages)
+		if pickErr != nil {
+			return fmt.Errorf("failed to get add messages GID query: %w", pickErr)
+		}
+
+		if _, execErr := tx.ExecContext(ctx, addGIDMessagesQuery); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
+			return fmt.Errorf("failed to add gid column to messages: %w", execErr)
+		}
+
+		addGIDSpamQuery, pickErr := locatorQueries.Pick(l.Type(), CmdAddGIDColumnSpam)
+		if pickErr != nil {
+			return fmt.Errorf("failed to get add spam GID query: %w", pickErr)
+		}
+
+		if _, execErr := tx.ExecContext(ctx, addGIDSpamQuery); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
+			return fmt.Errorf("failed to add gid column to spam: %w", execErr)
+		}
+
+		query := l.Adopt("UPDATE messages SET gid = ? WHERE gid = ''")
+		if _, err = tx.ExecContext(ctx, query, gid); err != nil {
+			return fmt.Errorf("failed to update gid for existing messages: %w", err)
+		}
+
+		if _, err = tx.ExecContext(ctx, "UPDATE spam SET gid = ? WHERE gid = ''", gid); err != nil {
+			return fmt.Errorf("failed to update gid for existing spam: %w", err)
+		}
+
+		log.Printf("[DEBUG] locator tables migrated")
 	}
 
-	_, err = tx.ExecContext(ctx, addGIDMessagesQuery)
-	if err != nil && !strings.Contains(err.Error(), "duplicate column") {
-		return fmt.Errorf("failed to add gid column to messages: %w", err)
-	}
+	migrateTenantID(ctx, tx, l.Type(), "messages")
+	migrateTenantID(ctx, tx, l.Type(), "spam")
 
-	// add gid column to spam
-	addGIDSpamQuery, err := locatorQueries.Pick(l.Type(), CmdAddGIDColumnSpam)
-	if err != nil {
-		return fmt.Errorf("failed to get add spam GID query: %w", err)
-	}
-
-	_, err = tx.ExecContext(ctx, addGIDSpamQuery)
-	if err != nil && !strings.Contains(err.Error(), "duplicate column") {
-		return fmt.Errorf("failed to add gid column to spam: %w", err)
-	}
-
-	// update existing records with provided gid
-	query := l.Adopt("UPDATE messages SET gid = ? WHERE gid = ''")
-	if _, err = tx.ExecContext(ctx, query, gid); err != nil {
-		return fmt.Errorf("failed to update gid for existing messages: %w", err)
-	}
-
-	if _, err = tx.ExecContext(ctx, "UPDATE spam SET gid = ? WHERE gid = ''", gid); err != nil {
-		return fmt.Errorf("failed to update gid for existing spam: %w", err)
-	}
-
-	log.Printf("[DEBUG] locator tables migrated")
 	return nil
 }
 
@@ -223,8 +238,9 @@ func (l *Locator) AddMessage(ctx context.Context, msg string, chatID, userID int
 	_, err = l.NamedExecContext(ctx, query,
 		struct {
 			MsgMeta
-			Hash string `db:"hash"`
-			GID  string `db:"gid"`
+			Hash     string `db:"hash"`
+			GID      string `db:"gid"`
+			TenantID string `db:"tenant_id"`
 		}{
 			MsgMeta: MsgMeta{
 				Time:     time.Now(),
@@ -233,8 +249,9 @@ func (l *Locator) AddMessage(ctx context.Context, msg string, chatID, userID int
 				UserName: userName,
 				MsgID:    msgID,
 			},
-			Hash: hash,
-			GID:  l.GID(),
+			Hash:     hash,
+			GID:      l.GID(),
+			TenantID: l.TenantID(),
 		})
 	if err != nil {
 		return fmt.Errorf("failed to insert message: %w", err)
@@ -259,10 +276,11 @@ func (l *Locator) AddSpam(ctx context.Context, userID int64, checks []spamcheck.
 
 	_, err = l.NamedExecContext(ctx, query,
 		map[string]any{
-			"user_id": userID,
-			"gid":     l.GID(),
-			"time":    time.Now(),
-			"checks":  string(checksStr),
+			"user_id":   userID,
+			"gid":       l.GID(),
+			"tenant_id": l.TenantID(),
+			"time":      time.Now(),
+			"checks":    string(checksStr),
 		})
 	if err != nil {
 		return fmt.Errorf("failed to insert spam: %w", err)
@@ -277,8 +295,8 @@ func (l *Locator) Message(ctx context.Context, msg string) (MsgMeta, bool) {
 
 	var meta MsgMeta
 	hash := l.MsgHash(msg)
-	query := l.Adopt(`SELECT time, chat_id, user_id, user_name, msg_id FROM messages WHERE hash = ? AND gid = ?`)
-	err := l.GetContext(ctx, &meta, query, hash, l.GID())
+	query := l.Adopt(`SELECT time, chat_id, user_id, user_name, msg_id FROM messages WHERE hash = ? AND tenant_id = ?`)
+	err := l.GetContext(ctx, &meta, query, hash, l.TenantID())
 	if err != nil {
 		observability.Logf(ctx, "[DEBUG] failed to find message by hash %q: %v", hash, err)
 		return MsgMeta{}, false
@@ -292,8 +310,8 @@ func (l *Locator) UserNameByID(ctx context.Context, userID int64) string {
 	defer l.RUnlock()
 
 	var userName string
-	query := l.Adopt(`SELECT user_name FROM messages WHERE user_id = ? AND gid = ? LIMIT 1`)
-	err := l.GetContext(ctx, &userName, query, userID, l.GID())
+	query := l.Adopt(`SELECT user_name FROM messages WHERE user_id = ? AND tenant_id = ? LIMIT 1`)
+	err := l.GetContext(ctx, &userName, query, userID, l.TenantID())
 	if err != nil {
 		observability.Logf(ctx, "[DEBUG] failed to find user name by id %d: %v", userID, err)
 		return ""
@@ -307,8 +325,8 @@ func (l *Locator) UserIDByName(ctx context.Context, userName string) int64 {
 	defer l.RUnlock()
 
 	var userID int64
-	query := l.Adopt(`SELECT user_id FROM messages WHERE user_name = ? AND gid = ? LIMIT 1`)
-	err := l.GetContext(ctx, &userID, query, userName, l.GID())
+	query := l.Adopt(`SELECT user_id FROM messages WHERE user_name = ? AND tenant_id = ? LIMIT 1`)
+	err := l.GetContext(ctx, &userID, query, userName, l.TenantID())
 	if err != nil {
 		observability.Logf(ctx, "[DEBUG] failed to find user id by name %q: %v", userName, err)
 		return 0
@@ -323,8 +341,8 @@ func (l *Locator) Spam(ctx context.Context, userID int64) (SpamData, bool) {
 
 	var data SpamData
 	var checksStr string
-	query := l.Adopt(`SELECT time, checks FROM spam WHERE user_id = ? AND gid = ?`)
-	err := l.QueryRowContext(ctx, query, userID, l.GID()).Scan(&data.Time, &checksStr)
+	query := l.Adopt(`SELECT time, checks FROM spam WHERE user_id = ? AND tenant_id = ?`)
+	err := l.QueryRowContext(ctx, query, userID, l.TenantID()).Scan(&data.Time, &checksStr)
 	if err != nil {
 		return SpamData{}, false
 	}
@@ -343,9 +361,9 @@ func (l *Locator) MsgHash(msg string) string {
 
 // GetUserMessageIDs returns message IDs from a user for bulk deletion
 func (l *Locator) GetUserMessageIDs(ctx context.Context, userID int64, limit int) ([]int, error) {
-	query := l.Adopt(`SELECT msg_id FROM messages WHERE user_id = ? AND gid = ? ORDER BY time DESC LIMIT ?`)
+	query := l.Adopt(`SELECT msg_id FROM messages WHERE user_id = ? AND tenant_id = ? ORDER BY time DESC LIMIT ?`)
 	var msgIDs []int
-	err := l.SelectContext(ctx, &msgIDs, query, userID, l.GID(), limit)
+	err := l.SelectContext(ctx, &msgIDs, query, userID, l.TenantID(), limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user message IDs: %w", err)
 	}
@@ -354,8 +372,8 @@ func (l *Locator) GetUserMessageIDs(ctx context.Context, userID int64, limit int
 
 // cleanupMessages removes old messages. Messages with expired ttl are removed if the total number of messages exceeds minSize.
 func (l *Locator) cleanupMessages(ctx context.Context) error {
-	query := l.Adopt(`DELETE FROM messages WHERE time < ? AND gid = ? AND (SELECT COUNT(*) FROM messages WHERE gid = ?) > ?`)
-	_, err := l.ExecContext(ctx, query, time.Now().Add(-l.ttl), l.GID(), l.GID(), l.minSize)
+	query := l.Adopt(`DELETE FROM messages WHERE time < ? AND tenant_id = ? AND (SELECT COUNT(*) FROM messages WHERE tenant_id = ?) > ?`)
+	_, err := l.ExecContext(ctx, query, time.Now().Add(-l.ttl), l.TenantID(), l.TenantID(), l.minSize)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup messages: %w", err)
 	}
@@ -364,8 +382,8 @@ func (l *Locator) cleanupMessages(ctx context.Context) error {
 
 // cleanupSpam removes old spam data within the same gid
 func (l *Locator) cleanupSpam() error {
-	query := l.Adopt(`DELETE FROM spam WHERE time < ? AND gid = ? AND (SELECT COUNT(*) FROM spam WHERE gid = ?) > ?`)
-	_, err := l.Exec(query, time.Now().Add(-l.ttl), l.GID(), l.GID(), l.minSize)
+	query := l.Adopt(`DELETE FROM spam WHERE time < ? AND tenant_id = ? AND (SELECT COUNT(*) FROM spam WHERE tenant_id = ?) > ?`)
+	_, err := l.Exec(query, time.Now().Add(-l.ttl), l.TenantID(), l.TenantID(), l.minSize)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup spam: %w", err)
 	}

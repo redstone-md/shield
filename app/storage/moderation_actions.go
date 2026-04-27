@@ -19,6 +19,7 @@ const (
 	CmdAddModerationAction
 	CmdGetLatestModerationAction
 	CmdAddModerationActionsGIDColumn
+	CmdAddModerationActionsTenantIDColumn
 )
 
 var moderationActionsQueries = engine.NewQueryMap().
@@ -26,6 +27,7 @@ var moderationActionsQueries = engine.NewQueryMap().
 		Sqlite: `CREATE TABLE IF NOT EXISTS moderation_actions (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			gid TEXT NOT NULL DEFAULT '',
+			tenant_id TEXT NOT NULL DEFAULT '',
 			event_id TEXT NOT NULL,
 			correlation_id TEXT NOT NULL DEFAULT '',
 			idempotency_key TEXT NOT NULL DEFAULT '',
@@ -41,6 +43,7 @@ var moderationActionsQueries = engine.NewQueryMap().
 		Postgres: `CREATE TABLE IF NOT EXISTS moderation_actions (
 			id SERIAL PRIMARY KEY,
 			gid TEXT NOT NULL DEFAULT '',
+			tenant_id TEXT NOT NULL DEFAULT '',
 			event_id TEXT NOT NULL,
 			correlation_id TEXT NOT NULL DEFAULT '',
 			idempotency_key TEXT NOT NULL DEFAULT '',
@@ -58,26 +61,32 @@ var moderationActionsQueries = engine.NewQueryMap().
 		CREATE INDEX IF NOT EXISTS idx_moderation_actions_gid_event ON moderation_actions(gid, event_id);
 		CREATE INDEX IF NOT EXISTS idx_moderation_actions_gid_key ON moderation_actions(gid, idempotency_key);
 		CREATE INDEX IF NOT EXISTS idx_moderation_actions_gid_created ON moderation_actions(gid, created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_moderation_actions_tenant_id ON moderation_actions(tenant_id);
 	`).
 	AddSame(CmdAddModerationAction, `INSERT INTO moderation_actions
-		(gid, event_id, correlation_id, idempotency_key, command, status, chat_id, subject_id, message_id, attempt, last_error, created_at)
-		VALUES (:gid, :event_id, :correlation_id, :idempotency_key, :command, :status, :chat_id, :subject_id, :message_id, :attempt, :last_error, :created_at)`).
+		(gid, tenant_id, event_id, correlation_id, idempotency_key, command, status, chat_id, subject_id, message_id, attempt, last_error, created_at)
+		VALUES (:gid, :tenant_id, :event_id, :correlation_id, :idempotency_key, :command, :status, :chat_id, :subject_id, :message_id, :attempt, :last_error, :created_at)`).
 	AddSame(CmdGetLatestModerationAction, `SELECT
 	id, gid, event_id, correlation_id, idempotency_key, command, status,
 	chat_id, subject_id, message_id, attempt, last_error, created_at
 	FROM moderation_actions
-	WHERE gid = ? AND idempotency_key = ? AND command = ? AND chat_id = ? AND subject_id = ? AND message_id = ?
+	WHERE tenant_id = ? AND idempotency_key = ? AND command = ? AND chat_id = ? AND subject_id = ? AND message_id = ?
 	ORDER BY attempt DESC, id DESC
 	LIMIT 1`).
 	Add(CmdAddModerationActionsGIDColumn, engine.Query{
 		Sqlite:   "ALTER TABLE moderation_actions ADD COLUMN gid TEXT NOT NULL DEFAULT ''",
 		Postgres: "ALTER TABLE moderation_actions ADD COLUMN IF NOT EXISTS gid TEXT NOT NULL DEFAULT ''",
+	}).
+	Add(CmdAddModerationActionsTenantIDColumn, engine.Query{
+		Sqlite:   "ALTER TABLE moderation_actions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''",
+		Postgres: "ALTER TABLE moderation_actions ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT ''",
 	})
 
 // ModerationActionEntry stores one executor command attempt.
 type ModerationActionEntry struct {
 	ID             int64     `db:"id"`
 	GID            string    `db:"gid"`
+	TenantID       string    `db:"tenant_id"`
 	EventID        string    `db:"event_id"`
 	CorrelationID  string    `db:"correlation_id"`
 	IdempotencyKey string    `db:"idempotency_key"`
@@ -136,23 +145,22 @@ func NewModerationActions(ctx context.Context, db *engine.SQL) (*ModerationActio
 func (m *ModerationActions) migrate(ctx context.Context, tx *sqlx.Tx, gid string) error {
 	var count int
 	err := tx.GetContext(ctx, &count, "SELECT COUNT(*) FROM moderation_actions WHERE gid = ''")
-	if err == nil {
-		return nil
+	if err != nil {
+		addGIDQuery, qErr := moderationActionsQueries.Pick(m.Type(), CmdAddModerationActionsGIDColumn)
+		if qErr != nil {
+			return fmt.Errorf("failed to get add GID query: %w", qErr)
+		}
+		if _, execErr := tx.ExecContext(ctx, addGIDQuery); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
+			return fmt.Errorf("failed to add gid column to moderation_actions: %w", execErr)
+		}
+
+		if _, err = tx.ExecContext(ctx, "UPDATE moderation_actions SET gid = ? WHERE gid = ''", gid); err != nil {
+			return fmt.Errorf("failed to update gid for existing moderation_actions: %w", err)
+		}
+		log.Printf("[DEBUG] moderation_actions table migrated")
 	}
 
-	addGIDQuery, qErr := moderationActionsQueries.Pick(m.Type(), CmdAddModerationActionsGIDColumn)
-	if qErr != nil {
-		return fmt.Errorf("failed to get add GID query: %w", qErr)
-	}
-	if _, execErr := tx.ExecContext(ctx, addGIDQuery); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
-		return fmt.Errorf("failed to add gid column to moderation_actions: %w", execErr)
-	}
-
-	if _, err = tx.ExecContext(ctx, "UPDATE moderation_actions SET gid = ? WHERE gid = ''", gid); err != nil {
-		return fmt.Errorf("failed to update gid for existing moderation_actions: %w", err)
-	}
-
-	log.Printf("[DEBUG] moderation_actions table migrated")
+	migrateTenantID(ctx, tx, m.Type(), "moderation_actions")
 	return nil
 }
 
@@ -168,6 +176,7 @@ func (m *ModerationActions) Add(ctx context.Context, entry ModerationActionEntry
 		entry.CreatedAt = time.Now().UTC()
 	}
 	entry.GID = m.GID()
+	entry.TenantID = m.TenantID()
 
 	query, err := moderationActionsQueries.Pick(m.Type(), CmdAddModerationAction)
 	if err != nil {
@@ -186,9 +195,9 @@ func (m *ModerationActions) ByEventID(ctx context.Context, eventID string) ([]Mo
 	m.RLock()
 	defer m.RUnlock()
 
-	query := m.Adopt(`SELECT * FROM moderation_actions WHERE gid = ? AND event_id = ? ORDER BY created_at ASC, id ASC`)
+	query := m.Adopt(`SELECT * FROM moderation_actions WHERE tenant_id = ? AND event_id = ? ORDER BY created_at ASC, id ASC`)
 	var entries []ModerationActionEntry
-	if err := m.SelectContext(ctx, &entries, query, m.GID(), eventID); err != nil {
+	if err := m.SelectContext(ctx, &entries, query, m.TenantID(), eventID); err != nil {
 		return nil, fmt.Errorf("failed to get moderation actions: %w", err)
 	}
 	return entries, nil
@@ -207,7 +216,7 @@ func (m *ModerationActions) Last(ctx context.Context, lookup ModerationActionLoo
 
 	var entry ModerationActionEntry
 	if err := m.GetContext(ctx, &entry, query,
-		m.GID(),
+		m.TenantID(),
 		lookup.IdempotencyKey,
 		lookup.Command,
 		lookup.ChatID,

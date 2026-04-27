@@ -35,6 +35,7 @@ const (
 	CmdAddApprovedUser
 	CmdAddUIDColumn
 	CmdAddGIDColumn
+	CmdAddApprovedUsersTenantIDColumn
 )
 
 // queries holds all approved users queries
@@ -44,17 +45,19 @@ var approvedUsersQueries = engine.NewQueryMap().
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             uid TEXT,
             gid TEXT DEFAULT '',
+            tenant_id TEXT NOT NULL DEFAULT '',
             name TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(gid, uid)
+            UNIQUE(tenant_id, uid)
         )`,
 		Postgres: `CREATE TABLE IF NOT EXISTS approved_users (
             id SERIAL PRIMARY KEY,
             uid TEXT,
             gid TEXT DEFAULT '',
+            tenant_id TEXT NOT NULL DEFAULT '',
             name TEXT,
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(gid, uid)
+            UNIQUE(tenant_id, uid)
         )`,
 	}).
 	AddSame(CmdCreateApprovedUsersIndexes, `
@@ -64,9 +67,9 @@ var approvedUsersQueries = engine.NewQueryMap().
         CREATE INDEX IF NOT EXISTS idx_approved_users_timestamp ON approved_users(timestamp)
     `).
 	Add(CmdAddApprovedUser, engine.Query{
-		Sqlite: "INSERT OR REPLACE INTO approved_users (uid, gid, name, timestamp) VALUES (?, ?, ?, ?)",
-		Postgres: "INSERT INTO approved_users (uid, gid, name, timestamp) VALUES ($1, $2, $3, $4) " +
-			"ON CONFLICT (gid, uid) DO UPDATE SET name=EXCLUDED.name, timestamp=EXCLUDED.timestamp",
+		Sqlite: "INSERT OR REPLACE INTO approved_users (uid, gid, tenant_id, name, timestamp) VALUES (?, ?, ?, ?, ?)",
+		Postgres: "INSERT INTO approved_users (uid, gid, tenant_id, name, timestamp) VALUES ($1, $2, $3, $4, $5) " +
+			"ON CONFLICT (tenant_id, uid) DO UPDATE SET name=EXCLUDED.name, timestamp=EXCLUDED.timestamp",
 	}).
 	Add(CmdAddUIDColumn, engine.Query{
 		Sqlite:   "ALTER TABLE approved_users ADD COLUMN uid TEXT",
@@ -101,9 +104,9 @@ func (au *ApprovedUsers) Read(ctx context.Context) ([]approved.UserInfo, error) 
 	au.RLock()
 	defer au.RUnlock()
 
-	query := au.Adopt("SELECT uid, gid, name, timestamp FROM approved_users WHERE gid = ? ORDER BY uid ASC")
+	query := au.Adopt("SELECT uid, gid, name, timestamp FROM approved_users WHERE tenant_id = ? ORDER BY uid ASC")
 	users := []approvedUsersInfo{}
-	if err := au.SelectContext(ctx, &users, query, au.GID()); err != nil {
+	if err := au.SelectContext(ctx, &users, query, au.TenantID()); err != nil {
 		return nil, fmt.Errorf("failed to get approved users: %w", err)
 	}
 
@@ -137,7 +140,7 @@ func (au *ApprovedUsers) Write(ctx context.Context, user approved.UserInfo) erro
 		return fmt.Errorf("failed to get write query: %w", err)
 	}
 
-	if _, err := au.ExecContext(ctx, query, user.UserID, au.GID(), user.UserName, user.Timestamp); err != nil {
+	if _, err := au.ExecContext(ctx, query, user.UserID, au.GID(), au.TenantID(), user.UserName, user.Timestamp); err != nil {
 		return fmt.Errorf("failed to insert user %+v: %w", user, err)
 	}
 
@@ -156,14 +159,14 @@ func (au *ApprovedUsers) Delete(ctx context.Context, id string) error {
 
 	// check if user exists first
 	var user approvedUsersInfo
-	query := au.Adopt("SELECT uid, gid, name, timestamp FROM approved_users WHERE uid = ? AND gid = ?")
-	if err := au.GetContext(ctx, &user, query, id, au.GID()); err != nil {
+	query := au.Adopt("SELECT uid, gid, name, timestamp FROM approved_users WHERE uid = ? AND tenant_id = ?")
+	if err := au.GetContext(ctx, &user, query, id, au.TenantID()); err != nil {
 		return fmt.Errorf("failed to get approved user for id %s: %w", id, err)
 	}
 
-	// delete user  "DELETE FROM approved_users WHERE uid = ? AND gid = ?"
-	query = au.Adopt("DELETE FROM approved_users WHERE uid = ? AND gid = ?")
-	if _, err := au.ExecContext(ctx, query, id, au.GID()); err != nil {
+	// delete user
+	query = au.Adopt("DELETE FROM approved_users WHERE uid = ? AND tenant_id = ?")
+	if _, err := au.ExecContext(ctx, query, id, au.TenantID()); err != nil {
 		return fmt.Errorf("failed to delete id %s: %w", id, err)
 	}
 
@@ -206,6 +209,8 @@ func (au *ApprovedUsers) migrate(ctx context.Context, tx *sqlx.Tx, gid string) e
 	if _, err = tx.ExecContext(ctx, migrateQuery, gid); err != nil {
 		return fmt.Errorf("failed to migrate data: %w", err)
 	}
+
+	migrateTenantID(ctx, tx, au.Type(), "approved_users")
 
 	log.Printf("[DEBUG] approved_users table migrated")
 	return nil

@@ -29,6 +29,7 @@ type DetectedSpam struct {
 type DetectedSpamInfo struct {
 	ID               int64                `db:"id"`
 	GID              string               `db:"gid"`
+	TenantID         string               `db:"tenant_id"`
 	Text             string               `db:"text"`
 	UserID           int64                `db:"user_id"`
 	UserName         string               `db:"user_name"`
@@ -53,6 +54,7 @@ const (
 	CmdAddDetectedSpamMatchedRulesColumn
 	CmdAddDetectedSpamRuleSetVersionColumn
 	CmdAddDetectedSpamIdempotencyKeyColumn
+	CmdAddDetectedSpamTenantIDColumn
 )
 
 // queries holds all detected spam queries
@@ -61,6 +63,7 @@ var detectedSpamQueries = engine.NewQueryMap().
 		Sqlite: `CREATE TABLE IF NOT EXISTS detected_spam (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             gid TEXT NOT NULL DEFAULT '',
+            tenant_id TEXT NOT NULL DEFAULT '',
             text TEXT,
             user_id INTEGER,
             user_name TEXT,
@@ -76,6 +79,7 @@ var detectedSpamQueries = engine.NewQueryMap().
 		Postgres: `CREATE TABLE IF NOT EXISTS detected_spam (
             id SERIAL PRIMARY KEY,
             gid TEXT NOT NULL DEFAULT '',
+            tenant_id TEXT NOT NULL DEFAULT '',
             text TEXT,
             user_id BIGINT,
             user_name TEXT,
@@ -93,7 +97,11 @@ var detectedSpamQueries = engine.NewQueryMap().
       	CREATE INDEX IF NOT EXISTS idx_detected_spam_gid_ts ON detected_spam(gid, timestamp DESC);
         CREATE INDEX IF NOT EXISTS idx_detected_spam_user_id_gid ON detected_spam(user_id, gid);
 		CREATE INDEX IF NOT EXISTS idx_spam_gid_time ON detected_spam(gid, timestamp DESC);
-        CREATE INDEX IF NOT EXISTS idx_detected_spam_gid ON detected_spam(gid)`,
+        CREATE INDEX IF NOT EXISTS idx_detected_spam_gid ON detected_spam(gid);
+        CREATE INDEX IF NOT EXISTS idx_detected_spam_tenant_id_ts ON detected_spam(tenant_id, timestamp DESC);
+        CREATE INDEX IF NOT EXISTS idx_detected_spam_user_id_tenant_id ON detected_spam(user_id, tenant_id);
+        CREATE INDEX IF NOT EXISTS idx_spam_tenant_id_time ON detected_spam(tenant_id, timestamp DESC);
+        CREATE INDEX IF NOT EXISTS idx_detected_spam_tenant_id ON detected_spam(tenant_id)`,
 	).
 	Add(CmdAddDetectedSpamSignalSourceColumn, engine.Query{
 		Sqlite:   "ALTER TABLE detected_spam ADD COLUMN signal_source TEXT DEFAULT ''",
@@ -118,6 +126,10 @@ var detectedSpamQueries = engine.NewQueryMap().
 	Add(CmdAddGIDColumn, engine.Query{
 		Sqlite:   "ALTER TABLE detected_spam ADD COLUMN gid TEXT DEFAULT ''",
 		Postgres: "ALTER TABLE detected_spam ADD COLUMN IF NOT EXISTS gid TEXT DEFAULT ''",
+	}).
+	Add(CmdAddDetectedSpamTenantIDColumn, engine.Query{
+		Sqlite:   "ALTER TABLE detected_spam ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''",
+		Postgres: "ALTER TABLE detected_spam ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT ''",
 	})
 
 // NewDetectedSpam creates a new DetectedSpam storage
@@ -158,10 +170,10 @@ func (ds *DetectedSpam) Write(ctx context.Context, entry DetectedSpamInfo, check
 	}
 
 	query := ds.Adopt(`INSERT INTO detected_spam
-		(gid, text, user_id, user_name, timestamp, checks, signal_source, score, matched_rules, rule_set_version, idempotency_key)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		(gid, tenant_id, text, user_id, user_name, timestamp, checks, signal_source, score, matched_rules, rule_set_version, idempotency_key)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	_, err = ds.ExecContext(ctx, query,
-		entry.GID, entry.Text, entry.UserID, entry.UserName, entry.Timestamp, string(checksJSON),
+		entry.GID, ds.TenantID(), entry.Text, entry.UserID, entry.UserName, entry.Timestamp, string(checksJSON),
 		entry.SignalSource, entry.Score, string(matchedRulesJSON), entry.RuleSetVersion, entry.IdempotencyKey)
 	if err != nil {
 		return fmt.Errorf("failed to insert detected spam entry: %w", err)
@@ -189,9 +201,9 @@ func (ds *DetectedSpam) Read(ctx context.Context) ([]DetectedSpamInfo, error) {
 	ds.RLock()
 	defer ds.RUnlock()
 
-	query := ds.Adopt("SELECT * FROM detected_spam WHERE gid = ? ORDER BY timestamp DESC LIMIT ?")
+	query := ds.Adopt("SELECT * FROM detected_spam WHERE tenant_id = ? ORDER BY timestamp DESC LIMIT ?")
 	var entries []DetectedSpamInfo
-	err := ds.SelectContext(ctx, &entries, query, ds.GID(), maxDetectedSpamEntries)
+	err := ds.SelectContext(ctx, &entries, query, ds.TenantID(), maxDetectedSpamEntries)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get detected spam entries: %w", err)
 	}
@@ -219,9 +231,9 @@ func (ds *DetectedSpam) FindByUserID(ctx context.Context, userID int64) (*Detect
 	ds.RLock()
 	defer ds.RUnlock()
 
-	query := ds.Adopt("SELECT * FROM detected_spam WHERE user_id = ? AND gid = ? ORDER BY timestamp DESC LIMIT 1")
+	query := ds.Adopt("SELECT * FROM detected_spam WHERE user_id = ? AND tenant_id = ? ORDER BY timestamp DESC LIMIT 1")
 	var entry DetectedSpamInfo
-	err := ds.GetContext(ctx, &entry, query, userID, ds.GID())
+	err := ds.GetContext(ctx, &entry, query, userID, ds.TenantID())
 	if errors.Is(err, sql.ErrNoRows) {
 		// not found, return nil *DetectedSpamInfo instead of error
 		return nil, nil
@@ -251,24 +263,22 @@ func (ds *DetectedSpam) CountByUserID(ctx context.Context, userID int64) (int, e
 	ds.RLock()
 	defer ds.RUnlock()
 
-	query := ds.Adopt("SELECT COUNT(*) FROM detected_spam WHERE user_id = ? AND gid = ?")
+	query := ds.Adopt("SELECT COUNT(*) FROM detected_spam WHERE user_id = ? AND tenant_id = ?")
 	var count int
-	if err := ds.GetContext(ctx, &count, query, userID, ds.GID()); err != nil {
+	if err := ds.GetContext(ctx, &count, query, userID, ds.TenantID()); err != nil {
 		return 0, fmt.Errorf("failed to count detected spam entries for user_id %d: %w", userID, err)
 	}
 	return count, nil
 }
 
 func (ds *DetectedSpam) migrate(ctx context.Context, tx *sqlx.Tx, gid string) error {
-	// try to select with new structure, if works - already migrated
 	var count int
 	err := tx.GetContext(ctx, &count, "SELECT COUNT(*) FROM detected_spam WHERE gid = '' AND signal_source = ''")
 	if err == nil {
-		log.Printf("[DEBUG] detected_spam table already migrated")
+		migrateTenantID(ctx, tx, ds.Type(), "detected_spam")
 		return nil
 	}
 
-	// add gid column using db-specific query
 	addGIDQuery, err := detectedSpamQueries.Pick(ds.Type(), CmdAddGIDColumn)
 	if err != nil {
 		return fmt.Errorf("failed to get add GID query: %w", err)
@@ -295,11 +305,11 @@ func (ds *DetectedSpam) migrate(ctx context.Context, tx *sqlx.Tx, gid string) er
 		}
 	}
 
-	// update existing records with provided gid
 	if _, err = tx.ExecContext(ctx, "UPDATE detected_spam SET gid = ? WHERE gid = ''", gid); err != nil {
 		return fmt.Errorf("failed to update gid for existing records: %w", err)
 	}
 
+	migrateTenantID(ctx, tx, ds.Type(), "detected_spam")
 	log.Printf("[DEBUG] detected_spam table migrated")
 	return nil
 }

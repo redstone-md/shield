@@ -21,6 +21,8 @@ const (
 	CmdCreateRuleSetsIndexes
 	CmdAddRuleSetsGIDColumn
 	CmdAddRuleSetVersionsGIDColumn
+	CmdAddRuleSetsTenantIDColumn
+	CmdAddRuleSetVersionsTenantIDColumn
 )
 
 var ruleSetQueries = engine.NewQueryMap().
@@ -28,12 +30,14 @@ var ruleSetQueries = engine.NewQueryMap().
 		Sqlite: `CREATE TABLE IF NOT EXISTS rule_sets (
 			workspace_id TEXT PRIMARY KEY,
 			gid TEXT NOT NULL DEFAULT '',
+			tenant_id TEXT NOT NULL DEFAULT '',
 			active_version INTEGER NOT NULL,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 		CREATE TABLE IF NOT EXISTS rule_set_versions (
 			workspace_id TEXT NOT NULL,
 			gid TEXT NOT NULL DEFAULT '',
+			tenant_id TEXT NOT NULL DEFAULT '',
 			version INTEGER NOT NULL,
 			source TEXT NOT NULL,
 			payload TEXT NOT NULL,
@@ -43,12 +47,14 @@ var ruleSetQueries = engine.NewQueryMap().
 		Postgres: `CREATE TABLE IF NOT EXISTS rule_sets (
 			workspace_id TEXT PRIMARY KEY,
 			gid TEXT NOT NULL DEFAULT '',
+			tenant_id TEXT NOT NULL DEFAULT '',
 			active_version INTEGER NOT NULL,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
 		CREATE TABLE IF NOT EXISTS rule_set_versions (
 			workspace_id TEXT NOT NULL,
 			gid TEXT NOT NULL DEFAULT '',
+			tenant_id TEXT NOT NULL DEFAULT '',
 			version INTEGER NOT NULL,
 			source TEXT NOT NULL,
 			payload TEXT NOT NULL,
@@ -61,12 +67,24 @@ var ruleSetQueries = engine.NewQueryMap().
 	CREATE INDEX IF NOT EXISTS idx_rule_sets_gid ON rule_sets(gid);
 	CREATE INDEX IF NOT EXISTS idx_rule_set_versions_gid ON rule_set_versions(gid);
 	CREATE INDEX IF NOT EXISTS idx_rule_set_versions_workspace_created
-	ON rule_set_versions(workspace_id, created_at DESC)`,
+	ON rule_set_versions(workspace_id, created_at DESC);
+	CREATE INDEX IF NOT EXISTS idx_rule_sets_tenant_id ON rule_sets(tenant_id);
+	CREATE INDEX IF NOT EXISTS idx_rule_set_versions_tenant_id ON rule_set_versions(tenant_id)`,
 		Postgres: `
 	CREATE INDEX IF NOT EXISTS idx_rule_sets_gid ON rule_sets(gid);
 	CREATE INDEX IF NOT EXISTS idx_rule_set_versions_gid ON rule_set_versions(gid);
 	CREATE INDEX IF NOT EXISTS idx_rule_set_versions_workspace_created
-	ON rule_set_versions(workspace_id, created_at DESC)`,
+	ON rule_set_versions(workspace_id, created_at DESC);
+	CREATE INDEX IF NOT EXISTS idx_rule_sets_tenant_id ON rule_sets(tenant_id);
+	CREATE INDEX IF NOT EXISTS idx_rule_set_versions_tenant_id ON rule_set_versions(tenant_id)`,
+	}).
+	Add(CmdAddRuleSetsTenantIDColumn, engine.Query{
+		Sqlite:   "ALTER TABLE rule_sets ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''",
+		Postgres: "ALTER TABLE rule_sets ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT ''",
+	}).
+	Add(CmdAddRuleSetVersionsTenantIDColumn, engine.Query{
+		Sqlite:   "ALTER TABLE rule_set_versions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''",
+		Postgres: "ALTER TABLE rule_set_versions ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT ''",
 	}).
 	Add(CmdAddRuleSetsGIDColumn, engine.Query{
 		Sqlite:   "ALTER TABLE rule_sets ADD COLUMN gid TEXT NOT NULL DEFAULT ''",
@@ -105,28 +123,28 @@ func NewRuleSets(ctx context.Context, db *engine.SQL) (*RuleSets, error) {
 func (rs *RuleSets) migrate(ctx context.Context, tx *sqlx.Tx, gid string) error {
 	var count int
 	err := tx.GetContext(ctx, &count, "SELECT COUNT(*) FROM rule_sets WHERE gid = ''")
-	if err == nil {
-		return nil
-	}
-
-	for _, cmd := range []engine.DBCmd{CmdAddRuleSetsGIDColumn, CmdAddRuleSetVersionsGIDColumn} {
-		query, qErr := ruleSetQueries.Pick(rs.Type(), cmd)
-		if qErr != nil {
-			return fmt.Errorf("failed to get rule sets migration query %d: %w", cmd, qErr)
+	if err != nil {
+		for _, cmd := range []engine.DBCmd{CmdAddRuleSetsGIDColumn, CmdAddRuleSetVersionsGIDColumn} {
+			query, qErr := ruleSetQueries.Pick(rs.Type(), cmd)
+			if qErr != nil {
+				return fmt.Errorf("failed to get rule sets migration query %d: %w", cmd, qErr)
+			}
+			if _, execErr := tx.ExecContext(ctx, query); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
+				return fmt.Errorf("failed to apply rule sets migration %d: %w", cmd, execErr)
+			}
 		}
-		if _, execErr := tx.ExecContext(ctx, query); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
-			return fmt.Errorf("failed to apply rule sets migration %d: %w", cmd, execErr)
+
+		if _, err = tx.ExecContext(ctx, "UPDATE rule_sets SET gid = ? WHERE gid = ''", gid); err != nil {
+			return fmt.Errorf("failed to update gid for existing rule_sets: %w", err)
 		}
+		if _, err = tx.ExecContext(ctx, "UPDATE rule_set_versions SET gid = ? WHERE gid = ''", gid); err != nil {
+			return fmt.Errorf("failed to update gid for existing rule_set_versions: %w", err)
+		}
+		log.Printf("[DEBUG] rule_sets and rule_set_versions tables migrated")
 	}
 
-	if _, err = tx.ExecContext(ctx, "UPDATE rule_sets SET gid = ? WHERE gid = ''", gid); err != nil {
-		return fmt.Errorf("failed to update gid for existing rule_sets: %w", err)
-	}
-	if _, err = tx.ExecContext(ctx, "UPDATE rule_set_versions SET gid = ? WHERE gid = ''", gid); err != nil {
-		return fmt.Errorf("failed to update gid for existing rule_set_versions: %w", err)
-	}
-
-	log.Printf("[DEBUG] rule_sets and rule_set_versions tables migrated")
+	migrateTenantID(ctx, tx, rs.Type(), "rule_sets")
+	migrateTenantID(ctx, tx, rs.Type(), "rule_set_versions")
 	return nil
 }
 
@@ -141,8 +159,8 @@ func (rs *RuleSets) EnsureBootstrap(ctx context.Context, ruleSet rules.RuleSet) 
 	defer rs.Unlock()
 
 	var activeVersion int
-	query := rs.Adopt(`SELECT active_version FROM rule_sets WHERE workspace_id = ? AND gid = ?`)
-	err := rs.GetContext(ctx, &activeVersion, query, ruleSet.WorkspaceID, rs.GID())
+	query := rs.Adopt(`SELECT active_version FROM rule_sets WHERE workspace_id = ? AND tenant_id = ?`)
+	err := rs.GetContext(ctx, &activeVersion, query, ruleSet.WorkspaceID, rs.TenantID())
 	if err == nil {
 		return false, nil
 	}
@@ -161,14 +179,14 @@ func (rs *RuleSets) EnsureBootstrap(ctx context.Context, ruleSet rules.RuleSet) 
 	}
 	defer tx.Rollback()
 
-	insertVersion := rs.Adopt(`INSERT INTO rule_set_versions (workspace_id, gid, version, source, payload, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)`)
-	if _, err = tx.ExecContext(ctx, insertVersion, ruleSet.WorkspaceID, rs.GID(), 1, ruleSet.Source, string(payload), time.Now()); err != nil {
+	insertVersion := rs.Adopt(`INSERT INTO rule_set_versions (workspace_id, gid, tenant_id, version, source, payload, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`)
+	if _, err = tx.ExecContext(ctx, insertVersion, ruleSet.WorkspaceID, rs.GID(), rs.TenantID(), 1, ruleSet.Source, string(payload), time.Now()); err != nil {
 		return false, fmt.Errorf("failed to insert bootstrap rule set version: %w", err)
 	}
 
 	insertActive := upsertRuleSetQuery(rs.Type())
-	if _, err = tx.ExecContext(ctx, insertActive, ruleSet.WorkspaceID, rs.GID(), 1, time.Now()); err != nil {
+	if _, err = tx.ExecContext(ctx, insertActive, ruleSet.WorkspaceID, rs.GID(), rs.TenantID(), 1, time.Now()); err != nil {
 		return false, fmt.Errorf("failed to upsert active rule set: %w", err)
 	}
 
@@ -193,8 +211,8 @@ func (rs *RuleSets) Active(ctx context.Context, workspaceID string) (rules.RuleS
 		JOIN rule_set_versions rsv
 		  ON rsv.workspace_id = rs.workspace_id
 		 AND rsv.version = rs.active_version
-		WHERE rs.workspace_id = ? AND rs.gid = ? AND rsv.gid = ?`)
-	if err := rs.GetContext(ctx, &row, query, workspaceID, rs.GID(), rs.GID()); err != nil {
+		WHERE rs.workspace_id = ? AND rs.tenant_id = ? AND rsv.tenant_id = ?`)
+	if err := rs.GetContext(ctx, &row, query, workspaceID, rs.TenantID(), rs.TenantID()); err != nil {
 		return rules.RuleSet{}, fmt.Errorf("failed to get active rule set: %w", err)
 	}
 
@@ -218,8 +236,8 @@ func (rs *RuleSets) Update(ctx context.Context, ruleSet rules.RuleSet) (int, err
 	defer rs.Unlock()
 
 	var currentVersion int
-	query := rs.Adopt(`SELECT active_version FROM rule_sets WHERE workspace_id = ? AND gid = ?`)
-	err := rs.GetContext(ctx, &currentVersion, query, ruleSet.WorkspaceID, rs.GID())
+	query := rs.Adopt(`SELECT active_version FROM rule_sets WHERE workspace_id = ? AND tenant_id = ?`)
+	err := rs.GetContext(ctx, &currentVersion, query, ruleSet.WorkspaceID, rs.TenantID())
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("failed to query current rule set version: %w", err)
 	}
@@ -236,14 +254,14 @@ func (rs *RuleSets) Update(ctx context.Context, ruleSet rules.RuleSet) (int, err
 	}
 	defer tx.Rollback()
 
-	insertVersion := rs.Adopt(`INSERT INTO rule_set_versions (workspace_id, gid, version, source, payload, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)`)
-	if _, err = tx.ExecContext(ctx, insertVersion, ruleSet.WorkspaceID, rs.GID(), newVersion, ruleSet.Source, string(payload), time.Now()); err != nil {
+	insertVersion := rs.Adopt(`INSERT INTO rule_set_versions (workspace_id, gid, tenant_id, version, source, payload, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`)
+	if _, err = tx.ExecContext(ctx, insertVersion, ruleSet.WorkspaceID, rs.GID(), rs.TenantID(), newVersion, ruleSet.Source, string(payload), time.Now()); err != nil {
 		return 0, fmt.Errorf("failed to insert rule set version %d: %w", newVersion, err)
 	}
 
 	upsertActive := upsertRuleSetQuery(rs.Type())
-	if _, err = tx.ExecContext(ctx, upsertActive, ruleSet.WorkspaceID, rs.GID(), newVersion, time.Now()); err != nil {
+	if _, err = tx.ExecContext(ctx, upsertActive, ruleSet.WorkspaceID, rs.GID(), rs.TenantID(), newVersion, time.Now()); err != nil {
 		return 0, fmt.Errorf("failed to upsert active rule set: %w", err)
 	}
 
@@ -263,7 +281,7 @@ func (rs *RuleSets) History(ctx context.Context, workspaceID string, limit int) 
 	}
 	query := rs.Adopt(`SELECT version, source, payload, created_at
 		FROM rule_set_versions
-		WHERE workspace_id = ? AND gid = ?
+		WHERE workspace_id = ? AND tenant_id = ?
 		ORDER BY version DESC LIMIT ?`)
 
 	var rows []struct {
@@ -272,7 +290,7 @@ func (rs *RuleSets) History(ctx context.Context, workspaceID string, limit int) 
 		Payload   string    `db:"payload"`
 		CreatedAt time.Time `db:"created_at"`
 	}
-	if err := rs.SelectContext(ctx, &rows, query, workspaceID, rs.GID(), limit); err != nil {
+	if err := rs.SelectContext(ctx, &rows, query, workspaceID, rs.TenantID(), limit); err != nil {
 		return nil, fmt.Errorf("failed to get rule set history: %w", err)
 	}
 
@@ -292,11 +310,11 @@ func (rs *RuleSets) History(ctx context.Context, workspaceID string, limit int) 
 
 func upsertRuleSetQuery(dbType engine.Type) string {
 	if dbType == engine.Postgres {
-		return `INSERT INTO rule_sets (workspace_id, gid, active_version, updated_at)
-			VALUES ($1, $2, $3, $4)
+		return `INSERT INTO rule_sets (workspace_id, gid, tenant_id, active_version, updated_at)
+			VALUES ($1, $2, $3, $4, $5)
 			ON CONFLICT (workspace_id) DO UPDATE
-			SET gid = EXCLUDED.gid, active_version = EXCLUDED.active_version, updated_at = EXCLUDED.updated_at`
+			SET gid = EXCLUDED.gid, tenant_id = EXCLUDED.tenant_id, active_version = EXCLUDED.active_version, updated_at = EXCLUDED.updated_at`
 	}
-	return `INSERT OR REPLACE INTO rule_sets (workspace_id, gid, active_version, updated_at)
-		VALUES (?, ?, ?, ?)`
+	return `INSERT OR REPLACE INTO rule_sets (workspace_id, gid, tenant_id, active_version, updated_at)
+		VALUES (?, ?, ?, ?, ?)`
 }

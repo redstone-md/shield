@@ -179,27 +179,26 @@ func (s *StorageTestSuite) TestLocator_CleanupLogic() {
 
 			oldTime := time.Now().Add(-2 * ttl) // ensure this is older than the ttl
 
-			// add two of each to both groups, we have minSize = 1, so we should have 2 to allow cleanup
-			q := `INSERT INTO messages (hash, gid, time, chat_id, user_id, user_name, msg_id) VALUES (?, ?, ?, ?, ?, ?, ?)`
-			_, err = locator.Exec(db.Adopt(q), "old_hash1", locator.GID(), oldTime, int64(111), int64(222), "old_user", 333)
+			q := `INSERT INTO messages (hash, gid, tenant_id, time, chat_id, user_id, user_name, msg_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+			_, err = locator.Exec(db.Adopt(q), "old_hash1", locator.GID(), locator.TenantID(), oldTime, int64(111), int64(222), "old_user", 333)
 			s.Require().NoError(err)
-			_, err = locator.Exec(db.Adopt(q), "old_hash2", locator.GID(), oldTime, int64(111), int64(222), "old_user", 333)
+			_, err = locator.Exec(db.Adopt(q), "old_hash2", locator.GID(), locator.TenantID(), oldTime, int64(111), int64(222), "old_user", 333)
 			s.Require().NoError(err)
 
-			_, err = locator.Exec(db.Adopt(`INSERT INTO spam (user_id, gid, time, checks) VALUES (?, ?, ?, ?)`),
-				int64(222), locator.GID(), oldTime, `[{"Name":"old_test","Spam":true,"Details":"old spam"}]`)
+			_, err = locator.Exec(db.Adopt(`INSERT INTO spam (user_id, gid, tenant_id, time, checks) VALUES (?, ?, ?, ?, ?)`),
+				int64(222), locator.GID(), locator.TenantID(), oldTime, `[{"Name":"old_test","Spam":true,"Details":"old spam"}]`)
 			s.Require().NoError(err)
-			_, err = locator.Exec(db.Adopt(`INSERT INTO spam (user_id, gid, time, checks) VALUES (?, ?, ?, ?)`),
-				int64(223), locator.GID(), oldTime, `[{"Name":"old_test","Spam":true,"Details":"old spam"}]`)
+			_, err = locator.Exec(db.Adopt(`INSERT INTO spam (user_id, gid, tenant_id, time, checks) VALUES (?, ?, ?, ?, ?)`),
+				int64(223), locator.GID(), locator.TenantID(), oldTime, `[{"Name":"old_test","Spam":true,"Details":"old spam"}]`)
 			s.Require().NoError(err)
 
 			s.Require().NoError(locator.cleanupMessages(ctx))
 			s.Require().NoError(locator.cleanupSpam())
 
 			var msgCountAfter, spamCountAfter int
-			err = locator.Get(&msgCountAfter, db.Adopt(`SELECT COUNT(*) FROM messages WHERE gid = ?`), locator.GID())
+			err = locator.Get(&msgCountAfter, db.Adopt(`SELECT COUNT(*) FROM messages WHERE tenant_id = ?`), locator.TenantID())
 			s.Require().NoError(err)
-			err = locator.Get(&spamCountAfter, db.Adopt(`SELECT COUNT(*) FROM spam WHERE gid = ?`), locator.GID())
+			err = locator.Get(&spamCountAfter, db.Adopt(`SELECT COUNT(*) FROM spam WHERE tenant_id = ?`), locator.TenantID())
 			s.Require().NoError(err)
 
 			s.Equal(0, msgCountAfter, "messages should be cleaned up")

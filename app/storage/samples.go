@@ -45,6 +45,7 @@ const (
 	CmdCreateSamplesIndexes
 	CmdAddSample
 	CmdImportSample
+	CmdAddSamplesTenantIDColumn
 )
 
 // queries holds all samples-related queries
@@ -53,33 +54,35 @@ var samplesQueries = engine.NewQueryMap().
 		Sqlite: `CREATE TABLE IF NOT EXISTS samples (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             gid TEXT NOT NULL DEFAULT '',
+            tenant_id TEXT NOT NULL DEFAULT '',
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             type TEXT CHECK (type IN ('ham', 'spam')),
             origin TEXT CHECK (origin IN ('preset', 'user')),
             message TEXT NOT NULL,
-            UNIQUE(gid, message)
+            UNIQUE(tenant_id, message)
         )`,
 		Postgres: `CREATE TABLE IF NOT EXISTS samples (
             id SERIAL PRIMARY KEY,
             gid TEXT NOT NULL DEFAULT '',
+            tenant_id TEXT NOT NULL DEFAULT '',
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             type TEXT CHECK (type IN ('ham', 'spam')),
             origin TEXT CHECK (origin IN ('preset', 'user')),
             message TEXT NOT NULL,
             message_hash TEXT GENERATED ALWAYS AS (encode(sha256(message::bytea), 'hex')) STORED,
-            UNIQUE(gid, message_hash)
+            UNIQUE(tenant_id, message_hash)
         )`,
 	}).
 	Add(CmdAddSample, engine.Query{
-		Sqlite: `INSERT OR REPLACE INTO samples (gid, type, origin, message) VALUES (?, ?, ?, ?)`,
-		Postgres: `INSERT INTO samples (gid, type, origin, message) VALUES ($1, $2, $3, $4) 
-                  ON CONFLICT (gid, message_hash) DO UPDATE SET type = EXCLUDED.type, origin = EXCLUDED.origin`,
+		Sqlite: `INSERT OR REPLACE INTO samples (gid, tenant_id, type, origin, message) VALUES (?, ?, ?, ?, ?)`,
+		Postgres: `INSERT INTO samples (gid, tenant_id, type, origin, message) VALUES ($1, $2, $3, $4, $5) 
+                  ON CONFLICT (tenant_id, message_hash) DO UPDATE SET type = EXCLUDED.type, origin = EXCLUDED.origin`,
 	}).
 	Add(CmdImportSample, engine.Query{
-		Sqlite: `INSERT OR REPLACE INTO samples (gid, type, origin, message) VALUES (?, ?, ?, ?)`,
-		Postgres: `INSERT INTO samples (gid, type, origin, message) 
-                  VALUES ($1, $2, $3, $4) 
-                  ON CONFLICT (gid, message_hash) DO UPDATE 
+		Sqlite: `INSERT OR REPLACE INTO samples (gid, tenant_id, type, origin, message) VALUES (?, ?, ?, ?, ?)`,
+		Postgres: `INSERT INTO samples (gid, tenant_id, type, origin, message) 
+                  VALUES ($1, $2, $3, $4, $5) 
+                  ON CONFLICT (tenant_id, message_hash) DO UPDATE 
                   SET type = EXCLUDED.type, origin = EXCLUDED.origin`,
 	}).
 	Add(CmdCreateSamplesIndexes, engine.Query{
@@ -89,17 +92,25 @@ var samplesQueries = engine.NewQueryMap().
 			CREATE INDEX IF NOT EXISTS idx_samples_type ON samples(type);
 			CREATE INDEX IF NOT EXISTS idx_samples_origin ON samples(origin);
 			CREATE INDEX IF NOT EXISTS idx_samples_lookup ON samples(gid, type, origin);
-			CREATE INDEX IF NOT EXISTS idx_samples_message ON samples(message)`,
+			CREATE INDEX IF NOT EXISTS idx_samples_message ON samples(message);
+			CREATE INDEX IF NOT EXISTS idx_samples_tenant_id ON samples(tenant_id);
+			CREATE INDEX IF NOT EXISTS idx_samples_tenant_lookup ON samples(tenant_id, type, origin)`,
 		Postgres: `
 			CREATE INDEX IF NOT EXISTS idx_samples_lookup ON samples(gid, type, origin);
             CREATE INDEX IF NOT EXISTS idx_samples_gid_type_origin_ts ON samples(gid, type, origin, timestamp DESC);
 			CREATE INDEX IF NOT EXISTS idx_samples_gid ON samples(gid);
 			CREATE INDEX IF NOT EXISTS idx_samples_origin ON samples(gid,origin);
-			CREATE INDEX IF NOT EXISTS idx_samples_message_hash ON samples(message_hash);`,
+			CREATE INDEX IF NOT EXISTS idx_samples_message_hash ON samples(message_hash);
+			CREATE INDEX IF NOT EXISTS idx_samples_tenant_id ON samples(tenant_id);
+			CREATE INDEX IF NOT EXISTS idx_samples_tenant_lookup ON samples(tenant_id, type, origin)`,
 	}).
 	Add(CmdAddGIDColumn, engine.Query{
 		Sqlite:   "ALTER TABLE samples ADD COLUMN gid TEXT DEFAULT ''",
 		Postgres: "ALTER TABLE samples ADD COLUMN IF NOT EXISTS gid TEXT DEFAULT ''",
+	}).
+	Add(CmdAddSamplesTenantIDColumn, engine.Query{
+		Sqlite:   "ALTER TABLE samples ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''",
+		Postgres: "ALTER TABLE samples ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT ''",
 	})
 
 // NewSamples creates a new Samples storage
@@ -149,7 +160,7 @@ func (s *Samples) Add(ctx context.Context, t SampleType, o SampleOrigin, message
 	if err != nil {
 		return fmt.Errorf("failed to get query: %w", err)
 	}
-	if _, err := s.ExecContext(ctx, query, s.GID(), t, o, message); err != nil {
+	if _, err := s.ExecContext(ctx, query, s.GID(), s.TenantID(), t, o, message); err != nil {
 		return fmt.Errorf("failed to add sample: %w", err)
 	}
 
@@ -186,15 +197,16 @@ func (s *Samples) DeleteMessage(ctx context.Context, message string) error {
 	// first verify the message exists in this group
 	var count int
 	gid := s.GID()
-	query := s.Adopt(`SELECT COUNT(*) FROM samples WHERE gid = ? AND message = ?`)
-	if err := s.GetContext(ctx, &count, query, gid, message); err != nil {
+	tenantID := s.TenantID()
+	query := s.Adopt(`SELECT COUNT(*) FROM samples WHERE tenant_id = ? AND message = ?`)
+	if err := s.GetContext(ctx, &count, query, tenantID, message); err != nil {
 		return fmt.Errorf("failed to check sample existence: %w", err)
 	}
 	if count == 0 {
 		return fmt.Errorf("sample not found: gid=%s, message=%s", gid, message)
 	}
 
-	result, err := s.ExecContext(ctx, s.Adopt(`DELETE FROM samples WHERE gid = ? AND message = ?`), gid, message)
+	result, err := s.ExecContext(ctx, s.Adopt(`DELETE FROM samples WHERE tenant_id = ? AND message = ?`), tenantID, message)
 	if err != nil {
 		return fmt.Errorf("failed to remove sample: %w", err)
 	}
@@ -226,20 +238,20 @@ func (s *Samples) Read(ctx context.Context, t SampleType, o SampleOrigin) ([]str
 		args    []any
 		samples []string
 	)
-	gid := s.GID()
+	tenantID := s.TenantID()
 	if o == SampleOriginAny {
-		query = `SELECT message FROM samples WHERE gid = ? AND type = ?`
-		args = []any{gid, t}
+		query = `SELECT message FROM samples WHERE tenant_id = ? AND type = ?`
+		args = []any{tenantID, t}
 	} else {
-		query = `SELECT message FROM samples WHERE gid = ? AND type = ? AND origin = ?`
-		args = []any{gid, t, o}
+		query = `SELECT message FROM samples WHERE tenant_id = ? AND type = ? AND origin = ?`
+		args = []any{tenantID, t, o}
 	}
 	query = s.Adopt(query)
 
 	if err := s.SelectContext(ctx, &samples, query, args...); err != nil {
 		return nil, fmt.Errorf("failed to get samples: %w", err)
 	}
-	log.Printf("[DEBUG] read %d samples: gid=%s, type=%s, origin=%s", len(samples), gid, t, o)
+	log.Printf("[DEBUG] read %d samples: gid=%s, type=%s, origin=%s", len(samples), s.GID(), t, o)
 	return samples, nil
 }
 
@@ -255,14 +267,14 @@ func (s *Samples) Reader(ctx context.Context, t SampleType, o SampleOrigin) (io.
 
 	var query string
 	var args []any
-	gid := s.GID()
+	tenantID := s.TenantID()
 
 	if o == SampleOriginAny {
-		query = `SELECT message FROM samples WHERE gid = ? AND  type = ? ORDER BY timestamp DESC`
-		args = []any{gid, t}
+		query = `SELECT message FROM samples WHERE tenant_id = ? AND  type = ? ORDER BY timestamp DESC`
+		args = []any{tenantID, t}
 	} else {
-		query = `SELECT message FROM samples WHERE gid = ? AND type = ? AND origin = ? ORDER BY timestamp DESC`
-		args = []any{gid, t, o}
+		query = `SELECT message FROM samples WHERE tenant_id = ? AND type = ? AND origin = ? ORDER BY timestamp DESC`
+		args = []any{tenantID, t, o}
 	}
 	query = s.Adopt(query)
 
@@ -289,14 +301,14 @@ func (s *Samples) Iterator(ctx context.Context, t SampleType, o SampleOrigin) (i
 
 	var query string
 	var args []any
-	gid := s.GID()
+	tenantID := s.TenantID()
 
 	if o == SampleOriginAny {
-		query = `SELECT message FROM samples WHERE gid = ? AND type = ? ORDER BY timestamp DESC`
-		args = []any{gid, t}
+		query = `SELECT message FROM samples WHERE tenant_id = ? AND type = ? ORDER BY timestamp DESC`
+		args = []any{tenantID, t}
 	} else {
-		query = `SELECT message FROM samples WHERE gid = ? AND type = ? AND origin = ? ORDER BY timestamp DESC`
-		args = []any{gid, t, o}
+		query = `SELECT message FROM samples WHERE tenant_id = ? AND type = ? AND origin = ? ORDER BY timestamp DESC`
+		args = []any{tenantID, t, o}
 	}
 	query = s.Adopt(query)
 
@@ -358,6 +370,7 @@ func (s *Samples) Import(ctx context.Context, t SampleType, o SampleOrigin, r io
 		return nil, fmt.Errorf("reader cannot be nil")
 	}
 	gid := s.GID()
+	tenantID := s.TenantID()
 
 	s.Lock()
 	defer s.Unlock()
@@ -371,8 +384,8 @@ func (s *Samples) Import(ctx context.Context, t SampleType, o SampleOrigin, r io
 
 	// remove all samples with the same type and origin if requested
 	if clr {
-		query := s.Adopt(`DELETE FROM samples WHERE gid = ? AND type = ? AND origin = ?`)
-		result, errDel := tx.ExecContext(ctx, query, gid, t, o)
+		query := s.Adopt(`DELETE FROM samples WHERE tenant_id = ? AND type = ? AND origin = ?`)
+		result, errDel := tx.ExecContext(ctx, query, tenantID, t, o)
 		if errDel != nil {
 			return nil, fmt.Errorf("failed to remove old samples: %w", errDel)
 		}
@@ -400,7 +413,7 @@ func (s *Samples) Import(ctx context.Context, t SampleType, o SampleOrigin, r io
 		if message == "" { // skip empty lines
 			continue
 		}
-		if _, err = tx.ExecContext(ctx, query, gid, t, o, message); err != nil {
+		if _, err = tx.ExecContext(ctx, query, gid, tenantID, t, o, message); err != nil {
 			return nil, fmt.Errorf("failed to add sample: %w", err)
 		}
 		added++
@@ -476,16 +489,15 @@ func (s *Samples) stats(ctx context.Context) (*SamplesStats, error) {
             COUNT(CASE WHEN type = 'spam' AND origin = 'user' THEN 1 END) as user_spam_count,
             COUNT(CASE WHEN type = 'ham' AND origin = 'user' THEN 1 END) as user_ham_count
         FROM samples 
-        WHERE gid = ?`)
+        WHERE tenant_id = ?`)
 
 	var stats SamplesStats
-	if err := s.GetContext(ctx, &stats, query, s.GID()); err != nil {
+	if err := s.GetContext(ctx, &stats, query, s.TenantID()); err != nil {
 		return nil, fmt.Errorf("failed to get stats: %w", err)
 	}
 	return &stats, nil
 }
 
 func (s *Samples) migrate(_ context.Context, _ *sqlx.Tx, _ string) error {
-	// no migration needed for now
 	return nil
 }

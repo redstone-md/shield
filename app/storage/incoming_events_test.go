@@ -46,7 +46,7 @@ func TestIncomingEventsRecord(t *testing.T) {
 	assert.Equal(t, "gr1", record.GID)
 	assert.Equal(t, event.EventID, record.EventID)
 	assert.Equal(t, event.CorrelationID, record.CorrelationID)
-	assert.Equal(t, event.TenantID, record.TenantID)
+	assert.Equal(t, "gr1", record.TenantID)
 	assert.Equal(t, event.UpdateID, record.UpdateID)
 	assert.Equal(t, event.ChatID, record.ChatID)
 	assert.Equal(t, event.MessageID, record.MessageID)

@@ -23,6 +23,7 @@ type Report struct {
 	MsgID            int       `db:"msg_id"`
 	ChatID           int64     `db:"chat_id"`
 	GID              string    `db:"gid"`
+	TenantID         string    `db:"tenant_id"`
 	ReporterUserID   int64     `db:"reporter_user_id"`
 	ReporterUserName string    `db:"reporter_user_name"`
 	ReportedUserID   int64     `db:"reported_user_id"`
@@ -43,6 +44,7 @@ const (
 	CmdUpdateReportsAdminMsgID
 	CmdDeleteReporter
 	CmdDeleteReportsByMessage
+	CmdAddReportsTenantIDColumn
 )
 
 // reportsQueries holds all reports-related queries
@@ -53,6 +55,7 @@ var reportsQueries = engine.NewQueryMap().
             msg_id INTEGER,
             chat_id INTEGER,
             gid TEXT NOT NULL DEFAULT '',
+            tenant_id TEXT NOT NULL DEFAULT '',
             reporter_user_id INTEGER,
             reporter_user_name TEXT,
             reported_user_id INTEGER,
@@ -61,13 +64,14 @@ var reportsQueries = engine.NewQueryMap().
             report_time TIMESTAMP,
             notification_sent BOOLEAN DEFAULT 0,
             admin_msg_id INTEGER DEFAULT 0,
-            UNIQUE(gid, msg_id, chat_id, reporter_user_id)
+            UNIQUE(tenant_id, msg_id, chat_id, reporter_user_id)
         )`,
 		Postgres: `CREATE TABLE IF NOT EXISTS reports (
             id SERIAL PRIMARY KEY,
             msg_id INTEGER,
             chat_id BIGINT,
             gid TEXT NOT NULL DEFAULT '',
+            tenant_id TEXT NOT NULL DEFAULT '',
             reporter_user_id BIGINT,
             reporter_user_name TEXT,
             reported_user_id BIGINT,
@@ -76,7 +80,7 @@ var reportsQueries = engine.NewQueryMap().
             report_time TIMESTAMP,
             notification_sent BOOLEAN DEFAULT false,
             admin_msg_id INTEGER DEFAULT 0,
-            UNIQUE(gid, msg_id, chat_id, reporter_user_id)
+            UNIQUE(tenant_id, msg_id, chat_id, reporter_user_id)
         )`,
 	}).
 	AddSame(CmdCreateReportsIndexes, `
@@ -84,24 +88,29 @@ var reportsQueries = engine.NewQueryMap().
         CREATE INDEX IF NOT EXISTS idx_reports_admin_msg ON reports(admin_msg_id);
         CREATE INDEX IF NOT EXISTS idx_reports_reporter_time ON reports(reporter_user_id, report_time);
         CREATE INDEX IF NOT EXISTS idx_reports_gid_time ON reports(gid, report_time DESC);
+        CREATE INDEX IF NOT EXISTS idx_reports_tenant_id ON reports(tenant_id)
     `).
-	Add(CmdAddReport, engine.Query{
-		Sqlite: "INSERT OR IGNORE INTO reports (msg_id, chat_id, gid, reporter_user_id, reporter_user_name, " +
-			"reported_user_id, reported_user_name, msg_text, report_time, notification_sent, admin_msg_id) " +
-			"VALUES (:msg_id, :chat_id, :gid, :reporter_user_id, :reporter_user_name, :reported_user_id, " +
-			":reported_user_name, :msg_text, :report_time, :notification_sent, :admin_msg_id)",
-		Postgres: "INSERT INTO reports (msg_id, chat_id, gid, reporter_user_id, reporter_user_name, " +
-			"reported_user_id, reported_user_name, msg_text, report_time, notification_sent, admin_msg_id) " +
-			"VALUES (:msg_id, :chat_id, :gid, :reporter_user_id, :reporter_user_name, :reported_user_id, " +
-			":reported_user_name, :msg_text, :report_time, :notification_sent, :admin_msg_id) " +
-			"ON CONFLICT (gid, msg_id, chat_id, reporter_user_id) DO NOTHING",
+	Add(CmdAddReportsTenantIDColumn, engine.Query{
+		Sqlite:   "ALTER TABLE reports ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''",
+		Postgres: "ALTER TABLE reports ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT ''",
 	}).
-	AddSame(CmdGetReportsByMessage, "SELECT * FROM reports WHERE gid = ? AND msg_id = ? AND chat_id = ? ORDER BY report_time ASC").
-	AddSame(CmdGetReporterCountSince, "SELECT COUNT(*) FROM reports WHERE gid = ? AND reporter_user_id = ? AND report_time > ?").
+	Add(CmdAddReport, engine.Query{
+		Sqlite: "INSERT OR IGNORE INTO reports (msg_id, chat_id, gid, tenant_id, reporter_user_id, reporter_user_name, " +
+			"reported_user_id, reported_user_name, msg_text, report_time, notification_sent, admin_msg_id) " +
+			"VALUES (:msg_id, :chat_id, :gid, :tenant_id, :reporter_user_id, :reporter_user_name, :reported_user_id, " +
+			":reported_user_name, :msg_text, :report_time, :notification_sent, :admin_msg_id)",
+		Postgres: "INSERT INTO reports (msg_id, chat_id, gid, tenant_id, reporter_user_id, reporter_user_name, " +
+			"reported_user_id, reported_user_name, msg_text, report_time, notification_sent, admin_msg_id) " +
+			"VALUES (:msg_id, :chat_id, :gid, :tenant_id, :reporter_user_id, :reporter_user_name, :reported_user_id, " +
+			":reported_user_name, :msg_text, :report_time, :notification_sent, :admin_msg_id) " +
+			"ON CONFLICT (tenant_id, msg_id, chat_id, reporter_user_id) DO NOTHING",
+	}).
+	AddSame(CmdGetReportsByMessage, "SELECT * FROM reports WHERE tenant_id = ? AND msg_id = ? AND chat_id = ? ORDER BY report_time ASC").
+	AddSame(CmdGetReporterCountSince, "SELECT COUNT(*) FROM reports WHERE tenant_id = ? AND reporter_user_id = ? AND report_time > ?").
 	AddSame(CmdUpdateReportsAdminMsgID,
-		"UPDATE reports SET notification_sent = true, admin_msg_id = ? WHERE gid = ? AND msg_id = ? AND chat_id = ?").
-	AddSame(CmdDeleteReporter, "DELETE FROM reports WHERE gid = ? AND reporter_user_id = ? AND msg_id = ? AND chat_id = ?").
-	AddSame(CmdDeleteReportsByMessage, "DELETE FROM reports WHERE gid = ? AND msg_id = ? AND chat_id = ?")
+		"UPDATE reports SET notification_sent = true, admin_msg_id = ? WHERE tenant_id = ? AND msg_id = ? AND chat_id = ?").
+	AddSame(CmdDeleteReporter, "DELETE FROM reports WHERE tenant_id = ? AND reporter_user_id = ? AND msg_id = ? AND chat_id = ?").
+	AddSame(CmdDeleteReportsByMessage, "DELETE FROM reports WHERE tenant_id = ? AND msg_id = ? AND chat_id = ?")
 
 // NewReports creates a new Reports storage
 func NewReports(ctx context.Context, db *engine.SQL) (*Reports, error) {
@@ -123,8 +132,8 @@ func NewReports(ctx context.Context, db *engine.SQL) (*Reports, error) {
 }
 
 // migrate is a no-op migration function for reports table (new table, no migration needed)
-func (r *Reports) migrate(_ context.Context, _ *sqlx.Tx, _ string) error {
-	// no migration needed for new table
+func (r *Reports) migrate(ctx context.Context, tx *sqlx.Tx, _ string) error {
+	migrateTenantID(ctx, tx, r.Type(), "reports")
 	return nil
 }
 
@@ -137,7 +146,8 @@ func (r *Reports) Add(ctx context.Context, report Report) error {
 		report.MsgID, report.ChatID, report.ReporterUserID, report.ReportedUserID)
 
 	// set auto-populated fields
-	report.GID = r.GID()
+	report.GID = 	r.TenantID()
+	report.TenantID = r.TenantID()
 	if report.ReportTime.IsZero() {
 		report.ReportTime = time.Now()
 	}
@@ -176,7 +186,7 @@ func (r *Reports) GetByMessage(ctx context.Context, msgID int, chatID int64) ([]
 	query = r.Adopt(query)
 
 	var reports []Report
-	if err := r.SelectContext(ctx, &reports, query, r.GID(), msgID, chatID); err != nil {
+	if err := r.SelectContext(ctx, &reports, query, 	r.TenantID(), msgID, chatID); err != nil {
 		return nil, fmt.Errorf("failed to get reports: %w", err)
 	}
 
@@ -195,7 +205,7 @@ func (r *Reports) GetReporterCountSince(ctx context.Context, reporterID int64, s
 	query = r.Adopt(query)
 
 	var count int
-	if err := r.GetContext(ctx, &count, query, r.GID(), reporterID, since); err != nil {
+	if err := r.GetContext(ctx, &count, query, 	r.TenantID(), reporterID, since); err != nil {
 		return 0, fmt.Errorf("failed to get reporter count: %w", err)
 	}
 
@@ -213,7 +223,7 @@ func (r *Reports) UpdateAdminMsgID(ctx context.Context, msgID int, chatID int64,
 	}
 	query = r.Adopt(query)
 
-	if _, err := r.ExecContext(ctx, query, adminMsgID, r.GID(), msgID, chatID); err != nil {
+	if _, err := r.ExecContext(ctx, query, adminMsgID, 	r.TenantID(), msgID, chatID); err != nil {
 		return fmt.Errorf("failed to update admin message id: %w", err)
 	}
 
@@ -232,7 +242,7 @@ func (r *Reports) DeleteReporter(ctx context.Context, reporterID int64, msgID in
 	}
 	query = r.Adopt(query)
 
-	if _, err := r.ExecContext(ctx, query, r.GID(), reporterID, msgID, chatID); err != nil {
+	if _, err := r.ExecContext(ctx, query, 	r.TenantID(), reporterID, msgID, chatID); err != nil {
 		return fmt.Errorf("failed to delete reporter: %w", err)
 	}
 
@@ -251,7 +261,7 @@ func (r *Reports) DeleteByMessage(ctx context.Context, msgID int, chatID int64) 
 	}
 	query = r.Adopt(query)
 
-	if _, err := r.ExecContext(ctx, query, r.GID(), msgID, chatID); err != nil {
+	if _, err := r.ExecContext(ctx, query, 	r.TenantID(), msgID, chatID); err != nil {
 		return fmt.Errorf("failed to delete reports: %w", err)
 	}
 
@@ -268,10 +278,10 @@ func (r *Reports) cleanupOldReports(ctx context.Context) error {
 	// no lock - called from Add which already has lock
 	const retentionDays = 7
 	// removed notification_sent filter - delete ALL old reports to prevent memory leak
-	query := r.Adopt("DELETE FROM reports WHERE gid = ? AND report_time < ?")
+	query := r.Adopt("DELETE FROM reports WHERE tenant_id = ? AND report_time < ?")
 	cutoffTime := time.Now().Add(-retentionDays * 24 * time.Hour)
 
-	result, err := r.ExecContext(ctx, query, r.GID(), cutoffTime)
+	result, err := r.ExecContext(ctx, query, 	r.TenantID(), cutoffTime)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup old reports: %w", err)
 	}
