@@ -323,7 +323,7 @@ func TestServer_getDictionaryEntriesHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict})
+		srv := NewServer(Config{DictionaryStore: mockDict})
 		req := httptest.NewRequest("GET", "/dictionary", http.NoBody)
 		w := httptest.NewRecorder()
 
@@ -349,7 +349,7 @@ func TestServer_getDictionaryEntriesHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict})
+		srv := NewServer(Config{DictionaryStore: mockDict})
 		req := httptest.NewRequest("GET", "/dictionary", http.NoBody)
 		w := httptest.NewRecorder()
 
@@ -374,7 +374,7 @@ func TestServer_getDictionaryEntriesHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict})
+		srv := NewServer(Config{DictionaryStore: mockDict})
 		req := httptest.NewRequest("GET", "/dictionary", http.NoBody)
 		w := httptest.NewRecorder()
 

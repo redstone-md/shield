@@ -63,8 +63,9 @@ type Config struct {
 	SpamFilter       SpamFilter             // spam filter (bot)
 	DetectedSpam     DetectedSpam           // detected spam accessor
 	Locator          Locator                // locator for user info
-	Dictionary       Dictionary             // dictionary for stop phrases and ignored words
-	StorageEngine    StorageEngine          // database engine access for backups
+	DictionaryStore       Dictionary             // dictionary storage (fallback when DictionaryProvider is nil)
+	DictionaryProvider   DictionaryProvider     // control plane dictionary service (takes precedence over DictionaryStore)
+	StorageEngine        StorageEngine          // database engine access for backups
 	DMUsersProvider  DMUsersProvider        // provider for recent DM users
 	RuleSetProvider       RuleSetProvider        // control plane rule set service
 	ControlPlaneAuth      ControlPlaneAuthorizer // role authorizer for control plane endpoints
@@ -195,6 +196,11 @@ type ApprovedUsersProvider interface {
 	List(ctx context.Context) ([]approved.UserInfo, error)
 	Add(ctx context.Context, user approved.UserInfo) error
 	Remove(ctx context.Context, id string) error
+}
+
+// DictionaryProvider provides access to dictionary management through the control plane service layer.
+type DictionaryProvider interface {
+	Dictionary
 }
 
 // RuleSetProvider provides access to the active rule set and allows runtime updates.

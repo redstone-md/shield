@@ -223,13 +223,14 @@ func (s *Server) reverseSamples(spam, ham []string) (revSpam, revHam []string) {
 
 // renderDictionary renders dictionary entries for HTMX or full page request
 func (s *Server) renderDictionary(ctx context.Context, w http.ResponseWriter, tmplName string) {
-	stopPhrases, err := s.Dictionary.ReadWithIDs(ctx, storage.DictionaryTypeStopPhrase)
+	dict := s.dictionary()
+	stopPhrases, err := dict.ReadWithIDs(ctx, storage.DictionaryTypeStopPhrase)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't fetch stop phrases", "details": err.Error()})
 		return
 	}
 
-	ignoredWords, err := s.Dictionary.ReadWithIDs(ctx, storage.DictionaryTypeIgnoredWord)
+	ignoredWords, err := dict.ReadWithIDs(ctx, storage.DictionaryTypeIgnoredWord)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't fetch ignored words", "details": err.Error()})
 		return

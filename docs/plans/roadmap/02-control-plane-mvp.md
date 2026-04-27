@@ -29,6 +29,8 @@
 - [x] Добавлен role-based authorizer для control plane endpoints: viewer получает read-only доступ, admin/owner получают write access.
 - [x] Добавлен `app/controlplane.ApprovedUsersService`: обёртка над storage/detector с pub/sub для cache invalidation.
 - [x] Webapi `/users` handlers переведены с прямых вызовов `Detector.AddApprovedUser/RemoveApprovedUser/ApprovedUsers` на `ApprovedUsersProvider` (сервис или adapter fallback).
+- [x] Добавлен `app/controlplane.DictionaryService`: обёртка над dictionary storage/spam-filter reload с pub/sub для cache invalidation.
+- [x] Webapi `/dictionary` handlers переведены с прямых вызовов `s.Dictionary` + `s.SpamFilter.ReloadSamples()` на `DictionaryProvider` (сервис или adapter fallback).
 
 ## Критерий завершения
 

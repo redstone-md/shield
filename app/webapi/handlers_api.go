@@ -267,6 +267,41 @@ func (a detectorApprovedUsersAdapter) Remove(_ context.Context, id string) error
 	return a.detector.RemoveApprovedUser(id)
 }
 
+func (s *Server) dictionary() DictionaryProvider {
+	if s.DictionaryProvider != nil {
+		return s.DictionaryProvider
+	}
+	return dictionaryStoreAdapter{
+		store: s.DictionaryStore,
+		spamFilter: s.SpamFilter,
+	}
+}
+
+type dictionaryStoreAdapter struct {
+	store      Dictionary
+	spamFilter SpamFilter
+}
+
+func (a dictionaryStoreAdapter) Read(ctx context.Context, t storage.DictionaryType) ([]string, error) {
+	return a.store.Read(ctx, t)
+}
+
+func (a dictionaryStoreAdapter) ReadWithIDs(ctx context.Context, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+	return a.store.ReadWithIDs(ctx, t)
+}
+
+func (a dictionaryStoreAdapter) Add(ctx context.Context, t storage.DictionaryType, data string) error {
+	return a.store.Add(ctx, t, data)
+}
+
+func (a dictionaryStoreAdapter) Delete(ctx context.Context, id int64) error {
+	return a.store.Delete(ctx, id)
+}
+
+func (a dictionaryStoreAdapter) Stats(ctx context.Context) (*storage.DictionaryStats, error) {
+	return a.store.Stats(ctx)
+}
+
 func (s *Server) getSettingsHandler(w http.ResponseWriter, _ *http.Request) {
 	s.Settings.LuaAvailablePlugins = s.Detector.GetLuaPluginNames()
 	rest.RenderJSON(w, s.Settings)
@@ -304,12 +339,13 @@ func (s *Server) updateRuleSetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getDictionaryEntriesHandler(w http.ResponseWriter, r *http.Request) {
-	stopPhrases, err := s.Dictionary.Read(r.Context(), storage.DictionaryTypeStopPhrase)
+	dict := s.dictionary()
+	stopPhrases, err := dict.Read(r.Context(), storage.DictionaryTypeStopPhrase)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get stop phrases", "details": err.Error()})
 		return
 	}
-	ignoredWords, err := s.Dictionary.Read(r.Context(), storage.DictionaryTypeIgnoredWord)
+	ignoredWords, err := dict.Read(r.Context(), storage.DictionaryTypeIgnoredWord)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get ignored words", "details": err.Error()})
 		return
@@ -354,7 +390,8 @@ func (s *Server) addDictionaryEntryHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := s.Dictionary.Add(r.Context(), dictType, req.Data); err != nil {
+	dict := s.dictionary()
+	if err := dict.Add(r.Context(), dictType, req.Data); err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't add entry", "details": err.Error()})
 		return
 	}
@@ -396,17 +433,20 @@ func (s *Server) deleteDictionaryEntryHandler(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	if err := s.Dictionary.Delete(r.Context(), req.ID); err != nil {
+	dict := s.dictionary()
+	if err := dict.Delete(r.Context(), req.ID); err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't delete entry", "details": err.Error()})
 		return
 	}
 
-	if err := s.SpamFilter.ReloadSamples(); err != nil {
-		observability.Logf(r.Context(), "[WARN] failed to reload samples after dictionary delete: %v", err)
-		if !isHtmxRequest {
-			_ = rest.EncodeJSON(w, http.StatusInternalServerError,
-				rest.JSON{"error": "entry deleted but reload failed", "details": err.Error()})
-			return
+	if s.DictionaryProvider == nil {
+		if err := s.SpamFilter.ReloadSamples(); err != nil {
+			observability.Logf(r.Context(), "[WARN] failed to reload samples after dictionary delete: %v", err)
+			if !isHtmxRequest {
+				_ = rest.EncodeJSON(w, http.StatusInternalServerError,
+					rest.JSON{"error": "entry deleted but reload failed", "details": err.Error()})
+				return
+			}
 		}
 	}
 

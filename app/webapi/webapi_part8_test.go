@@ -35,7 +35,7 @@ func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict, SpamFilter: mockSpamFilter})
+		srv := NewServer(Config{DictionaryStore: mockDict, SpamFilter: mockSpamFilter})
 		reqBody := `{"id": 123}`
 		req := httptest.NewRequest("POST", "/dictionary/delete", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
@@ -67,7 +67,7 @@ func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict, SpamFilter: mockSpamFilter})
+		srv := NewServer(Config{DictionaryStore: mockDict, SpamFilter: mockSpamFilter})
 		reqBody := `{"id": 999}`
 		req := httptest.NewRequest("POST", "/dictionary/delete", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
@@ -93,7 +93,7 @@ func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict, SpamFilter: mockSpamFilter})
+		srv := NewServer(Config{DictionaryStore: mockDict, SpamFilter: mockSpamFilter})
 		reqBody := `{"id": malformed json}`
 		req := httptest.NewRequest("POST", "/dictionary/delete", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
@@ -127,7 +127,7 @@ func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict, SpamFilter: mockSpamFilter})
+		srv := NewServer(Config{DictionaryStore: mockDict, SpamFilter: mockSpamFilter})
 		form := url.Values{}
 		form.Set("id", "123")
 		req := httptest.NewRequest("POST", "/dictionary/delete", strings.NewReader(form.Encode()))
@@ -151,7 +151,7 @@ func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("invalid id htmx", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{}
-		srv := NewServer(Config{Dictionary: mockDict})
+		srv := NewServer(Config{DictionaryStore: mockDict})
 		form := url.Values{}
 		form.Set("id", "not-a-number")
 		req := httptest.NewRequest("POST", "/dictionary/delete", strings.NewReader(form.Encode()))
@@ -184,7 +184,7 @@ func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict, SpamFilter: mockSpamFilter})
+		srv := NewServer(Config{DictionaryStore: mockDict, SpamFilter: mockSpamFilter})
 		reqBody := `{"id": 123}`
 		req := httptest.NewRequest("POST", "/dictionary/delete", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
@@ -218,7 +218,7 @@ func TestServer_deleteDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict, SpamFilter: mockSpamFilter})
+		srv := NewServer(Config{DictionaryStore: mockDict, SpamFilter: mockSpamFilter})
 		form := url.Values{}
 		form.Set("id", "123")
 		req := httptest.NewRequest("POST", "/dictionary/delete", strings.NewReader(form.Encode()))
@@ -315,7 +315,7 @@ func TestServer_ErrorResponseContentType(t *testing.T) {
 
 	t.Run("add dictionary entry bad request empty data", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{}
-		server := NewServer(Config{Dictionary: mockDict})
+		server := NewServer(Config{DictionaryStore: mockDict})
 		reqBody, _ := json.Marshal(map[string]string{"type": "stop_phrase", "data": ""})
 		req := httptest.NewRequest("POST", "/dictionary/add", bytes.NewBuffer(reqBody))
 		rr := httptest.NewRecorder()

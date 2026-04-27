@@ -28,7 +28,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict, SpamFilter: mockSpamFilter})
+		srv := NewServer(Config{DictionaryStore: mockDict, SpamFilter: mockSpamFilter})
 		reqBody := `{"type": "stop_phrase", "data": "test phrase"}`
 		req := httptest.NewRequest("POST", "/dictionary/add", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
@@ -51,7 +51,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("empty data", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{}
-		srv := NewServer(Config{Dictionary: mockDict})
+		srv := NewServer(Config{DictionaryStore: mockDict})
 		reqBody := `{"type": "stop_phrase", "data": ""}`
 		req := httptest.NewRequest("POST", "/dictionary/add", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
@@ -71,7 +71,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("invalid type", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{}
-		srv := NewServer(Config{Dictionary: mockDict})
+		srv := NewServer(Config{DictionaryStore: mockDict})
 		reqBody := `{"type": "invalid_type", "data": "test"}`
 		req := httptest.NewRequest("POST", "/dictionary/add", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
@@ -97,7 +97,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict, SpamFilter: mockSpamFilter})
+		srv := NewServer(Config{DictionaryStore: mockDict, SpamFilter: mockSpamFilter})
 		reqBody := `{"type": "stop_phrase", "data": malformed json}`
 		req := httptest.NewRequest("POST", "/dictionary/add", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
@@ -128,7 +128,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict, SpamFilter: mockSpamFilter})
+		srv := NewServer(Config{DictionaryStore: mockDict, SpamFilter: mockSpamFilter})
 		reqBody := `{"type": "stop_phrase", "data": "test phrase"}`
 		req := httptest.NewRequest("POST", "/dictionary/add", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
@@ -162,7 +162,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict, SpamFilter: mockSpamFilter})
+		srv := NewServer(Config{DictionaryStore: mockDict, SpamFilter: mockSpamFilter})
 		form := url.Values{}
 		form.Set("type", "stop_phrase")
 		form.Set("data", "test phrase")
@@ -188,7 +188,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("empty data htmx", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{}
-		srv := NewServer(Config{Dictionary: mockDict})
+		srv := NewServer(Config{DictionaryStore: mockDict})
 		form := url.Values{}
 		form.Set("type", "stop_phrase")
 		form.Set("data", "")
@@ -212,7 +212,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 
 	t.Run("invalid type htmx", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{}
-		srv := NewServer(Config{Dictionary: mockDict})
+		srv := NewServer(Config{DictionaryStore: mockDict})
 		form := url.Values{}
 		form.Set("type", "invalid_type")
 		form.Set("data", "test")
@@ -246,7 +246,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict, SpamFilter: mockSpamFilter})
+		srv := NewServer(Config{DictionaryStore: mockDict, SpamFilter: mockSpamFilter})
 		reqBody := `{"type": "stop_phrase", "data": "test phrase"}`
 		req := httptest.NewRequest("POST", "/dictionary/add", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
@@ -280,7 +280,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 
-		srv := NewServer(Config{Dictionary: mockDict, SpamFilter: mockSpamFilter})
+		srv := NewServer(Config{DictionaryStore: mockDict, SpamFilter: mockSpamFilter})
 		form := url.Values{}
 		form.Set("type", "stop_phrase")
 		form.Set("data", "test phrase")
