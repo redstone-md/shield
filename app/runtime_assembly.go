@@ -32,6 +32,7 @@ type runtimeAssembly struct {
 	ReportsStore           *storage.Reports
 	DetectedSpamStore      *storage.DetectedSpam
 	WorkspacesStore        *storage.Workspaces
+	TenantsStore           *storage.Tenants
 	WorkspaceService       *controlplane.WorkspaceService
 	RoleAuthorizer         *controlplane.RoleAuthorizer
 	RuleSetService         *controlplane.RuleSetService
@@ -52,6 +53,7 @@ type webRuntimeAssembly struct {
 	DictionaryService    *controlplane.DictionaryService
 	DetectedSpamService  *controlplane.DetectedSpamService
 	RoleAuthorizer       *controlplane.RoleAuthorizer
+	TenantStatusProvider webapi.TenantStatusProvider
 	BotUsername          string
 }
 
@@ -156,6 +158,14 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	roleAuthorizer := controlplane.NewRoleAuthorizer(workspacesStore)
 	ruleSetService := controlplane.NewRuleSetService(ruleSets, opts.InstanceID)
 
+	tenantsStore, err := storage.NewTenants(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make tenants store, %w", err)
+	}
+	if err = tenantsStore.BootstrapDefault(ctx, opts.InstanceID, opts.InstanceID, "tg-spam"); err != nil {
+		return nil, fmt.Errorf("can't bootstrap default tenant, %w", err)
+	}
+
 	assembly := &runtimeAssembly{
 		DataDB:                 dataDB,
 		Detector:               detector,
@@ -171,6 +181,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		DetectedSpamStore:      detectedSpamStore,
 		WorkspacesStore:        workspacesStore,
 		WorkspaceService:       workspaceService,
+		TenantsStore:           tenantsStore,
 		RoleAuthorizer:         roleAuthorizer,
 		RuleSetService:         ruleSetService,
 		ApprovedUsersService:   approvedUsersSvc,
@@ -186,6 +197,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 			ApprovedUsersService: approvedUsersSvc,
 			DictionaryService:    dictSvc,
 			DetectedSpamService:  detectedSpamSvc,
+			TenantStatusProvider: tenantStatusAdapter{inner: tenantsStore},
 		},
 	}
 

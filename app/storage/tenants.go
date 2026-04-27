@@ -98,8 +98,8 @@ func NewTenants(ctx context.Context, db *engine.SQL) (*Tenants, error) {
 	return res, nil
 }
 
-func (t *Tenants) migrate(_ context.Context, _ *sqlx.Tx, _ string) error {
-	log.Printf("[DEBUG] tenants table migration check (no-op, new table)")
+func (t *Tenants) migrate(ctx context.Context, tx *sqlx.Tx, _ string) error {
+	migrateTenantID(ctx, tx, t.Type(), "tenants")
 	return nil
 }
 
