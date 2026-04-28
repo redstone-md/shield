@@ -79,6 +79,8 @@ func (e defaultPolicyEngine) decideWithEngine(req PolicyRequest) (PolicyOutcome,
 	outcome.Decision.Score = spamScore(req.Response)
 	outcome.Decision.Action = result.Action
 	outcome.Decision.Reason = result.Reason
+	outcome.Decision.PolicyVersion = result.Explanation.PolicyVersion
+	outcome.Decision.ProfileName = result.Explanation.ProfileName
 	outcome.Duration = result.Duration
 	outcome.Restrict = result.Restrict
 

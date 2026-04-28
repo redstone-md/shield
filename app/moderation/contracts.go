@@ -69,6 +69,8 @@ type PolicyDecision struct {
 	Reason        string
 	Score         float64
 	DecidedAt     time.Time
+	PolicyVersion int
+	ProfileName   string
 }
 
 // ModerationActionResult stores the executor result for a policy action.
