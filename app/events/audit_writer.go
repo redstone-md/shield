@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/umputun/tg-spam/app/bot"
@@ -31,9 +32,14 @@ type enrichedAuditLogger interface {
 	SaveAudit(ctx context.Context, record AuditRecord) error
 }
 
+type IncidentCreator interface {
+	CreateIncident(ctx context.Context, idempotencyKey string, chatID int64, ruleSetVersion int, spamUserID int64, spamUserName string, messageText string, checks []spamcheck.Response, slowPath *slowpath.SlowPathInvocation) error
+}
+
 type defaultAuditWriter struct {
-	spamLogger SpamLogger
-	locator    Locator
+	spamLogger      SpamLogger
+	locator         Locator
+	incidentCreator IncidentCreator
 }
 
 func (w defaultAuditWriter) Write(ctx context.Context, record AuditRecord) error {
@@ -53,6 +59,23 @@ func (w defaultAuditWriter) Write(ctx context.Context, record AuditRecord) error
 	if w.locator != nil {
 		if err := w.locator.AddSpam(ctx, record.SpamUserID, record.Response.CheckResults); err != nil {
 			return fmt.Errorf("add spam to locator: %w", err)
+		}
+	}
+	if w.incidentCreator != nil {
+		userName := ""
+		if record.Message != nil && record.Message.From.ID != 0 {
+			userName = record.Message.From.DisplayName
+		}
+		msgText := ""
+		if record.Message != nil {
+			msgText = record.Message.Text
+		}
+		if err := w.incidentCreator.CreateIncident(ctx,
+			record.Event.IdempotencyKey, record.ChatID, record.RuleSetVersion,
+			record.SpamUserID, userName, msgText,
+			record.Response.CheckResults, record.SlowPath,
+		); err != nil {
+			log.Printf("[WARN] incident creation failed: %v", err)
 		}
 	}
 	return nil
