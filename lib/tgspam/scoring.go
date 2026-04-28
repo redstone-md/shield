@@ -110,3 +110,28 @@ func (d *Detector) scoreSignals(cr []spamcheck.Response, boolOR func([]spamcheck
 	}
 	return boolOR(cr)
 }
+
+// withScoring populates scoring fields on a Response. Deterministic checks get Score=1.0, Weight=1.0.
+// Probabilistic checks pass their own score. NormalizedText is truncated to 64 runes.
+func withScoring(r spamcheck.Response, score float64, normText string) spamcheck.Response {
+	r.RuleID = r.Name
+	r.Score = score
+	if r.Weight == 0 && r.Spam {
+		r.Weight = 1.0
+	}
+	if len(normText) > 64 {
+		r.NormalizedText = string([]rune(normText)[:64])
+	} else {
+		r.NormalizedText = normText
+	}
+	return r
+}
+
+// truncateRunes truncates text to maxRunes runes.
+func truncateRunes(text string, maxRunes int) string {
+	runes := []rune(text)
+	if len(runes) <= maxRunes {
+		return text
+	}
+	return string(runes[:maxRunes])
+}

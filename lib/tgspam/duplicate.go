@@ -91,6 +91,10 @@ func (d *duplicateDetector) check(req spamcheck.Request) spamcheck.Response {
 			Spam:           true,
 			Details:        fmt.Sprintf("message repeated %d times in %s", count, d.formatDuration(userID, msgHash)),
 			ExtraDeleteIDs: extraIDs,
+			RuleID:         "duplicate",
+			Score:          1.0,
+			Weight:         1.0,
+			NormalizedText: truncateRunes(req.Msg, 64),
 		}
 	}
 

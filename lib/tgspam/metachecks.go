@@ -21,11 +21,11 @@ func LinksCheck(limit int) MetaCheck {
 			links = strings.Count(req.Msg, "http://") + strings.Count(req.Msg, "https://")
 		}
 		if links > limit {
-			return spamcheck.Response{
+			return withScoring(spamcheck.Response{
 				Name:    "links",
 				Spam:    true,
 				Details: fmt.Sprintf("too many links %d/%d", links, limit),
-			}
+			}, 1.0, "")
 		}
 		return spamcheck.Response{Spam: false, Name: "links", Details: fmt.Sprintf("links %d/%d", links, limit)}
 	}
@@ -47,11 +47,11 @@ func LinkOnlyCheck() MetaCheck {
 		msgWithoutLinks = strings.TrimSpace(msgWithoutLinks)
 
 		if msgWithoutLinks == "" {
-			return spamcheck.Response{
+			return withScoring(spamcheck.Response{
 				Name:    "link-only",
 				Spam:    true,
 				Details: "message contains links only",
-			}
+			}, 1.0, "")
 		}
 		return spamcheck.Response{Spam: false, Name: "link-only", Details: "message contains text"}
 	}
@@ -66,15 +66,15 @@ func ImagesCheck(minTextLen int) MetaCheck {
 			return spamcheck.Response{Spam: false, Name: "images", Details: "text or no images"}
 		}
 		if req.Msg == "" {
-			return spamcheck.Response{Name: "images", Spam: true, Details: "image without text"}
+			return withScoring(spamcheck.Response{Name: "images", Spam: true, Details: "image without text"}, 1.0, "")
 		}
 		textLen := len([]rune(req.Msg))
 		if minTextLen > 0 && textLen < minTextLen {
-			return spamcheck.Response{
+			return withScoring(spamcheck.Response{
 				Name:    "images",
 				Spam:    true,
 				Details: fmt.Sprintf("image with short text (%d chars)", textLen),
-			}
+			}, 1.0, "")
 		}
 		return spamcheck.Response{Spam: false, Name: "images", Details: "text or no images"}
 	}
@@ -89,15 +89,15 @@ func VideosCheck(minTextLen int) MetaCheck {
 			return spamcheck.Response{Spam: false, Name: "videos", Details: "text or no video"}
 		}
 		if req.Msg == "" {
-			return spamcheck.Response{Name: "videos", Spam: true, Details: "video without text"}
+			return withScoring(spamcheck.Response{Name: "videos", Spam: true, Details: "video without text"}, 1.0, "")
 		}
 		textLen := len([]rune(req.Msg))
 		if minTextLen > 0 && textLen < minTextLen {
-			return spamcheck.Response{
+			return withScoring(spamcheck.Response{
 				Name:    "videos",
 				Spam:    true,
 				Details: fmt.Sprintf("video with short text (%d chars)", textLen),
-			}
+			}, 1.0, "")
 		}
 		return spamcheck.Response{Spam: false, Name: "videos", Details: "text or no video"}
 	}
@@ -112,15 +112,15 @@ func AudioCheck(minTextLen int) MetaCheck {
 			return spamcheck.Response{Spam: false, Name: "audio", Details: "text or no audio"}
 		}
 		if req.Msg == "" {
-			return spamcheck.Response{Name: "audio", Spam: true, Details: "audio without text"}
+			return withScoring(spamcheck.Response{Name: "audio", Spam: true, Details: "audio without text"}, 1.0, "")
 		}
 		textLen := len([]rune(req.Msg))
 		if minTextLen > 0 && textLen < minTextLen {
-			return spamcheck.Response{
+			return withScoring(spamcheck.Response{
 				Name:    "audio",
 				Spam:    true,
 				Details: fmt.Sprintf("audio with short text (%d chars)", textLen),
-			}
+			}, 1.0, "")
 		}
 		return spamcheck.Response{Spam: false, Name: "audio", Details: "text or no audio"}
 	}
@@ -131,11 +131,11 @@ func AudioCheck(minTextLen int) MetaCheck {
 func ContactCheck() MetaCheck {
 	return func(req spamcheck.Request) spamcheck.Response {
 		if req.Meta.HasContact && req.Msg == "" {
-			return spamcheck.Response{
+			return withScoring(spamcheck.Response{
 				Name:    "contact",
 				Spam:    true,
 				Details: "contact without text",
-			}
+			}, 1.0, "")
 		}
 		return spamcheck.Response{Spam: false, Name: "contact", Details: "no contact without text"}
 	}
@@ -146,11 +146,11 @@ func ContactCheck() MetaCheck {
 func ForwardedCheck() MetaCheck {
 	return func(req spamcheck.Request) spamcheck.Response {
 		if req.Meta.HasForward {
-			return spamcheck.Response{
+			return withScoring(spamcheck.Response{
 				Name:    "forward",
 				Spam:    true,
 				Details: "forwarded message",
-			}
+			}, 1.0, "")
 		}
 		return spamcheck.Response{
 			Name:    "forward",
@@ -165,11 +165,11 @@ func ForwardedCheck() MetaCheck {
 func KeyboardCheck() MetaCheck {
 	return func(req spamcheck.Request) spamcheck.Response {
 		if req.Meta.HasKeyboard {
-			return spamcheck.Response{
+			return withScoring(spamcheck.Response{
 				Name:    "keyboard",
 				Spam:    true,
 				Details: "message with keyboard",
-			}
+			}, 1.0, "")
 		}
 		return spamcheck.Response{
 			Name:    "keyboard",
@@ -192,11 +192,11 @@ func MentionsCheck(limit int) MetaCheck {
 			}
 		}
 		if req.Meta.Mentions > limit {
-			return spamcheck.Response{
+			return withScoring(spamcheck.Response{
 				Name:    "mentions",
 				Spam:    true,
 				Details: fmt.Sprintf("too many mentions %d/%d", req.Meta.Mentions, limit),
-			}
+			}, 1.0, "")
 		}
 		return spamcheck.Response{
 			Name:    "mentions",
@@ -229,11 +229,11 @@ func UsernameSymbolsCheck(symbols string) MetaCheck {
 
 		for _, symbol := range symbols {
 			if strings.ContainsRune(req.UserName, symbol) {
-				return spamcheck.Response{
+				return withScoring(spamcheck.Response{
 					Name:    "username-symbols",
 					Spam:    true,
 					Details: fmt.Sprintf("username contains prohibited symbol '%c'", symbol),
-				}
+				}, 1.0, "")
 			}
 		}
 
@@ -250,11 +250,11 @@ func UsernameSymbolsCheck(symbols string) MetaCheck {
 func GiveawayCheck() MetaCheck {
 	return func(req spamcheck.Request) spamcheck.Response {
 		if req.Meta.HasGiveaway {
-			return spamcheck.Response{
+			return withScoring(spamcheck.Response{
 				Name:    "giveaway",
 				Spam:    true,
 				Details: "giveaway message",
-			}
+			}, 1.0, "")
 		}
 		return spamcheck.Response{Spam: false, Name: "giveaway", Details: "no giveaway"}
 	}
