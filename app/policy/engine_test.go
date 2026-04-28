@@ -132,3 +132,56 @@ func TestActionLevelToAction_Defaults(t *testing.T) {
 		t.Errorf("ban: expected ban/.../false, got %s/%v/%v", a, d, r)
 	}
 }
+
+func TestEngine_Decide_ShadowMode(t *testing.T) {
+	real := BalancedProfile()
+	shadow := StrictProfile()
+	shadow.Version = 2
+
+	e := NewEngine(real)
+	e.ShadowProfile = &shadow
+
+	sig := []spamcheck.Response{{Name: "stop-word", Spam: true, RuleID: "stop-word"}}
+	result := e.Decide(PolicyInput{Signals: sig})
+
+	if result.Shadow == nil {
+		t.Fatal("expected shadow result")
+	}
+	if result.Shadow.Action != moderation.ActionBan {
+		t.Errorf("shadow strict should ban, got %s", result.Shadow.Action)
+	}
+	if result.Action == result.Shadow.Action && real.Matrix[RiskSpam] == shadow.Matrix[RiskSpam] {
+		t.Error("shadow and real should differ with different profiles")
+	}
+	if result.Shadow.Explanation.ProfileName != "strict" {
+		t.Errorf("shadow should use strict profile, got %s", result.Shadow.Explanation.ProfileName)
+	}
+}
+
+func TestEngine_Decide_ShadowMode_Nil(t *testing.T) {
+	e := NewEngine(BalancedProfile())
+	sig := []spamcheck.Response{{Name: "stop-word", Spam: true, RuleID: "stop-word"}}
+	result := e.Decide(PolicyInput{Signals: sig})
+	if result.Shadow != nil {
+		t.Error("no shadow profile set, Shadow should be nil")
+	}
+}
+
+func TestEngine_Decide_ShadowAllowCases(t *testing.T) {
+	e := NewEngine(BalancedProfile())
+	e.ShadowProfile = &[]PolicyProfile{StrictProfile()}[0]
+
+	result := e.Decide(PolicyInput{Signals: nil})
+	if result.Shadow != nil {
+		t.Error("shadow should be nil for allowed messages (no action difference)")
+	}
+}
+
+func TestEngine_Decide_DryRunFlag(t *testing.T) {
+	e := NewEngine(BalancedProfile())
+	sig := []spamcheck.Response{{Name: "stop-word", Spam: true, RuleID: "stop-word"}}
+	result := e.Decide(PolicyInput{Signals: sig, DryRun: true})
+	if result.DryRun != true {
+		t.Error("expected DryRun flag set in result")
+	}
+}

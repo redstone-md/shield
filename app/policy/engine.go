@@ -23,8 +23,10 @@ type PolicyResult struct {
 	Action      moderation.Action
 	Duration    time.Duration
 	Restrict    bool
+	DryRun      bool
 	Reason      string
 	Explanation DecisionExplanation
+	Shadow      *PolicyResult
 }
 
 type DecisionExplanation struct {
@@ -38,11 +40,16 @@ type DecisionExplanation struct {
 }
 
 type Engine struct {
-	Profile PolicyProfile
+	Profile       PolicyProfile
+	ShadowProfile *PolicyProfile
 }
 
 func NewEngine(profile PolicyProfile) *Engine {
 	return &Engine{Profile: profile}
+}
+
+func NewEngineWithShadow(profile, shadow PolicyProfile) *Engine {
+	return &Engine{Profile: profile, ShadowProfile: &shadow}
 }
 
 func (e *Engine) Decide(input PolicyInput) PolicyResult {
@@ -90,11 +97,12 @@ func (e *Engine) Decide(input PolicyInput) PolicyResult {
 		reason = fmt.Sprintf("%s: %s", riskType, strings.Join(matchedRules, ", "))
 	}
 
-	return PolicyResult{
-		Action:    action,
-		Duration:  duration,
-		Restrict:  restrict,
-		Reason:    reason,
+	result := PolicyResult{
+		Action:   action,
+		Duration: duration,
+		Restrict: restrict,
+		Reason:   reason,
+		DryRun:   input.DryRun,
 		Explanation: DecisionExplanation{
 			ProfileName:   e.Profile.Name,
 			RiskType:      riskType,
@@ -105,6 +113,21 @@ func (e *Engine) Decide(input PolicyInput) PolicyResult {
 			PolicyVersion: e.Profile.Version,
 		},
 	}
+
+	if e.ShadowProfile != nil {
+		shadowEngine := &Engine{Profile: *e.ShadowProfile}
+		shadowResult := shadowEngine.Decide(PolicyInput{
+			Signals:      input.Signals,
+			StrikeCount:  input.StrikeCount,
+			IsSuperUser:  input.IsSuperUser,
+			SoftBanMode:  input.SoftBanMode,
+			FirstStrike:  input.FirstStrike,
+			SecondStrike: input.SecondStrike,
+		})
+		result.Shadow = &shadowResult
+	}
+
+	return result
 }
 
 func filterSpam(results []spamcheck.Response) []spamcheck.Response {
