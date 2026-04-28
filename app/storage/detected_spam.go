@@ -189,8 +189,8 @@ func (ds *DetectedSpam) SetAddedToSamplesFlag(ctx context.Context, id int64) err
 	ds.Lock()
 	defer ds.Unlock()
 
-	query := ds.Adopt("UPDATE detected_spam SET added = ? WHERE id = ?")
-	if _, err := ds.ExecContext(ctx, query, true, id); err != nil {
+	query := ds.Adopt("UPDATE detected_spam SET added = ? WHERE tenant_id = ? AND id = ?")
+	if _, err := ds.ExecContext(ctx, query, true, ds.TenantID(), id); err != nil {
 		return fmt.Errorf("failed to update added to samples flag: %w", err)
 	}
 	return nil

@@ -32,6 +32,13 @@ func (q *QueryMap) AddSame(cmd DBCmd, query string) *QueryMap {
 	return q.Add(cmd, Query{Sqlite: query, Postgres: query})
 }
 
+// Iterate calls fn for each entry in the query map.
+func (q *QueryMap) Iterate(fn func(cmd DBCmd, query Query)) {
+	for cmd, query := range q.queries {
+		fn(cmd, query)
+	}
+}
+
 // Pick returns a query for given db type and command
 func (q *QueryMap) Pick(dbType Type, cmd DBCmd) (string, error) {
 	query, ok := q.queries[cmd]
