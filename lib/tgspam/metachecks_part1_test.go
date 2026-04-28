@@ -45,6 +45,9 @@ func TestLinksCheck(t *testing.T) {
 				Name:    "links",
 				Spam:    true,
 				Details: "too many links 3/2",
+				RuleID:  "links",
+				Score:   1.0,
+				Weight:  1.0,
 			},
 		},
 		{
@@ -57,6 +60,9 @@ func TestLinksCheck(t *testing.T) {
 				Name:    "links",
 				Spam:    true,
 				Details: "too many links 2/1",
+				RuleID:  "links",
+				Score:   1.0,
+				Weight:  1.0,
 			},
 		},
 	}
@@ -87,14 +93,28 @@ func TestLinkOnlyCheck(t *testing.T) {
 			req: spamcheck.Request{
 				Msg: "http://example.com https://example.org",
 			},
-			expected: spamcheck.Response{Name: "link-only", Spam: true, Details: "message contains links only"},
+			expected: spamcheck.Response{
+				Name:    "link-only",
+				Spam:    true,
+				Details: "message contains links only",
+				RuleID:  "link-only",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 		{
 			name: "with a single link, no text",
 			req: spamcheck.Request{
 				Msg: " https://example.org ",
 			},
-			expected: spamcheck.Response{Name: "link-only", Spam: true, Details: "message contains links only"},
+			expected: spamcheck.Response{
+				Name:    "link-only",
+				Spam:    true,
+				Details: "message contains links only",
+				RuleID:  "link-only",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 		{
 			name: "with text and links",
@@ -140,17 +160,38 @@ func TestImagesCheck(t *testing.T) {
 		{
 			name: "images without text, minTextLen=0", minTextLen: 0,
 			req:      spamcheck.Request{Msg: "", Meta: spamcheck.MetaData{Images: 1}},
-			expected: spamcheck.Response{Name: "images", Spam: true, Details: "image without text"},
+			expected: spamcheck.Response{
+				Name:    "images",
+				Spam:    true,
+				Details: "image without text",
+				RuleID:  "images",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 		{
 			name: "multiple images without text, minTextLen=0", minTextLen: 0,
 			req:      spamcheck.Request{Msg: "", Meta: spamcheck.MetaData{Images: 3}},
-			expected: spamcheck.Response{Name: "images", Spam: true, Details: "image without text"},
+			expected: spamcheck.Response{
+				Name:    "images",
+				Spam:    true,
+				Details: "image without text",
+				RuleID:  "images",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 		{
 			name: "image with short text below threshold", minTextLen: 50,
 			req:      spamcheck.Request{Msg: "@Angelina_crypto717", Meta: spamcheck.MetaData{Images: 1}},
-			expected: spamcheck.Response{Name: "images", Spam: true, Details: "image with short text (19 chars)"},
+			expected: spamcheck.Response{
+				Name:    "images",
+				Spam:    true,
+				Details: "image with short text (19 chars)",
+				RuleID:  "images",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 		{
 			name: "image with text exactly at threshold", minTextLen: 50,
@@ -170,12 +211,26 @@ func TestImagesCheck(t *testing.T) {
 		{
 			name: "image with cyrillic short text", minTextLen: 50,
 			req:      spamcheck.Request{Msg: "Менеджер - @test123", Meta: spamcheck.MetaData{Images: 1}},
-			expected: spamcheck.Response{Name: "images", Spam: true, Details: "image with short text (19 chars)"},
+			expected: spamcheck.Response{
+				Name:    "images",
+				Spam:    true,
+				Details: "image with short text (19 chars)",
+				RuleID:  "images",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 		{
 			name: "image with empty text, minTextLen=50", minTextLen: 50,
 			req:      spamcheck.Request{Msg: "", Meta: spamcheck.MetaData{Images: 1}},
-			expected: spamcheck.Response{Name: "images", Spam: true, Details: "image without text"},
+			expected: spamcheck.Response{
+				Name:    "images",
+				Spam:    true,
+				Details: "image without text",
+				RuleID:  "images",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 	}
 
@@ -207,12 +262,26 @@ func TestVideosCheck(t *testing.T) {
 		{
 			name: "video without text, minTextLen=0", minTextLen: 0,
 			req:      spamcheck.Request{Msg: "", Meta: spamcheck.MetaData{HasVideo: true}},
-			expected: spamcheck.Response{Name: "videos", Spam: true, Details: "video without text"},
+			expected: spamcheck.Response{
+				Name:    "videos",
+				Spam:    true,
+				Details: "video without text",
+				RuleID:  "videos",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 		{
 			name: "video with short text below threshold", minTextLen: 50,
 			req:      spamcheck.Request{Msg: "@spam_channel", Meta: spamcheck.MetaData{HasVideo: true}},
-			expected: spamcheck.Response{Name: "videos", Spam: true, Details: "video with short text (13 chars)"},
+			expected: spamcheck.Response{
+				Name:    "videos",
+				Spam:    true,
+				Details: "video with short text (13 chars)",
+				RuleID:  "videos",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 		{
 			name: "video with text at threshold", minTextLen: 50,
@@ -232,7 +301,14 @@ func TestVideosCheck(t *testing.T) {
 		{
 			name: "video with empty text, minTextLen=50", minTextLen: 50,
 			req:      spamcheck.Request{Msg: "", Meta: spamcheck.MetaData{HasVideo: true}},
-			expected: spamcheck.Response{Name: "videos", Spam: true, Details: "video without text"},
+			expected: spamcheck.Response{
+				Name:    "videos",
+				Spam:    true,
+				Details: "video without text",
+				RuleID:  "videos",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 	}
 
@@ -261,6 +337,9 @@ func TestForwardedCheck(t *testing.T) {
 				Name:    "forward",
 				Spam:    true,
 				Details: "forwarded message",
+				RuleID:  "forward",
+				Score:   1.0,
+				Weight:  1.0,
 			},
 		},
 		{
@@ -306,12 +385,26 @@ func TestAudioCheck(t *testing.T) {
 		{
 			name: "audio without text, minTextLen=0", minTextLen: 0,
 			req:      spamcheck.Request{Msg: "", Meta: spamcheck.MetaData{HasAudio: true}},
-			expected: spamcheck.Response{Name: "audio", Spam: true, Details: "audio without text"},
+			expected: spamcheck.Response{
+				Name:    "audio",
+				Spam:    true,
+				Details: "audio without text",
+				RuleID:  "audio",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 		{
 			name: "audio with short text below threshold", minTextLen: 50,
 			req:      spamcheck.Request{Msg: "@spam_channel", Meta: spamcheck.MetaData{HasAudio: true}},
-			expected: spamcheck.Response{Name: "audio", Spam: true, Details: "audio with short text (13 chars)"},
+			expected: spamcheck.Response{
+				Name:    "audio",
+				Spam:    true,
+				Details: "audio with short text (13 chars)",
+				RuleID:  "audio",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 		{
 			name: "audio with text at threshold", minTextLen: 50,
@@ -331,7 +424,14 @@ func TestAudioCheck(t *testing.T) {
 		{
 			name: "audio with empty text, minTextLen=50", minTextLen: 50,
 			req:      spamcheck.Request{Msg: "", Meta: spamcheck.MetaData{HasAudio: true}},
-			expected: spamcheck.Response{Name: "audio", Spam: true, Details: "audio without text"},
+			expected: spamcheck.Response{
+				Name:    "audio",
+				Spam:    true,
+				Details: "audio without text",
+				RuleID:  "audio",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 	}
 
@@ -362,7 +462,14 @@ func TestContactCheck(t *testing.T) {
 		{
 			name:     "contact without text",
 			req:      spamcheck.Request{Msg: "", Meta: spamcheck.MetaData{HasContact: true}},
-			expected: spamcheck.Response{Name: "contact", Spam: true, Details: "contact without text"},
+			expected: spamcheck.Response{
+				Name:    "contact",
+				Spam:    true,
+				Details: "contact without text",
+				RuleID:  "contact",
+				Score:   1.0,
+				Weight:  1.0,
+			},
 		},
 	}
 
@@ -402,6 +509,9 @@ func TestKeyboardCheck(t *testing.T) {
 				Name:    "keyboard",
 				Spam:    true,
 				Details: "message with keyboard",
+				RuleID:  "keyboard",
+				Score:   1.0,
+				Weight:  1.0,
 			},
 		},
 		{
@@ -416,6 +526,9 @@ func TestKeyboardCheck(t *testing.T) {
 				Name:    "keyboard",
 				Spam:    true,
 				Details: "message with keyboard",
+				RuleID:  "keyboard",
+				Score:   1.0,
+				Weight:  1.0,
 			},
 		},
 	}

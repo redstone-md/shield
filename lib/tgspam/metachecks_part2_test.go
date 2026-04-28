@@ -59,6 +59,7 @@ func TestMentionsCheck(t *testing.T) {
 				Name:    "mentions",
 				Spam:    true,
 				Details: "too many mentions 6/5",
+				RuleID:  "mentions", Score: 1.0, Weight: 1.0,
 			},
 		},
 		{
@@ -96,6 +97,7 @@ func TestMentionsCheck(t *testing.T) {
 				Name:    "mentions",
 				Spam:    true,
 				Details: "too many mentions 1/0",
+				RuleID:  "mentions", Score: 1.0, Weight: 1.0,
 			},
 		},
 	}
@@ -149,6 +151,7 @@ func TestUsernameSymbolsCheck(t *testing.T) {
 				Name:    "username-symbols",
 				Spam:    true,
 				Details: "username contains prohibited symbol '@'",
+				RuleID:  "username-symbols", Score: 1.0, Weight: 1.0,
 			},
 		},
 		{
@@ -161,6 +164,7 @@ func TestUsernameSymbolsCheck(t *testing.T) {
 				Name:    "username-symbols",
 				Spam:    true,
 				Details: "username contains prohibited symbol '#'",
+				RuleID:  "username-symbols", Score: 1.0, Weight: 1.0,
 			},
 		},
 		{
@@ -211,7 +215,7 @@ func TestGiveawayCheck(t *testing.T) {
 		{
 			name:     "giveaway",
 			req:      spamcheck.Request{Meta: spamcheck.MetaData{HasGiveaway: true}},
-			expected: spamcheck.Response{Name: "giveaway", Spam: true, Details: "giveaway message"},
+			expected: spamcheck.Response{Name: "giveaway", Spam: true, Details: "giveaway message", RuleID: "giveaway", Score: 1.0, Weight: 1.0},
 		},
 	}
 

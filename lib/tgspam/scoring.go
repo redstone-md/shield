@@ -119,11 +119,7 @@ func withScoring(r spamcheck.Response, score float64, normText string) spamcheck
 	if r.Weight == 0 && r.Spam {
 		r.Weight = 1.0
 	}
-	if len(normText) > 64 {
-		r.NormalizedText = string([]rune(normText)[:64])
-	} else {
-		r.NormalizedText = normText
-	}
+	r.NormalizedText = truncateRunes(normText, 64)
 	return r
 }
 
