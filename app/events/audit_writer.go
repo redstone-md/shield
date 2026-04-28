@@ -7,6 +7,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
+	"github.com/umputun/tg-spam/app/slowpath"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
@@ -23,6 +24,7 @@ type AuditRecord struct {
 	RuleSetVersion int
 	ChatID         int64
 	SpamUserID     int64
+	SlowPath       *slowpath.SlowPathInvocation
 }
 
 type enrichedAuditLogger interface {

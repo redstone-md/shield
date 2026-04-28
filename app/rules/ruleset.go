@@ -17,6 +17,7 @@ type RuleSet struct {
 	OpenAI          LLMRules             `json:"openai"`
 	Gemini          LLMRules             `json:"gemini"`
 	PolicyProfile   string               `json:"policy_profile"`
+	SlowPathEnabled bool                 `json:"slow_path_enabled"`
 }
 
 type MetaRules struct {

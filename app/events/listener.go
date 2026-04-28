@@ -59,6 +59,7 @@ type TelegramListener struct {
 	PolicyEngine     PolicyEngine
 	PolicyProfileName string
 	AuditWriter      AuditWriter
+	SlowPathEnabled  bool
 
 	adminHandler    *admin
 	reportsHandler  *userReports
@@ -117,8 +118,10 @@ func (l *TelegramListener) ApplyRuleSet(rs rules.RuleSet) {
 	profile := policy.ResolveProfile(profileName)
 	l.PolicyEngine = defaultPolicyEngine{eng: policy.NewEngine(profile)}
 
-	log.Printf("[INFO] listener config updated from rule set: version=%d, soft_ban=%v, dry=%v, policy=%s",
-		rs.Version, rs.Moderation.SoftBan, rs.Moderation.DryRun, profileName)
+	l.SlowPathEnabled = rs.SlowPathEnabled
+
+	log.Printf("[INFO] listener config updated from rule set: version=%d, soft_ban=%v, dry=%v, policy=%s, slow_path=%v",
+		rs.Version, rs.Moderation.SoftBan, rs.Moderation.DryRun, profileName, rs.SlowPathEnabled)
 }
 
 // Do process all events, blocked call
