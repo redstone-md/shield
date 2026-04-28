@@ -18,6 +18,7 @@ import (
 	"github.com/go-pkgz/rest/logger"
 	"github.com/go-pkgz/routegroup"
 
+	"github.com/umputun/tg-spam/app/audit"
 	"github.com/umputun/tg-spam/app/events"
 	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/rules"
@@ -74,8 +75,10 @@ type Config struct {
 	RateLimiter          *TenantRateLimiter      // per-tenant rate limiter (nil = unlimited)
 	AuthPasswd            string                 // basic auth password for user "tg-spam"
 	AuthHash              string                 // basic auth bcrypt hash for user "tg-spam", takes precedence over AuthPasswd
-	Dbg                   bool                   // debug mode
-	Settings              Settings               // application settings
+	AuditService                *audit.Service       // audit service for incidents
+	AppealService               *audit.AppealService // appeal service for incident appeals
+	Dbg                         bool                   // debug mode
+	Settings                    Settings               // application settings
 }
 
 // Settings contains all application settings
@@ -221,6 +224,7 @@ type ControlPlaneAuthorizer interface {
 	Authorize(ctx context.Context, workspaceID string, userID string, access string) error
 }
 
+
 // NewServer creates a new web API server.
 func NewServer(config Config) *Server {
 	return &Server{Config: config}
@@ -358,6 +362,22 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 			// get all entries
 			r.HandleFunc("GET /", s.getDictionaryEntriesHandler)
 		})
+
+		if s.AuditService != nil {
+			authApi.Mount("/incidents").Route(func(r *routegroup.Bundle) {
+				r.HandleFunc("GET /", s.listIncidentsHandler)
+				r.HandleFunc("GET /{id}", s.getIncidentHandler)
+				r.HandleFunc("POST /{id}/replay", s.replayIncidentHandler)
+				r.HandleFunc("POST /{id}/comment", s.addIncidentCommentHandler)
+				r.HandleFunc("POST /{id}/status", s.updateIncidentStatusHandler)
+			})
+		}
+		if s.AppealService != nil {
+			authApi.Mount("/appeals").Route(func(r *routegroup.Bundle) {
+				r.HandleFunc("GET /", s.listAppealsHandler)
+				r.HandleFunc("POST /{id}/resolve", s.resolveAppealHandler)
+			})
+		}
 	})
 
 	router.Group().Route(func(webUI *routegroup.Bundle) {
