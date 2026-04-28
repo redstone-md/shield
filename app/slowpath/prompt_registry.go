@@ -160,3 +160,41 @@ func (r *FilePromptRegistry) saveToDir() error {
 
 	return nil
 }
+
+type InMemoryPromptRegistry struct {
+	mu      sync.RWMutex
+	entries map[string][]PromptEntry
+}
+
+func NewInMemoryPromptRegistry() *InMemoryPromptRegistry {
+	return &InMemoryPromptRegistry{entries: make(map[string][]PromptEntry)}
+}
+
+func (r *InMemoryPromptRegistry) Set(entry PromptEntry) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.entries[entry.Provider] = append(r.entries[entry.Provider], entry)
+}
+
+func (r *InMemoryPromptRegistry) Active(provider string) (*PromptEntry, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	entries := r.entries[provider]
+	for i := len(entries) - 1; i >= 0; i-- {
+		if entries[i].Active {
+			return &entries[i], nil
+		}
+	}
+	return nil, fmt.Errorf("no active prompt for %s", provider)
+}
+
+func (r *InMemoryPromptRegistry) Get(provider string, version string) (*PromptEntry, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, e := range r.entries[provider] {
+		if e.Version == version {
+			return &e, nil
+		}
+	}
+	return nil, fmt.Errorf("prompt %s/%s not found", provider, version)
+}

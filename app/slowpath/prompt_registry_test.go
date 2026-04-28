@@ -10,81 +10,125 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFilePromptRegistryActive(t *testing.T) {
+func TestFilePromptRegistrySetAndGet(t *testing.T) {
 	dir := t.TempDir()
-	entries := []PromptEntry{
-		{Provider: "openai", Version: "v1", SystemPrompt: "prompt1", Active: true},
-		{Provider: "openai", Version: "v2", SystemPrompt: "prompt2", Active: false},
-		{Provider: "gemini", Version: "v1", SystemPrompt: "gemini1", Active: true},
-	}
-	writeTestPrompts(t, dir, entries)
+	reg := NewFilePromptRegistry(dir)
 
-	reg := NewFilePromptRegistry(filepath.Join(dir, "prompts.json"))
+	err := reg.Set(PromptEntry{
+		Provider:     "openai",
+		Version:      "v1",
+		SystemPrompt: "prompt1",
+		Active:       true,
+	})
+	require.NoError(t, err)
+
 	entry, err := reg.Active("openai")
 	require.NoError(t, err)
-	assert.Equal(t, "v1", entry.Version)
 	assert.Equal(t, "prompt1", entry.SystemPrompt)
-
-	geminiEntry, err := reg.Active("gemini")
-	require.NoError(t, err)
-	assert.Equal(t, "v1", geminiEntry.Version)
+	assert.Equal(t, "v1", entry.Version)
+	assert.True(t, entry.Active)
 }
 
-func TestFilePromptRegistryGet(t *testing.T) {
+func TestFilePromptRegistryActiveReturnsLatest(t *testing.T) {
+	dir := t.TempDir()
+	reg := NewFilePromptRegistry(dir)
+
+	require.NoError(t, reg.Set(PromptEntry{
+		Provider: "openai", Version: "v1", SystemPrompt: "old", Active: true,
+	}))
+	require.NoError(t, reg.Set(PromptEntry{
+		Provider: "openai", Version: "v2", SystemPrompt: "new", Active: true,
+	}))
+
+	entry, err := reg.Active("openai")
+	require.NoError(t, err)
+	assert.Equal(t, "v2", entry.Version)
+	assert.Equal(t, "new", entry.SystemPrompt)
+}
+
+func TestFilePromptRegistryGetByVersion(t *testing.T) {
+	dir := t.TempDir()
+	reg := NewFilePromptRegistry(dir)
+
+	require.NoError(t, reg.Set(PromptEntry{
+		Provider: "openai", Version: "v1", SystemPrompt: "old", Active: false,
+	}))
+	require.NoError(t, reg.Set(PromptEntry{
+		Provider: "openai", Version: "v2", SystemPrompt: "new", Active: true,
+	}))
+
+	entry, err := reg.Get("openai", "v1")
+	require.NoError(t, err)
+	assert.Equal(t, "old", entry.SystemPrompt)
+	assert.False(t, entry.Active)
+}
+
+func TestFilePromptRegistryGetNotFound(t *testing.T) {
+	dir := t.TempDir()
+	reg := NewFilePromptRegistry(dir)
+
+	_, err := reg.Get("openai", "v99")
+	assert.Error(t, err)
+	assert.Error(t, err)
+}
+
+func TestFilePromptRegistryActiveDefaultWhenEmpty(t *testing.T) {
+	dir := t.TempDir()
+	reg := NewFilePromptRegistry(dir)
+
+	entry, err := reg.Active("openai")
+	require.NoError(t, err)
+	assert.Equal(t, "1", entry.Version)
+	assert.Equal(t, defaultSystemPrompt, entry.SystemPrompt)
+	assert.True(t, entry.Active)
+}
+
+func TestFilePromptRegistryLoadFromDir(t *testing.T) {
 	dir := t.TempDir()
 	entries := []PromptEntry{
-		{Provider: "openai", Version: "v2", SystemPrompt: "new prompt", Active: false},
+		{Provider: "openai", Version: "v1", SystemPrompt: "loaded", Active: true},
 	}
-	writeTestPrompts(t, dir, entries)
-
-	reg := NewFilePromptRegistry(filepath.Join(dir, "prompts.json"))
-	entry, err := reg.Get("openai", "v2")
-	require.NoError(t, err)
-	assert.Equal(t, "new prompt", entry.SystemPrompt)
-}
-
-func TestFilePromptRegistryNoActive(t *testing.T) {
-	dir := t.TempDir()
-	entries := []PromptEntry{
-		{Provider: "openai", Version: "v1", SystemPrompt: "old", Active: false},
-	}
-	writeTestPrompts(t, dir, entries)
-
-	reg := NewFilePromptRegistry(filepath.Join(dir, "prompts.json"))
-	_, err := reg.Active("openai")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no active prompt")
-}
-
-func TestFilePromptRegistryNotFound(t *testing.T) {
-	dir := t.TempDir()
-	writeTestPrompts(t, dir, nil)
-
-	reg := NewFilePromptRegistry(filepath.Join(dir, "prompts.json"))
-	_, err := reg.Get("unknown", "v99")
-	assert.Error(t, err)
-}
-
-func TestFilePromptRegistryMissingFile(t *testing.T) {
-	reg := NewFilePromptRegistry("/nonexistent/prompts.json")
-	_, err := reg.Active("openai")
-	assert.Error(t, err)
-}
-
-func TestFilePromptRegistryEmptyFile(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "prompts.json")
-	require.NoError(t, os.WriteFile(path, []byte("[]"), 0644))
-
-	reg := NewFilePromptRegistry(path)
-	_, err := reg.Active("openai")
-	assert.Error(t, err)
-}
-
-func writeTestPrompts(t *testing.T, dir string, entries []PromptEntry) {
-	t.Helper()
-	path := filepath.Join(dir, "prompts.json")
 	data, err := json.MarshalIndent(entries, "", "  ")
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(path, data, 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompts-openai.json"), data, 0644))
+
+	reg := NewFilePromptRegistry(dir)
+	require.NoError(t, reg.Load())
+
+	entry, err := reg.Active("openai")
+	require.NoError(t, err)
+	assert.Equal(t, "loaded", entry.SystemPrompt)
+}
+
+func TestFilePromptRegistryEmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	reg := NewFilePromptRegistry(dir)
+	require.NoError(t, reg.Load())
+
+	entry, err := reg.Active("openai")
+	require.NoError(t, err)
+	assert.Equal(t, "1", entry.Version)
+}
+
+func TestInMemoryPromptRegistry(t *testing.T) {
+	reg := NewInMemoryPromptRegistry()
+	reg.Set(PromptEntry{Provider: "test", Version: "v1", SystemPrompt: "p1", Active: true})
+	reg.Set(PromptEntry{Provider: "test", Version: "v2", SystemPrompt: "p2", Active: true})
+
+	entry, err := reg.Active("test")
+	require.NoError(t, err)
+	assert.Equal(t, "p2", entry.SystemPrompt)
+
+	old, err := reg.Get("test", "v1")
+	require.NoError(t, err)
+	assert.Equal(t, "p1", old.SystemPrompt)
+}
+
+func TestInMemoryPromptRegistryNotFound(t *testing.T) {
+	reg := NewInMemoryPromptRegistry()
+	_, err := reg.Active("missing")
+	assert.Error(t, err)
+
+	_, err = reg.Get("missing", "v1")
+	assert.Error(t, err)
 }

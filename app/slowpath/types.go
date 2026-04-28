@@ -106,3 +106,15 @@ type SlowPathInvocation struct {
 	Confidence    int
 	Timestamp     time.Time
 }
+
+type SlowPathResult struct {
+	EventID       string
+	CorrelationID string
+	Providers     []string
+	Spam          bool
+	Confidence    int
+	Reason        string
+	Final         bool
+	Skipped       bool
+	Signals       []ProviderResult
+}
