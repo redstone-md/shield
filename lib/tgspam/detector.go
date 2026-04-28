@@ -117,6 +117,8 @@ type Config struct {
 	}
 
 	HistorySize int // history of recent messages to keep in memory
+
+	ScoringThreshold float64 // threshold for scoring engine aggregation, 0 = disabled (use boolean OR)
 }
 
 // SampleUpdater is an interface for updating spam/ham samples on the fly.
@@ -287,7 +289,7 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 		cr = append(cr, d.isSpamClassified(cleanMsg))
 	}
 
-	baseSpam := isSpamDetected(cr)
+	baseSpam := d.scoreSignals(cr, isSpamDetected)
 	spamDetected := baseSpam
 
 	// we hit eligible LLMs in three cases:

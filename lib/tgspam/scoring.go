@@ -98,3 +98,15 @@ func (e *ScoringEngine) booleanFallback() spamcheck.RiskScore {
 		Reason:   reason,
 	}
 }
+
+// scoreSignals determines spam via ScoringEngine if threshold > 0, else boolean OR.
+func (d *Detector) scoreSignals(cr []spamcheck.Response, boolOR func([]spamcheck.Response) bool) bool {
+	if d.ScoringThreshold > 0 {
+		se := NewScoringEngine(d.ScoringThreshold)
+		for _, r := range cr {
+			se.AddSignal(r)
+		}
+		return se.Score().Decision
+	}
+	return boolOR(cr)
+}
