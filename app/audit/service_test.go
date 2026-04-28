@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -404,4 +405,160 @@ func TestAppealService_Triage(t *testing.T) {
 
 	got, _ := apStore.Get(context.Background(), ap.ID)
 	assert.Equal(t, AppealTriaged, got.Status)
+}
+
+func TestFullWorkflow_SpamDetectionToAppealAccepted(t *testing.T) {
+	incStore := newMockIncidentStore()
+	apStore := newMockAppealStore()
+	bot := &mockBotService{}
+
+	auditSvc := NewAuditService(incStore)
+	appealSvc := NewAppealService(apStore, incStore, bot)
+
+	inc, err := auditSvc.CreateFromSpam(context.Background(), Incident{
+		Source:         SourceAutoMod,
+		IdempotencyKey: fmt.Sprintf("wf-%d", time.Now().UnixNano()),
+		ReasonCode:     ReasonRegexMatch,
+		ReasonText:     "regex matched promotional content",
+		SpamUserID:     123,
+		SpamUserName:   "spammer123",
+		ChatID:         999,
+		MessageText:    "buy cheap stuff now!!!",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, IncidentStatusOpen, inc.Status)
+	assert.Equal(t, SeverityLow, inc.Severity)
+
+	comments, _ := incStore.ListComments(context.Background(), inc.ID)
+	assert.Len(t, comments, 1)
+	assert.Equal(t, "created", comments[0].Action)
+
+	ap, err := appealSvc.Submit(context.Background(), inc.ID, 123, "spammer123", "I was not spamming, this was a legitimate message")
+	require.NoError(t, err)
+	assert.Equal(t, AppealNew, ap.Status)
+
+	updatedInc, _ := incStore.Get(context.Background(), inc.ID)
+	assert.Equal(t, IncidentStatusAppealed, updatedInc.Status)
+
+	err = appealSvc.Triage(context.Background(), ap.ID, "moderator1")
+	require.NoError(t, err)
+
+	err = appealSvc.Accept(context.Background(), ap.ID, "admin1", "false positive confirmed, user is legitimate")
+	require.NoError(t, err)
+
+	finalAp, _ := apStore.Get(context.Background(), ap.ID)
+	assert.Equal(t, AppealAccepted, finalAp.Status)
+	assert.Equal(t, "admin1", finalAp.ResolvedBy)
+	assert.Equal(t, "false positive confirmed, user is legitimate", finalAp.ResolutionText)
+	assert.NotNil(t, finalAp.ResolvedAt)
+
+	finalInc, _ := incStore.Get(context.Background(), inc.ID)
+	assert.Equal(t, IncidentStatusClosed, finalInc.Status)
+
+	assert.Contains(t, bot.unbannedIDs, int64(123))
+	assert.Contains(t, bot.hamAdded, "buy cheap stuff now!!!")
+
+	allComments, _ := incStore.ListComments(context.Background(), inc.ID)
+	assert.GreaterOrEqual(t, len(allComments), 4)
+}
+
+func TestFullWorkflow_ReportToRejection(t *testing.T) {
+	incStore := newMockIncidentStore()
+	apStore := newMockAppealStore()
+	bot := &mockBotService{}
+
+	auditSvc := NewAuditService(incStore)
+	appealSvc := NewAppealService(apStore, incStore, bot)
+
+	inc, err := auditSvc.CreateFromSpam(context.Background(), Incident{
+		Source:         SourceUserReport,
+		IdempotencyKey: fmt.Sprintf("report-%d", time.Now().UnixNano()),
+		ReasonCode:     ReasonUserReport,
+		ReasonText:     "multiple user reports",
+		Severity:       SeverityHigh,
+		SpamUserID:     456,
+		SpamUserName:   "reportedUser",
+		ChatID:         100,
+		MessageText:    "suspicious message",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, SeverityHigh, inc.Severity)
+
+	ap, err := appealSvc.Submit(context.Background(), inc.ID, 456, "reportedUser", "this was taken out of context")
+	require.NoError(t, err)
+
+	err = appealSvc.Reject(context.Background(), ap.ID, "admin1", "spam confirmed after review")
+	require.NoError(t, err)
+
+	finalAp, _ := apStore.Get(context.Background(), ap.ID)
+	assert.Equal(t, AppealRejected, finalAp.Status)
+
+	finalInc, _ := incStore.Get(context.Background(), inc.ID)
+	assert.Equal(t, IncidentStatusClosed, finalInc.Status)
+
+	assert.Empty(t, bot.unbannedIDs, "rejected appeal should not unban")
+	assert.Empty(t, bot.hamAdded, "rejected appeal should not add ham")
+}
+
+func TestFullWorkflow_EscalationPath(t *testing.T) {
+	incStore := newMockIncidentStore()
+	apStore := newMockAppealStore()
+	bot := &mockBotService{}
+
+	auditSvc := NewAuditService(incStore)
+	appealSvc := NewAppealService(apStore, incStore, bot)
+
+	inc, _ := auditSvc.CreateFromSpam(context.Background(), Incident{
+		IdempotencyKey: fmt.Sprintf("esc-%d", time.Now().UnixNano()),
+		ReasonCode:     ReasonLLMOpenAI,
+		Severity:       SeverityMedium,
+		SpamUserID:     789,
+		MessageText:    "edge case message",
+	})
+
+	ap, err := appealSvc.Submit(context.Background(), inc.ID, 789, "user", "dispute LLM classification")
+	require.NoError(t, err)
+
+	err = appealSvc.Triage(context.Background(), ap.ID, "mod1")
+	require.NoError(t, err)
+
+	err = appealSvc.Escalate(context.Background(), ap.ID)
+	require.NoError(t, err)
+
+	gotAp, _ := apStore.Get(context.Background(), ap.ID)
+	assert.Equal(t, AppealEscalated, gotAp.Status)
+
+	gotInc, _ := incStore.Get(context.Background(), inc.ID)
+	assert.Equal(t, IncidentStatusReviewing, gotInc.Status)
+
+	err = appealSvc.Accept(context.Background(), ap.ID, "senior-admin", "after senior review, confirmed false positive")
+	require.NoError(t, err)
+
+	gotAp2, _ := apStore.Get(context.Background(), ap.ID)
+	assert.Equal(t, AppealAccepted, gotAp2.Status)
+	assert.Contains(t, bot.unbannedIDs, int64(789))
+}
+
+func TestListIncidents_Filtering(t *testing.T) {
+	incStore := newMockIncidentStore()
+	svc := NewAuditService(incStore)
+
+	svc.CreateFromSpam(context.Background(), Incident{
+		IdempotencyKey: "f1", ReasonCode: ReasonRegexMatch, Severity: SeverityLow,
+	})
+	svc.CreateFromSpam(context.Background(), Incident{
+		IdempotencyKey: "f2", ReasonCode: ReasonUserReport, Severity: SeverityHigh,
+	})
+	inc3, _ := svc.CreateFromSpam(context.Background(), Incident{
+		IdempotencyKey: "f3", ReasonCode: ReasonStopWord, Severity: SeverityLow,
+	})
+	svc.Resolve(context.Background(), inc3.ID, "admin", "done")
+
+	open, err := svc.ListByStatus(context.Background(), IncidentStatusOpen, 10)
+	require.NoError(t, err)
+	assert.Len(t, open, 2)
+
+	resolved, err := svc.ListByStatus(context.Background(), IncidentStatusResolved, 10)
+	require.NoError(t, err)
+	assert.Len(t, resolved, 1)
 }
