@@ -18,6 +18,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
+	"github.com/umputun/tg-spam/app/policy"
 	"github.com/umputun/tg-spam/app/rules"
 )
 
@@ -56,6 +57,7 @@ type TelegramListener struct {
 	Queue            moderation.Queue
 	ActionExecutor   ActionExecutor
 	PolicyEngine     PolicyEngine
+	PolicyProfileName string
 	AuditWriter      AuditWriter
 
 	adminHandler    *admin
@@ -108,8 +110,15 @@ func (l *TelegramListener) ApplyRuleSet(rs rules.RuleSet) {
 		l.reportsHandler.dry = rs.Moderation.DryRun
 	}
 
-	log.Printf("[INFO] listener config updated from rule set: version=%d, soft_ban=%v, dry=%v",
-		rs.Version, rs.Moderation.SoftBan, rs.Moderation.DryRun)
+	profileName := rs.PolicyProfile
+	if profileName == "" {
+		profileName = "balanced"
+	}
+	profile := policy.ResolveProfile(profileName)
+	l.PolicyEngine = defaultPolicyEngine{eng: policy.NewEngine(profile)}
+
+	log.Printf("[INFO] listener config updated from rule set: version=%d, soft_ban=%v, dry=%v, policy=%s",
+		rs.Version, rs.Moderation.SoftBan, rs.Moderation.DryRun, profileName)
 }
 
 // Do process all events, blocked call

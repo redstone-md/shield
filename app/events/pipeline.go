@@ -102,7 +102,7 @@ func (l *TelegramListener) ensurePipeline() {
 		l.ActionExecutor = exec
 	}
 	if l.PolicyEngine == nil {
-		l.PolicyEngine = defaultPolicyEngine{}
+		l.PolicyEngine = newProfilePolicyEngine(l.PolicyProfileName)
 	}
 	if l.AuditWriter == nil {
 		l.AuditWriter = defaultAuditWriter{spamLogger: l.SpamLogger, locator: l.Locator}
@@ -385,4 +385,5 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 	}
 	return nil
 }
+
 

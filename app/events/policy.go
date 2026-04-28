@@ -3,11 +3,13 @@ package events
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
+	"github.com/umputun/tg-spam/app/policy"
 )
 
 type PolicyEngine interface {
@@ -32,9 +34,63 @@ type PolicyOutcome struct {
 	Restrict bool
 }
 
-type defaultPolicyEngine struct{}
+type defaultPolicyEngine struct {
+	eng *policy.Engine
+}
+
+func newProfilePolicyEngine(profileName string) defaultPolicyEngine {
+	if profileName == "" {
+		return defaultPolicyEngine{}
+	}
+	return defaultPolicyEngine{eng: policy.NewEngine(policy.ResolveProfile(profileName))}
+}
 
 func (e defaultPolicyEngine) Decide(_ context.Context, req PolicyRequest) (PolicyOutcome, error) {
+	if e.eng != nil {
+		return e.decideWithEngine(req)
+	}
+	return e.decideLegacy(req)
+}
+
+func (e defaultPolicyEngine) decideWithEngine(req PolicyRequest) (PolicyOutcome, error) {
+	outcome := PolicyOutcome{
+		Decision: moderation.PolicyDecision{
+			EventID:       req.Event.EventID,
+			CorrelationID: req.Event.CorrelationID,
+			Action:        moderation.ActionAllow,
+			Reason:        "message allowed",
+			DecidedAt:     time.Now().UTC(),
+		},
+	}
+
+	if !req.Response.Send {
+		return outcome, nil
+	}
+
+	result := e.eng.Decide(policy.PolicyInput{
+		Signals:      req.Response.CheckResults,
+		StrikeCount:  req.StrikeCount,
+		IsSuperUser:  req.IsSuperUser,
+		SoftBanMode:  req.SoftBanMode,
+		FirstStrike:  req.Moderation.FirstStrike,
+		SecondStrike: req.Moderation.SecondStrike,
+	})
+
+	outcome.Decision.Score = spamScore(req.Response)
+	outcome.Decision.Action = result.Action
+	outcome.Decision.Reason = result.Reason
+	outcome.Duration = result.Duration
+	outcome.Restrict = result.Restrict
+
+	if result.Shadow != nil {
+		log.Printf("[INFO] shadow decision: action=%s reason=%q profile=%s",
+			result.Shadow.Action, result.Shadow.Reason, result.Shadow.Explanation.ProfileName)
+	}
+
+	return outcome, nil
+}
+
+func (e defaultPolicyEngine) decideLegacy(req PolicyRequest) (PolicyOutcome, error) {
 	outcome := PolicyOutcome{
 		Decision: moderation.PolicyDecision{
 			EventID:       req.Event.EventID,

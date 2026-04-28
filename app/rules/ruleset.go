@@ -16,6 +16,7 @@ type RuleSet struct {
 	Reports         ReportRules          `json:"reports"`
 	OpenAI          LLMRules             `json:"openai"`
 	Gemini          LLMRules             `json:"gemini"`
+	PolicyProfile   string               `json:"policy_profile"`
 }
 
 type MetaRules struct {
