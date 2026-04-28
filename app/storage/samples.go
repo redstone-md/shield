@@ -20,19 +20,15 @@ type Samples struct {
 	engine.RWLocker
 }
 
-// SampleType represents the type of the sample
 type SampleType string
 
-// enum for sample types
 const (
 	SampleTypeHam  SampleType = "ham"
 	SampleTypeSpam SampleType = "spam"
 )
 
-// SampleOrigin represents the origin of the sample
 type SampleOrigin string
 
-// enum for sample origins
 const (
 	SampleOriginPreset SampleOrigin = "preset"
 	SampleOriginUser   SampleOrigin = "user"
