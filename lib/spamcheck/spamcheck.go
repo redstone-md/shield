@@ -44,11 +44,23 @@ func (r *Request) String() string {
 
 // Response is a result of spam check.
 type Response struct {
-	Name           string `json:"name"`                       // name of the check
-	Spam           bool   `json:"spam"`                       // true if spam
-	Details        string `json:"details"`                    // details of the check
-	Error          error  `json:"-"`                          // error message, if any. Do not serialize it
-	ExtraDeleteIDs []int  `json:"extra_delete_ids,omitempty"` // additional message IDs to delete when spam detected
+	Name           string  `json:"name"`                       // name of the check
+	Spam           bool    `json:"spam"`                       // true if spam
+	Details        string  `json:"details"`                    // details of the check
+	Error          error   `json:"-"`                          // error message, if any. Do not serialize it
+	ExtraDeleteIDs []int   `json:"extra_delete_ids,omitempty"` // additional message IDs to delete when spam detected
+	Score          float64 `json:"score,omitempty"`            // signal strength 0.0-1.0 (1.0 for deterministic)
+	Weight         float64 `json:"weight,omitempty"`           // signal weight for aggregation (default 1.0)
+	RuleID         string  `json:"rule_id,omitempty"`          // structured rule identifier (e.g. "stopword", "meta-links")
+	NormalizedText string  `json:"normalized_text,omitempty"`  // matched text snippet after normalization (truncated 64 chars)
+}
+
+// RiskScore is the aggregated scoring result from all detector signals.
+type RiskScore struct {
+	Total    float64   `json:"total"`              // weighted sum of all spam signal scores
+	Signals  []Response `json:"signals"`            // all signals that contributed
+	Decision bool      `json:"decision"`           // true if total >= threshold
+	Reason   string    `json:"reason,omitempty"`   // human-readable explanation
 }
 
 func (r *Response) String() string {
