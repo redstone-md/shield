@@ -87,16 +87,34 @@ func spamScore(resp bot.Response) float64 {
 	if len(resp.CheckResults) == 0 {
 		return 1
 	}
-	score := 0.0
+	total := 0.0
+	hasWeighted := false
 	for _, result := range resp.CheckResults {
-		if result.Spam {
-			score++
+		if !result.Spam {
+			continue
+		}
+		w := result.Weight
+		s := result.Score
+		if w > 0 || s > 0 {
+			hasWeighted = true
+			if w == 0 {
+				w = 1.0
+			}
+			if s == 0 {
+				s = 1.0
+			}
+			total += w * s
+		} else {
+			total++
 		}
 	}
-	if score == 0 {
+	if total == 0 {
 		return 1
 	}
-	return score
+	if hasWeighted {
+		return total
+	}
+	return total
 }
 
 func policyReason(resp bot.Response) string {

@@ -56,12 +56,17 @@ func (w defaultAuditWriter) Write(ctx context.Context, record AuditRecord) error
 	return nil
 }
 
-// MatchedRules returns the names of spam checks that matched.
+// MatchedRules returns the rule IDs of spam checks that matched.
+// Prefers RuleID (structured identifier) over Name when available.
 func MatchedRules(results []spamcheck.Response) []string {
 	res := make([]string, 0, len(results))
 	for _, result := range results {
 		if result.Spam {
-			res = append(res, result.Name)
+			id := result.RuleID
+			if id == "" {
+				id = result.Name
+			}
+			res = append(res, id)
 		}
 	}
 	return res
