@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Appeals - TG-Spam</title>
+    {{template "heads.html"}}
+</head>
+<body>
+{{template "navbar.html"}}
+
+<div class="container mt-4">
+    <h2 class="text-center mb-4">Appeals Queue</h2>
+
+    <div class="row mb-3">
+        <div class="col-12 col-md-6 offset-md-3">
+            <select class="form-select" id="status-filter"
+                    hx-get="/appeals" hx-target="#appeals-content" hx-trigger="change"
+                    name="status">
+                <option value="new" selected>New</option>
+                <option value="triaged">Triaged</option>
+                <option value="escalated">Escalated</option>
+                <option value="accepted">Accepted</option>
+                <option value="rejected">Rejected</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="appeals-content">
+        {{template "appeals_list" .}}
+    </div>
+</div>
+
+</body>
+</html>
+
+{{define "appeals_list"}}
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead class="custom-table-header">
+            <tr>
+                <th>ID</th>
+                <th>Incident</th>
+                <th>Appellant</th>
+                <th>Status</th>
+                <th>Text</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .}}
+            <tr>
+                <td><a href="/appeals/{{.ID}}">{{.ID}}</a></td>
+                <td><a href="/incidents/{{.IncidentID}}">#{{.IncidentID}}</a></td>
+                <td>{{.AppellantName}}</td>
+                <td>
+                    <span class="badge {{if eq .Status "new"}}bg-warning{{else if eq .Status "triaged"}}bg-info{{else if eq .Status "escalated"}}bg-danger{{else if eq .Status "accepted"}}bg-success{{else}}bg-secondary{{end}}">
+                        {{.Status}}
+                    </span>
+                </td>
+                <td>{{.AppealText}}</td>
+                <td>{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+                <td>
+                    <a href="/appeals/{{.ID}}" class="btn btn-sm btn-outline-primary">Review</a>
+                </td>
+            </tr>
+            {{else}}
+            <tr>
+                <td colspan="7" class="text-center text-muted">No appeals found</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

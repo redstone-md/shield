@@ -391,6 +391,12 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 		webUI.HandleFunc("POST /detected_spam/add", s.htmlAddDetectedSpamHandler) // add detected spam to samples
 		webUI.HandleFunc("GET /dm-users", s.getDMUsersHandler)                    // get recent DM users (HTMX/JSON)
 
+		if s.AuditService != nil {
+			webUI.HandleFunc("GET /incidents", s.htmlIncidentsHandler)               // incident list page
+			webUI.HandleFunc("GET /incidents/{id}", s.htmlIncidentDetailHandler)      // incident detail page
+			webUI.HandleFunc("GET /appeals", s.htmlAppealsHandler)                    // appeals list page
+		}
+
 		// handle logout - force Basic Auth re-authentication
 		webUI.HandleFunc("GET /logout", func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="tg-spam"`)

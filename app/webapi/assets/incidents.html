@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Incidents - TG-Spam</title>
+    {{template "heads.html"}}
+</head>
+<body>
+{{template "navbar.html"}}
+
+<div class="container mt-4">
+    <h2 class="text-center mb-4">Incidents</h2>
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <form id="filter-form" hx-get="/incidents" hx-target="#incidents-content" hx-swap="innerHTML" class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="open">Open</option>
+                        <option value="reviewing">Reviewing</option>
+                        <option value="appealed">Appealed</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Source</label>
+                    <select name="source" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="auto_mod">Auto Mod</option>
+                        <option value="user_report">User Report</option>
+                        <option value="admin_action">Admin Action</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Limit</label>
+                    <select name="limit" class="form-select form-select-sm">
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="incidents-content">
+        {{if .Incidents}}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="custom-table-header">
+                    <tr>
+                        <th>ID</th>
+                        <th>Time</th>
+                        <th>User</th>
+                        <th>Source</th>
+                        <th>Status</th>
+                        <th>Severity</th>
+                        <th>Reason</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Incidents}}
+                    <tr>
+                        <td><a href="/incidents/{{.ID}}">{{.ID}}</a></td>
+                        <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+                        <td>{{.SpamUserName}} <small class="text-muted">({{.SpamUserID}})</small></td>
+                        <td><span class="badge bg-secondary">{{.Source}}</span></td>
+                        <td>
+                            <span class="badge {{if eq .Status "open"}}bg-warning{{else if eq .Status "reviewing"}}bg-info{{else if eq .Status "appealed"}}bg-purple{{else if eq .Status "resolved"}}bg-success{{else}}bg-secondary{{end}}">
+                                {{.Status}}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge {{if eq .Severity "critical"}}bg-danger{{else if eq .Severity "high"}}bg-warning{{else if eq .Severity "medium"}}bg-info{{else}}bg-light text-dark{{end}}">
+                                {{.Severity}}
+                            </span>
+                        </td>
+                        <td>{{.ReasonCode}}</td>
+                        <td>
+                            <a href="/incidents/{{.ID}}" class="btn btn-sm btn-outline-primary">View</a>
+                            <button class="btn btn-sm btn-outline-secondary" hx-post="/incidents/{{.ID}}/replay" hx-target="#replay-result-{{.ID}}" hx-swap="innerHTML" hx-indicator="#replay-spinner-{{.ID}}">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </button>
+                            <img id="replay-spinner-{{.ID}}" class="htmx-indicator" src="/spinner.svg" alt="loading" style="height:18px"/>
+                        </td>
+                    </tr>
+                    {{else}}
+                    <tr><td colspan="8" class="text-center text-muted">No incidents found</td></tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{else}}
+        <div class="alert alert-light text-center">No incidents found</div>
+        {{end}}
+    </div>
+</div>
+
+</body>
+</html>
