@@ -1,6 +1,11 @@
 package audit
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var ErrNotFound = errors.New("not found")
 
 type IncidentStatus string
 
@@ -111,6 +116,25 @@ type Appeal struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	ResolvedAt       *time.Time
+}
+
+type SpamCheckResult struct {
+	Name    string
+	Spam    bool
+	Details string
+}
+
+type AuditEventData struct {
+	IdempotencyKey  string
+	ChatID          int64
+	RuleSetVersion  int
+	SpamUserID      int64
+	SpamUserName    string
+	MessageText     string
+	CheckResults    []SpamCheckResult
+	SlowPathInvoked bool
+	SlowProvider    string
+	SlowPromptVer   string
 }
 
 func ClassifySeverity(reason ReasonCode) IncidentSeverity {
