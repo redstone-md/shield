@@ -3,31 +3,30 @@ package textnorm
 import (
 	"strings"
 	"unicode"
+
+	"golang.org/x/text/unicode/norm"
 )
 
-// ScriptFoldFunc optionally rewrites text across scripts before downstream matching.
 type ScriptFoldFunc func(string) string
 
-// Options control normalization stages.
 type Options struct {
 	LowerCase           bool
 	Trim                bool
 	StripInvisible      bool
 	CanonicalWhitespace bool
+	NFKC                bool
+	ConfusablesFold     bool
 	ScriptFold          ScriptFoldFunc
 }
 
-// Normalizer applies a stable text-normalization pipeline.
 type Normalizer struct {
 	opts Options
 }
 
-// New creates a normalizer with the provided options.
 func New(opts Options) Normalizer {
 	return Normalizer{opts: opts}
 }
 
-// Default returns the runtime ingress normalization pipeline.
 func Default() Normalizer {
 	return New(Options{
 		LowerCase:           true,
@@ -37,10 +36,15 @@ func Default() Normalizer {
 	})
 }
 
-// Normalize applies the configured stages in order.
 func (n Normalizer) Normalize(text string) string {
 	if n.opts.StripInvisible {
 		text = stripInvisible(text)
+	}
+	if n.opts.NFKC {
+		text = norm.NFKC.String(text)
+	}
+	if n.opts.ConfusablesFold {
+		text = foldConfusables(text)
 	}
 	if n.opts.ScriptFold != nil {
 		text = n.opts.ScriptFold(text)
