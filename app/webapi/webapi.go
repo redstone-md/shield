@@ -20,6 +20,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/audit"
 	"github.com/umputun/tg-spam/app/events"
+	"github.com/umputun/tg-spam/app/feedback"
 	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
@@ -77,6 +78,9 @@ type Config struct {
 	AuthHash              string                 // basic auth bcrypt hash for user "tg-spam", takes precedence over AuthPasswd
 	AuditService                *audit.Service       // audit service for incidents
 	AppealService               *audit.AppealService // appeal service for incident appeals
+	FeedbackService             *feedback.Service    // feedback service for labeling
+	ReviewService               *feedback.ReviewService    // review service for candidates
+	KnowledgeService            *feedback.KnowledgeService // knowledge snapshot service
 	Dbg                         bool                   // debug mode
 	Settings                    Settings               // application settings
 }
@@ -376,6 +380,16 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 			authApi.Mount("/api/appeals").Route(func(r *routegroup.Bundle) {
 				r.HandleFunc("GET /", s.listAppealsHandler)
 				r.HandleFunc("POST /{id}/resolve", s.resolveAppealHandler)
+			})
+		}
+		if s.FeedbackService != nil {
+			authApi.Mount("/api/feedback").Route(func(r *routegroup.Bundle) {
+				r.HandleFunc("POST /labels", s.createLabelHandler)
+				r.HandleFunc("GET /labels", s.listLabelsHandler)
+				r.HandleFunc("GET /labels/stats", s.labelStatsHandler)
+				r.HandleFunc("GET /candidates", s.listCandidatesHandler)
+				r.HandleFunc("POST /candidates/{id}/approve", s.approveCandidateHandler)
+				r.HandleFunc("POST /candidates/{id}/reject", s.rejectCandidateHandler)
 			})
 		}
 	})

@@ -12,6 +12,7 @@ import (
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/controlplane"
 	"github.com/umputun/tg-spam/app/events"
+	"github.com/umputun/tg-spam/app/feedback"
 	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
@@ -43,6 +44,8 @@ type runtimeAssembly struct {
 	TelegramListener       *events.TelegramListener
 	AuditService           *audit.Service
 	AppealService          *audit.AppealService
+	FeedbackService  *feedback.Service
+	ReviewService    *feedback.ReviewService
 	Web                    webRuntimeAssembly
 }
 
@@ -59,6 +62,9 @@ type webRuntimeAssembly struct {
 	TenantStatusProvider webapi.TenantStatusProvider
 	AuditService         *audit.Service
 	AppealService        *audit.AppealService
+	FeedbackService      *feedback.Service
+	ReviewService        *feedback.ReviewService
+	KnowledgeService     *feedback.KnowledgeService
 	BotUsername          string
 }
 
@@ -182,6 +188,22 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	auditSvc := audit.NewService(incidentsStore)
 	appealSvc := audit.NewAppealService(appealsStore, incidentsStore, nil)
 
+	labelsStore, err := storage.NewLabelStorage(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make labels store, %w", err)
+	}
+	candidatesStore, err := storage.NewCandidateStorage(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make candidates store, %w", err)
+	}
+	knowledgeStore, err := storage.NewKnowledgeSnapshotStorage(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make knowledge snapshots store, %w", err)
+	}
+	feedbackSvc := feedback.NewService(labelsStore, nil, nil)
+	reviewSvc := feedback.NewReviewService(candidatesStore, nil, feedbackSvc)
+	knowledgeSvc := feedback.NewKnowledgeService(knowledgeStore, nil, nil)
+
 	assembly := &runtimeAssembly{
 		DataDB:                 dataDB,
 		Detector:               detector,
@@ -203,7 +225,9 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		ApprovedUsersService:   approvedUsersSvc,
 		DictionaryService:      dictSvc,
 		DetectedSpamService:    detectedSpamSvc,
-		AppealService:        appealSvc,
+		AppealService:     appealSvc,
+		FeedbackService:   feedbackSvc,
+		ReviewService:     reviewSvc,
 		Web: webRuntimeAssembly{
 			Detector:             detector,
 			SpamFilter:           spamBot,
@@ -217,6 +241,9 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 			TenantStatusProvider: tenantStatusAdapter{inner: tenantsStore},
 			AuditService:         auditSvc,
 			AppealService:        appealSvc,
+			FeedbackService:      feedbackSvc,
+			ReviewService:        reviewSvc,
+			KnowledgeService:     knowledgeSvc,
 		},
 	}
 
