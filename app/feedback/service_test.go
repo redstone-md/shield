@@ -191,3 +191,57 @@ func TestService_GetByDetectedSpamID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, labels, 2)
 }
+
+func TestIntegration_LabelToCandidateToApproval(t *testing.T) {
+	labelStore := &mockLabelStore{}
+	candStore := &mockCandidateStore{}
+	dict := &mockDictAdder{}
+
+	feedbackSvc := NewService(labelStore, nil, nil)
+	reviewSvc := NewReviewService(candStore, dict, feedbackSvc)
+
+	_, err := feedbackSvc.Label(t.Context(), LabelEntry{
+		IncidentID:     1,
+		DetectedSpamID: 100,
+		Label:          LabelConfirmedSpam,
+		LabeledBy:      "admin",
+	})
+	require.NoError(t, err)
+
+	candidates, err := reviewSvc.GenerateFromIncident(t.Context(), 1, "buy cheap viagra now free shipping")
+	require.NoError(t, err)
+	require.NotEmpty(t, candidates)
+
+	var pendingID int64
+	for _, c := range candidates {
+		if c.Value == "viagra" {
+			pendingID = c.ID
+			break
+		}
+	}
+	require.NotZero(t, pendingID, "expected 'viagra' candidate")
+
+	err = reviewSvc.Approve(t.Context(), pendingID, "reviewer1")
+	require.NoError(t, err)
+
+	assert.Contains(t, dict.added, "viagra")
+
+	got, err := candStore.GetByID(t.Context(), pendingID)
+	require.NoError(t, err)
+	assert.Equal(t, CandidateApproved, got.Status)
+	assert.Equal(t, "reviewer1", got.ReviewedBy)
+}
+
+func TestIntegration_AutoLabelFromAppeal(t *testing.T) {
+	labelStore := &mockLabelStore{}
+	feedbackSvc := NewService(labelStore, nil, nil)
+
+	err := feedbackSvc.AutoLabel(t.Context(), 42, "false_positive")
+	require.NoError(t, err)
+
+	labels := labelStore.entries
+	require.Len(t, labels, 1)
+	assert.Equal(t, LabelFalsePositive, labels[0].Label)
+	assert.Equal(t, int64(42), labels[0].IncidentID)
+	assert.Equal(t, "appeal_system", labels[0].LabeledBy)
+}

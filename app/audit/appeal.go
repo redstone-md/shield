@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -11,14 +12,23 @@ type BotService interface {
 	AddHamSample(ctx context.Context, text string) error
 }
 
+type FeedbackLabeler interface {
+	AutoLabel(ctx context.Context, incidentID int64, label string) error
+}
+
 type AppealService struct {
 	appeals   AppealStore
 	incidents IncidentStore
 	bot       BotService
+	labeler   FeedbackLabeler
 }
 
 func NewAppealService(appeals AppealStore, incidents IncidentStore, bot BotService) *AppealService {
 	return &AppealService{appeals: appeals, incidents: incidents, bot: bot}
+}
+
+func (s *AppealService) SetFeedbackLabeler(labeler FeedbackLabeler) {
+	s.labeler = labeler
 }
 
 func (s *AppealService) Submit(ctx context.Context, incidentID int64, appellantUserID int64, appellantName, appealText string) (Appeal, error) {
@@ -105,6 +115,8 @@ func (s *AppealService) Accept(ctx context.Context, appealID int64, resolverID, 
 		}
 	}
 
+	s.autoLabel(ctx, inc, "false_positive", resolverID)
+
 	_, _ = s.incidents.AddComment(ctx, IncidentComment{
 		IncidentID: ap.IncidentID,
 		AuthorType: "admin",
@@ -129,6 +141,8 @@ func (s *AppealService) Reject(ctx context.Context, appealID int64, resolverID, 
 	if err := s.incidents.UpdateStatus(ctx, ap.IncidentID, IncidentStatusClosed, resolverID); err != nil {
 		return fmt.Errorf("update incident status: %w", err)
 	}
+
+	s.autoLabelAppeal(ctx, ap, "rejected", resolverID)
 
 	_, _ = s.incidents.AddComment(ctx, IncidentComment{
 		IncidentID: ap.IncidentID,
@@ -175,6 +189,32 @@ func (s *AppealService) ListByStatus(ctx context.Context, status AppealStatus, l
 
 func (s *AppealService) GetForIncident(ctx context.Context, incidentID int64) (Appeal, error) {
 	return s.appeals.GetByIncident(ctx, incidentID)
+}
+
+func (s *AppealService) autoLabel(ctx context.Context, inc Incident, label, resolverID string) {
+	if s.labeler == nil {
+		return
+	}
+	if err := s.labeler.AutoLabel(ctx, inc.ID, label); err != nil {
+		log.Printf("[WARN] auto-label incident %d as %s failed: %v", inc.ID, label, err)
+	}
+}
+
+func (s *AppealService) autoLabelAppeal(ctx context.Context, ap Appeal, action, resolverID string) {
+	if s.labeler == nil {
+		return
+	}
+	inc, err := s.incidents.Get(ctx, ap.IncidentID)
+	if err != nil {
+		return
+	}
+	label := "confirmed_spam"
+	if action == "accepted" {
+		label = "false_positive"
+	}
+	if err := s.labeler.AutoLabel(ctx, inc.ID, label); err != nil {
+		log.Printf("[WARN] auto-label incident %d as %s failed: %v", inc.ID, label, err)
+	}
 }
 
 func noopTime() time.Time { return time.Time{} }

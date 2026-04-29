@@ -64,6 +64,15 @@ func (s *Service) Stats(ctx context.Context) (LabelStats, error) {
 	return stats, nil
 }
 
+func (s *Service) AutoLabel(ctx context.Context, incidentID int64, label string) error {
+	_, err := s.Label(ctx, LabelEntry{
+		IncidentID: incidentID,
+		Label:      Label(label),
+		LabeledBy:  "appeal_system",
+	})
+	return err
+}
+
 func (s *Service) applySideEffects(ctx context.Context, entry LabelEntry) {
 	if s.samples == nil || s.spamTxt == nil {
 		return
