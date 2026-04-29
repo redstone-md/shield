@@ -16,6 +16,8 @@ type mockTenantStore struct {
 	status  string
 	getErr  error
 	updErr  error
+	addErr  error
+	added   storage.TenantRecord
 }
 
 func (m *mockTenantStore) Get(_ context.Context, id string) (storage.TenantRecord, error) {
@@ -30,6 +32,11 @@ func (m *mockTenantStore) Get(_ context.Context, id string) (storage.TenantRecor
 func (m *mockTenantStore) UpdateStatus(_ context.Context, _, status string) error {
 	m.status = status
 	return m.updErr
+}
+
+func (m *mockTenantStore) Add(_ context.Context, rec storage.TenantRecord) error {
+	m.added = rec
+	return m.addErr
 }
 
 func TestTenantService_Suspend(t *testing.T) {

@@ -81,8 +81,27 @@ type Config struct {
 	FeedbackService             *feedback.Service    // feedback service for labeling
 	ReviewService               *feedback.ReviewService    // review service for candidates
 	KnowledgeService            *feedback.KnowledgeService // knowledge snapshot service
+	OnboardingProvider          OnboardingService         // tenant onboarding/offboarding
 	Dbg                         bool                   // debug mode
 	Settings                    Settings               // application settings
+}
+
+type OnboardingService interface {
+	Onboard(ctx context.Context, req OnboardRequest) (*OnboardResult, error)
+	Offboard(ctx context.Context, tenantID string) error
+}
+
+type OnboardRequest struct {
+	TenantID string `json:"tenant_id"`
+	Name     string `json:"name"`
+	OwnerID  string `json:"owner_id"`
+	GID      string `json:"gid"`
+}
+
+type OnboardResult struct {
+	TenantID    string `json:"tenant_id"`
+	WorkspaceID string `json:"workspace_id"`
+	RuleSetVer  int    `json:"rule_set_version"`
 }
 
 // Settings contains all application settings
@@ -390,6 +409,12 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 				r.HandleFunc("GET /candidates", s.listCandidatesHandler)
 				r.HandleFunc("POST /candidates/{id}/approve", s.approveCandidateHandler)
 				r.HandleFunc("POST /candidates/{id}/reject", s.rejectCandidateHandler)
+			})
+		}
+		if s.OnboardingProvider != nil {
+			authApi.Mount("/api/tenants").Route(func(r *routegroup.Bundle) {
+				r.HandleFunc("POST /onboard", s.onboardTenantHandler)
+				r.HandleFunc("POST /{id}/offboard", s.offboardTenantHandler)
 			})
 		}
 	})

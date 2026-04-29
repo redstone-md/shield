@@ -11,6 +11,7 @@ import (
 
 type TenantStore interface {
 	Get(ctx context.Context, id string) (storage.TenantRecord, error)
+	Add(ctx context.Context, rec storage.TenantRecord) error
 	UpdateStatus(ctx context.Context, id, status string) error
 }
 

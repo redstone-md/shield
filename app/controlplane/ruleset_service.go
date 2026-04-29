@@ -78,6 +78,10 @@ func (s *RuleSetService) OnChange(fn func(rules.RuleSet)) {
 	s.mu.Unlock()
 }
 
+func (s *RuleSetService) Cache() RuleSetCache {
+	return s.cache
+}
+
 func (s *RuleSetService) Invalidate() {
 	s.cache.InvalidateAll(context.Background(), s.tenantID)
 }

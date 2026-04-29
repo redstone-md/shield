@@ -47,6 +47,7 @@ type runtimeAssembly struct {
 	AppealService          *audit.AppealService
 	FeedbackService  *feedback.Service
 	ReviewService    *feedback.ReviewService
+	OnboardingSvc    *controlplane.OnboardingService
 	UsageMetering    *storage.UsageMetering
 	RetentionSvc     *storage.RetentionService
 	Web              webRuntimeAssembly
@@ -67,8 +68,9 @@ type webRuntimeAssembly struct {
 	AppealService        *audit.AppealService
 	FeedbackService      *feedback.Service
 	ReviewService        *feedback.ReviewService
-	KnowledgeService     *feedback.KnowledgeService
-	BotUsername          string
+	KnowledgeService    *feedback.KnowledgeService
+	OnboardingProvider webapi.OnboardingService
+	BotUsername         string
 }
 
 func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error) {
@@ -221,6 +223,8 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 
 	appealSvc.SetFeedbackLabeler(feedbackSvc)
 
+	onboardingSvc := controlplane.NewOnboardingService(tenantsStore, workspacesStore, ruleSets, ruleSetService.Cache())
+
 	assembly := &runtimeAssembly{
 		DataDB:                 dataDB,
 		Detector:               detector,
@@ -257,23 +261,25 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 			UsageCountersTTL:     opts.Retention.UsageCountersTTL,
 			Interval:             opts.Retention.Interval,
 		}),
-		Web: webRuntimeAssembly{
-			Detector:             detector,
-			SpamFilter:           spamBot,
-			Locator:              locator,
-			StorageEngine:        dataDB,
-			RuleSetService:       ruleSetService,
-			RoleAuthorizer:       roleAuthorizer,
-			ApprovedUsersService: approvedUsersSvc,
-			DictionaryService:    dictSvc,
-			DetectedSpamService:  detectedSpamSvc,
-			TenantStatusProvider: tenantStatusAdapter{inner: tenantsStore},
-			AuditService:         auditSvc,
-			AppealService:        appealSvc,
-			FeedbackService:      feedbackSvc,
-			ReviewService:        reviewSvc,
-			KnowledgeService:     knowledgeSvc,
-		},
+	OnboardingSvc: onboardingSvc,
+	Web: webRuntimeAssembly{
+		Detector: detector,
+		SpamFilter: spamBot,
+		Locator: locator,
+		StorageEngine: dataDB,
+		RuleSetService: ruleSetService,
+		RoleAuthorizer: roleAuthorizer,
+		ApprovedUsersService: approvedUsersSvc,
+		DictionaryService: dictSvc,
+		DetectedSpamService: detectedSpamSvc,
+		TenantStatusProvider: tenantStatusAdapter{inner: tenantsStore},
+		AuditService: auditSvc,
+		AppealService: appealSvc,
+		FeedbackService: feedbackSvc,
+		ReviewService: reviewSvc,
+		KnowledgeService: knowledgeSvc,
+		OnboardingProvider: &onboardingAdapter{inner: onboardingSvc},
+	},
 	}
 
 	return assembly, nil
@@ -515,4 +521,29 @@ func (a *usageMeterAdapter) Increment(ctx context.Context, meterType string) err
 	windowStart := now.Truncate(time.Hour)
 	windowEnd := windowStart.Add(time.Hour)
 	return a.store.Increment(ctx, meterType, windowStart, windowEnd)
+}
+
+type onboardingAdapter struct {
+	inner *controlplane.OnboardingService
+}
+
+func (a *onboardingAdapter) Onboard(ctx context.Context, req webapi.OnboardRequest) (*webapi.OnboardResult, error) {
+	res, err := a.inner.Onboard(ctx, controlplane.OnboardRequest{
+		TenantID: req.TenantID,
+		Name:     req.Name,
+		OwnerID:  req.OwnerID,
+		GID:      req.GID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &webapi.OnboardResult{
+		TenantID:   res.TenantID,
+		WorkspaceID: res.WorkspaceID,
+		RuleSetVer: res.RuleSetVer,
+	}, nil
+}
+
+func (a *onboardingAdapter) Offboard(ctx context.Context, tenantID string) error {
+	return a.inner.Offboard(ctx, tenantID)
 }
