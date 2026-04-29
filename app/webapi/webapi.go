@@ -409,6 +409,7 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 			webUI.HandleFunc("GET /incidents", s.htmlIncidentsHandler)               // incident list page
 			webUI.HandleFunc("GET /incidents/{id}", s.htmlIncidentDetailHandler)      // incident detail page
 			webUI.HandleFunc("GET /appeals", s.htmlAppealsHandler)                    // appeals list page
+			webUI.HandleFunc("GET /feedback", s.htmlFeedbackHandler)                  // feedback page
 		}
 
 		// handle logout - force Basic Auth re-authentication
