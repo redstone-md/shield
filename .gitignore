@@ -42,3 +42,6 @@ docs/prompts/
 
 # ralphex progress logs
 .ralphex/progress/
+
+# codex skills and config
+.codex/
