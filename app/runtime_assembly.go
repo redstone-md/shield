@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"time"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
@@ -46,7 +47,8 @@ type runtimeAssembly struct {
 	AppealService          *audit.AppealService
 	FeedbackService  *feedback.Service
 	ReviewService    *feedback.ReviewService
-	Web                    webRuntimeAssembly
+	UsageMetering    *storage.UsageMetering
+	Web              webRuntimeAssembly
 }
 
 type webRuntimeAssembly struct {
@@ -211,6 +213,11 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		&knowledgeSamplesAdapter{samples: samplesStore},
 	)
 
+	usageMetering, err := storage.NewUsageMetering(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make usage metering store, %w", err)
+	}
+
 	appealSvc.SetFeedbackLabeler(feedbackSvc)
 
 	assembly := &runtimeAssembly{
@@ -237,6 +244,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		AppealService:     appealSvc,
 		FeedbackService:   feedbackSvc,
 		ReviewService:     reviewSvc,
+		UsageMetering:     usageMetering,
 		Web: webRuntimeAssembly{
 			Detector:             detector,
 			SpamFilter:           spamBot,
@@ -377,6 +385,9 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 	if a.AuditService != nil {
 		listener.AuditWriter = events.NewDefaultAuditWriter(a.SpamLogger, a.Locator, events.NewIncidentAdapter(a.AuditService))
 	}
+	if a.UsageMetering != nil {
+		listener.UsageMeter = &usageMeterAdapter{store: a.UsageMetering}
+	}
 	a.TelegramListener = listener
 	a.Web.BotUsername = listener.BotUsername
 	return listener
@@ -481,4 +492,15 @@ func (a *knowledgeSamplesAdapter) CountSamples(ctx context.Context) (int, int, e
 		return 0, 0, err
 	}
 	return stats.TotalSpam, stats.TotalHam, nil
+}
+
+type usageMeterAdapter struct {
+	store *storage.UsageMetering
+}
+
+func (a *usageMeterAdapter) Increment(ctx context.Context, meterType string) error {
+	now := time.Now().UTC()
+	windowStart := now.Truncate(time.Hour)
+	windowEnd := windowStart.Add(time.Hour)
+	return a.store.Increment(ctx, meterType, windowStart, windowEnd)
 }

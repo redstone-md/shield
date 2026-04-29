@@ -226,6 +226,10 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 	}
 
 	resp := l.botOnMessage(ctx, *msg, false)
+	l.meter(ctx, "spam_checks")
+	if resp.Send && resp.BanInterval > 0 {
+		l.meter(ctx, "spam_detected")
+	}
 
 	if resp.Send && !l.NoSpamReply && !l.TrainingMode {
 		if err := l.sendBotResponse(resp, fromChat, NotificationSilent); err != nil {
@@ -262,6 +266,7 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 	if policyErr != nil {
 		return fmt.Errorf("policy decision failed: %w", policyErr)
 	}
+	l.meter(ctx, "policy_"+string(policyOutcome.Decision.Action))
 
 	if policyOutcome.Decision.Action == moderation.ActionAllow {
 		if resp.Send && resp.BanInterval > 0 {
@@ -386,4 +391,12 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 	return nil
 }
 
+func (l *TelegramListener) meter(ctx context.Context, meterType string) {
+	if l.UsageMeter == nil {
+		return
+	}
+	if err := l.UsageMeter.Increment(ctx, meterType); err != nil {
+		observability.Logf(ctx, "[WARN] usage meter increment failed: %v", err)
+	}
+}
 

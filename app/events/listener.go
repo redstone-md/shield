@@ -22,6 +22,10 @@ import (
 	"github.com/umputun/tg-spam/app/rules"
 )
 
+type UsageMeter interface {
+	Increment(ctx context.Context, meterType string) error
+}
+
 // TelegramListener listens to tg update, forward to bots and send back responses
 // Not thread safe
 type TelegramListener struct {
@@ -59,6 +63,7 @@ type TelegramListener struct {
 	PolicyEngine     PolicyEngine
 	PolicyProfileName string
 	AuditWriter      AuditWriter
+	UsageMeter       UsageMeter
 	SlowPathEnabled  bool
 
 	adminHandler    *admin
