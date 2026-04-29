@@ -250,6 +250,21 @@ func TestSettings_PageLoads(t *testing.T) {
 	assert.Contains(t, title, "Settings")
 }
 
+func TestFeedback_PageLoads(t *testing.T) {
+	page := newPage(t)
+	_, err := page.Goto(baseURL + "/feedback")
+	require.NoError(t, err)
+
+	title, err := page.Title()
+	require.NoError(t, err)
+	assert.Contains(t, title, "Feedback")
+
+	waitVisible(t, page.Locator("h2:has-text('Feedback & Knowledge')"))
+	waitVisible(t, page.Locator("button[data-bs-target='#labels-tab']"))
+	waitVisible(t, page.Locator("button[data-bs-target='#candidates-tab']"))
+	waitVisible(t, page.Locator("button[data-bs-target='#knowledge-tab']"))
+}
+
 // --- navigation tests ---
 
 func TestNavbar_NavigationWorks(t *testing.T) {
@@ -269,6 +284,7 @@ func TestNavbar_NavigationWorks(t *testing.T) {
 		{"Manage Users", "/manage_users"},
 		{"Manage Dictionary", "/manage_dictionary"},
 		{"Detected Spam", "/detected_spam"},
+		{"Feedback", "/feedback"},
 		{"Settings", "/list_settings"},
 		{"Checker", "/"},
 	}
