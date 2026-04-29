@@ -42,6 +42,10 @@ type defaultAuditWriter struct {
 	incidentCreator IncidentCreator
 }
 
+func NewDefaultAuditWriter(spamLogger SpamLogger, locator Locator, incidentCreator IncidentCreator) AuditWriter {
+	return defaultAuditWriter{spamLogger: spamLogger, locator: locator, incidentCreator: incidentCreator}
+}
+
 func (w defaultAuditWriter) Write(ctx context.Context, record AuditRecord) error {
 	if !record.Response.Send || record.Response.BanInterval <= 0 {
 		return nil

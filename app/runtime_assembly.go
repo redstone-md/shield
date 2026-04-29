@@ -8,6 +8,7 @@ import (
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
+	"github.com/umputun/tg-spam/app/audit"
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/controlplane"
 	"github.com/umputun/tg-spam/app/events"
@@ -40,6 +41,8 @@ type runtimeAssembly struct {
 	DictionaryService      *controlplane.DictionaryService
 	DetectedSpamService    *controlplane.DetectedSpamService
 	TelegramListener       *events.TelegramListener
+	AuditService           *audit.Service
+	AppealService          *audit.AppealService
 	Web                    webRuntimeAssembly
 }
 
@@ -54,6 +57,8 @@ type webRuntimeAssembly struct {
 	DetectedSpamService  *controlplane.DetectedSpamService
 	RoleAuthorizer       *controlplane.RoleAuthorizer
 	TenantStatusProvider webapi.TenantStatusProvider
+	AuditService         *audit.Service
+	AppealService        *audit.AppealService
 	BotUsername          string
 }
 
@@ -166,6 +171,17 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		return nil, fmt.Errorf("can't bootstrap default tenant, %w", err)
 	}
 
+	incidentsStore, err := storage.NewIncidentStorage(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make incidents store, %w", err)
+	}
+	appealsStore, err := storage.NewAppealStorage(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make appeals store, %w", err)
+	}
+	auditSvc := audit.NewService(incidentsStore)
+	appealSvc := audit.NewAppealService(appealsStore, incidentsStore, nil)
+
 	assembly := &runtimeAssembly{
 		DataDB:                 dataDB,
 		Detector:               detector,
@@ -187,6 +203,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		ApprovedUsersService:   approvedUsersSvc,
 		DictionaryService:      dictSvc,
 		DetectedSpamService:    detectedSpamSvc,
+		AppealService:        appealSvc,
 		Web: webRuntimeAssembly{
 			Detector:             detector,
 			SpamFilter:           spamBot,
@@ -198,6 +215,8 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 			DictionaryService:    dictSvc,
 			DetectedSpamService:  detectedSpamSvc,
 			TenantStatusProvider: tenantStatusAdapter{inner: tenantsStore},
+			AuditService:         auditSvc,
+			AppealService:        appealSvc,
 		},
 	}
 
@@ -318,6 +337,9 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 		Dry:                     a.ActiveRuleSet.Moderation.DryRun,
 		AggressiveCleanup:       opts.AggressiveCleanup,
 		AggressiveCleanupLimit:  opts.AggressiveCleanupLimit,
+	}
+	if a.AuditService != nil {
+		listener.AuditWriter = events.NewDefaultAuditWriter(a.SpamLogger, a.Locator, events.NewIncidentAdapter(a.AuditService))
 	}
 	a.TelegramListener = listener
 	a.Web.BotUsername = listener.BotUsername

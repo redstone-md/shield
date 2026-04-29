@@ -211,6 +211,8 @@ func activateServer(ctx context.Context, opts options, web webRuntimeAssembly, d
 		ApprovedUsersProvider: web.ApprovedUsersService,
 		RateLimiter:           webapi.NewTenantRateLimiter(50, 50),
 		TenantStatusProvider:  web.TenantStatusProvider,
+		AuditService:                web.AuditService,
+		AppealService:               web.AppealService,
 		AuthPasswd:            authPassswd,
 		AuthHash:              opts.Server.AuthHash,
 		Version:               revision,

@@ -364,7 +364,7 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 		})
 
 		if s.AuditService != nil {
-			authApi.Mount("/incidents").Route(func(r *routegroup.Bundle) {
+			authApi.Mount("/api/incidents").Route(func(r *routegroup.Bundle) {
 				r.HandleFunc("GET /", s.listIncidentsHandler)
 				r.HandleFunc("GET /{id}", s.getIncidentHandler)
 				r.HandleFunc("POST /{id}/replay", s.replayIncidentHandler)
@@ -373,7 +373,7 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 			})
 		}
 		if s.AppealService != nil {
-			authApi.Mount("/appeals").Route(func(r *routegroup.Bundle) {
+			authApi.Mount("/api/appeals").Route(func(r *routegroup.Bundle) {
 				r.HandleFunc("GET /", s.listAppealsHandler)
 				r.HandleFunc("POST /{id}/resolve", s.resolveAppealHandler)
 			})
