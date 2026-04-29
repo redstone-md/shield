@@ -182,6 +182,19 @@ type options struct {
 
 	MaxBackups int `long:"max-backups" env:"MAX_BACKUPS" default:"10" description:"maximum number of backups to keep, set 0 to disable"`
 
+	Retention struct {
+		Enabled bool `long:"enabled" env:"ENABLED" description:"enable automatic data retention cleanup"`
+		Interval time.Duration `long:"interval" env:"INTERVAL" default:"1h" description:"how often to run retention cleanup"`
+		IncidentsTTL time.Duration `long:"incidents-ttl" env:"INCIDENTS_TTL" default:"720h" description:"time-to-live for incidents (0=keep forever)"`
+		AppealsTTL time.Duration `long:"appeals-ttl" env:"APPEALS_TTL" default:"720h" description:"time-to-live for appeals (0=keep forever)"`
+		DetectedSpamTTL time.Duration `long:"detected-spam-ttl" env:"DETECTED_SPAM_TTL" default:"720h" description:"time-to-live for detected spam entries (0=keep forever)"`
+		IncomingEventsTTL time.Duration `long:"incoming-events-ttl" env:"INCOMING_EVENTS_TTL" default:"168h" description:"time-to-live for incoming events (0=keep forever)"`
+		ModerationActionsTTL time.Duration `long:"moderation-actions-ttl" env:"MODERATION_ACTIONS_TTL" default:"720h" description:"time-to-live for moderation actions (0=keep forever)"`
+		LabelsTTL time.Duration `long:"labels-ttl" env:"LABELS_TTL" default:"720h" description:"time-to-live for feedback labels (0=keep forever)"`
+		CandidatesTTL time.Duration `long:"candidates-ttl" env:"CANDIDATES_TTL" default:"720h" description:"time-to-live for review candidates (0=keep forever)"`
+		UsageCountersTTL time.Duration `long:"usage-counters-ttl" env:"USAGE_COUNTERS_TTL" default:"168h" description:"time-to-live for usage counter windows (0=keep forever)"`
+	} `group:"retention" namespace:"retention" env-namespace:"RETENTION"`
+
 	Dry bool `long:"dry" env:"DRY" description:"dry mode, no bans"`
 	Dbg bool `long:"dbg" env:"DEBUG" description:"debug mode"`
 	TGDbg bool `long:"tg-dbg" env:"TG_DEBUG" description:"telegram debug mode"`
@@ -289,6 +302,10 @@ func execute(ctx context.Context, opts options) error {
 	defer assembly.close()
 	if opts.Convert == "only" {
 		return nil
+	}
+
+	if assembly.RetentionSvc != nil {
+		go assembly.RetentionSvc.Run(ctx)
 	}
 
 	// activate web server if enabled, server-only mode (no telegram token)

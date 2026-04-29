@@ -48,6 +48,7 @@ type runtimeAssembly struct {
 	FeedbackService  *feedback.Service
 	ReviewService    *feedback.ReviewService
 	UsageMetering    *storage.UsageMetering
+	RetentionSvc     *storage.RetentionService
 	Web              webRuntimeAssembly
 }
 
@@ -244,7 +245,18 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		AppealService:     appealSvc,
 		FeedbackService:   feedbackSvc,
 		ReviewService:     reviewSvc,
-		UsageMetering:     usageMetering,
+		UsageMetering:    usageMetering,
+		RetentionSvc: storage.NewRetentionService(dataDB, storage.RetentionConfig{
+			IncidentsTTL:         opts.Retention.IncidentsTTL,
+			AppealsTTL:           opts.Retention.AppealsTTL,
+			DetectedSpamTTL:      opts.Retention.DetectedSpamTTL,
+			LabelsTTL:            opts.Retention.LabelsTTL,
+			CandidatesTTL:        opts.Retention.CandidatesTTL,
+			IncomingEventsTTL:    opts.Retention.IncomingEventsTTL,
+			ModerationActionsTTL: opts.Retention.ModerationActionsTTL,
+			UsageCountersTTL:     opts.Retention.UsageCountersTTL,
+			Interval:             opts.Retention.Interval,
+		}),
 		Web: webRuntimeAssembly{
 			Detector:             detector,
 			SpamFilter:           spamBot,
