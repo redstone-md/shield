@@ -72,7 +72,12 @@ func (e *SQL) backupSqliteTable(ctx context.Context, tx *sqlx.Tx, w io.Writer, t
 		return err
 	}
 
-	if err := e.writeSqliteTableData(ctx, tx, w, table, columns); err != nil {
+	hasTenantID, err := e.sqliteHasTenantID(ctx, tx, table)
+	if err != nil {
+		return err
+	}
+
+	if err := e.writeSqliteTableData(ctx, tx, w, table, columns, hasTenantID); err != nil {
 		return err
 	}
 
@@ -122,9 +127,30 @@ func (e *SQL) getSqliteColumns(ctx context.Context, tx *sqlx.Tx, table string) (
 	return columns, nil
 }
 
-func (e *SQL) writeSqliteTableData(ctx context.Context, tx *sqlx.Tx, w io.Writer, table string, columns []string) error {
-	query := fmt.Sprintf("SELECT * FROM %s", table)
-	rows, err := tx.QueryxContext(ctx, query)
+func (e *SQL) sqliteHasTenantID(ctx context.Context, tx *sqlx.Tx, table string) (bool, error) {
+	columns, err := e.getSqliteColumns(ctx, tx, table)
+	if err != nil {
+		return false, err
+	}
+	for _, col := range columns {
+		if col == "tenant_id" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (e *SQL) writeSqliteTableData(ctx context.Context, tx *sqlx.Tx, w io.Writer, table string, columns []string, hasTenantID bool) error {
+	var query string
+	var err error
+	var rows *sqlx.Rows
+	if hasTenantID {
+		query = fmt.Sprintf("SELECT * FROM %s WHERE tenant_id = ?", table)
+		rows, err = tx.QueryxContext(ctx, query, e.TenantID())
+	} else {
+		query = fmt.Sprintf("SELECT * FROM %s", table)
+		rows, err = tx.QueryxContext(ctx, query)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to query data from table %s: %w", table, err)
 	}

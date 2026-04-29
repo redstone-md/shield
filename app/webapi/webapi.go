@@ -82,6 +82,7 @@ type Config struct {
 	ReviewService               *feedback.ReviewService    // review service for candidates
 	KnowledgeService            *feedback.KnowledgeService // knowledge snapshot service
 	OnboardingProvider          OnboardingService         // tenant onboarding/offboarding
+	RestoreProvider             RestoreService            // tenant restore from backup
 	Dbg                         bool                   // debug mode
 	Settings                    Settings               // application settings
 }
@@ -89,6 +90,10 @@ type Config struct {
 type OnboardingService interface {
 	Onboard(ctx context.Context, req OnboardRequest) (*OnboardResult, error)
 	Offboard(ctx context.Context, tenantID string) error
+}
+
+type RestoreService interface {
+	RestoreTenant(ctx context.Context, tenantID string, r io.Reader) error
 }
 
 type OnboardRequest struct {
@@ -411,10 +416,15 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 				r.HandleFunc("POST /candidates/{id}/reject", s.rejectCandidateHandler)
 			})
 		}
-		if s.OnboardingProvider != nil {
+		if s.OnboardingProvider != nil || s.RestoreProvider != nil {
 			authApi.Mount("/api/tenants").Route(func(r *routegroup.Bundle) {
-				r.HandleFunc("POST /onboard", s.onboardTenantHandler)
-				r.HandleFunc("POST /{id}/offboard", s.offboardTenantHandler)
+				if s.OnboardingProvider != nil {
+					r.HandleFunc("POST /onboard", s.onboardTenantHandler)
+					r.HandleFunc("POST /{id}/offboard", s.offboardTenantHandler)
+				}
+				if s.RestoreProvider != nil {
+					r.HandleFunc("POST /{id}/restore", s.restoreTenantHandler)
+				}
 			})
 		}
 	})

@@ -48,6 +48,7 @@ type runtimeAssembly struct {
 	FeedbackService  *feedback.Service
 	ReviewService    *feedback.ReviewService
 	OnboardingSvc    *controlplane.OnboardingService
+	RestoreSvc       *storage.RestoreService
 	UsageMetering    *storage.UsageMetering
 	RetentionSvc     *storage.RetentionService
 	Web              webRuntimeAssembly
@@ -70,6 +71,7 @@ type webRuntimeAssembly struct {
 	ReviewService        *feedback.ReviewService
 	KnowledgeService    *feedback.KnowledgeService
 	OnboardingProvider webapi.OnboardingService
+	RestoreProvider    webapi.RestoreService
 	BotUsername         string
 }
 
@@ -224,6 +226,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	appealSvc.SetFeedbackLabeler(feedbackSvc)
 
 	onboardingSvc := controlplane.NewOnboardingService(tenantsStore, workspacesStore, ruleSets, ruleSetService.Cache())
+	restoreSvc := storage.NewRestoreService(dataDB)
 
 	assembly := &runtimeAssembly{
 		DataDB:                 dataDB,
@@ -262,23 +265,25 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 			Interval:             opts.Retention.Interval,
 		}),
 	OnboardingSvc: onboardingSvc,
+	RestoreSvc:    restoreSvc,
 	Web: webRuntimeAssembly{
-		Detector: detector,
-		SpamFilter: spamBot,
-		Locator: locator,
-		StorageEngine: dataDB,
-		RuleSetService: ruleSetService,
-		RoleAuthorizer: roleAuthorizer,
+		Detector:             detector,
+		SpamFilter:           spamBot,
+		Locator:              locator,
+		StorageEngine:        dataDB,
+		RuleSetService:       ruleSetService,
+		RoleAuthorizer:       roleAuthorizer,
 		ApprovedUsersService: approvedUsersSvc,
-		DictionaryService: dictSvc,
-		DetectedSpamService: detectedSpamSvc,
+		DictionaryService:    dictSvc,
+		DetectedSpamService:  detectedSpamSvc,
 		TenantStatusProvider: tenantStatusAdapter{inner: tenantsStore},
-		AuditService: auditSvc,
-		AppealService: appealSvc,
-		FeedbackService: feedbackSvc,
-		ReviewService: reviewSvc,
-		KnowledgeService: knowledgeSvc,
-		OnboardingProvider: &onboardingAdapter{inner: onboardingSvc},
+		AuditService:         auditSvc,
+		AppealService:        appealSvc,
+		FeedbackService:      feedbackSvc,
+		ReviewService:        reviewSvc,
+		KnowledgeService:     knowledgeSvc,
+		OnboardingProvider:   &onboardingAdapter{inner: onboardingSvc},
+		RestoreProvider:      &restoreProviderAdapter{svc: restoreSvc},
 	},
 	}
 
@@ -546,4 +551,12 @@ func (a *onboardingAdapter) Onboard(ctx context.Context, req webapi.OnboardReque
 
 func (a *onboardingAdapter) Offboard(ctx context.Context, tenantID string) error {
 	return a.inner.Offboard(ctx, tenantID)
+}
+
+type restoreProviderAdapter struct {
+	svc *storage.RestoreService
+}
+
+func (a *restoreProviderAdapter) RestoreTenant(ctx context.Context, tenantID string, r io.Reader) error {
+	return a.svc.RestoreTenant(ctx, tenantID, r)
 }
