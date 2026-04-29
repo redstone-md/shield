@@ -202,7 +202,16 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	}
 	feedbackSvc := feedback.NewService(labelsStore, nil, nil)
 	reviewSvc := feedback.NewReviewService(candidatesStore, nil, feedbackSvc)
-	knowledgeSvc := feedback.NewKnowledgeService(knowledgeStore, nil, nil)
+	samplesStore, err := storage.NewSamples(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make samples store for knowledge, %w", err)
+	}
+	knowledgeSvc := feedback.NewKnowledgeService(knowledgeStore,
+		&knowledgeDictAdapter{dict: dictionaryStore},
+		&knowledgeSamplesAdapter{samples: samplesStore},
+	)
+
+	appealSvc.SetFeedbackLabeler(feedbackSvc)
 
 	assembly := &runtimeAssembly{
 		DataDB:                 dataDB,
@@ -440,4 +449,36 @@ func (a *runtimeAssembly) close() {
 	if a.DataDB != nil {
 		_ = a.DataDB.Close()
 	}
+}
+
+type knowledgeDictAdapter struct {
+	dict *storage.Dictionary
+}
+
+func (a *knowledgeDictAdapter) ReadStopPhrases(ctx context.Context) ([]string, error) {
+	return a.dict.Read(ctx, storage.DictionaryTypeStopPhrase)
+}
+
+func (a *knowledgeDictAdapter) ReadIgnoredWords(_ context.Context) error {
+	return nil
+}
+
+func (a *knowledgeDictAdapter) CountEntries(ctx context.Context) (int, error) {
+	stats, err := a.dict.Stats(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return stats.TotalStopPhrases + stats.TotalIgnoredWords, nil
+}
+
+type knowledgeSamplesAdapter struct {
+	samples *storage.Samples
+}
+
+func (a *knowledgeSamplesAdapter) CountSamples(ctx context.Context) (int, int, error) {
+	stats, err := a.samples.Stats(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	return stats.TotalSpam, stats.TotalHam, nil
 }

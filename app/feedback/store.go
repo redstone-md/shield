@@ -1,6 +1,18 @@
 package feedback
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+var ErrNotFound = errors.New("not found")
+
+type CandidateStore interface {
+	Create(ctx context.Context, entry CandidateEntry) (CandidateEntry, error)
+	GetByID(ctx context.Context, id int64) (CandidateEntry, error)
+	List(ctx context.Context, filter CandidateFilter) ([]CandidateEntry, error)
+	UpdateStatus(ctx context.Context, id int64, status CandidateStatus, reviewedBy, comment string) error
+}
 
 type LabelStore interface {
 	Create(ctx context.Context, entry LabelEntry) (LabelEntry, error)
