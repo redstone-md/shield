@@ -342,7 +342,10 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 				training:  l.TrainingMode,
 				restrict:  policyOutcome.Restrict,
 			}
+			banStart := time.Now()
 			if err := l.ActionExecutor.ApplyBan(ctx, banReq); err != nil {
+				l.observeLatency("ban_latency", time.Since(banStart))
+				l.incMetric("ban_errors")
 				actionResult.Applied = false
 				actionResult.Error = err.Error()
 				errs = multierror.Append(errs, fmt.Errorf("failed to apply %s for %s: %w",
@@ -407,5 +410,12 @@ func (l *TelegramListener) observeLatency(name string, d time.Duration) {
 		return
 	}
 	l.MetricsRecorder.Observe(name, d)
+}
+
+func (l *TelegramListener) incMetric(name string) {
+	if l.MetricsRecorder == nil {
+		return
+	}
+	l.MetricsRecorder.Inc(name)
 }
 

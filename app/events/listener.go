@@ -236,7 +236,9 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 				if l.DisableAdminSpamForward {
 					continue
 				}
+				l.incMetric("admin_messages")
 				if err := l.adminHandler.MsgHandler(update); err != nil {
+					l.incMetric("admin_errors")
 					log.Printf("[WARN] failed to process admin chat message: %v", err)
 					errResp := l.sendBotResponse(bot.Response{Send: true, Text: "error: " + err.Error()}, l.adminChatID, NotificationDefault)
 					if errResp != nil {
@@ -248,8 +250,10 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 
 			if update.CallbackQuery != nil {
 				callbackData := update.CallbackQuery.Data
+				l.incMetric("callbacks_total")
 				if len(callbackData) >= 3 && callbackData[:1] == "R" {
 					if err := l.reportsHandler.HandleReportCallback(ctx, update.CallbackQuery); err != nil {
+						l.incMetric("callback_errors")
 						log.Printf("[WARN] failed to process report callback: %v", err)
 						errResp := l.sendBotResponse(bot.Response{Send: true, Text: "error: " + err.Error()}, l.adminChatID, NotificationDefault)
 						if errResp != nil {
@@ -258,6 +262,7 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 					}
 				} else {
 					if err := l.adminHandler.InlineCallbackHandler(update.CallbackQuery); err != nil {
+						l.incMetric("callback_errors")
 						log.Printf("[WARN] failed to process callback: %v", err)
 						errResp := l.sendBotResponse(bot.Response{Send: true, Text: "error: " + err.Error()}, l.adminChatID, NotificationDefault)
 						if errResp != nil {
@@ -269,6 +274,7 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 			}
 
 			if update.EditedMessage != nil {
+				l.incMetric("edited_messages")
 				log.Printf("[INFO] processing edited message, id: %d", update.EditedMessage.MessageID)
 				editedUpdate := tbapi.Update{
 					UpdateID:      update.UpdateID,

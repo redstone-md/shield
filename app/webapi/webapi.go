@@ -270,6 +270,9 @@ func NewServer(config Config) *Server {
 func (s *Server) Run(ctx context.Context) error {
 	router := routegroup.New(http.NewServeMux())
 	router.Use(rest.Recoverer(log.Default()))
+	router.Use(SecurityHeaders)
+	router.Use(NewAdminAuditLogger().Middleware)
+	router.Use(SanitizeInputMiddleware)
 	router.Use(s.requestMetadataMiddleware)
 	router.Use(logger.New(logger.Log(log.Default()), logger.Prefix("[DEBUG]")).Handler)
 	router.Use(rest.Throttle(1000))
