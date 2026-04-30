@@ -218,6 +218,7 @@ func activateServer(ctx context.Context, opts options, web webRuntimeAssembly, d
 		KnowledgeService:   web.KnowledgeService,
 		OnboardingProvider: web.OnboardingProvider,
 		RestoreProvider:    web.RestoreProvider,
+		MetricsCollector:   web.Metrics,
 		AuthPasswd:         authPassswd,
 		AuthHash:              opts.Server.AuthHash,
 		Version:               revision,

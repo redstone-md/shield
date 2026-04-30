@@ -225,7 +225,9 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 		return nil
 	}
 
+	checkStart := time.Now()
 	resp := l.botOnMessage(ctx, *msg, false)
+	l.observeLatency("fast_path_latency", time.Since(checkStart))
 	l.meter(ctx, "spam_checks")
 	if resp.Send && resp.BanInterval > 0 {
 		l.meter(ctx, "spam_detected")
@@ -398,5 +400,12 @@ func (l *TelegramListener) meter(ctx context.Context, meterType string) {
 	if err := l.UsageMeter.Increment(ctx, meterType); err != nil {
 		observability.Logf(ctx, "[WARN] usage meter increment failed: %v", err)
 	}
+}
+
+func (l *TelegramListener) observeLatency(name string, d time.Duration) {
+	if l.MetricsRecorder == nil {
+		return
+	}
+	l.MetricsRecorder.Observe(name, d)
 }
 

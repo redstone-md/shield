@@ -39,7 +39,15 @@ func (s *Server) checkMsgHandler(w http.ResponseWriter, r *http.Request) {
 		req.Msg = r.FormValue("msg")
 	}
 
+	start := time.Now()
 	spam, cr := s.Detector.Check(req)
+	if s.MetricsCollector != nil {
+		s.MetricsCollector.Observe("gateway_check_latency", time.Since(start))
+		s.MetricsCollector.Inc("gateway_checks_total")
+		if spam {
+			s.MetricsCollector.Inc("gateway_spam_detected")
+		}
+	}
 	if !isHtmxRequest {
 		rest.RenderJSON(w, rest.JSON{"spam": spam, "checks": cr})
 		return

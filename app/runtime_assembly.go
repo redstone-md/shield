@@ -14,6 +14,7 @@ import (
 	"github.com/umputun/tg-spam/app/controlplane"
 	"github.com/umputun/tg-spam/app/events"
 	"github.com/umputun/tg-spam/app/feedback"
+	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
@@ -51,6 +52,7 @@ type runtimeAssembly struct {
 	RestoreSvc       *storage.RestoreService
 	UsageMetering    *storage.UsageMetering
 	RetentionSvc     *storage.RetentionService
+	Metrics          *observability.Metrics
 	Web              webRuntimeAssembly
 }
 
@@ -72,7 +74,8 @@ type webRuntimeAssembly struct {
 	KnowledgeService    *feedback.KnowledgeService
 	OnboardingProvider webapi.OnboardingService
 	RestoreProvider    webapi.RestoreService
-	BotUsername         string
+	Metrics            *observability.Metrics
+	BotUsername        string
 }
 
 func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error) {
@@ -227,6 +230,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 
 	onboardingSvc := controlplane.NewOnboardingService(tenantsStore, workspacesStore, ruleSets, ruleSetService.Cache())
 	restoreSvc := storage.NewRestoreService(dataDB)
+	metrics := observability.NewMetrics()
 
 	assembly := &runtimeAssembly{
 		DataDB:                 dataDB,
@@ -264,6 +268,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 			UsageCountersTTL:     opts.Retention.UsageCountersTTL,
 			Interval:             opts.Retention.Interval,
 		}),
+	Metrics:        metrics,
 	OnboardingSvc: onboardingSvc,
 	RestoreSvc:    restoreSvc,
 	Web: webRuntimeAssembly{
@@ -284,6 +289,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		KnowledgeService:     knowledgeSvc,
 		OnboardingProvider:   &onboardingAdapter{inner: onboardingSvc},
 		RestoreProvider:      &restoreProviderAdapter{svc: restoreSvc},
+		Metrics:              metrics,
 	},
 	}
 
@@ -410,6 +416,9 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 	}
 	if a.UsageMetering != nil {
 		listener.UsageMeter = &usageMeterAdapter{store: a.UsageMetering}
+	}
+	if a.Metrics != nil {
+		listener.MetricsRecorder = a.Metrics
 	}
 	a.TelegramListener = listener
 	a.Web.BotUsername = listener.BotUsername

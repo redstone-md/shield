@@ -26,6 +26,11 @@ type UsageMeter interface {
 	Increment(ctx context.Context, meterType string) error
 }
 
+type MetricsRecorder interface {
+	Inc(name string)
+	Observe(name string, duration time.Duration)
+}
+
 // TelegramListener listens to tg update, forward to bots and send back responses
 // Not thread safe
 type TelegramListener struct {
@@ -64,6 +69,7 @@ type TelegramListener struct {
 	PolicyProfileName string
 	AuditWriter      AuditWriter
 	UsageMeter       UsageMeter
+	MetricsRecorder  MetricsRecorder
 	SlowPathEnabled  bool
 
 	adminHandler    *admin

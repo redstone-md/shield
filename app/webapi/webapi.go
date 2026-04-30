@@ -83,6 +83,7 @@ type Config struct {
 	KnowledgeService            *feedback.KnowledgeService // knowledge snapshot service
 	OnboardingProvider          OnboardingService         // tenant onboarding/offboarding
 	RestoreProvider             RestoreService            // tenant restore from backup
+	MetricsCollector            MetricsProvider           // SLO/SLA metrics
 	Dbg                         bool                   // debug mode
 	Settings                    Settings               // application settings
 }
@@ -94,6 +95,13 @@ type OnboardingService interface {
 
 type RestoreService interface {
 	RestoreTenant(ctx context.Context, tenantID string, r io.Reader) error
+}
+
+type MetricsProvider interface {
+	Inc(name string)
+	Add(name string, delta int64)
+	Observe(name string, duration time.Duration)
+	Snapshot() any
 }
 
 type OnboardRequest struct {
@@ -415,6 +423,9 @@ func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
 				r.HandleFunc("POST /candidates/{id}/approve", s.approveCandidateHandler)
 				r.HandleFunc("POST /candidates/{id}/reject", s.rejectCandidateHandler)
 			})
+		}
+		if s.MetricsCollector != nil {
+			authApi.HandleFunc("GET /api/metrics", s.metricsHandler)
 		}
 		if s.OnboardingProvider != nil || s.RestoreProvider != nil {
 			authApi.Mount("/api/tenants").Route(func(r *routegroup.Bundle) {
