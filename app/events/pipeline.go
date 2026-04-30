@@ -12,6 +12,7 @@ import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/hashicorp/go-multierror"
 
+	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/observability"
 )
@@ -193,6 +194,16 @@ func (l *TelegramListener) shutdownPipeline() {
 	}
 }
 
+type pipelineContext struct {
+	event      moderation.IncomingEvent
+	msg        *bot.Message
+	resp       bot.Response
+	fromChat   int64
+	spamUserID int64
+	banUserStr string
+	outcome    PolicyOutcome
+}
+
 func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error {
 	ctx = observability.WithModerationMetadata(ctx, event.EventID, event.CorrelationID, event.IdempotencyKey)
 
@@ -208,18 +219,8 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 	observability.Logf(ctx, "[DEBUG] incoming msg: %+v", strings.ReplaceAll(msg.Text, "\n", " "))
 	observability.Logf(ctx, "[DEBUG] incoming msg details: %+v", msg)
 
-	// use channel identity for locator when message is sent on behalf of a channel
-	locatorUserID := msg.From.ID
-	locatorUserName := msg.From.Username
-	if msg.SenderChat.ID != 0 {
-		locatorUserID = msg.SenderChat.ID
-		locatorUserName = msg.SenderChat.UserName
-	}
-	if err := l.Locator.AddMessage(ctx, msg.Text, fromChat, locatorUserID, locatorUserName, msg.ID); err != nil {
-		observability.Logf(ctx, "[WARN] failed to add message to locator: %v", err)
-	}
+	l.locateMessage(ctx, msg, fromChat)
 
-	// skip spam check for anonymous admin posts from this group or from the linked channel.
 	if msg.SenderChat.ID != 0 && (msg.SenderChat.ID == fromChat || msg.SenderChat.ID == l.linkedChannelID) {
 		observability.Logf(ctx, "[DEBUG] skipping spam check for anonymous admin post from group itself or linked channel")
 		return nil
@@ -239,22 +240,13 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 		}
 	}
 
-	errs := new(multierror.Error)
 	spamUserID := msg.From.ID
 	if msg.SenderChat.ID != 0 {
 		spamUserID = msg.SenderChat.ID
 	}
-	banUserStr := l.getBanUsername(resp, update)
-	strikeCount := 0
-	if spamUserID != 0 && l.DetectedSpamCounter != nil {
-		if count, countErr := l.DetectedSpamCounter.CountByUserID(ctx, spamUserID); countErr != nil {
-			observability.Logf(ctx, "[WARN] failed to count spam strikes for user %d: %v", spamUserID, countErr)
-		} else {
-			strikeCount = count
-		}
-	}
 
-	policyOutcome, policyErr := l.PolicyEngine.Decide(ctx, PolicyRequest{
+	strikeCount := l.getStrikeCount(ctx, spamUserID)
+	outcome, policyErr := l.PolicyEngine.Decide(ctx, PolicyRequest{
 		Event:         event,
 		Response:      resp,
 		Message:       msg,
@@ -268,124 +260,150 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 	if policyErr != nil {
 		return fmt.Errorf("policy decision failed: %w", policyErr)
 	}
-	l.meter(ctx, "policy_"+string(policyOutcome.Decision.Action))
+	l.meter(ctx, "policy_"+string(outcome.Decision.Action))
 
-	if policyOutcome.Decision.Action == moderation.ActionAllow {
-		if resp.Send && resp.BanInterval > 0 {
-			actionResult := moderation.ModerationActionResult{
-				EventID:       event.EventID,
-				CorrelationID: event.CorrelationID,
-				Action:        policyOutcome.Decision.Action,
-				Applied:       false,
-				Provider:      "telegram",
-				AppliedAt:     time.Now().UTC(),
-			}
-			if err := l.AuditWriter.Write(ctx, AuditRecord{
-				Event:          event,
-				Message:        msg,
-				Response:       resp,
-				Decision:       policyOutcome.Decision,
-				ActionResult:   actionResult,
-				RuleSetVersion: l.RuleSetVersion,
-				ChatID:         fromChat,
-				SpamUserID:     spamUserID,
-			}); err != nil {
-				errs = multierror.Append(errs, fmt.Errorf("audit write failed: %w", err))
-			}
-			if err := l.completeIncomingEvent(ctx, event, policyOutcome.Decision, actionResult); err != nil {
-				errs = multierror.Append(errs, err)
-			}
-		}
-		if resp.Send && l.SuperUsers.IsSuper(msg.From.Username, msg.From.ID) && l.TrainingMode && resp.BanInterval > 0 {
-			l.adminHandler.ReportBan(banUserStr, msg, resp.BanInterval, l.SoftBanMode)
-		}
-		if !resp.Send || resp.BanInterval <= 0 {
-			actionResult := moderation.ModerationActionResult{
-				EventID:       event.EventID,
-				CorrelationID: event.CorrelationID,
-				Action:        policyOutcome.Decision.Action,
-				Applied:       false,
-				Provider:      "telegram",
-				AppliedAt:     time.Now().UTC(),
-			}
-			if err := l.completeIncomingEvent(ctx, event, policyOutcome.Decision, actionResult); err != nil {
-				errs = multierror.Append(errs, err)
-			}
-		}
-		if err := errs.ErrorOrNil(); err != nil {
-			return fmt.Errorf("processing events failed: %w", err)
-		}
-		return nil
+	pc := pipelineContext{
+		event: event, msg: msg, resp: resp, fromChat: fromChat,
+		spamUserID: spamUserID, banUserStr: l.getBanUsername(resp, update), outcome: outcome,
 	}
 
-	if resp.Send {
-		observability.Logf(ctx, "[DEBUG] policy action=%s reason=%q score=%.2f",
-			policyOutcome.Decision.Action, policyOutcome.Decision.Reason, policyOutcome.Decision.Score)
+	switch outcome.Decision.Action {
+	case moderation.ActionAllow:
+		return l.processAllow(ctx, pc)
+	case moderation.ActionDelete:
+		return l.processEnforce(ctx, pc)
+	case moderation.ActionRestrict, moderation.ActionBan:
+		return l.processEnforce(ctx, pc)
+	default:
+		return l.processAllow(ctx, pc)
+	}
+}
 
-		actionResult := moderation.ModerationActionResult{
-			EventID:       event.EventID,
-			CorrelationID: event.CorrelationID,
-			Action:        policyOutcome.Decision.Action,
-			Applied:       policyOutcome.Decision.Action == moderation.ActionDelete,
-			Provider:      "telegram",
-			AppliedAt:     time.Now().UTC(),
-		}
-		switch policyOutcome.Decision.Action {
-		case moderation.ActionRestrict, moderation.ActionBan:
-			banReq := banRequest{
-				duration:  policyOutcome.Duration,
-				userID:    resp.User.ID,
-				channelID: resp.ChannelID,
-				userName:  banUserStr,
-				chatID:    fromChat,
-				dry:       l.Dry,
-				training:  l.TrainingMode,
-				restrict:  policyOutcome.Restrict,
-			}
-			banStart := time.Now()
-			if err := l.ActionExecutor.ApplyBan(ctx, banReq); err != nil {
-				l.observeLatency("ban_latency", time.Since(banStart))
-				l.incMetric("ban_errors")
-				actionResult.Applied = false
-				actionResult.Error = err.Error()
-				errs = multierror.Append(errs, fmt.Errorf("failed to apply %s for %s: %w",
-					policyOutcome.Decision.Action, banUserStr, err))
-			} else if l.adminChatID != 0 && msg.From.ID != 0 {
-				actionResult.Applied = true
-				l.adminHandler.ReportBan(banUserStr, msg, policyOutcome.Duration, policyOutcome.Restrict)
-			} else {
-				actionResult.Applied = true
-			}
-		}
+func (l *TelegramListener) locateMessage(ctx context.Context, msg *bot.Message, fromChat int64) {
+	locatorUserID := msg.From.ID
+	locatorUserName := msg.From.Username
+	if msg.SenderChat.ID != 0 {
+		locatorUserID = msg.SenderChat.ID
+		locatorUserName = msg.SenderChat.UserName
+	}
+	if err := l.Locator.AddMessage(ctx, msg.Text, fromChat, locatorUserID, locatorUserName, msg.ID); err != nil {
+		observability.Logf(ctx, "[WARN] failed to add message to locator: %v", err)
+	}
+}
 
-		if actionResult.Error == "" {
-			if err := l.AuditWriter.Write(ctx, AuditRecord{
-				Event:          event,
-				Message:        msg,
-				Response:       resp,
-				Decision:       policyOutcome.Decision,
-				ActionResult:   actionResult,
-				RuleSetVersion: l.RuleSetVersion,
-				ChatID:         fromChat,
-				SpamUserID:     spamUserID,
-			}); err != nil {
-				errs = multierror.Append(errs, fmt.Errorf("audit write failed: %w", err))
-			}
-		}
+func (l *TelegramListener) getStrikeCount(ctx context.Context, spamUserID int64) int {
+	if spamUserID == 0 || l.DetectedSpamCounter == nil {
+		return 0
+	}
+	count, err := l.DetectedSpamCounter.CountByUserID(ctx, spamUserID)
+	if err != nil {
+		observability.Logf(ctx, "[WARN] failed to count spam strikes for user %d: %v", spamUserID, err)
+		return 0
+	}
+	return count
+}
 
-		if err := l.completeIncomingEvent(ctx, event, policyOutcome.Decision, actionResult); err != nil {
+func (l *TelegramListener) processAllow(ctx context.Context, pc pipelineContext) error {
+	errs := new(multierror.Error)
+	if pc.resp.Send && pc.resp.BanInterval > 0 {
+		actionResult := l.makeActionResult(pc.event, pc.outcome.Decision.Action, false)
+		if err := l.AuditWriter.Write(ctx, AuditRecord{
+			Event: pc.event, Message: pc.msg, Response: pc.resp,
+			Decision: pc.outcome.Decision, ActionResult: actionResult,
+			RuleSetVersion: l.RuleSetVersion, ChatID: pc.fromChat, SpamUserID: pc.spamUserID,
+		}); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("audit write failed: %w", err))
+		}
+		if err := l.completeIncomingEvent(ctx, pc.event, pc.outcome.Decision, actionResult); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 	}
+	if pc.resp.Send && l.SuperUsers.IsSuper(pc.msg.From.Username, pc.msg.From.ID) && l.TrainingMode && pc.resp.BanInterval > 0 {
+		l.adminHandler.ReportBan(pc.banUserStr, pc.msg, pc.resp.BanInterval, l.SoftBanMode)
+	}
+	if !pc.resp.Send || pc.resp.BanInterval <= 0 {
+		actionResult := l.makeActionResult(pc.event, pc.outcome.Decision.Action, false)
+		if err := l.completeIncomingEvent(ctx, pc.event, pc.outcome.Decision, actionResult); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+	}
+	if err := errs.ErrorOrNil(); err != nil {
+		return fmt.Errorf("processing events failed: %w", err)
+	}
+	return nil
+}
 
-	if err := l.ActionExecutor.DeleteExtraMessages(ctx, resp.CheckResults, msg.From.ID, msg.From.Username, fromChat); err != nil {
+func (l *TelegramListener) processEnforce(ctx context.Context, pc pipelineContext) error {
+	errs := new(multierror.Error)
+
+	if !pc.resp.Send {
+		return l.cleanupAfterAction(ctx, pc, errs)
+	}
+
+	observability.Logf(ctx, "[DEBUG] policy action=%s reason=%q score=%.2f",
+		pc.outcome.Decision.Action, pc.outcome.Decision.Reason, pc.outcome.Decision.Score)
+
+	actionResult := l.makeActionResult(pc.event, pc.outcome.Decision.Action,
+		pc.outcome.Decision.Action == moderation.ActionDelete)
+
+	switch pc.outcome.Decision.Action {
+	case moderation.ActionRestrict, moderation.ActionBan:
+		l.applyBanAction(ctx, pc, &actionResult, errs)
+	}
+
+	if actionResult.Error == "" {
+		if err := l.AuditWriter.Write(ctx, AuditRecord{
+			Event: pc.event, Message: pc.msg, Response: pc.resp,
+			Decision: pc.outcome.Decision, ActionResult: actionResult,
+			RuleSetVersion: l.RuleSetVersion, ChatID: pc.fromChat, SpamUserID: pc.spamUserID,
+		}); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("audit write failed: %w", err))
+		}
+	}
+
+	if err := l.completeIncomingEvent(ctx, pc.event, pc.outcome.Decision, actionResult); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 
-	canDelete := resp.DeleteReplyTo && resp.ReplyTo != 0 && !l.Dry &&
-		!l.SuperUsers.IsSuper(msg.From.Username, msg.From.ID) && !l.TrainingMode
+	return l.cleanupAfterAction(ctx, pc, errs)
+}
+
+func (l *TelegramListener) applyBanAction(ctx context.Context, pc pipelineContext, actionResult *moderation.ModerationActionResult, errs *multierror.Error) {
+	banReq := banRequest{
+		duration:  pc.outcome.Duration,
+		userID:    pc.resp.User.ID,
+		channelID: pc.resp.ChannelID,
+		userName:  pc.banUserStr,
+		chatID:    pc.fromChat,
+		dry:       l.Dry,
+		training:  l.TrainingMode,
+		restrict:  pc.outcome.Restrict,
+	}
+	banStart := time.Now()
+	if err := l.ActionExecutor.ApplyBan(ctx, banReq); err != nil {
+		l.observeLatency("ban_latency", time.Since(banStart))
+		l.incMetric("ban_errors")
+		actionResult.Applied = false
+		actionResult.Error = err.Error()
+		errs = multierror.Append(errs, fmt.Errorf("failed to apply %s for %s: %w",
+			pc.outcome.Decision.Action, pc.banUserStr, err))
+	} else if l.adminChatID != 0 && pc.msg.From.ID != 0 {
+		actionResult.Applied = true
+		l.adminHandler.ReportBan(pc.banUserStr, pc.msg, pc.outcome.Duration, pc.outcome.Restrict)
+	} else {
+		actionResult.Applied = true
+	}
+}
+
+func (l *TelegramListener) cleanupAfterAction(ctx context.Context, pc pipelineContext, errs *multierror.Error) error {
+	if err := l.ActionExecutor.DeleteExtraMessages(ctx, pc.resp.CheckResults, pc.msg.From.ID, pc.msg.From.Username, pc.fromChat); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	canDelete := pc.resp.DeleteReplyTo && pc.resp.ReplyTo != 0 && !l.Dry &&
+		!l.SuperUsers.IsSuper(pc.msg.From.Username, pc.msg.From.ID) && !l.TrainingMode
 	if canDelete {
-		if err := l.ActionExecutor.DeleteMessage(ctx, l.chatID, resp.ReplyTo); err != nil {
+		if err := l.ActionExecutor.DeleteMessage(ctx, l.chatID, pc.resp.ReplyTo); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 	}
@@ -394,6 +412,17 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 		return fmt.Errorf("processing events failed: %w", err)
 	}
 	return nil
+}
+
+func (l *TelegramListener) makeActionResult(event moderation.IncomingEvent, action moderation.Action, applied bool) moderation.ModerationActionResult {
+	return moderation.ModerationActionResult{
+		EventID:       event.EventID,
+		CorrelationID: event.CorrelationID,
+		Action:        action,
+		Applied:       applied,
+		Provider:      "telegram",
+		AppliedAt:     time.Now().UTC(),
+	}
 }
 
 func (l *TelegramListener) meter(ctx context.Context, meterType string) {
@@ -418,4 +447,3 @@ func (l *TelegramListener) incMetric(name string) {
 	}
 	l.MetricsRecorder.Inc(name)
 }
-

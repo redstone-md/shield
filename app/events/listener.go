@@ -34,43 +34,43 @@ type MetricsRecorder interface {
 // TelegramListener listens to tg update, forward to bots and send back responses
 // Not thread safe
 type TelegramListener struct {
-	TbAPI            TbAPI            // telegram bot API
-	SpamLogger       SpamLogger       // logger to save spam to files and db
-	Bot              Bot              // bot to handle messages
-	BotUsername      string           // telegram bot username (without "@" prefix)
-	TenantID         string           // storage tenant id
-	Group            string           // can be int64 or public group username (without "@" prefix)
-	AdminGroup       string           // can be int64 or public group username (without "@" prefix)
-	IdleDuration     time.Duration    // idle timeout to send "idle" message to bots
-	SuperUsers       SuperUsers       // list of superusers, can ban and report spam, can't be banned
-	TestingIDs       []int64          // list of chat IDs to test the bot
-	StartupMsg       string           // message to send on startup to the primary chat
-	WarnMsg          string           // message to send on warning
-	NoSpamReply      bool             // do not reply on spam messages in the primary chat
-	SuppressJoinMessage bool          // delete join message when kick out user
-	DeleteJoinMessages  bool          // delete join messages immediately
-	DeleteLeaveMessages bool          // delete leave messages immediately
-	TrainingMode     bool             // do not ban users, just report and train spam detector
-	SoftBanMode      bool             // do not ban users, but restrict their actions
-	Locator          Locator          // message locator to get info about messages
-	IncomingEvents   IncomingEvents
-	ModerationActions ModerationActions
-	DetectedSpamCounter DetectedSpamCounter
-	RuleSetVersion   int
-	ModerationConfig ModerationConfig
-	ReportConfig     ReportConfig     // user spam reporting configuration
-	DisableAdminSpamForward bool     // disable forwarding spam reports to admin chat support
-	Dry              bool             // dry run, do not ban or send messages
-	AggressiveCleanup bool            // delete all messages from user when banned via /spam command
-	AggressiveCleanupLimit int       // max messages to delete in aggressive cleanup mode
-	Queue            moderation.Queue
-	ActionExecutor   ActionExecutor
-	PolicyEngine     PolicyEngine
-	PolicyProfileName string
-	AuditWriter      AuditWriter
-	UsageMeter       UsageMeter
-	MetricsRecorder  MetricsRecorder
-	SlowPathEnabled  bool
+	TbAPI                   TbAPI         // telegram bot API
+	SpamLogger              SpamLogger    // logger to save spam to files and db
+	Bot                     Bot           // bot to handle messages
+	BotUsername             string        // telegram bot username (without "@" prefix)
+	TenantID                string        // storage tenant id
+	Group                   string        // can be int64 or public group username (without "@" prefix)
+	AdminGroup              string        // can be int64 or public group username (without "@" prefix)
+	IdleDuration            time.Duration // idle timeout to send "idle" message to bots
+	SuperUsers              SuperUsers    // list of superusers, can ban and report spam, can't be banned
+	TestingIDs              []int64       // list of chat IDs to test the bot
+	StartupMsg              string        // message to send on startup to the primary chat
+	WarnMsg                 string        // message to send on warning
+	NoSpamReply             bool          // do not reply on spam messages in the primary chat
+	SuppressJoinMessage     bool          // delete join message when kick out user
+	DeleteJoinMessages      bool          // delete join messages immediately
+	DeleteLeaveMessages     bool          // delete leave messages immediately
+	TrainingMode            bool          // do not ban users, just report and train spam detector
+	SoftBanMode             bool          // do not ban users, but restrict their actions
+	Locator                 Locator       // message locator to get info about messages
+	IncomingEvents          IncomingEvents
+	ModerationActions       ModerationActions
+	DetectedSpamCounter     DetectedSpamCounter
+	RuleSetVersion          int
+	ModerationConfig        ModerationConfig
+	ReportConfig            ReportConfig // user spam reporting configuration
+	DisableAdminSpamForward bool         // disable forwarding spam reports to admin chat support
+	Dry                     bool         // dry run, do not ban or send messages
+	AggressiveCleanup       bool         // delete all messages from user when banned via /spam command
+	AggressiveCleanupLimit  int          // max messages to delete in aggressive cleanup mode
+	Queue                   moderation.Queue
+	ActionExecutor          ActionExecutor
+	PolicyEngine            PolicyEngine
+	PolicyProfileName       string
+	AuditWriter             AuditWriter
+	UsageMeter              UsageMeter
+	MetricsRecorder         MetricsRecorder
+	SlowPathEnabled         bool
 
 	adminHandler    *admin
 	reportsHandler  *userReports
@@ -188,21 +188,7 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 	}
 
 	l.ensurePipeline()
-
-	l.adminHandler = &admin{
-		tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers, actions: l.ActionExecutor,
-		primChatID: l.chatID, adminChatID: l.adminChatID,
-		trainingMode: l.TrainingMode, softBan: l.SoftBanMode, dry: l.Dry, warnMsg: l.WarnMsg,
-		aggressiveCleanup: l.AggressiveCleanup, aggressiveCleanupLimit: l.AggressiveCleanupLimit,
-	}
-
-	l.reportsHandler = &userReports{
-		ReportConfig: l.ReportConfig, tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers,
-		actions: l.ActionExecutor,
-		detectedSpam: l.DetectedSpamCounter, tenantID: l.TenantID, moderation: l.ModerationConfig,
-		primChatID: l.chatID, adminChatID: l.adminChatID,
-		trainingMode: l.TrainingMode, softBanMode: l.SoftBanMode, dry: l.Dry,
-	}
+	l.initHandlers()
 
 	adminForwardStatus := "enabled"
 	if l.DisableAdminSpamForward {
@@ -215,6 +201,27 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 			l.AggressiveCleanupLimit)
 	}
 
+	return l.eventLoop(ctx)
+}
+
+func (l *TelegramListener) initHandlers() {
+	l.adminHandler = &admin{
+		tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers, actions: l.ActionExecutor,
+		primChatID: l.chatID, adminChatID: l.adminChatID,
+		trainingMode: l.TrainingMode, softBan: l.SoftBanMode, dry: l.Dry, warnMsg: l.WarnMsg,
+		aggressiveCleanup: l.AggressiveCleanup, aggressiveCleanupLimit: l.AggressiveCleanupLimit,
+	}
+
+	l.reportsHandler = &userReports{
+		ReportConfig: l.ReportConfig, tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers,
+		actions:      l.ActionExecutor,
+		detectedSpam: l.DetectedSpamCounter, tenantID: l.TenantID, moderation: l.ModerationConfig,
+		primChatID: l.chatID, adminChatID: l.adminChatID,
+		trainingMode: l.TrainingMode, softBanMode: l.SoftBanMode, dry: l.Dry,
+	}
+}
+
+func (l *TelegramListener) eventLoop(ctx context.Context) error {
 	u := tbapi.NewUpdate(0)
 	u.Timeout = 60
 
@@ -231,125 +238,132 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 				l.shutdownPipeline()
 				return fmt.Errorf("telegram update chan closed")
 			}
-
-			if update.Message != nil && l.isAdminChat(update.Message.Chat.ID, update.Message.From.UserName, update.Message.From.ID) {
-				if l.DisableAdminSpamForward {
-					continue
-				}
-				l.incMetric("admin_messages")
-				if err := l.adminHandler.MsgHandler(update); err != nil {
-					l.incMetric("admin_errors")
-					log.Printf("[WARN] failed to process admin chat message: %v", err)
-					errResp := l.sendBotResponse(bot.Response{Send: true, Text: "error: " + err.Error()}, l.adminChatID, NotificationDefault)
-					if errResp != nil {
-						log.Printf("[WARN] failed to respond on error, %v", errResp)
-					}
-				}
-				continue
-			}
-
-			if update.CallbackQuery != nil {
-				callbackData := update.CallbackQuery.Data
-				l.incMetric("callbacks_total")
-				if len(callbackData) >= 3 && callbackData[:1] == "R" {
-					if err := l.reportsHandler.HandleReportCallback(ctx, update.CallbackQuery); err != nil {
-						l.incMetric("callback_errors")
-						log.Printf("[WARN] failed to process report callback: %v", err)
-						errResp := l.sendBotResponse(bot.Response{Send: true, Text: "error: " + err.Error()}, l.adminChatID, NotificationDefault)
-						if errResp != nil {
-							log.Printf("[WARN] failed to respond on error, %v", errResp)
-						}
-					}
-				} else {
-					if err := l.adminHandler.InlineCallbackHandler(update.CallbackQuery); err != nil {
-						l.incMetric("callback_errors")
-						log.Printf("[WARN] failed to process callback: %v", err)
-						errResp := l.sendBotResponse(bot.Response{Send: true, Text: "error: " + err.Error()}, l.adminChatID, NotificationDefault)
-						if errResp != nil {
-							log.Printf("[WARN] failed to respond on error, %v", errResp)
-						}
-					}
-				}
-				continue
-			}
-
-			if update.EditedMessage != nil {
-				l.incMetric("edited_messages")
-				log.Printf("[INFO] processing edited message, id: %d", update.EditedMessage.MessageID)
-				editedUpdate := tbapi.Update{
-					UpdateID:      update.UpdateID,
-					Message:       update.EditedMessage,
-					EditedMessage: update.EditedMessage,
-				}
-				if err := l.procEvents(editedUpdate); err != nil {
-					log.Printf("[WARN] failed to process edited message update: %v", err)
-				}
-				continue
-			}
-
-			if update.Message == nil {
-				continue
-			}
-
-			if update.Message.NewChatMembers != nil {
-				if l.DeleteJoinMessages {
-					l.deleteSystemMessage(update.Message.MessageID, update.Message.Chat.ID, "join")
-				} else {
-					err := l.procNewChatMemberMessage(update)
-					if err != nil {
-						log.Printf("[WARN] failed to process new chat member: %v", err)
-					}
-				}
-				continue
-			}
-
-			if update.Message.LeftChatMember != nil {
-				if l.SuppressJoinMessage {
-					err := l.procLeftChatMemberMessage(update)
-					if err != nil {
-						log.Printf("[WARN] failed to process left chat member: %v", err)
-					}
-				}
-				if l.DeleteLeaveMessages {
-					l.deleteSystemMessage(update.Message.MessageID, update.Message.Chat.ID, "leave")
-				}
-				continue
-			}
-
-			fromSuper := l.SuperUsers.IsSuper(update.Message.From.UserName, update.Message.From.ID) ||
-				l.isLinkedChannel(update.Message)
-			if update.Message.ReplyToMessage != nil && fromSuper {
-				if l.procSuperReply(update) {
-					continue
-				}
-			}
-
-			if !fromSuper && l.isReportCommand(update.Message.Text) && update.Message.ReplyToMessage == nil {
-				log.Printf("[DEBUG] deleting orphaned /report command from %s (%d)", update.Message.From.UserName, update.Message.From.ID)
-				_, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-					MessageID: update.Message.MessageID, ChatConfig: tbapi.ChatConfig{ChatID: update.Message.Chat.ID},
-				}})
-				if err != nil {
-					log.Printf("[WARN] failed to delete orphaned /report message %d: %v", update.Message.MessageID, err)
-				}
-				continue
-			}
-
-			if update.Message.ReplyToMessage != nil && !fromSuper {
-				if l.procUserReply(ctx, update) {
-					continue
-				}
-			}
-
-			if err := l.procEventsWithContext(ctx, update); err != nil {
-				log.Printf("[WARN] failed to process update: %v", err)
-				continue
+			if err := l.handleUpdate(ctx, update); err != nil {
+				return err
 			}
 
 		case <-time.After(l.IdleDuration):
 			resp := l.Bot.OnMessage(bot.Message{Text: "idle"}, false)
 			if err := l.sendBotResponse(resp, l.chatID, NotificationSilent); err != nil {
 				log.Printf("[WARN] failed to respond on idle, %v", err)
+			}
+		}
+	}
+}
+
+func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update) error {
+	if update.Message != nil && l.isAdminChat(update.Message.Chat.ID, update.Message.From.UserName, update.Message.From.ID) {
+		if l.DisableAdminSpamForward {
+			return nil
+		}
+		l.incMetric("admin_messages")
+		if err := l.adminHandler.MsgHandler(update); err != nil {
+			l.incMetric("admin_errors")
+			log.Printf("[WARN] failed to process admin chat message: %v", err)
+			errResp := l.sendBotResponse(bot.Response{Send: true, Text: "error: " + err.Error()}, l.adminChatID, NotificationDefault)
+			if errResp != nil {
+				log.Printf("[WARN] failed to respond on error, %v", errResp)
+			}
+		}
+		return nil
+	}
+
+	if update.CallbackQuery != nil {
+		l.handleCallback(ctx, update.CallbackQuery)
+		return nil
+	}
+
+	if update.EditedMessage != nil {
+		l.incMetric("edited_messages")
+		log.Printf("[INFO] processing edited message, id: %d", update.EditedMessage.MessageID)
+		editedUpdate := tbapi.Update{
+			UpdateID:      update.UpdateID,
+			Message:       update.EditedMessage,
+			EditedMessage: update.EditedMessage,
+		}
+		if err := l.procEvents(editedUpdate); err != nil {
+			log.Printf("[WARN] failed to process edited message update: %v", err)
+		}
+		return nil
+	}
+
+	if update.Message == nil {
+		return nil
+	}
+
+	if update.Message.NewChatMembers != nil {
+		if l.DeleteJoinMessages {
+			l.deleteSystemMessage(update.Message.MessageID, update.Message.Chat.ID, "join")
+		} else {
+			if err := l.procNewChatMemberMessage(update); err != nil {
+				log.Printf("[WARN] failed to process new chat member: %v", err)
+			}
+		}
+		return nil
+	}
+
+	if update.Message.LeftChatMember != nil {
+		if l.SuppressJoinMessage {
+			if err := l.procLeftChatMemberMessage(update); err != nil {
+				log.Printf("[WARN] failed to process left chat member: %v", err)
+			}
+		}
+		if l.DeleteLeaveMessages {
+			l.deleteSystemMessage(update.Message.MessageID, update.Message.Chat.ID, "leave")
+		}
+		return nil
+	}
+
+	fromSuper := l.SuperUsers.IsSuper(update.Message.From.UserName, update.Message.From.ID) ||
+		l.isLinkedChannel(update.Message)
+	if update.Message.ReplyToMessage != nil && fromSuper {
+		if l.procSuperReply(update) {
+			return nil
+		}
+	}
+
+	if !fromSuper && l.isReportCommand(update.Message.Text) && update.Message.ReplyToMessage == nil {
+		log.Printf("[DEBUG] deleting orphaned /report command from %s (%d)", update.Message.From.UserName, update.Message.From.ID)
+		_, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
+			MessageID: update.Message.MessageID, ChatConfig: tbapi.ChatConfig{ChatID: update.Message.Chat.ID},
+		}})
+		if err != nil {
+			log.Printf("[WARN] failed to delete orphaned /report message %d: %v", update.Message.MessageID, err)
+		}
+		return nil
+	}
+
+	if update.Message.ReplyToMessage != nil && !fromSuper {
+		if l.procUserReply(ctx, update) {
+			return nil
+		}
+	}
+
+	if err := l.procEventsWithContext(ctx, update); err != nil {
+		log.Printf("[WARN] failed to process update: %v", err)
+	}
+	return nil
+}
+
+func (l *TelegramListener) handleCallback(ctx context.Context, cb *tbapi.CallbackQuery) {
+	callbackData := cb.Data
+	l.incMetric("callbacks_total")
+	if len(callbackData) >= 3 && callbackData[:1] == "R" {
+		if err := l.reportsHandler.HandleReportCallback(ctx, cb); err != nil {
+			l.incMetric("callback_errors")
+			log.Printf("[WARN] failed to process report callback: %v", err)
+			errResp := l.sendBotResponse(bot.Response{Send: true, Text: "error: " + err.Error()}, l.adminChatID, NotificationDefault)
+			if errResp != nil {
+				log.Printf("[WARN] failed to respond on error, %v", errResp)
+			}
+		}
+	} else {
+		if err := l.adminHandler.InlineCallbackHandler(cb); err != nil {
+			l.incMetric("callback_errors")
+			log.Printf("[WARN] failed to process callback: %v", err)
+			errResp := l.sendBotResponse(bot.Response{Send: true, Text: "error: " + err.Error()}, l.adminChatID, NotificationDefault)
+			if errResp != nil {
+				log.Printf("[WARN] failed to respond on error, %v", errResp)
 			}
 		}
 	}
