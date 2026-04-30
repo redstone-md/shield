@@ -200,7 +200,13 @@ func (s *Server) addIncidentCommentHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	comment, err := s.AuditService.AddComment(r.Context(), id, body.AuthorType, body.AuthorID, body.Action, body.Payload)
+	comment, err := s.AuditService.AddComment(r.Context(), audit.IncidentComment{
+		IncidentID: id,
+		AuthorType: body.AuthorType,
+		AuthorID:   body.AuthorID,
+		Action:     body.Action,
+		Payload:    body.Payload,
+	})
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "add comment failed", "details": err.Error()})
 		return

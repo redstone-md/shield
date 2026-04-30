@@ -58,34 +58,34 @@ type Server struct {
 
 // Config defines server parameters
 type Config struct {
-	Version               string                 // version to show in /ping
-	ListenAddr            string                 // listen address
-	Detector              Detector               // spam detector
-	SpamFilter            SpamFilter             // spam filter (bot)
-	DetectedSpamStore     DetectedSpam           // detected spam storage (fallback when DetectedSpamProvider is nil)
-	DetectedSpamProvider  DetectedSpamProvider   // control plane detected spam service
-	Locator               Locator                // locator for user info
-	DictionaryStore       Dictionary             // dictionary storage (fallback when DictionaryProvider is nil)
-	DictionaryProvider    DictionaryProvider     // control plane dictionary service (takes precedence over DictionaryStore)
-	StorageEngine         StorageEngine          // database engine access for backups
-	DMUsersProvider       DMUsersProvider        // provider for recent DM users
-	RuleSetProvider       RuleSetProvider        // control plane rule set service
-	ControlPlaneAuth      ControlPlaneAuthorizer // role authorizer for control plane endpoints
-	ApprovedUsersProvider ApprovedUsersProvider   // control plane approved users service
-	TenantStatusProvider TenantStatusProvider    // checks if tenant is active (nil = skip check)
-	RateLimiter          *TenantRateLimiter      // per-tenant rate limiter (nil = unlimited)
-	AuthPasswd            string                 // basic auth password for user "tg-spam"
-	AuthHash              string                 // basic auth bcrypt hash for user "tg-spam", takes precedence over AuthPasswd
-	AuditService                *audit.Service       // audit service for incidents
-	AppealService               *audit.AppealService // appeal service for incident appeals
-	FeedbackService             *feedback.Service    // feedback service for labeling
-	ReviewService               *feedback.ReviewService    // review service for candidates
-	KnowledgeService            *feedback.KnowledgeService // knowledge snapshot service
-	OnboardingProvider          OnboardingService         // tenant onboarding/offboarding
-	RestoreProvider             RestoreService            // tenant restore from backup
-	MetricsCollector            MetricsProvider           // SLO/SLA metrics
-	Dbg                         bool                   // debug mode
-	Settings                    Settings               // application settings
+	Version               string                     // version to show in /ping
+	ListenAddr            string                     // listen address
+	Detector              Detector                   // spam detector
+	SpamFilter            SpamFilter                 // spam filter (bot)
+	DetectedSpamStore     DetectedSpam               // detected spam storage (fallback when DetectedSpamProvider is nil)
+	DetectedSpamProvider  DetectedSpamProvider       // control plane detected spam service
+	Locator               Locator                    // locator for user info
+	DictionaryStore       Dictionary                 // dictionary storage (fallback when DictionaryProvider is nil)
+	DictionaryProvider    DictionaryProvider         // control plane dictionary service (takes precedence over DictionaryStore)
+	StorageEngine         StorageEngine              // database engine access for backups
+	DMUsersProvider       DMUsersProvider            // provider for recent DM users
+	RuleSetProvider       RuleSetProvider            // control plane rule set service
+	ControlPlaneAuth      ControlPlaneAuthorizer     // role authorizer for control plane endpoints
+	ApprovedUsersProvider ApprovedUsersProvider      // control plane approved users service
+	TenantStatusProvider  TenantStatusProvider       // checks if tenant is active (nil = skip check)
+	RateLimiter           *TenantRateLimiter         // per-tenant rate limiter (nil = unlimited)
+	AuthPasswd            string                     // basic auth password for user "tg-spam"
+	AuthHash              string                     // basic auth bcrypt hash for user "tg-spam", takes precedence over AuthPasswd
+	AuditService          *audit.Service             // audit service for incidents
+	AppealService         *audit.AppealService       // appeal service for incident appeals
+	FeedbackService       *feedback.Service          // feedback service for labeling
+	ReviewService         *feedback.ReviewService    // review service for candidates
+	KnowledgeService      *feedback.KnowledgeService // knowledge snapshot service
+	OnboardingProvider    OnboardingService          // tenant onboarding/offboarding
+	RestoreProvider       RestoreService             // tenant restore from backup
+	MetricsCollector      MetricsProvider            // SLO/SLA metrics
+	Dbg                   bool                       // debug mode
+	Settings              Settings                   // application settings
 }
 
 type OnboardingService interface {
@@ -260,7 +260,6 @@ type ControlPlaneAuthorizer interface {
 	Authorize(ctx context.Context, workspaceID string, userID string, access string) error
 }
 
-
 // NewServer creates a new web API server.
 func NewServer(config Config) *Server {
 	return &Server{Config: config}
@@ -342,142 +341,6 @@ func (s *Server) requestMetadata(r *http.Request) (eventID, correlationID string
 	}
 
 	return eventID, correlationID
-}
-
-func (s *Server) routes(router *routegroup.Bundle) *routegroup.Bundle {
-	// auth api routes
-	router.Group().Route(func(authApi *routegroup.Bundle) {
-		authApi.Use(s.authMiddleware(rest.BasicAuthWithUserPasswd("tg-spam", s.AuthPasswd)))
-		authApi.HandleFunc("POST /check", s.checkMsgHandler)         // check a message for spam
-		authApi.HandleFunc("GET /check/{user_id}", s.checkIDHandler) // check user id for spam
-
-		authApi.Mount("/update").Route(func(r *routegroup.Bundle) {
-			// update spam/ham samples
-			r.HandleFunc("POST /spam", s.updateSampleHandler(s.SpamFilter.UpdateSpam)) // update spam samples
-			r.HandleFunc("POST /ham", s.updateSampleHandler(s.SpamFilter.UpdateHam))   // update ham samples
-		})
-
-		authApi.Mount("/delete").Route(func(r *routegroup.Bundle) {
-			// delete spam/ham samples
-			r.HandleFunc("POST /spam", s.deleteSampleHandler(s.SpamFilter.RemoveDynamicSpamSample))
-			r.HandleFunc("POST /ham", s.deleteSampleHandler(s.SpamFilter.RemoveDynamicHamSample))
-		})
-
-		authApi.Mount("/download").Route(func(r *routegroup.Bundle) {
-			r.HandleFunc("GET /spam", s.downloadSampleHandler(func(spam, _ []string) ([]string, string) {
-				return spam, "spam.txt"
-			}))
-			r.HandleFunc("GET /ham", s.downloadSampleHandler(func(_, ham []string) ([]string, string) {
-				return ham, "ham.txt"
-			}))
-			r.HandleFunc("GET /detected_spam", s.downloadDetectedSpamHandler)
-			r.HandleFunc("GET /backup", s.downloadBackupHandler)
-			r.HandleFunc("GET /export-to-postgres", s.downloadExportToPostgresHandler)
-		})
-
-		authApi.HandleFunc("GET /samples", s.getDynamicSamplesHandler)    // get dynamic samples
-		authApi.HandleFunc("PUT /samples", s.reloadDynamicSamplesHandler) // reload samples
-
-		authApi.Mount("/users").Route(func(r *routegroup.Bundle) {
-			au := s.approvedUsers()
-			r.HandleFunc("POST /add", s.updateApprovedUsersHandler(au.Add))
-			r.HandleFunc("POST /delete", s.updateApprovedUsersHandler(s.removeApprovedUserAdapter))
-			r.HandleFunc("GET /", s.getApprovedUsersHandler)
-		})
-
-		authApi.HandleFunc("GET /settings", s.getSettingsHandler) // get application settings
-
-		authApi.Mount("/rules").Route(func(r *routegroup.Bundle) {
-			r.Use(s.controlPlaneAuthMiddleware)
-			r.HandleFunc("GET /", s.getRuleSetHandler)    // get active rule set
-			r.HandleFunc("PUT /", s.updateRuleSetHandler) // update rule set
-		})
-
-		authApi.Mount("/dictionary").Route(func(r *routegroup.Bundle) { // manage dictionary
-			// add stop phrase or ignored word
-			r.HandleFunc("POST /add", s.addDictionaryEntryHandler)
-			// delete entry by id
-			r.HandleFunc("POST /delete", s.deleteDictionaryEntryHandler)
-			// get all entries
-			r.HandleFunc("GET /", s.getDictionaryEntriesHandler)
-		})
-
-		if s.AuditService != nil {
-			authApi.Mount("/api/incidents").Route(func(r *routegroup.Bundle) {
-				r.HandleFunc("GET /", s.listIncidentsHandler)
-				r.HandleFunc("GET /{id}", s.getIncidentHandler)
-				r.HandleFunc("POST /{id}/replay", s.replayIncidentHandler)
-				r.HandleFunc("POST /{id}/comment", s.addIncidentCommentHandler)
-				r.HandleFunc("POST /{id}/status", s.updateIncidentStatusHandler)
-			})
-		}
-		if s.AppealService != nil {
-			authApi.Mount("/api/appeals").Route(func(r *routegroup.Bundle) {
-				r.HandleFunc("GET /", s.listAppealsHandler)
-				r.HandleFunc("POST /{id}/resolve", s.resolveAppealHandler)
-			})
-		}
-		if s.FeedbackService != nil {
-			authApi.Mount("/api/feedback").Route(func(r *routegroup.Bundle) {
-				r.HandleFunc("POST /labels", s.createLabelHandler)
-				r.HandleFunc("GET /labels", s.listLabelsHandler)
-				r.HandleFunc("GET /labels/stats", s.labelStatsHandler)
-				r.HandleFunc("GET /candidates", s.listCandidatesHandler)
-				r.HandleFunc("POST /candidates/{id}/approve", s.approveCandidateHandler)
-				r.HandleFunc("POST /candidates/{id}/reject", s.rejectCandidateHandler)
-			})
-		}
-		if s.MetricsCollector != nil {
-			authApi.HandleFunc("GET /api/metrics", s.metricsHandler)
-		}
-		if s.OnboardingProvider != nil || s.RestoreProvider != nil {
-			authApi.Mount("/api/tenants").Route(func(r *routegroup.Bundle) {
-				if s.OnboardingProvider != nil {
-					r.HandleFunc("POST /onboard", s.onboardTenantHandler)
-					r.HandleFunc("POST /{id}/offboard", s.offboardTenantHandler)
-				}
-				if s.RestoreProvider != nil {
-					r.HandleFunc("POST /{id}/restore", s.restoreTenantHandler)
-				}
-			})
-		}
-	})
-
-	router.Group().Route(func(webUI *routegroup.Bundle) {
-		webUI.Use(s.authMiddleware(rest.BasicAuthWithPrompt("tg-spam", s.AuthPasswd)))
-		webUI.HandleFunc("GET /", s.htmlSpamCheckHandler)                         // serve template for webUI UI
-		webUI.HandleFunc("GET /manage_samples", s.htmlManageSamplesHandler)       // serve manage samples page
-		webUI.HandleFunc("GET /manage_users", s.htmlManageUsersHandler)           // serve manage users page
-		webUI.HandleFunc("GET /manage_dictionary", s.htmlManageDictionaryHandler) // serve manage dictionary page
-		webUI.HandleFunc("GET /detected_spam", s.htmlDetectedSpamHandler)         // serve detected spam page
-		webUI.HandleFunc("GET /list_settings", s.htmlSettingsHandler)             // serve settings
-		webUI.HandleFunc("POST /detected_spam/add", s.htmlAddDetectedSpamHandler) // add detected spam to samples
-		webUI.HandleFunc("GET /dm-users", s.getDMUsersHandler)                    // get recent DM users (HTMX/JSON)
-
-		if s.AuditService != nil {
-			webUI.HandleFunc("GET /incidents", s.htmlIncidentsHandler)               // incident list page
-			webUI.HandleFunc("GET /incidents/{id}", s.htmlIncidentDetailHandler)      // incident detail page
-			webUI.HandleFunc("GET /appeals", s.htmlAppealsHandler)                    // appeals list page
-			webUI.HandleFunc("GET /feedback", s.htmlFeedbackHandler)                  // feedback page
-		}
-
-		// handle logout - force Basic Auth re-authentication
-		webUI.HandleFunc("GET /logout", func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("WWW-Authenticate", `Basic realm="tg-spam"`)
-			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprintln(w, "Logged out successfully")
-		})
-
-		// serve only specific static files at root level
-		staticFiles := newStaticFS(templateFS,
-			staticFileMapping{urlPath: "styles.css", filesysPath: "assets/styles.css"},
-			staticFileMapping{urlPath: "logo.png", filesysPath: "assets/logo.png"},
-			staticFileMapping{urlPath: "spinner.svg", filesysPath: "assets/spinner.svg"},
-		)
-		webUI.HandleFiles("/", http.FS(staticFiles))
-	})
-
-	return router
 }
 
 func (s *Server) authMiddleware(mw func(next http.Handler) http.Handler) func(next http.Handler) http.Handler {
