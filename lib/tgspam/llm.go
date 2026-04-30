@@ -32,9 +32,17 @@ var (
 	confFieldRegex     = regexp.MustCompile(`(?is)"?confidence"?\s*:\s*"?([0-9]{1,3})"?`)
 )
 
-func runLLMProviderCheck(ctx context.Context, name, errorPrefix string, retryCount int, msg string, history llmContext,
-	send func(context.Context, string) (llmResponse, error),
-) (spam bool, cr spamcheck.Response) {
+type llmCheckParams struct {
+	Name        string
+	ErrorPrefix string
+	RetryCount  int
+	Msg         string
+	History     llmContext
+	Send        func(context.Context, string) (llmResponse, error)
+}
+
+func runLLMProviderCheck(ctx context.Context, p llmCheckParams) (spam bool, cr spamcheck.Response) {
+	retryCount := p.RetryCount
 	if retryCount < 1 {
 		retryCount = 1
 	}
@@ -42,12 +50,12 @@ func runLLMProviderCheck(ctx context.Context, name, errorPrefix string, retryCou
 		retryCount = maxLLMProviderRetries
 	}
 
-	msg = appendHistoryToLLMMessage(msg, history)
+	msg := appendHistoryToLLMMessage(p.Msg, p.History)
 
 	var resp llmResponse
 	var err error
 	for i := 0; i < retryCount; i++ {
-		if resp, err = send(ctx, msg); err == nil {
+		if resp, err = p.Send(ctx, msg); err == nil {
 			break
 		}
 		if ctx.Err() != nil {
@@ -57,12 +65,12 @@ func runLLMProviderCheck(ctx context.Context, name, errorPrefix string, retryCou
 	}
 	if err != nil {
 		return false, spamcheck.Response{
-			Spam: false, Name: name, Details: fmt.Sprintf("%s error: %v", errorPrefix, err), Error: err,
+			Spam: false, Name: p.Name, Details: fmt.Sprintf("%s error: %v", p.ErrorPrefix, err), Error: err,
 		}
 	}
 
 	return resp.IsSpam, spamcheck.Response{
-		Spam: resp.IsSpam, Name: name,
+		Spam: resp.IsSpam, Name: p.Name,
 		Details: strings.TrimSuffix(resp.Reason, ".") + ", confidence: " + fmt.Sprintf("%d%%", resp.Confidence),
 	}
 }

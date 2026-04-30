@@ -108,19 +108,28 @@ func (s *Service) CreateIncident(ctx context.Context, data AuditEventData) error
 	return nil
 }
 
-func (s *Service) CreateFromReport(ctx context.Context, reportID int64, msgText string, reportedUserID int64, reportedUserName string, chatID int64, idempotencyKey string) error {
+type ReportParams struct {
+	ReportID       int64
+	MsgText        string
+	UserID         int64
+	UserName       string
+	ChatID         int64
+	IdempotencyKey string
+}
+
+func (s *Service) CreateFromReport(ctx context.Context, p ReportParams) error {
 	incident := Incident{
 		Source:         SourceUserReport,
 		Status:         IncidentStatusOpen,
 		Severity:       SeverityHigh,
-		IdempotencyKey: idempotencyKey,
-		ReportID:       reportID,
+		IdempotencyKey: p.IdempotencyKey,
+		ReportID:       p.ReportID,
 		ReasonCode:     ReasonUserReport,
 		ReasonText:     "user report threshold reached",
-		SpamUserID:     reportedUserID,
-		SpamUserName:   reportedUserName,
-		ChatID:         chatID,
-		MessageText:    truncateMsg(msgText, 1000),
+		SpamUserID:     p.UserID,
+		SpamUserName:   p.UserName,
+		ChatID:         p.ChatID,
+		MessageText:    truncateMsg(p.MsgText, 1000),
 	}
 
 	created, err := s.store.Create(ctx, incident)
@@ -136,23 +145,32 @@ func (s *Service) CreateFromReport(ctx context.Context, reportID int64, msgText 
 		AuthorType: "system",
 		AuthorID:   "reports",
 		Action:     "created",
-		Payload:    fmt.Sprintf(`{"source":"user_report","report_id":%d}`, reportID),
+		Payload:    fmt.Sprintf(`{"source":"user_report","report_id":%d}`, p.ReportID),
 	})
 
 	return nil
 }
 
-func (s *Service) CreateFromAdminAction(ctx context.Context, adminUserName string, userID int64, userName string, chatID int64, action, idempotencyKey string) error {
+type AdminActionParams struct {
+	AdminUserName  string
+	UserID         int64
+	UserName       string
+	ChatID         int64
+	Action         string
+	IdempotencyKey string
+}
+
+func (s *Service) CreateFromAdminAction(ctx context.Context, p AdminActionParams) error {
 	incident := Incident{
 		Source:         SourceAdminAction,
 		Status:         IncidentStatusResolved,
 		Severity:       SeverityHigh,
-		IdempotencyKey: idempotencyKey,
+		IdempotencyKey: p.IdempotencyKey,
 		ReasonCode:     ReasonAdminAction,
-		ReasonText:     fmt.Sprintf("admin %s performed %s", adminUserName, action),
-		SpamUserID:     userID,
-		SpamUserName:   userName,
-		ChatID:         chatID,
+		ReasonText:     fmt.Sprintf("admin %s performed %s", p.AdminUserName, p.Action),
+		SpamUserID:     p.UserID,
+		SpamUserName:   p.UserName,
+		ChatID:         p.ChatID,
 	}
 
 	created, err := s.store.Create(ctx, incident)
@@ -166,9 +184,9 @@ func (s *Service) CreateFromAdminAction(ctx context.Context, adminUserName strin
 	_, _ = s.store.AddComment(ctx, IncidentComment{
 		IncidentID: created.ID,
 		AuthorType: "admin",
-		AuthorID:   adminUserName,
-		Action:     action,
-		Payload:    fmt.Sprintf(`{"admin":"%s","user_id":%d,"action":"%s"}`, adminUserName, userID, action),
+		AuthorID:   p.AdminUserName,
+		Action:     p.Action,
+		Payload:    fmt.Sprintf(`{"admin":"%s","user_id":%d,"action":"%s"}`, p.AdminUserName, p.UserID, p.Action),
 	})
 
 	return nil
@@ -208,14 +226,8 @@ func (s *Service) Resolve(ctx context.Context, id int64, resolvedBy, comment str
 	return nil
 }
 
-func (s *Service) AddComment(ctx context.Context, incidentID int64, authorType, authorID, action, payload string) (IncidentComment, error) {
-	return s.store.AddComment(ctx, IncidentComment{
-		IncidentID: incidentID,
-		AuthorType: authorType,
-		AuthorID:   authorID,
-		Action:     action,
-		Payload:    payload,
-	})
+func (s *Service) AddComment(ctx context.Context, comment IncidentComment) (IncidentComment, error) {
+	return s.store.AddComment(ctx, comment)
 }
 
 func (s *Service) AddRawComment(ctx context.Context, comment IncidentComment) (IncidentComment, error) {

@@ -60,7 +60,10 @@ func (g *geminiChecker) check(ctx context.Context, msg string, history llmContex
 		return false, spamcheck.Response{}
 	}
 
-	return runLLMProviderCheck(ctx, "gemini", "Gemini", g.params.RetryCount, msg, history, g.sendRequest)
+	return runLLMProviderCheck(ctx, llmCheckParams{
+		Name: "gemini", ErrorPrefix: "Gemini",
+		RetryCount: g.params.RetryCount, Msg: msg, History: history, Send: g.sendRequest,
+	})
 }
 
 // buildSystemPrompt creates the complete system prompt by combining the base prompt with custom prompts

@@ -86,7 +86,12 @@ func (o *openAIChecker) check(ctx context.Context, msg string, history llmContex
 		return false, spamcheck.Response{}
 	}
 
-	return runLLMProviderCheck(ctx, "openai", "OpenAI", o.params.RetryCount, msg, history, o.sendRequest)
+	return runLLMProviderCheck(ctx, llmCheckParams{
+		Name: "openai", ErrorPrefix: "OpenAI",
+		RetryCount: o.params.RetryCount,
+		Msg:        msg, History: history,
+		Send: o.sendRequest,
+	})
 }
 
 // buildSystemPrompt creates the complete system prompt by combining the base prompt with custom prompts

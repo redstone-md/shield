@@ -264,7 +264,9 @@ func TestAuditService_AddComment(t *testing.T) {
 		ReasonCode:     ReasonRegexMatch,
 	})
 
-	c, err := svc.AddComment(context.Background(), inc.ID, "admin", "admin1", "reviewed", "looks good")
+	c, err := svc.AddComment(context.Background(), IncidentComment{
+		IncidentID: inc.ID, AuthorType: "admin", AuthorID: "admin1", Action: "reviewed", Payload: "looks good",
+	})
 	require.NoError(t, err)
 	assert.NotZero(t, c.ID)
 	assert.Equal(t, "reviewed", c.Action)

@@ -49,13 +49,14 @@ Recent messages from the same user:
 func TestRunLLMProviderCheck(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		calls := 0
-		spam, details := runLLMProviderCheck(context.Background(), "openai", "OpenAI", 3, "test message", llmContext{},
-			func(_ context.Context, msg string) (llmResponse, error) {
+		spam, details := runLLMProviderCheck(context.Background(), llmCheckParams{
+			Name: "openai", ErrorPrefix: "OpenAI", RetryCount: 3, Msg: "test message",
+			Send: func(_ context.Context, msg string) (llmResponse, error) {
 				calls++
 				assert.Equal(t, "test message", msg)
 				return llmResponse{IsSpam: true, Reason: "bad text.", Confidence: 91}, nil
 			},
-		)
+		})
 
 		assert.True(t, spam)
 		assert.Equal(t, 1, calls)
@@ -68,8 +69,9 @@ func TestRunLLMProviderCheck(t *testing.T) {
 		calls := 0
 		history := llmContext{RecentChatMessages: []spamcheck.Request{{Msg: "prev", UserName: "alice"}}}
 
-		spam, details := runLLMProviderCheck(context.Background(), "gemini", "Gemini", 3, "current", history,
-			func(_ context.Context, msg string) (llmResponse, error) {
+		spam, details := runLLMProviderCheck(context.Background(), llmCheckParams{
+			Name: "gemini", ErrorPrefix: "Gemini", RetryCount: 3, Msg: "current", History: history,
+			Send: func(_ context.Context, msg string) (llmResponse, error) {
 				calls++
 				assert.Equal(t, "User message:\ncurrent\n\nRecent chat messages:\n\"alice\": \"prev\"\n", msg)
 				if calls < 3 {
@@ -77,7 +79,7 @@ func TestRunLLMProviderCheck(t *testing.T) {
 				}
 				return llmResponse{IsSpam: false, Reason: "looks fine", Confidence: 42}, nil
 			},
-		)
+		})
 
 		assert.False(t, spam)
 		assert.Equal(t, 3, calls)
@@ -89,12 +91,13 @@ func TestRunLLMProviderCheck(t *testing.T) {
 	t.Run("retry count defaults to one", func(t *testing.T) {
 		calls := 0
 
-		spam, details := runLLMProviderCheck(context.Background(), "gemini", "Gemini", 0, "test", llmContext{},
-			func(_ context.Context, msg string) (llmResponse, error) {
+		spam, details := runLLMProviderCheck(context.Background(), llmCheckParams{
+			Name: "gemini", ErrorPrefix: "Gemini", RetryCount: 0, Msg: "test", History: llmContext{},
+			Send: func(_ context.Context, msg string) (llmResponse, error) {
 				calls++
 				return llmResponse{}, errors.New("boom")
 			},
-		)
+		})
 
 		require.False(t, spam)
 		assert.Equal(t, 1, calls)
@@ -107,12 +110,13 @@ func TestRunLLMProviderCheck(t *testing.T) {
 	t.Run("retry count capped at twenty", func(t *testing.T) {
 		calls := 0
 
-		spam, details := runLLMProviderCheck(context.Background(), "openai", "OpenAI", 99, "test", llmContext{},
-			func(_ context.Context, msg string) (llmResponse, error) {
+		spam, details := runLLMProviderCheck(context.Background(), llmCheckParams{
+			Name: "openai", ErrorPrefix: "OpenAI", RetryCount: 99, Msg: "test",
+			Send: func(_ context.Context, msg string) (llmResponse, error) {
 				calls++
 				return llmResponse{}, errors.New("bad json")
 			},
-		)
+		})
 
 		require.False(t, spam)
 		assert.Equal(t, 20, calls)
