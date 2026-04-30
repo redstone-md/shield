@@ -17,7 +17,7 @@ type mockSampleReloader struct {
 	reloadErr    error
 }
 
-func (m *mockSampleReloader) ReloadSamples() error {
+func (m *mockSampleReloader) ReloadSamples(ctx context.Context) error {
 	m.reloadCalled.Add(1)
 	return m.reloadErr
 }

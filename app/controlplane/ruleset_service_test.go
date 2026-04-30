@@ -112,7 +112,7 @@ func TestRuleSetService_UsesCacheAndInvalidatesOnUpdate(t *testing.T) {
 	assert.Equal(t, 1, cached.Version, "service should keep serving cached active rules until invalidated")
 	assert.Equal(t, 1, cached.Meta.LinksLimit)
 
-	svc.Invalidate()
+	svc.Invalidate(context.Background())
 	reloaded, err := svc.Get(context.Background(), "gr1")
 	require.NoError(t, err)
 	assert.Equal(t, 2, reloaded.Version)
@@ -181,7 +181,7 @@ func TestRuleSetService_Invalidate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, rs.Version)
 
-	svc.Invalidate()
+	svc.Invalidate(context.Background())
 
 	rs2, err := svc.Get(context.Background(), "gr1")
 	require.NoError(t, err)

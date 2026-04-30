@@ -16,18 +16,18 @@ import (
 )
 
 type admin struct {
-	tbAPI                TbAPI
-	bot                  Bot
-	locator              Locator
-	superUsers           SuperUsers
-	actions              ActionExecutor
-	primChatID           int64
-	adminChatID          int64
-	trainingMode         bool
-	softBan              bool
-	dry                  bool
-	warnMsg              string
-	aggressiveCleanup    bool
+	tbAPI                  TbAPI
+	bot                    Bot
+	locator                Locator
+	superUsers             SuperUsers
+	actions                ActionExecutor
+	primChatID             int64
+	adminChatID            int64
+	trainingMode           bool
+	softBan                bool
+	dry                    bool
+	warnMsg                string
+	aggressiveCleanup      bool
 	aggressiveCleanupLimit int
 }
 
@@ -66,7 +66,7 @@ func (a *admin) ReportBan(banUserStr string, msg *bot.Message, duration time.Dur
 	}
 }
 
-func (a *admin) MsgHandler(update tbapi.Update) error {
+func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 	shrink := func(inp string, maxLen int) string {
 		if utf8.RuneCountInString(inp) <= maxLen {
 			return inp
@@ -97,10 +97,10 @@ func (a *admin) MsgHandler(update tbapi.Update) error {
 	log.Printf("[DEBUG] forwarded message from superuser %q (%d) to admin chat %d: %q",
 		update.Message.From.UserName, update.Message.From.ID, a.adminChatID, msgTxt)
 
-	info, ok := a.locator.Message(context.TODO(), msgTxt)
+	info, ok := a.locator.Message(ctx, msgTxt)
 	if !ok {
 		if fwdID != 0 {
-			return a.msgHandlerFallback(update, fwdID, username, msgTxt)
+			return a.msgHandlerFallback(ctx, update, fwdID, username, msgTxt)
 		}
 		return fmt.Errorf("not found %q in locator", shrink(msgTxt, 50))
 	}
@@ -144,7 +144,7 @@ func (a *admin) MsgHandler(update tbapi.Update) error {
 
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
 		BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID: info.MsgID,
+			MessageID:  info.MsgID,
 			ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
 		},
 	})
@@ -159,8 +159,8 @@ func (a *admin) MsgHandler(update tbapi.Update) error {
 	} else {
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: info.UserID,
 			channelID: channelIDFromCallback(info.UserID),
-			chatID: a.primChatID, tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
-		if err := banUserOrChannel(context.Background(), banReq); err != nil {
+			chatID:    a.primChatID, tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
+		if err := banUserOrChannel(ctx, banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", info.UserID, err))
 		}
 	}
@@ -171,7 +171,7 @@ func (a *admin) MsgHandler(update tbapi.Update) error {
 	return nil
 }
 
-func (a *admin) msgHandlerFallback(update tbapi.Update, fwdID int64, username, msgTxt string) error {
+func (a *admin) msgHandlerFallback(ctx context.Context, update tbapi.Update, fwdID int64, username, msgTxt string) error {
 	log.Printf("[INFO] locator fallback: forwarded user %q (%d), processing without locator data", username, fwdID)
 	errs := new(multierror.Error)
 
@@ -217,7 +217,7 @@ func (a *admin) msgHandlerFallback(update tbapi.Update, fwdID int64, username, m
 
 	banReq := banRequest{duration: bot.PermanentBanDuration, userID: fwdID, chatID: a.primChatID,
 		tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
-	if err := banUserOrChannel(context.Background(), banReq); err != nil {
+	if err := banUserOrChannel(ctx, banReq); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", fwdID, err))
 	}
 
@@ -262,8 +262,7 @@ func (a *admin) channelDisplayName(ch *tbapi.Chat) string {
 	return fmt.Sprintf("channel_%d", ch.ID)
 }
 
-func (a *admin) deleteUserMessages(userID int64) (deleted int, err error) {
-	ctx := context.Background()
+func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted int, err error) {
 	msgIDs, err := a.locator.GetUserMessageIDs(ctx, userID, a.aggressiveCleanupLimit)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get user messages: %w", err)
@@ -286,7 +285,7 @@ func (a *admin) deleteUserMessages(userID int64) (deleted int, err error) {
 
 		_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
 			BaseChatMessage: tbapi.BaseChatMessage{
-				MessageID: msgID,
+				MessageID:  msgID,
 				ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
 			},
 		})

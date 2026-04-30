@@ -104,7 +104,7 @@ func TestServer_updateSampleHandler(t *testing.T) {
 func TestServer_deleteSampleHandler(t *testing.T) {
 	spamFilterMock := &mocks.SpamFilterMock{
 		RemoveDynamicHamSampleFunc: func(sample string) error { return nil },
-		DynamicSamplesFunc: func() ([]string, []string, error) {
+		DynamicSamplesFunc: func(ctx context.Context) ([]string, []string, error) {
 			return []string{"spam1", "spam2"}, []string{"ham1", "ham2"}, nil
 		},
 	}

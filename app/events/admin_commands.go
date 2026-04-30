@@ -13,12 +13,12 @@ import (
 	"github.com/umputun/tg-spam/app/observability"
 )
 
-func (a *admin) DirectSpamReport(update tbapi.Update) error {
-	return a.directReport(update, true)
+func (a *admin) DirectSpamReport(ctx context.Context, update tbapi.Update) error {
+	return a.directReport(ctx, update, true)
 }
 
-func (a *admin) DirectBanReport(update tbapi.Update) error {
-	return a.directReport(update, false)
+func (a *admin) DirectBanReport(ctx context.Context, update tbapi.Update) error {
+	return a.directReport(ctx, update, false)
 }
 
 func (a *admin) DirectWarnReport(update tbapi.Update) error {
@@ -74,7 +74,7 @@ func (a *admin) deleteWarnMessage(ctx context.Context, msgID int, label string) 
 	}
 
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID: msgID,
+		MessageID:  msgID,
 		ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
 	}})
 	if err != nil {
@@ -132,7 +132,7 @@ func warnSubjectID(msg *tbapi.Message) int64 {
 	return 0
 }
 
-func (a *admin) directReport(update tbapi.Update, updateSamples bool) error {
+func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSamples bool) error {
 	logFrom := update.Message.ReplyToMessage.From.UserName
 	logID := update.Message.ReplyToMessage.From.ID
 	if sc := update.Message.ReplyToMessage.SenderChat; sc != nil && sc.ID != 0 {
@@ -214,7 +214,7 @@ func (a *admin) directReport(update tbapi.Update, updateSamples bool) error {
 	}
 
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID: origMsg.MessageID,
+		MessageID:  origMsg.MessageID,
 		ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
 	}})
 	if err != nil {
@@ -224,7 +224,7 @@ func (a *admin) directReport(update tbapi.Update, updateSamples bool) error {
 	}
 
 	_, err = a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID: update.Message.MessageID,
+		MessageID:  update.Message.MessageID,
 		ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
 	}})
 	if err != nil {
@@ -244,7 +244,7 @@ func (a *admin) directReport(update tbapi.Update, updateSamples bool) error {
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: origMsg.From.ID, channelID: channelID,
 			chatID: a.primChatID, tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
 
-		if err := banUserOrChannel(context.Background(), banReq); err != nil {
+		if err := banUserOrChannel(ctx, banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", origMsg.From.ID, err))
 		}
 	}
@@ -255,7 +255,8 @@ func (a *admin) directReport(update tbapi.Update, updateSamples bool) error {
 	}
 	if a.aggressiveCleanup && !a.dry && (origMsg.SenderChat == nil || origMsg.SenderChat.ID != a.primChatID) {
 		go func() {
-			deleted, err := a.deleteUserMessages(cleanupUserID)
+			cleanupCtx := context.WithoutCancel(ctx)
+			deleted, err := a.deleteUserMessages(cleanupCtx, cleanupUserID)
 			if err != nil {
 				log.Printf("[WARN] aggressive cleanup failed: %v", err)
 				return

@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/go-pkgz/routegroup"
@@ -101,7 +102,7 @@ func TestServer_StaticFiles(t *testing.T) {
 func TestServer_getDynamicSamplesHandler(t *testing.T) {
 	t.Run("successful response", func(t *testing.T) {
 		mockSpamFilter := &mocks.SpamFilterMock{
-			DynamicSamplesFunc: func() ([]string, []string, error) {
+			DynamicSamplesFunc: func(ctx context.Context) ([]string, []string, error) {
 				return []string{"spam1", "spam2"}, []string{"ham1", "ham2"}, nil
 			},
 		}
@@ -130,7 +131,7 @@ func TestServer_getDynamicSamplesHandler(t *testing.T) {
 
 	t.Run("error response", func(t *testing.T) {
 		mockSpamFilter := &mocks.SpamFilterMock{
-			DynamicSamplesFunc: func() ([]string, []string, error) {
+			DynamicSamplesFunc: func(ctx context.Context) ([]string, []string, error) {
 				return nil, nil, errors.New("test error")
 			},
 		}
@@ -160,7 +161,7 @@ func TestServer_getDynamicSamplesHandler(t *testing.T) {
 
 func Test_downloadSampleHandler(t *testing.T) {
 	mockSpamFilter := &mocks.SpamFilterMock{
-		DynamicSamplesFunc: func() ([]string, []string, error) {
+		DynamicSamplesFunc: func(ctx context.Context) ([]string, []string, error) {
 			return []string{"spam1", "spam2"}, []string{"ham1", "ham2"}, nil
 		},
 	}
@@ -200,7 +201,7 @@ func Test_downloadSampleHandler(t *testing.T) {
 	})
 
 	t.Run("error handling", func(t *testing.T) {
-		mockSpamFilter.DynamicSamplesFunc = func() ([]string, []string, error) {
+		mockSpamFilter.DynamicSamplesFunc = func(ctx context.Context) ([]string, []string, error) {
 			return nil, nil, errors.New("test error")
 		}
 
@@ -229,7 +230,7 @@ func Test_downloadSampleHandler(t *testing.T) {
 
 func TestServer_reloadDynamicSamplesHandler(t *testing.T) {
 	mockSpamFilter := &mocks.SpamFilterMock{
-		ReloadSamplesFunc: func() error {
+		ReloadSamplesFunc: func(ctx context.Context) error {
 			return nil
 		},
 	}
@@ -258,7 +259,7 @@ func TestServer_reloadDynamicSamplesHandler(t *testing.T) {
 	})
 
 	t.Run("error during reload", func(t *testing.T) {
-		mockSpamFilter.ReloadSamplesFunc = func() error {
+		mockSpamFilter.ReloadSamplesFunc = func(ctx context.Context) error {
 			return errors.New("test error")
 		}
 
@@ -352,14 +353,14 @@ func TestServer_reverseSamples(t *testing.T) {
 func TestServer_renderSamples(t *testing.T) {
 	t.Run("successful rendering", func(t *testing.T) {
 		mockSpamFilter := &mocks.SpamFilterMock{
-			DynamicSamplesFunc: func() ([]string, []string, error) {
+			DynamicSamplesFunc: func(ctx context.Context) ([]string, []string, error) {
 				return []string{"spam1", "spam2"}, []string{"ham1", "ham2"}, nil
 			},
 		}
 
 		server := NewServer(Config{SpamFilter: mockSpamFilter})
 		w := httptest.NewRecorder()
-		server.renderSamples(w, "samples_list")
+		server.renderSamples(w, httptest.NewRequest("GET", "/", nil), "samples_list")
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, "text/html; charset=utf-8", w.Header().Get("Content-Type"))
 		t.Log(w.Body.String())
@@ -373,14 +374,14 @@ func TestServer_renderSamples(t *testing.T) {
 
 	t.Run("empty samples", func(t *testing.T) {
 		mockSpamFilter := &mocks.SpamFilterMock{
-			DynamicSamplesFunc: func() ([]string, []string, error) {
+			DynamicSamplesFunc: func(ctx context.Context) ([]string, []string, error) {
 				return []string{}, []string{}, nil
 			},
 		}
 
 		server := NewServer(Config{SpamFilter: mockSpamFilter})
 		w := httptest.NewRecorder()
-		server.renderSamples(w, "samples_list")
+		server.renderSamples(w, httptest.NewRequest("GET", "/", nil), "samples_list")
 		assert.Equal(t, http.StatusOK, w.Code)
 		body := w.Body.String()
 		assert.Contains(t, body, "Spam Samples (0)")
@@ -389,14 +390,14 @@ func TestServer_renderSamples(t *testing.T) {
 
 	t.Run("DynamicSamples error", func(t *testing.T) {
 		mockSpamFilter := &mocks.SpamFilterMock{
-			DynamicSamplesFunc: func() ([]string, []string, error) {
+			DynamicSamplesFunc: func(ctx context.Context) ([]string, []string, error) {
 				return nil, nil, errors.New("sample fetch error")
 			},
 		}
 
 		server := NewServer(Config{SpamFilter: mockSpamFilter})
 		w := httptest.NewRecorder()
-		server.renderSamples(w, "samples_list")
+		server.renderSamples(w, httptest.NewRequest("GET", "/", nil), "samples_list")
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
 
@@ -417,14 +418,14 @@ func TestServer_renderSamples(t *testing.T) {
 		tmpl = badTemplate
 
 		mockSpamFilter := &mocks.SpamFilterMock{
-			DynamicSamplesFunc: func() ([]string, []string, error) {
+			DynamicSamplesFunc: func(ctx context.Context) ([]string, []string, error) {
 				return []string{"spam1"}, []string{"ham1"}, nil
 			},
 		}
 
 		server := NewServer(Config{SpamFilter: mockSpamFilter})
 		w := httptest.NewRecorder()
-		server.renderSamples(w, "samples_list")
+		server.renderSamples(w, httptest.NewRequest("GET", "/", nil), "samples_list")
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
 

@@ -18,7 +18,7 @@ type DictionaryStore interface {
 }
 
 type SampleReloader interface {
-	ReloadSamples() error
+	ReloadSamples(ctx context.Context) error
 }
 
 type DictionaryService struct {
@@ -42,7 +42,7 @@ func (s *DictionaryService) Add(ctx context.Context, _ string, t storage.Diction
 	if err := s.store.Add(ctx, t, data); err != nil {
 		return fmt.Errorf("failed to add %s entry: %w", t, err)
 	}
-	s.reloadAndNotify()
+	s.reloadAndNotify(ctx)
 	log.Printf("[INFO] dictionary entry added: type=%s, data=%q", t, data)
 	return nil
 }
@@ -51,7 +51,7 @@ func (s *DictionaryService) Delete(ctx context.Context, _ string, id int64) erro
 	if err := s.store.Delete(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete dictionary entry %d: %w", id, err)
 	}
-	s.reloadAndNotify()
+	s.reloadAndNotify(ctx)
 	log.Printf("[INFO] dictionary entry deleted: id=%d", id)
 	return nil
 }
@@ -63,11 +63,11 @@ func (s *DictionaryService) Read(ctx context.Context, _ string, t storage.Dictio
 	return s.store.Read(ctx, t)
 }
 
-func (s *DictionaryService) ReadWithIDs(_ context.Context, _ string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+func (s *DictionaryService) ReadWithIDs(ctx context.Context, _ string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
 	if s.store == nil {
 		return nil, fmt.Errorf("dictionary store is nil")
 	}
-	return s.store.ReadWithIDs(context.Background(), t)
+	return s.store.ReadWithIDs(ctx, t)
 }
 
 func (s *DictionaryService) Stats(ctx context.Context, _ string) (*storage.DictionaryStats, error) {
@@ -83,9 +83,9 @@ func (s *DictionaryService) OnChange(fn func()) {
 	s.mu.Unlock()
 }
 
-func (s *DictionaryService) reloadAndNotify() {
+func (s *DictionaryService) reloadAndNotify(ctx context.Context) {
 	if s.reloader != nil {
-		if err := s.reloader.ReloadSamples(); err != nil {
+		if err := s.reloader.ReloadSamples(ctx); err != nil {
 			log.Printf("[WARN] failed to reload samples after dictionary change: %v", err)
 		}
 	}

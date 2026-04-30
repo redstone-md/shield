@@ -163,8 +163,8 @@ func (s *Server) downloadExportToPostgresHandler(w http.ResponseWriter, r *http.
 	}
 }
 
-func (s *Server) renderSamples(w http.ResponseWriter, tmplName string) {
-	spam, ham, err := s.SpamFilter.DynamicSamples()
+func (s *Server) renderSamples(w http.ResponseWriter, r *http.Request, tmplName string) {
+	spam, ham, err := s.SpamFilter.DynamicSamples(r.Context())
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't fetch samples", "details": err.Error()})
 		return

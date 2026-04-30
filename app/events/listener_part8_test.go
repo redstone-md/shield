@@ -139,7 +139,7 @@ func TestProcLeftChatMemberMessage(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			err := l.procLeftChatMemberMessage(tt.update)
+			err := l.procLeftChatMemberMessage(context.Background(), tt.update)
 			if tt.expectedError {
 				require.Error(t, err)
 			} else {

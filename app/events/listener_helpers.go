@@ -14,7 +14,7 @@ import (
 	"github.com/umputun/tg-spam/app/bot"
 )
 
-func (l *TelegramListener) procNewChatMemberMessage(update tbapi.Update) error {
+func (l *TelegramListener) procNewChatMemberMessage(ctx context.Context, update tbapi.Update) error {
 	fromChat := update.Message.Chat.ID
 	if !l.isChatAllowed(fromChat) {
 		return nil
@@ -29,7 +29,7 @@ func (l *TelegramListener) procNewChatMemberMessage(update tbapi.Update) error {
 
 	member := update.Message.NewChatMembers[0]
 	msg := fmt.Sprintf("new_%d_%d", fromChat, member.ID)
-	if err := l.Locator.AddMessage(context.TODO(), msg, fromChat, member.ID, "", update.Message.MessageID); err != nil {
+	if err := l.Locator.AddMessage(ctx, msg, fromChat, member.ID, "", update.Message.MessageID); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to add new chat member message to locator: %w", err))
 	}
 
@@ -39,7 +39,7 @@ func (l *TelegramListener) procNewChatMemberMessage(update tbapi.Update) error {
 	return nil
 }
 
-func (l *TelegramListener) procLeftChatMemberMessage(update tbapi.Update) error {
+func (l *TelegramListener) procLeftChatMemberMessage(ctx context.Context, update tbapi.Update) error {
 	fromChat := update.Message.Chat.ID
 	if !l.isChatAllowed(fromChat) {
 		return nil
@@ -49,7 +49,7 @@ func (l *TelegramListener) procLeftChatMemberMessage(update tbapi.Update) error 
 		log.Printf("[DEBUG] left chat member is the same as the message sender, ignored")
 		return nil
 	}
-	msg, found := l.Locator.Message(context.TODO(), fmt.Sprintf("new_%d_%d", fromChat, update.Message.LeftChatMember.ID))
+	msg, found := l.Locator.Message(ctx, fmt.Sprintf("new_%d_%d", fromChat, update.Message.LeftChatMember.ID))
 	if !found {
 		log.Printf("[DEBUG] no new chat member message found for %d in chat %d", update.Message.LeftChatMember.ID, fromChat)
 		return nil
@@ -66,7 +66,7 @@ func (l *TelegramListener) procLeftChatMemberMessage(update tbapi.Update) error 
 func (l *TelegramListener) deleteSystemMessage(msgID int, chatID int64, msgType string) {
 	deleteMsg := tbapi.DeleteMessageConfig{
 		BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID: msgID,
+			MessageID:  msgID,
 			ChatConfig: tbapi.ChatConfig{ChatID: chatID},
 		},
 	}

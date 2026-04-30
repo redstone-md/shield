@@ -192,8 +192,8 @@ type Detector interface {
 type SpamFilter interface {
 	UpdateSpam(msg string) error
 	UpdateHam(msg string) error
-	ReloadSamples() (err error)
-	DynamicSamples() (spam, ham []string, err error)
+	ReloadSamples(ctx context.Context) (err error)
+	DynamicSamples(ctx context.Context) (spam, ham []string, err error)
 	RemoveDynamicSpamSample(sample string) error
 	RemoveDynamicHamSample(sample string) error
 }

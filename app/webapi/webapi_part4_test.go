@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -121,7 +122,7 @@ func TestServer_htmlSpamCheckHandler(t *testing.T) {
 
 func TestServer_htmlManageSamplesHandler(t *testing.T) {
 	spamFilterMock := &mocks.SpamFilterMock{
-		DynamicSamplesFunc: func() ([]string, []string, error) {
+		DynamicSamplesFunc: func(ctx context.Context) ([]string, []string, error) {
 			return []string{"spam1", "spam2"}, []string{"ham1", "ham2"}, nil
 		},
 	}

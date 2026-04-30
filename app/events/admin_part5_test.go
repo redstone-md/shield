@@ -43,7 +43,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 		}
 
 		update := tbapi.Update{Message: msg}
-		err := adminHandler.MsgHandler(update)
+		err := adminHandler.MsgHandler(context.Background(), update)
 		require.NoError(t, err)
 
 		assert.Empty(t, mockAPI.RequestCalls())
@@ -108,7 +108,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 		}
 
 		update := tbapi.Update{Message: msg}
-		err := adminHandler.MsgHandler(update)
+		err := adminHandler.MsgHandler(context.Background(), update)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "forwarded message is about super-user")
 
@@ -177,7 +177,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 		}
 
 		update := tbapi.Update{Message: msg}
-		err := adminHandler.MsgHandler(update)
+		err := adminHandler.MsgHandler(context.Background(), update)
 		require.NoError(t, err)
 
 		assert.Len(t, mockAPI.SendCalls(), 1, "Should send detection results to admin")
@@ -233,7 +233,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 			},
 		}
 
-		err := adm.MsgHandler(tbapi.Update{Message: msg})
+		err := adm.MsgHandler(context.Background(), tbapi.Update{Message: msg})
 		require.NoError(t, err)
 
 		// verify BanChatSenderChatConfig was used with the channel ID
@@ -295,7 +295,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 			},
 		}
 
-		err := adm.MsgHandler(tbapi.Update{Message: msg})
+		err := adm.MsgHandler(context.Background(), tbapi.Update{Message: msg})
 		require.NoError(t, err)
 
 		require.Len(t, locatorMock.MessageCalls(), 1)
@@ -337,7 +337,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 		}
 
 		update := tbapi.Update{Message: msg}
-		err := adminHandler.MsgHandler(update)
+		err := adminHandler.MsgHandler(context.Background(), update)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
@@ -400,7 +400,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 		}
 
 		update := tbapi.Update{Message: msg}
-		err := adminHandler.MsgHandler(update)
+		err := adminHandler.MsgHandler(context.Background(), update)
 		require.NoError(t, err)
 
 		assert.Len(t, mockAPI.SendCalls(), 1, "Should send detection results to admin")
@@ -471,7 +471,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 		}
 
 		update := tbapi.Update{Message: msg}
-		err := adminHandler.MsgHandler(update)
+		err := adminHandler.MsgHandler(context.Background(), update)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to remove user")

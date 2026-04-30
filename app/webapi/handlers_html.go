@@ -34,8 +34,8 @@ func (s *Server) htmlSpamCheckHandler(w http.ResponseWriter, r *http.Request) {
 
 // htmlManageSamplesHandler handles GET /manage_samples request.
 // It returns rendered manage_samples.html template with all the components.
-func (s *Server) htmlManageSamplesHandler(w http.ResponseWriter, _ *http.Request) {
-	s.renderSamples(w, "manage_samples.html")
+func (s *Server) htmlManageSamplesHandler(w http.ResponseWriter, r *http.Request) {
+	s.renderSamples(w, r, "manage_samples.html")
 }
 
 func (s *Server) htmlManageUsersHandler(w http.ResponseWriter, r *http.Request) {

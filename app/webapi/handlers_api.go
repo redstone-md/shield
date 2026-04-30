@@ -101,8 +101,8 @@ func (s *Server) checkIDHandler(w http.ResponseWriter, r *http.Request) {
 	rest.RenderJSON(w, resp)
 }
 
-func (s *Server) getDynamicSamplesHandler(w http.ResponseWriter, _ *http.Request) {
-	spam, ham, err := s.SpamFilter.DynamicSamples()
+func (s *Server) getDynamicSamplesHandler(w http.ResponseWriter, r *http.Request) {
+	spam, ham, err := s.SpamFilter.DynamicSamples(r.Context())
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get dynamic samples", "details": err.Error()})
 		return
@@ -111,8 +111,8 @@ func (s *Server) getDynamicSamplesHandler(w http.ResponseWriter, _ *http.Request
 }
 
 func (s *Server) downloadSampleHandler(pickFn func(spam, ham []string) ([]string, string)) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		spam, ham, err := s.SpamFilter.DynamicSamples()
+	return func(w http.ResponseWriter, r *http.Request) {
+		spam, ham, err := s.SpamFilter.DynamicSamples(r.Context())
 		if err != nil {
 			_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't get dynamic samples", "details": err.Error()})
 			return
@@ -146,7 +146,7 @@ func (s *Server) updateSampleHandler(updFn func(msg string) error) func(w http.R
 			return
 		}
 		if isHtmxRequest {
-			s.renderSamples(w, "samples_list")
+			s.renderSamples(w, r, "samples_list")
 		} else {
 			rest.RenderJSON(w, rest.JSON{"updated": true, "msg": req.Msg})
 		}
@@ -172,15 +172,15 @@ func (s *Server) deleteSampleHandler(delFn func(msg string) error) func(w http.R
 			return
 		}
 		if isHtmxRequest {
-			s.renderSamples(w, "samples_list")
+			s.renderSamples(w, r, "samples_list")
 		} else {
 			rest.RenderJSON(w, rest.JSON{"deleted": true, "msg": req.Msg, "count": 1})
 		}
 	}
 }
 
-func (s *Server) reloadDynamicSamplesHandler(w http.ResponseWriter, _ *http.Request) {
-	if err := s.SpamFilter.ReloadSamples(); err != nil {
+func (s *Server) reloadDynamicSamplesHandler(w http.ResponseWriter, r *http.Request) {
+	if err := s.SpamFilter.ReloadSamples(r.Context()); err != nil {
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "can't reload samples", "details": err.Error()})
 		return
 	}
@@ -411,7 +411,7 @@ func (s *Server) addDictionaryEntryHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := s.SpamFilter.ReloadSamples(); err != nil {
+	if err := s.SpamFilter.ReloadSamples(r.Context()); err != nil {
 		observability.Logf(r.Context(), "[WARN] failed to reload samples after dictionary add: %v", err)
 		if !isHtmxRequest {
 			_ = rest.EncodeJSON(w, http.StatusInternalServerError,
@@ -455,7 +455,7 @@ func (s *Server) deleteDictionaryEntryHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	if s.DictionaryProvider == nil {
-		if err := s.SpamFilter.ReloadSamples(); err != nil {
+		if err := s.SpamFilter.ReloadSamples(r.Context()); err != nil {
 			observability.Logf(r.Context(), "[WARN] failed to reload samples after dictionary delete: %v", err)
 			if !isHtmxRequest {
 				_ = rest.EncodeJSON(w, http.StatusInternalServerError,

@@ -14,7 +14,7 @@ import (
 	"github.com/umputun/tg-spam/app/bot"
 )
 
-func (a *admin) InlineCallbackHandler(query *tbapi.CallbackQuery) error {
+func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.CallbackQuery) error {
 	callbackData := query.Data
 	chatID := query.Message.Chat.ID
 	if chatID != a.adminChatID {
@@ -31,7 +31,7 @@ func (a *admin) InlineCallbackHandler(query *tbapi.CallbackQuery) error {
 	}
 
 	if strings.HasPrefix(callbackData, banPrefix) {
-		if err := a.callbackBanConfirmed(query); err != nil {
+		if err := a.callbackBanConfirmed(ctx, query); err != nil {
 			return fmt.Errorf("failed confirmation ban: %w", err)
 		}
 		log.Printf("[DEBUG] ban confirmed, chatID: %d, userID: %s, orig: %q", chatID, callbackData, query.Message.Text)
@@ -39,7 +39,7 @@ func (a *admin) InlineCallbackHandler(query *tbapi.CallbackQuery) error {
 	}
 
 	if strings.HasPrefix(callbackData, infoPrefix) {
-		if err := a.callbackShowInfo(query); err != nil {
+		if err := a.callbackShowInfo(ctx, query); err != nil {
 			return fmt.Errorf("failed to show spam info: %w", err)
 		}
 		log.Printf("[DEBUG] spam info sent, chatID: %d, userID: %s, orig: %q", chatID, callbackData, query.Message.Text)
@@ -47,7 +47,7 @@ func (a *admin) InlineCallbackHandler(query *tbapi.CallbackQuery) error {
 	}
 
 	log.Printf("[DEBUG] unban action activated, chatID: %d, userID: %s, orig: %q", chatID, callbackData, query.Message.Text)
-	if err := a.callbackUnbanConfirmed(query); err != nil {
+	if err := a.callbackUnbanConfirmed(ctx, query); err != nil {
 		return fmt.Errorf("failed to unban user: %w", err)
 	}
 	log.Printf("[INFO] user unbanned, chatID: %d, userID: %s, orig: %q", chatID, callbackData, query.Message.Text)
@@ -76,7 +76,7 @@ func (a *admin) callbackAskBanConfirmation(query *tbapi.CallbackQuery) error {
 	return nil
 }
 
-func (a *admin) callbackBanConfirmed(query *tbapi.CallbackQuery) error {
+func (a *admin) callbackBanConfirmed(ctx context.Context, query *tbapi.CallbackQuery) error {
 	updText := query.Message.Text + fmt.Sprintf("\n\n_ban confirmed by %s in %v_", query.From.UserName, sinceQuery(query))
 	editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, updText)
 	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
@@ -98,7 +98,7 @@ func (a *admin) callbackBanConfirmed(query *tbapi.CallbackQuery) error {
 	}
 
 	if a.trainingMode {
-		if err := a.deleteAndBan(query, userID, msgID); err != nil {
+		if err := a.deleteAndBan(ctx, query, userID, msgID); err != nil {
 			return fmt.Errorf("failed to ban user %d: %w", userID, err)
 		}
 	}
@@ -111,7 +111,7 @@ func (a *admin) callbackBanConfirmed(query *tbapi.CallbackQuery) error {
 		}
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: userID, channelID: channelIDFromCallback(userID),
 			chatID: a.primChatID, tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: userName, restrict: false}
-		if err := banUserOrChannel(context.Background(), banReq); err != nil {
+		if err := banUserOrChannel(ctx, banReq); err != nil {
 			return fmt.Errorf("failed to ban user %d: %w", userID, err)
 		}
 	}
@@ -119,7 +119,7 @@ func (a *admin) callbackBanConfirmed(query *tbapi.CallbackQuery) error {
 	return nil
 }
 
-func (a *admin) callbackUnbanConfirmed(query *tbapi.CallbackQuery) error {
+func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.CallbackQuery) error {
 	callbackData := query.Data
 	chatID := query.Message.Chat.ID
 	log.Printf("[DEBUG] unban action activated, chatID: %d, userID: %s", chatID, callbackData)
@@ -167,7 +167,7 @@ func (a *admin) callbackUnbanConfirmed(query *tbapi.CallbackQuery) error {
 	if !strings.Contains(query.Message.Text, "spam detection results") && userID != 0 {
 		spamInfoText := []string{"\n\n**original detection results**\n"}
 
-		info, found := a.locator.Spam(context.TODO(), userID)
+		info, found := a.locator.Spam(ctx, userID)
 		if found {
 			for _, check := range info.Checks {
 				spamInfoText = append(spamInfoText, "- "+escapeMarkDownV1Text(check.String()))
@@ -192,17 +192,17 @@ func (a *admin) unban(userID int64) error {
 		_, err := a.tbAPI.Request(tbapi.RestrictChatMemberConfig{
 			ChatMemberConfig: tbapi.ChatMemberConfig{UserID: userID, ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID}},
 			Permissions: &tbapi.ChatPermissions{
-				CanSendMessages:   true,
-				CanSendAudios:     true,
-				CanSendDocuments:  true,
-				CanSendPhotos:     true,
-				CanSendVideos:     true,
-				CanSendVideoNotes: true,
-				CanSendVoiceNotes: true,
+				CanSendMessages:      true,
+				CanSendAudios:        true,
+				CanSendDocuments:     true,
+				CanSendPhotos:        true,
+				CanSendVideos:        true,
+				CanSendVideoNotes:    true,
+				CanSendVoiceNotes:    true,
 				CanSendOtherMessages: true,
-				CanChangeInfo:     true,
-				CanInviteUsers:    true,
-				CanPinMessages:    true,
+				CanChangeInfo:        true,
+				CanInviteUsers:       true,
+				CanPinMessages:       true,
 			},
 		})
 		if err != nil {
@@ -233,7 +233,7 @@ func (a *admin) unbanChannel(channelID int64) error {
 	return nil
 }
 
-func (a *admin) callbackShowInfo(query *tbapi.CallbackQuery) error {
+func (a *admin) callbackShowInfo(ctx context.Context, query *tbapi.CallbackQuery) error {
 	callbackData := query.Data
 	spamInfoText := "**can't get spam info**"
 	spamInfo := []string{}
@@ -243,7 +243,7 @@ func (a *admin) callbackShowInfo(query *tbapi.CallbackQuery) error {
 	}
 
 	if userID != 0 {
-		info, found := a.locator.Spam(context.TODO(), userID)
+		info, found := a.locator.Spam(ctx, userID)
 		if found {
 			for _, check := range info.Checks {
 				spamInfo = append(spamInfo, "- "+escapeMarkDownV1Text(check.String()))
@@ -269,9 +269,9 @@ func (a *admin) callbackShowInfo(query *tbapi.CallbackQuery) error {
 	return nil
 }
 
-func (a *admin) deleteAndBan(query *tbapi.CallbackQuery, userID int64, msgID int) error {
+func (a *admin) deleteAndBan(ctx context.Context, query *tbapi.CallbackQuery, userID int64, msgID int) error {
 	errs := new(multierror.Error)
-	userName := a.locator.UserNameByID(context.TODO(), userID)
+	userName := a.locator.UserNameByID(ctx, userID)
 	banReq := banRequest{
 		duration:  bot.PermanentBanDuration,
 		userID:    userID,
@@ -285,13 +285,13 @@ func (a *admin) deleteAndBan(query *tbapi.CallbackQuery, userID int64, msgID int
 
 	msgFromSuper := userName != "" && a.superUsers.IsSuper(userName, userID)
 	if !msgFromSuper {
-		if err := banUserOrChannel(context.Background(), banReq); err != nil {
+		if err := banUserOrChannel(ctx, banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", userID, err))
 		}
 	}
 
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID: msgID,
+		MessageID:  msgID,
 		ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
 	}})
 	if err != nil {

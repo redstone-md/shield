@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"time"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
@@ -466,14 +467,18 @@ func (a *runtimeAssembly) wireLiveReload(opts options) {
 	if a.ApprovedUsersService != nil {
 		a.ApprovedUsersService.OnChange(func() {
 			log.Printf("[INFO] approved users changed, invalidating rule set cache")
-			a.RuleSetService.Invalidate()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			a.RuleSetService.Invalidate(ctx)
 		})
 	}
 
 	if a.DictionaryService != nil {
 		a.DictionaryService.OnChange(func() {
 			log.Printf("[INFO] dictionary changed, invalidating rule set cache")
-			a.RuleSetService.Invalidate()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			a.RuleSetService.Invalidate(ctx)
 		})
 	}
 

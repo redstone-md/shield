@@ -80,7 +80,7 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 	t.Run("callbackBanConfirmed", func(t *testing.T) {
 		mockAPI, botMock, adm, query := setupCallback(false, false)
 
-		err := adm.callbackBanConfirmed(query)
+		err := adm.callbackBanConfirmed(context.Background(), query)
 		require.NoError(t, err)
 
 		require.Len(t, mockAPI.SendCalls(), 1)
@@ -97,7 +97,7 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 	t.Run("callbackBanConfirmed_TrainingMode", func(t *testing.T) {
 		mockAPI, _, adm, query := setupCallback(true, false)
 
-		err := adm.callbackBanConfirmed(query)
+		err := adm.callbackBanConfirmed(context.Background(), query)
 		require.NoError(t, err)
 
 		require.GreaterOrEqual(t, len(mockAPI.RequestCalls()), 1)
@@ -110,7 +110,7 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 	t.Run("callbackBanConfirmed_SoftBan", func(t *testing.T) {
 		mockAPI, botMock, adm, query := setupCallback(false, true)
 
-		err := adm.callbackBanConfirmed(query)
+		err := adm.callbackBanConfirmed(context.Background(), query)
 		require.NoError(t, err)
 
 		require.GreaterOrEqual(t, len(mockAPI.RequestCalls()), 1)
@@ -154,7 +154,7 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 			From: &tbapi.User{UserName: "admin", ID: 111},
 		}
 
-		err := adm.callbackUnbanConfirmed(query)
+		err := adm.callbackUnbanConfirmed(context.Background(), query)
 		require.NoError(t, err)
 
 		// verify UnbanChatSenderChatConfig was used (not UnbanChatMemberConfig)
@@ -194,7 +194,7 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 			From: &tbapi.User{UserName: "admin", ID: 111},
 		}
 
-		err := adm.callbackUnbanConfirmed(query)
+		err := adm.callbackUnbanConfirmed(context.Background(), query)
 		require.NoError(t, err)
 
 		// verify UnbanChatSenderChatConfig was used
@@ -228,7 +228,7 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 			From: &tbapi.User{UserName: "admin", ID: 111},
 		}
 
-		err := adm.callbackBanConfirmed(query)
+		err := adm.callbackBanConfirmed(context.Background(), query)
 		require.NoError(t, err)
 
 		// in soft ban mode with channel, should use BanChatSenderChatConfig
@@ -314,7 +314,7 @@ func TestAdmin_CallbackShowInfo_PreservesUserLinks(t *testing.T) {
 			},
 		}
 
-		err := adm.callbackShowInfo(query)
+		err := adm.callbackShowInfo(context.Background(), query)
 		require.NoError(t, err)
 
 		assert.Len(t, mockAPI.SendCalls(), 1, "Should succeed on first attempt with markdown")
@@ -364,7 +364,7 @@ func TestAdmin_CallbackShowInfo_PreservesUserLinks(t *testing.T) {
 			},
 		}
 
-		err := adm.callbackShowInfo(query)
+		err := adm.callbackShowInfo(context.Background(), query)
 		require.NoError(t, err)
 		assert.Equal(t, 1, sendAttempts, "Should succeed on first attempt with markdown")
 	})
@@ -414,7 +414,7 @@ func TestAdmin_CallbackShowInfo_PreservesUserLinks(t *testing.T) {
 			},
 		}
 
-		err := adm.callbackShowInfo(query)
+		err := adm.callbackShowInfo(context.Background(), query)
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, sendAttempts, "Should succeed on first attempt with markdown")

@@ -257,7 +257,7 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 			return nil
 		}
 		l.incMetric("admin_messages")
-		if err := l.adminHandler.MsgHandler(update); err != nil {
+		if err := l.adminHandler.MsgHandler(ctx, update); err != nil {
 			l.incMetric("admin_errors")
 			log.Printf("[WARN] failed to process admin chat message: %v", err)
 			errResp := l.sendBotResponse(bot.Response{Send: true, Text: "error: " + err.Error()}, l.adminChatID, NotificationDefault)
@@ -281,7 +281,7 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 			Message:       update.EditedMessage,
 			EditedMessage: update.EditedMessage,
 		}
-		if err := l.procEvents(editedUpdate); err != nil {
+		if err := l.procEventsWithContext(ctx, editedUpdate); err != nil {
 			log.Printf("[WARN] failed to process edited message update: %v", err)
 		}
 		return nil
@@ -295,7 +295,7 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 		if l.DeleteJoinMessages {
 			l.deleteSystemMessage(update.Message.MessageID, update.Message.Chat.ID, "join")
 		} else {
-			if err := l.procNewChatMemberMessage(update); err != nil {
+			if err := l.procNewChatMemberMessage(ctx, update); err != nil {
 				log.Printf("[WARN] failed to process new chat member: %v", err)
 			}
 		}
@@ -304,7 +304,7 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 
 	if update.Message.LeftChatMember != nil {
 		if l.SuppressJoinMessage {
-			if err := l.procLeftChatMemberMessage(update); err != nil {
+			if err := l.procLeftChatMemberMessage(ctx, update); err != nil {
 				log.Printf("[WARN] failed to process left chat member: %v", err)
 			}
 		}
@@ -317,7 +317,7 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 	fromSuper := l.SuperUsers.IsSuper(update.Message.From.UserName, update.Message.From.ID) ||
 		l.isLinkedChannel(update.Message)
 	if update.Message.ReplyToMessage != nil && fromSuper {
-		if l.procSuperReply(update) {
+		if l.procSuperReply(ctx, update) {
 			return nil
 		}
 	}
@@ -358,7 +358,7 @@ func (l *TelegramListener) handleCallback(ctx context.Context, cb *tbapi.Callbac
 			}
 		}
 	} else {
-		if err := l.adminHandler.InlineCallbackHandler(cb); err != nil {
+		if err := l.adminHandler.InlineCallbackHandler(ctx, cb); err != nil {
 			l.incMetric("callback_errors")
 			log.Printf("[WARN] failed to process callback: %v", err)
 			errResp := l.sendBotResponse(bot.Response{Send: true, Text: "error: " + err.Error()}, l.adminChatID, NotificationDefault)
@@ -370,17 +370,17 @@ func (l *TelegramListener) handleCallback(ctx context.Context, cb *tbapi.Callbac
 }
 
 // procSuperReply processes superuser commands (reply) /spam, /ban, /warn
-func (l *TelegramListener) procSuperReply(update tbapi.Update) (handled bool) {
+func (l *TelegramListener) procSuperReply(ctx context.Context, update tbapi.Update) (handled bool) {
 	switch {
 	case strings.EqualFold(update.Message.Text, "/spam") || strings.EqualFold(update.Message.Text, "spam"):
 		log.Printf("[DEBUG] superuser %s reported spam", update.Message.From.UserName)
-		if err := l.adminHandler.DirectSpamReport(update); err != nil {
+		if err := l.adminHandler.DirectSpamReport(ctx, update); err != nil {
 			log.Printf("[WARN] failed to process direct spam report: %v", err)
 		}
 		return true
 	case strings.EqualFold(update.Message.Text, "/ban") || strings.EqualFold(update.Message.Text, "ban"):
 		log.Printf("[DEBUG] superuser %s requested ban", update.Message.From.UserName)
-		if err := l.adminHandler.DirectBanReport(update); err != nil {
+		if err := l.adminHandler.DirectBanReport(ctx, update); err != nil {
 			log.Printf("[WARN] failed to process direct ban request: %v", err)
 		}
 		return true

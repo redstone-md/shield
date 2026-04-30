@@ -36,19 +36,19 @@ type ReportConfig struct {
 
 type userReports struct {
 	ReportConfig
-	tbAPI         TbAPI
-	bot           Bot
-	locator       Locator
-	detectedSpam  DetectedSpamCounter
-	tenantID      string
-	superUsers    SuperUsers
-	actions       ActionExecutor
-	primChatID    int64
-	adminChatID   int64
-	moderation    ModerationConfig
-	trainingMode  bool
-	softBanMode   bool
-	dry           bool
+	tbAPI        TbAPI
+	bot          Bot
+	locator      Locator
+	detectedSpam DetectedSpamCounter
+	tenantID     string
+	superUsers   SuperUsers
+	actions      ActionExecutor
+	primChatID   int64
+	adminChatID  int64
+	moderation   ModerationConfig
+	trainingMode bool
+	softBanMode  bool
+	dry          bool
 }
 
 func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update) error {
@@ -87,14 +87,14 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 	if rateLimited {
 		log.Printf("[INFO] reporter %d (%s) exceeded rate limit", update.Message.From.ID, update.Message.From.UserName)
 		_, _ = r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID: update.Message.MessageID,
+			MessageID:  update.Message.MessageID,
 			ChatConfig: tbapi.ChatConfig{ChatID: r.primChatID},
 		}})
 		return fmt.Errorf("rate limit exceeded for reporter %d", update.Message.From.ID)
 	}
 
 	_, err = r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID: update.Message.MessageID,
+		MessageID:  update.Message.MessageID,
 		ChatConfig: tbapi.ChatConfig{ChatID: r.primChatID},
 	}})
 	if err != nil {
@@ -112,7 +112,7 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 		msgTxt = msgTxt + "\n" + origMsg.Quote.Text
 	}
 
-	if handled, err := r.tryLLMReportModeration(update, origMsg, msgTxt); handled {
+	if handled, err := r.tryLLMReportModeration(ctx, update, origMsg, msgTxt); handled {
 		if err == nil {
 			duration, restrict := r.reportPenalty(ctx, origMsg.From.ID)
 			r.notifyPrimaryChat(reportOutcomeBanned, duration, restrict)
@@ -170,7 +170,7 @@ func (r *userReports) notifyPrimaryChat(outcome reportOutcome, duration time.Dur
 	}
 }
 
-func (r *userReports) tryLLMReportModeration(update tbapi.Update, origMsg *tbapi.Message, msgTxt string) (bool, error) {
+func (r *userReports) tryLLMReportModeration(ctx context.Context, update tbapi.Update, origMsg *tbapi.Message, msgTxt string) (bool, error) {
 	reviewMsg := transform(origMsg)
 	reviewMsg.ForceLLM = true
 	reviewMsg.LLMContext = reportLLMContext
@@ -182,7 +182,7 @@ func (r *userReports) tryLLMReportModeration(update tbapi.Update, origMsg *tbapi
 
 	log.Printf("[INFO] LLM confirmed reported message %d from %s (%d) as spam",
 		origMsg.MessageID, origMsg.From.UserName, origMsg.From.ID)
-	return true, r.applyImmediateReportModeration(context.Background(), update, origMsg, msgTxt, resp)
+	return true, r.applyImmediateReportModeration(ctx, update, origMsg, msgTxt, resp)
 }
 
 func (r *userReports) applyImmediateReportModeration(ctx context.Context, update tbapi.Update, origMsg *tbapi.Message, msgTxt string, resp bot.Response) error {
@@ -205,7 +205,7 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 		}
 	} else if !r.dry {
 		_, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID: origMsg.MessageID,
+			MessageID:  origMsg.MessageID,
 			ChatConfig: tbapi.ChatConfig{ChatID: r.primChatID},
 		}})
 		if err != nil {
@@ -416,7 +416,7 @@ func (r *userReports) executeAutoBan(ctx context.Context, reports []storage.Repo
 		}
 	} else if !r.dry {
 		_, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID: msgID,
+			MessageID:  msgID,
 			ChatConfig: tbapi.ChatConfig{ChatID: chatID},
 		}})
 		if err != nil {

@@ -105,7 +105,7 @@ func TestServer_routesThroughApprovedUsersProvider(t *testing.T) {
 		GetLuaPluginNamesFunc: func() []string { return nil },
 	}
 	spamFilterMock := &mocks.SpamFilterMock{
-		ReloadSamplesFunc: func() error { return nil },
+		ReloadSamplesFunc: func(ctx context.Context) error { return nil },
 	}
 
 	server := NewServer(Config{
@@ -190,7 +190,7 @@ func TestServer_routesThroughDictionaryProvider(t *testing.T) {
 		},
 	}
 	spamFilterMock := &mocks.SpamFilterMock{
-		ReloadSamplesFunc: func() error { return nil },
+		ReloadSamplesFunc: func(ctx context.Context) error { return nil },
 	}
 
 	server := NewServer(Config{
@@ -273,7 +273,7 @@ func TestServer_routesThroughDetectedSpamProvider(t *testing.T) {
 		},
 	}
 	spamFilterMock := &mocks.SpamFilterMock{
-		ReloadSamplesFunc: func() error { return nil },
+		ReloadSamplesFunc: func(ctx context.Context) error { return nil },
 	}
 
 	server := NewServer(Config{

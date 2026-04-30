@@ -301,7 +301,7 @@ func TestSpamFilter_ReloadSamples(t *testing.T) {
 				TenantID:      "gr1",
 			})
 
-			err := s.ReloadSamples()
+			err := s.ReloadSamples(context.Background())
 			if tc.expectError {
 				assert.Error(t, err)
 				return

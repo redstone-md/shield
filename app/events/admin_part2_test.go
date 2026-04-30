@@ -120,7 +120,7 @@ func TestAdmin_DirectCommands(t *testing.T) {
 
 		update := createReplyUpdate("admin", 111, "spammer", 222, "spam message text")
 
-		err := adm.DirectBanReport(update)
+		err := adm.DirectBanReport(context.Background(), update)
 		require.NoError(t, err)
 
 		verifyDirectReportResults(t, mockAPI, botMock)
@@ -134,7 +134,7 @@ func TestAdmin_DirectCommands(t *testing.T) {
 
 		update := createReplyUpdate("admin", 111, "spammer", 222, "spam message text")
 
-		err := adm.DirectSpamReport(update)
+		err := adm.DirectSpamReport(context.Background(), update)
 		require.NoError(t, err)
 
 		verifyDirectReportResults(t, mockAPI, botMock)
@@ -150,7 +150,7 @@ func TestAdmin_DirectCommands(t *testing.T) {
 
 		update := createReplyUpdate("admin", 111, "spammer", 222, "spam message text")
 
-		err := adm.DirectSpamReport(update)
+		err := adm.DirectSpamReport(context.Background(), update)
 		require.NoError(t, err)
 
 		require.Len(t, mockAPI.SendCalls(), 1)
@@ -234,7 +234,7 @@ func TestAdmin_DirectCommands(t *testing.T) {
 			},
 		}
 
-		err := adm.DirectSpamReport(update)
+		err := adm.DirectSpamReport(context.Background(), update)
 		require.NoError(t, err)
 
 		// verify ban used BanChatSenderChatConfig with channel ID, not BanChatMemberConfig
@@ -281,7 +281,7 @@ func TestAdmin_DirectCommands(t *testing.T) {
 			},
 		}
 
-		err := adm.DirectSpamReport(update)
+		err := adm.DirectSpamReport(context.Background(), update)
 		require.NoError(t, err)
 
 		for _, call := range mockAPI.RequestCalls() {
@@ -370,7 +370,7 @@ func TestAdmin_DirectCommands(t *testing.T) {
 			},
 		}
 
-		err := adm.DirectSpamReport(update)
+		err := adm.DirectSpamReport(context.Background(), update)
 		require.NoError(t, err)
 
 		require.Len(t, mockAPI.SendCalls(), 1)

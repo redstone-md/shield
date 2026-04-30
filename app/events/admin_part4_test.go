@@ -117,7 +117,7 @@ func TestAdmin_MsgHandlerWithEmptyText(t *testing.T) {
 			botMock.ResetCalls()
 
 			update := tbapi.Update{Message: tt.msg}
-			err := adminHandler.MsgHandler(update)
+			err := adminHandler.MsgHandler(context.Background(), update)
 			require.Error(t, err)
 			assert.Equal(t, "empty message text", err.Error())
 

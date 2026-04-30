@@ -42,7 +42,7 @@ type SpamConfig struct {
 
 	SpamMsg    string
 	SpamDryMsg string
-	TenantID    string
+	TenantID   string
 	Dry        bool
 }
 
@@ -296,14 +296,13 @@ func (s *SpamFilter) RemoveApprovedUser(id int64) error {
 }
 
 // ReloadSamples reloads samples and stop-words
-func (s *SpamFilter) ReloadSamples() (err error) {
+func (s *SpamFilter) ReloadSamples(ctx context.Context) (err error) {
 	log.Printf("[DEBUG] reloading samples")
 	if s.loader == nil {
 		return fmt.Errorf("sample loader not configured")
 	}
 
 	var exclReader, spamReader, hamReader, stopWordsReader, spamDynamicReader, hamDynamicReader io.ReadCloser
-	ctx := context.TODO()
 
 	// check mandatory data presence
 	st, err := s.params.SamplesStore.Stats(ctx)
@@ -365,14 +364,14 @@ func (s *SpamFilter) ReloadSamples() (err error) {
 }
 
 // DynamicSamples returns dynamic spam and ham samples. both are optional
-func (s *SpamFilter) DynamicSamples() (spam, ham []string, err error) {
+func (s *SpamFilter) DynamicSamples(ctx context.Context) (spam, ham []string, err error) {
 	errs := new(multierror.Error)
 
-	if spam, err = s.params.SamplesStore.Read(context.TODO(), storage.SampleTypeSpam, storage.SampleOriginUser); err != nil {
+	if spam, err = s.params.SamplesStore.Read(ctx, storage.SampleTypeSpam, storage.SampleOriginUser); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to read dynamic spam samples: %w", err))
 	}
 
-	if ham, err = s.params.SamplesStore.Read(context.TODO(), storage.SampleTypeHam, storage.SampleOriginUser); err != nil {
+	if ham, err = s.params.SamplesStore.Read(ctx, storage.SampleTypeHam, storage.SampleOriginUser); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to read dynamic ham samples: %w", err))
 	}
 

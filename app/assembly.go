@@ -436,7 +436,7 @@ func makeSpamBot(ctx context.Context, opts options, ruleSet rules.RuleSet, dataD
 	spamBot := bot.NewSpamFilter(detector, spamBotParams)
 	log.Printf("[DEBUG] spam bot config: %+v", spamBotParams)
 
-	if err := spamBot.ReloadSamples(); err != nil {
+	if err := spamBot.ReloadSamples(ctx); err != nil {
 		return nil, fmt.Errorf("can't reload samples, %w", err)
 	}
 

@@ -54,7 +54,7 @@ func TestSpamFilter_DynamicSamples(t *testing.T) {
 				SamplesStore: samplesStore,
 			})
 
-			spam, ham, err := s.DynamicSamples()
+			spam, ham, err := s.DynamicSamples(context.Background())
 			if tc.expectError {
 				assert.Error(t, err)
 				return

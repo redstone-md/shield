@@ -23,7 +23,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 		mockSpamFilter := &mocks.SpamFilterMock{
-			ReloadSamplesFunc: func() error {
+			ReloadSamplesFunc: func(ctx context.Context) error {
 				return nil
 			},
 		}
@@ -92,7 +92,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 	t.Run("json decode error", func(t *testing.T) {
 		mockDict := &mocks.DictionaryMock{}
 		mockSpamFilter := &mocks.SpamFilterMock{
-			ReloadSamplesFunc: func() error {
+			ReloadSamplesFunc: func(ctx context.Context) error {
 				return nil
 			},
 		}
@@ -123,7 +123,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 		mockSpamFilter := &mocks.SpamFilterMock{
-			ReloadSamplesFunc: func() error {
+			ReloadSamplesFunc: func(ctx context.Context) error {
 				return nil
 			},
 		}
@@ -157,7 +157,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 		mockSpamFilter := &mocks.SpamFilterMock{
-			ReloadSamplesFunc: func() error {
+			ReloadSamplesFunc: func(ctx context.Context) error {
 				return nil
 			},
 		}
@@ -241,7 +241,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 		mockSpamFilter := &mocks.SpamFilterMock{
-			ReloadSamplesFunc: func() error {
+			ReloadSamplesFunc: func(ctx context.Context) error {
 				return errors.New("reload failed")
 			},
 		}
@@ -275,7 +275,7 @@ func TestServer_addDictionaryEntryHandler(t *testing.T) {
 			},
 		}
 		mockSpamFilter := &mocks.SpamFilterMock{
-			ReloadSamplesFunc: func() error {
+			ReloadSamplesFunc: func(ctx context.Context) error {
 				return errors.New("reload failed")
 			},
 		}

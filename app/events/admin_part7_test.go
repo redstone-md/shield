@@ -85,7 +85,7 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 		mockAPI, locatorMock, adm := setupAggressiveCleanupTest(true, false, []int{100, 101, 102})
 		update := createSpamReportUpdate()
 
-		err := adm.directReport(update, true)
+		err := adm.directReport(context.Background(), update, true)
 		require.NoError(t, err)
 
 		time.Sleep(200 * time.Millisecond)
@@ -123,7 +123,7 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 		mockAPI, locatorMock, adm := setupAggressiveCleanupTest(false, false, []int{})
 		update := createSpamReportUpdate()
 
-		err := adm.directReport(update, true)
+		err := adm.directReport(context.Background(), update, true)
 		require.NoError(t, err)
 
 		assert.Empty(t, locatorMock.GetUserMessageIDsCalls())
@@ -142,7 +142,7 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 		_, locatorMock, adm := setupAggressiveCleanupTest(true, true, []int{})
 		update := createSpamReportUpdate()
 
-		err := adm.directReport(update, false)
+		err := adm.directReport(context.Background(), update, false)
 		require.NoError(t, err)
 
 		assert.Empty(t, locatorMock.GetUserMessageIDsCalls())
@@ -173,7 +173,7 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 			aggressiveCleanupLimit: 100,
 		}
 
-		deleted, err := adm.deleteUserMessages(666)
+		deleted, err := adm.deleteUserMessages(context.Background(), 666)
 		require.NoError(t, err)
 		assert.Equal(t, 3, deleted)
 
@@ -199,7 +199,7 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 			aggressiveCleanupLimit: 100,
 		}
 
-		deleted, err := adm.deleteUserMessages(666)
+		deleted, err := adm.deleteUserMessages(context.Background(), 666)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get user messages")
 		assert.Equal(t, 0, deleted)
@@ -231,7 +231,7 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 			aggressiveCleanupLimit: 100,
 		}
 
-		deleted, err := adm.deleteUserMessages(666)
+		deleted, err := adm.deleteUserMessages(context.Background(), 666)
 		require.NoError(t, err)
 		assert.Equal(t, 2, deleted)
 
@@ -260,7 +260,7 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 			aggressiveCleanupLimit: 100,
 		}
 
-		deleted, err := adm.deleteUserMessages(666)
+		deleted, err := adm.deleteUserMessages(context.Background(), 666)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "stopped after 5 consecutive failures")
 		assert.Equal(t, 0, deleted)
@@ -279,7 +279,7 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 			aggressiveCleanupLimit: 100,
 		}
 
-		deleted, err := adm.deleteUserMessages(666)
+		deleted, err := adm.deleteUserMessages(context.Background(), 666)
 		require.NoError(t, err)
 		assert.Equal(t, 0, deleted)
 	})

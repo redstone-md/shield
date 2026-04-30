@@ -359,7 +359,7 @@ func TestProcNewChatMemberMessage(t *testing.T) {
 				chatID:  123,
 			}
 
-			err := l.procNewChatMemberMessage(tt.update)
+			err := l.procNewChatMemberMessage(context.Background(), tt.update)
 			if tt.expectedError {
 				require.Error(t, err)
 			} else {

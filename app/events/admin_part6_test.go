@@ -58,7 +58,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 			},
 		}
 
-		err := adminHandler.MsgHandler(tbapi.Update{Message: msg})
+		err := adminHandler.MsgHandler(context.Background(), tbapi.Update{Message: msg})
 		require.NoError(t, err)
 
 		assert.Len(t, botMock.RemoveApprovedUserCalls(), 1)
@@ -100,7 +100,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 			},
 		}
 
-		err := adminHandler.MsgHandler(tbapi.Update{Message: msg})
+		err := adminHandler.MsgHandler(context.Background(), tbapi.Update{Message: msg})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 
@@ -130,7 +130,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 			},
 		}
 
-		err := adminHandler.MsgHandler(tbapi.Update{Message: msg})
+		err := adminHandler.MsgHandler(context.Background(), tbapi.Update{Message: msg})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
@@ -175,7 +175,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 			},
 		}
 
-		err := adminHandler.MsgHandler(tbapi.Update{Message: msg})
+		err := adminHandler.MsgHandler(context.Background(), tbapi.Update{Message: msg})
 		require.NoError(t, err)
 
 		assert.Empty(t, mockAPI.RequestCalls(), "should not ban in dry mode")
@@ -227,7 +227,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 			},
 		}
 
-		err := adminHandler.MsgHandler(tbapi.Update{Message: msg})
+		err := adminHandler.MsgHandler(context.Background(), tbapi.Update{Message: msg})
 		require.NoError(t, err)
 
 		assert.Len(t, botMock.UpdateSpamCalls(), 1, "should update spam in training mode")
@@ -259,7 +259,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 			},
 		}
 
-		err := adminHandler.MsgHandler(tbapi.Update{Message: msg})
+		err := adminHandler.MsgHandler(context.Background(), tbapi.Update{Message: msg})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "super-user")
 		assert.Contains(t, err.Error(), "ignored")
@@ -291,7 +291,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 			},
 		}
 
-		err := adminHandler.MsgHandler(tbapi.Update{Message: msg})
+		err := adminHandler.MsgHandler(context.Background(), tbapi.Update{Message: msg})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "super-user")
 		assert.Contains(t, err.Error(), "ignored")
@@ -356,7 +356,7 @@ func TestAdmin_DirectSpamReport_ImageOnly(t *testing.T) {
 		},
 	}
 
-	err := adm.directReport(update, true)
+	err := adm.directReport(context.Background(), update, true)
 	require.NoError(t, err, "Should handle image-only spam without error")
 
 	assert.Len(t, botMock.RemoveApprovedUserCalls(), 1, "Should remove user from approved list")
@@ -402,7 +402,7 @@ func TestAdmin_DirectSpamReport_QuoteHandling(t *testing.T) {
 				},
 			},
 		}
-		err := adm.directReport(update, true)
+		err := adm.directReport(context.Background(), update, true)
 		require.NoError(t, err)
 		require.Len(t, botMock.UpdateSpamCalls(), 1)
 		assert.Equal(t, "Thank you\nBuy cheap stuff at spam.com", botMock.UpdateSpamCalls()[0].Msg)
@@ -423,7 +423,7 @@ func TestAdmin_DirectSpamReport_QuoteHandling(t *testing.T) {
 				},
 			},
 		}
-		err := adm.directReport(update, true)
+		err := adm.directReport(context.Background(), update, true)
 		require.NoError(t, err)
 		require.Len(t, botMock.UpdateSpamCalls(), 1)
 		assert.Equal(t, "some text", botMock.UpdateSpamCalls()[0].Msg)
@@ -441,7 +441,7 @@ func TestAdmin_DirectSpamReport_QuoteHandling(t *testing.T) {
 				},
 			},
 		}
-		err := adm.directReport(update, true)
+		err := adm.directReport(context.Background(), update, true)
 		require.NoError(t, err)
 		require.Len(t, botMock.UpdateSpamCalls(), 1)
 		assert.Equal(t, "plain spam text", botMock.UpdateSpamCalls()[0].Msg)
@@ -462,7 +462,7 @@ func TestAdmin_DirectSpamReport_QuoteHandling(t *testing.T) {
 				},
 			},
 		}
-		err := adm.directReport(update, true)
+		err := adm.directReport(context.Background(), update, true)
 		require.NoError(t, err)
 		require.Len(t, botMock.UpdateSpamCalls(), 1)
 		assert.Equal(t, "image caption\nquoted spam content", botMock.UpdateSpamCalls()[0].Msg)
