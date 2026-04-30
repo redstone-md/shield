@@ -8,7 +8,7 @@ import (
 )
 
 type Metrics struct {
-	counters  sync.Map
+	counters   sync.Map
 	histograms sync.Map
 }
 
@@ -17,10 +17,10 @@ type counter struct {
 }
 
 type timingHistogram struct {
-	mu    sync.Mutex
+	mu      sync.Mutex
 	buckets []bucket
-	count atomic.Int64
-	sum   atomic.Int64
+	count   atomic.Int64
+	sum     atomic.Int64
 }
 
 type bucket struct {
@@ -71,8 +71,8 @@ func (m *Metrics) Snapshot() any {
 			hs.AvgMs = float64(hs.SumMs) / float64(hs.Count)
 		}
 		hs.Buckets = make(map[string]int64)
-		for _, b := range h.buckets {
-			hs.Buckets[b.label] = b.count.Load()
+		for i := range h.buckets {
+			hs.Buckets[h.buckets[i].label] = h.buckets[i].count.Load()
 		}
 		snap.Histograms[key.(string)] = hs
 		return true
@@ -116,15 +116,15 @@ func (h *timingHistogram) record(d time.Duration) {
 }
 
 type MetricsSnapshot struct {
-	Counters   map[string]int64          `json:"counters"`
+	Counters   map[string]int64             `json:"counters"`
 	Histograms map[string]HistogramSnapshot `json:"histograms"`
 }
 
 type HistogramSnapshot struct {
-	Count   int64             `json:"count"`
-	SumMs   int64             `json:"sum_ms"`
-	AvgMs   float64           `json:"avg_ms"`
-	Buckets map[string]int64  `json:"buckets"`
+	Count   int64            `json:"count"`
+	SumMs   int64            `json:"sum_ms"`
+	AvgMs   float64          `json:"avg_ms"`
+	Buckets map[string]int64 `json:"buckets"`
 }
 
 func (s MetricsSnapshot) MarshalJSON() ([]byte, error) {
