@@ -12,10 +12,12 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+    env_file:
+      - .env
     environment:
       - TZ=America/Chicago
-      - TELEGRAM_TOKEN # set your telegram token in .env file
-      - TELEGRAM_GROUP # set your telegram group in .env file
+      - TELEGRAM_TOKEN
+      - TELEGRAM_GROUP
       - ADMIN_GROUP=-403777777777 # admin group id
       - LOGGER_ENABLED=true
       - LOGGER_FILE=/srv/log/tg-spam.log

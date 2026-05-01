@@ -1,17 +1,20 @@
-# example of a minimal compose file to run tg-spam
-services:
-  tg-spam:
-    image: ghcr.io/umputun/tg-spam:master # use :latest tag for production
-    hostname: tg-spam
-    restart: always
-    container_name: tg-spam
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    environment:
-      - TELEGRAM_TOKEN # should be set in environment or in .env file
-      - TELEGRAM_GROUP # should be set in environment or in .env file
-    volumes:
-      - ./var:/srv/data # mount volume to store persistent data on host's var directory
+ # example of a minimal compose file to run tg-spam
+ # copy .env.example to .env and fill in values before starting
+ services:
+   tg-spam:
+     build:
+       context: ..
+       dockerfile: Dockerfile
+     image: tg-spam:minimal
+     hostname: tg-spam
+     restart: always
+     container_name: tg-spam
+     env_file:
+       - .env
+     logging:
+       driver: json-file
+       options:
+         max-size: "10m"
+         max-file: "5"
+     volumes:
+       - ./var:/srv/data
