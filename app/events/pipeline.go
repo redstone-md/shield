@@ -15,6 +15,8 @@ import (
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/observability"
+	"github.com/umputun/tg-spam/app/slowpath"
+	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
 type incomingEventProcessor interface {
@@ -237,6 +239,46 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 	if resp.Send && !l.NoSpamReply && !l.TrainingMode {
 		if err := l.sendBotResponse(resp, fromChat, NotificationSilent); err != nil {
 			observability.Logf(ctx, "[WARN] failed to respond on update, %v", err)
+		}
+	}
+
+	if l.SlowPathEnabled && l.SlowPathEngine != nil && msg.Image != nil && msg.Image.FileID != "" && !resp.Send {
+		dl := newImageDownloader(l.TbAPI)
+		data, mime, dlErr := dl.download(ctx, msg.Image.FileID)
+		if dlErr != nil {
+			observability.Logf(ctx, "[WARN] image download failed: %v", dlErr)
+		} else {
+			defer func() { data = nil }()
+			observability.Logf(ctx, "[DEBUG] downloaded image for slowpath: %d bytes, mime=%s", len(data), mime)
+
+			slowReq := slowpath.SlowPathRequest{
+				EventID:       event.EventID,
+				CorrelationID: event.CorrelationID,
+				TenantID:      l.TenantID,
+				Reason:        slowpath.EscalationImageContent,
+				Content:       slowpath.Content{Text: msg.Text, HasMedia: true},
+				ImageData:     data,
+				ImageMIME:     mime,
+			}
+
+			slowStart := time.Now()
+			slowResult, slowErr := l.SlowPathEngine.Check(ctx, slowReq)
+			l.observeLatency("slow_path_latency", time.Since(slowStart))
+
+			if slowErr != nil {
+				observability.Logf(ctx, "[WARN] slowpath check failed: %v", slowErr)
+			} else if slowResult != nil && !slowResult.Skipped && slowResult.Spam {
+				observability.Logf(ctx, "[INFO] slowpath detected spam: confidence=%d, reason=%s", slowResult.Confidence, slowResult.Reason)
+				l.meter(ctx, "slowpath_spam")
+				resp.Send = true
+				resp.User = msg.From
+				resp.ReplyTo = msg.ID
+				resp.CheckResults = append(resp.CheckResults, spamcheck.Response{
+					Name:    "slowpath",
+					Spam:    true,
+					Details: slowResult.Reason,
+				})
+			}
 		}
 	}
 
