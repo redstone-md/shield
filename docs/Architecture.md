@@ -1,200 +1,332 @@
 # Architecture Overview
 
-Goal: in ~5 minutes, understand the current tg-spam runtime, the roadmap target boundaries, and where to start for phase-0 moderation pipeline work.
+Goal: in ~5 minutes, understand the tg-spam runtime, all module boundaries, and where to start for any task.
 
 This file is the primary start-here card for humans and AI agents. Detailed decisions belong in `docs/ADR/`; detailed roadmap execution lives in `docs/plans/`.
 
 ## Summary
 
 - **System:** self-hosted Telegram anti-spam bot with optional web UI and HTTP server
-- **Where is the code:** `app/` for runtime and adapters, `lib/` for reusable detection logic, `site/` for documentation site assets
-- **Entry points:** [`app/main.go`](../app/main.go), [`app/events/listener.go`](../app/events/listener.go), [`app/webapi/webapi.go`](../app/webapi/webapi.go)
+- **Where is the code:** `app/` for runtime and adapters, `lib/` for reusable detection logic, `site/` for documentation site assets, `e2e-ui/` for Playwright tests
+- **Entry points:** [`app/main.go`](../app/main.go), [`app/events/listener.go`](../app/events/listener.go), [`app/webapi/webapi.go`](../app/webapi/webapi.go), [`app/runtime_assembly.go`](../app/runtime_assembly.go)
 - **Dependencies:** Telegram Bot API, SQLite/Postgres storage, optional OpenAI/Gemini integrations, Docker-based local/runtime packaging
+- **Config:** CLI flags + env vars via `go-flags`, ~100 parameters in [`app/main.go`](../app/main.go)
 
 ## Scoping
 
-- **In scope:** runtime boundaries, moderation flow, roadmap phase-0 seam work, current storage and web UI integration points
-- **Out of scope:** vendored code, `_examples/`, and future SaaS infrastructure not yet implemented
-- Pick impacted modules from the diagrams below, then read the linked ADR and the smallest matching code path.
+- **In scope:** runtime boundaries, moderation flow, storage layer, web UI, control plane, detection pipeline
+- **Out of scope:** vendored code, `_examples/`, `site/` (static docs only)
+- Pick impacted modules from the diagrams below, then read the linked code.
 - If the work changes boundaries or execution order materially, update this file together with the ADR.
 
-## 2) Diagrams
+## Diagrams
 
-### 2.1 System / module map
+### System / module map
 
 ```mermaid
 flowchart LR
-  TG[Telegram]
+  TG[Telegram API]
   Main[app/main.go]
   Events[app/events]
   Bot[app/bot]
   Detect[lib/tgspam]
   Store[app/storage]
   Web[app/webapi]
+  CP[app/controlplane]
   Mods[app/moderation]
-  Docs[docs/]
+  Policy[app/policy]
+  Audit[app/audit]
+  Feedback[app/feedback]
+  SlowPath[app/slowpath]
+  Obs[app/observability]
 
   TG --> Events
   Main --> Events
   Main --> Bot
   Main --> Store
   Main --> Web
+  Main --> CP
   Events --> Bot
   Events --> Store
+  Events --> Mods
+  Events --> Policy
+  Events --> SlowPath
   Bot --> Detect
-  Events -. roadmap seam .-> Mods
-  Docs -. guides .-> Main
+  Web --> Store
+  Web --> CP
+  CP --> Store
+  Audit --> Store
+  Feedback --> Store
+  Obs -. context metadata .-> Events
+  Obs -. context metadata .-> Web
 ```
 
-### 2.2 Interfaces / contracts map
+### Moderation pipeline flow
+
+```mermaid
+sequenceDiagram
+  participant TG as Telegram
+  participant TL as TelegramListener
+  participant Q as InMemoryQueue
+  participant W as Queue Worker
+  participant D as SpamFilter/lib/tgspam
+  participant P as PolicyEngine
+  participant AE as ActionExecutor
+  participant AW as AuditWriter
+
+  TG->>TL: Update (message)
+  TL->>TL: procEventsWithContext(ctx, update)
+  TL->>Q: Publish(IncomingEvent)
+  Q->>W: Consume()
+  W->>D: Check(message)
+  D-->>W: DetectionResult
+  W->>P: Decide(ctx, request)
+  P-->>W: PolicyOutcome
+  W->>AE: ApplyBan / DeleteMessage / WarnUser
+  W->>AW: Write(ctx, AuditRecord)
+```
+
+### Storage layer
+
+```mermaid
+flowchart TB
+  subgraph Engine
+    SQL[engine.SQL]
+    SQLite[modernc.org/sqlite]
+    Postgres[lib/pq]
+  end
+
+  subgraph Stores
+    Samples[samples.go]
+    Dict[dictionary.go]
+    DS[detected_spam.go]
+    Loc[locator.go]
+    AU[approved_users.go]
+    RS[rule_sets.go]
+    IE[incoming_events.go]
+    MA[moderation_actions.go]
+    Rep[reports.go]
+    WS[workspaces.go]
+    TN[tenants.go]
+    Inc[incidents.go]
+    App[appeals.go]
+    Lab[labels.go]
+    Can[candidates.go]
+    KS[knowledge_snapshots.go]
+    UM[usage_metering.go]
+  end
+
+  SQL --> SQLite
+  SQL --> Postgres
+  Stores --> SQL
+```
+
+### Web API route groups
 
 ```mermaid
 flowchart LR
-  Gateway[app/events]
-  Queue[[app/moderation.Queue]]
-  Event[[app/moderation.IncomingEvent]]
-  Worker[app/events worker]
-  Policy[app/events policy engine]
-  Detection[app/bot]
-  ActionExec[app/events action executor]
-  Audit[app/events audit writer]
-  DetectorLib[lib/tgspam]
-  Storage[app/storage]
-  WebAPI[app/webapi]
+  subgraph Middleware
+    Recover[Recoverer]
+    Sec[SecurityHeaders]
+    AuditLog[AdminAuditLogger]
+    Sanitize[SanitizeInput]
+    Meta[RequestMetadata]
+    Logger[Logger]
+    Throttle[Throttle 1000]
+    Auth[BasicAuth]
+    RateLimit[TenantRateLimit]
+    Authz[TenantAuthz]
+  end
 
-  Gateway --publishes--> Event
-  Gateway --publishes to--> Queue
-  Queue --consumed by--> Worker
-  Worker --calls--> Detection
-  Worker --calls--> Policy
-  Worker --calls--> ActionExec
-  Worker --calls--> Audit
-  Detection --uses--> DetectorLib
-  Gateway --reads/writes--> Storage
-  WebAPI --reads/writes--> Storage
+  subgraph API
+    Check[/check]
+    Samples[/samples /update/spam /update/ham]
+    Users[/users/]
+    Dict[/dictionary/]
+    Rules[/rules/]
+    Incidents[/api/incidents/]
+    Appeals[/api/appeals/]
+    FeedbackAPI[/api/feedback/]
+    Metrics[/api/metrics]
+    Tenants[/api/tenants/]
+  end
+
+  subgraph UI
+    Home[/]
+    ManageSamples[/manage_samples]
+    ManageUsers[/manage_users]
+    ManageDict[/manage_dictionary]
+    DetectedSpam[/detected_spam]
+    Settings[/list_settings]
+    IncidentsUI[/incidents]
+    AppealsUI[/appeals]
+    FeedbackUI[/feedback]
+  end
+
+  Middleware --> API
+  Middleware --> UI
 ```
 
-### 2.3 Key types map
+### Key types class diagram
 
 ```mermaid
 classDiagram
-  class TelegramListener
-  class IncomingEvent
-  class DetectionResult
-  class PolicyDecision
-  class ModerationActionResult
-  class Queue
-  class InMemoryQueue
-  class listenerEventProcessor
-  class defaultPolicyEngine
-  class telegramActionExecutor
-  class defaultAuditWriter
+  class TelegramListener {
+    +Do(ctx)
+    -procEventsWithContext(ctx, update)
+    -procSuperReply(ctx, update)
+    -procNewChatMemberMessage(update)
+    -procLeftChatMemberMessage(update)
+  }
 
-  TelegramListener --> Queue : publishes to
-  Queue <|.. InMemoryQueue : implemented by
-  TelegramListener --> listenerEventProcessor : worker uses
-  listenerEventProcessor --> defaultPolicyEngine : asks for decision
-  listenerEventProcessor --> telegramActionExecutor : applies actions through
-  listenerEventProcessor --> defaultAuditWriter : records results through
-  Queue --> IncomingEvent : transports
+  class IncomingEvent {
+    +MsgID
+    +UserID
+    +Text
+    +TimeStamp
+  }
+
+  class DetectionResult {
+    +Spam bool
+    +Checks []CheckResult
+    +Score float64
+  }
+
+  class PolicyDecision {
+    +Action ActionType
+    +Reason string
+    +Score float64
+  }
+
+  class ModerationActionResult {
+    +Success bool
+    +Action string
+    +Error error
+  }
+
+  class InMemoryQueue {
+    +Publish(ctx, IncomingEvent)
+    +Consume() chan IncomingEvent
+    +Close()
+  }
+
+  class SpamFilter {
+    +OnMessage(msg) Response
+    +OnMessageWithContext(ctx, msg) Response
+  }
+
+  class Detector {
+    +Check(req) (bool, []Response)
+    +LoadSamples()
+    +LoadStopWords()
+  }
+
+  TelegramListener --> InMemoryQueue : publishes to
+  InMemoryQueue --> IncomingEvent : transports
   IncomingEvent --> DetectionResult : analyzed into
   DetectionResult --> PolicyDecision : evaluated into
   PolicyDecision --> ModerationActionResult : executed into
+  SpamFilter --> Detector : wraps
 ```
 
-## 3) Navigation index
+## Navigation index
 
-### 3.1 Modules
+### Entry points
 
-- `app/events` — Telegram ingestion, queue publication, in-process worker, policy evaluation, action execution, audit writing, and high-level event orchestration; code: [app/events/](../app/events/); entry points: [listener.go](../app/events/listener.go), [pipeline.go](../app/events/pipeline.go), [policy.go](../app/events/policy.go), [action_executor.go](../app/events/action_executor.go), [audit_writer.go](../app/events/audit_writer.go), [events.go](../app/events/events.go); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
-- `app/bot` — moderation-facing bot interface and current detection orchestration; code: [app/bot/](../app/bot/); entry point: [spam.go](../app/bot/spam.go)
-- `lib/tgspam` — reusable spam detection heuristics and optional LLM integrations; code: [lib/tgspam/](../lib/tgspam/)
-- `lib/textnorm` — shared text normalization stages for detector-facing cleanup and future script folding; code: [lib/textnorm/](../lib/textnorm/)
-- `app/storage` — persistence for samples, reports, detected spam, locators, bootstrap rule sets, ingress `incoming_events`, and executor `moderation_actions` with retry/replay lookup by command target; code: [app/storage/](../app/storage/)
-- `app/webapi` — server-rendered admin UI and HTTP endpoints; code: [app/webapi/](../app/webapi/)
-- `app/moderation` — transport-neutral moderation contracts and internal queue seam for roadmap phase 0; code: [app/moderation/](../app/moderation/); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
-- `app/rules` — single-tenant moderation rule domain snapshots introduced for phase 1 bootstrap persistence; code: [app/rules/](../app/rules/)
+| File | Purpose |
+|------|---------|
+| `app/main.go:216` | Primary `func main()`. Parses CLI flags/env, creates DB, assembles runtime, starts Telegram listener and/or web server. |
+| `app/events/listener.go:139` | `TelegramListener.Do(ctx)`. Main event loop, dispatches updates to admin, reports, and moderation pipeline. |
+| `app/webapi/webapi.go` | HTTP server for server-rendered admin UI and JSON API. |
+| `app/runtime_assembly.go:25` | `runtimeAssembly` / `webRuntimeAssembly`. Wires storage, services, listeners together. |
 
-### 3.2 Interfaces / contracts
+### Module responsibilities
 
-- `IncomingEvent` — source of truth: [app/moderation/contracts.go](../app/moderation/contracts.go); producer: `app/events`; future consumer: phase-0 worker
-- `DetectionResult` — source of truth: [app/moderation/contracts.go](../app/moderation/contracts.go); producer: detection layer; consumer: policy layer
-- `PolicyDecision` — source of truth: [app/moderation/contracts.go](../app/moderation/contracts.go); producer: future policy package; consumer: action executor and audit writer
-- `Queue` — source of truth: [app/moderation/queue.go](../app/moderation/queue.go); producer: ingestion; consumer: [app/events/pipeline.go](../app/events/pipeline.go); docs: [ADR-0001](./ADR/ADR-0001-internal-moderation-pipeline-seams.md)
+| Package | Responsibility |
+|---------|---------------|
+| `app/events` | Telegram ingestion, admin handlers, user reports, moderation pipeline (queue, worker), policy engine, action executor, audit writer |
+| `app/bot` | Spam filter bridge: wraps `lib/tgspam.Detector` behind interfaces consumed by the event layer |
+| `app/moderation` | Transport-neutral contracts (`IncomingEvent`, `DetectionResult`, `PolicyDecision`) and in-memory queue |
+| `app/policy` | Policy decision engine with profiles (balanced, strict, permissive) and escalation logic |
+| `app/rules` | `RuleSet` domain type — single-tenant moderation configuration snapshot |
+| `app/storage` | Persistence: SQLite/Postgres via `engine.SQL` wrapper. 20+ store types |
+| `app/storage/engine` | Database engine abstraction: `SQL` type, backup, SQLite-to-Postgres converter, query placeholder adapter |
+| `app/webapi` | Server-rendered web UI (HTMX) + JSON API. 50+ routes for spam checking, sample management, incidents, appeals, feedback, metrics, onboarding |
+| `app/controlplane` | Service layer: workspace, tenant, rule set (with caching), dictionary, detected spam, onboarding, role authorization, quota/plan, federation |
+| `app/audit` | Incident management and appeal resolution |
+| `app/feedback` | Feedback labeling, review candidates, knowledge snapshots |
+| `app/observability` | Context metadata (`event_id`, `correlation_id`, `idempotency_key`), `Metrics` type (sync/atomic counters and histograms) |
+| `app/slowpath` | Slow-path LLM analysis: budget, circuit breaker, OpenAI/Gemini adapters, prompt registry, merge logic |
+| `lib/tgspam` | Core spam `Detector`: sequential checks (duplicates, stop words, emoji, meta, CAS, multi-lang, spacing, similarity/Naive Bayes, LLM, Lua plugins, scoring) |
+| `lib/tgspam/plugin` | Lua plugin system: script loading, dynamic file reload via fsnotify, Arabic script detector |
+| `lib/spamcheck` | Shared request/response types for spam checks, scoring |
+| `lib/textnorm` | Text normalization pipeline: lowercase, trim, invisible chars, NFKC, confusables, script folding |
+| `lib/approved` | `UserInfo` type for approved users |
 
-### 3.3 Key types
+### Key interfaces
 
-- `TelegramListener` — defined in [app/events/listener.go](../app/events/listener.go); used by `app/main.go`
-- `IncomingEvent` — defined in [app/moderation/contracts.go](../app/moderation/contracts.go); used by future gateway/worker seam
-- `InMemoryQueue` — defined in [app/moderation/queue.go](../app/moderation/queue.go); used by phase-0 tracer-bullet wiring
-- `listenerEventProcessor` — defined in [app/events/pipeline.go](../app/events/pipeline.go); adapts queued moderation events back into the current runtime flow
-- `defaultPolicyEngine` — defined in [app/events/policy.go](../app/events/policy.go); converts detection results into explicit moderation decisions
-- `telegramActionExecutor` — defined in [app/events/action_executor.go](../app/events/action_executor.go); applies bans/restrictions, message deletions, and warning messages through the shared executor surface
-- `defaultAuditWriter` — defined in [app/events/audit_writer.go](../app/events/audit_writer.go); records moderation results through current logging and locator sinks
-- `app/observability` metadata helper — defined in [app/observability/context.go](../app/observability/context.go); carries `event_id` and `correlation_id` through the moderation tracer-bullet path
-- `app/webapi` request metadata middleware — defined in [app/webapi/webapi.go](../app/webapi/webapi.go); attaches `event_id` and `correlation_id` to request context and response headers
-- `runtimeProbe` — defined in [app/runtime_probe.go](../app/runtime_probe.go); exposes `/healthz` and `/readyz` for the main process independently of `app/webapi`
-- `runtimeAssembly` — defined in [app/runtime_assembly.go](../app/runtime_assembly.go); assembles storage, gateway, and web runtime seams before `execute` orchestrates startup
-- `RuleSet` — defined in [app/rules/ruleset.go](../app/rules/ruleset.go); persisted bootstrap moderation configuration for one workspace
-- `IncomingEvents` — defined in [app/storage/incoming_events.go](../app/storage/incoming_events.go); durable ingress ledger keyed by Telegram idempotency key before queue publication
-- `IncomingEvents` replay snapshot — stored in [app/storage/incoming_events.go](../app/storage/incoming_events.go); captures completed decision/action state so duplicate Telegram retries can short-circuit before worker execution
-- Active runtime `RuleSet` — loaded in [app/runtime_assembly.go](../app/runtime_assembly.go); now drives detector flags plus listener moderation/report configuration
-- `textnorm.Normalizer` — defined in [lib/textnorm/normalizer.go](../lib/textnorm/normalizer.go); centralizes lower-case, trim, invisible-character cleanup, canonical whitespace, and script-fold hooks
-- `ModerationActions` — defined in [app/storage/moderation_actions.go](../app/storage/moderation_actions.go); durable executor command journal for bans, restrictions, and deletes, including latest-attempt replay lookup for idempotent command execution
-- Report-driven sanctions in [app/events/reports.go](../app/events/reports.go) now flow through the shared `ActionExecutor`, so manual report approval and auto-ban thresholds reuse the same command journal and replay boundary as the queue worker
-- Reporter-ban callbacks in [app/events/reports.go](../app/events/reports.go) also reuse the shared `ActionExecutor`, closing the remaining direct report-side ban path
-- Admin `/warn` handling in [app/events/admin.go](../app/events/admin.go) now also reuses the shared `ActionExecutor`, so delete-plus-warn flows carry idempotency metadata and enter the same journal boundary as the rest of moderation actions
-- Enriched moderation audit now persists into [app/storage/detected_spam.go](../app/storage/detected_spam.go) with `signal_source`, `score`, `matched_rules`, `rule_set_version`, and `idempotency_key`, fed by [app/events/audit_writer.go](../app/events/audit_writer.go) and the runtime spam logger
-- Failed Telegram action attempts remain retryable in [app/storage/incoming_events.go](../app/storage/incoming_events.go): failure snapshots keep decision/error state without setting `processed_at`, so a later duplicate delivery can re-enter the pipeline without duplicating successful audit writes
+| Interface | Location | Used by |
+|-----------|----------|---------|
+| `TbAPI` | `app/events/events.go:26` | Telegram Bot API wrapper |
+| `Bot` | `app/events/events.go:96` | Event layer -> spam detection bridge |
+| `SpamLogger` | `app/events/events.go:35` | Spam result persistence |
+| `Locator` | `app/events/events.go:48` | Message location tracking |
+| `ActionExecutor` | `app/events/action_executor.go:15` | Ban/delete/warn execution |
+| `PolicyEngine` | `app/events/policy.go:15` | Moderation policy decisions |
+| `AuditWriter` | `app/events/audit_writer.go:15` | Audit record persistence |
+| `Queue` | `app/moderation/queue.go:10` | In-process moderation queue |
+| `Detector` | `app/bot/spam.go:50` | Full spam detection surface |
+| `engine.SQL` | `app/storage/engine/engine.go:32` | Database engine abstraction |
 
-## 7) Verification status
+### Key types
 
-- Phase-0 tracer bullet is covered by [TestTelegramListener_TracerBulletSmoke](../app/events/listener_test.go), which proves:
-  - queue publication from the listener
-  - worker execution
-  - detection
-  - policy decision
-  - action execution
-  - audit recording
-- Baseline listener behavior is still covered by [TestTelegramListener_Do](../app/events/listener_test.go) and [TestTelegramListener_DoWithBotBan](../app/events/listener_test.go), which stay green through the queue-backed path.
-- Correlation metadata is covered by the moderation-path tests in [app/events/listener_test.go](../app/events/listener_test.go), which prove the same `event_id` and `correlation_id` reach detection, action, audit, and locator calls.
-- Correlation metadata is also covered for `app/webapi` requests in [app/webapi/webapi_test.go](../app/webapi/webapi_test.go), which prove request metadata reaches downstream storage calls and request-scoped logs.
-- Main-runtime probe coverage is in [app/runtime_probe_test.go](../app/runtime_probe_test.go) and [app/main_test.go](../app/main_test.go), which prove the core process exposes `/healthz` and `/readyz` when configured.
-- Runtime assembly coverage remains in [app/main_test.go](../app/main_test.go), with startup behavior preserved while `execute` now orchestrates higher-level assemblies instead of wiring the full concrete chain inline.
-- Incoming-event ingress coverage is in [app/storage/incoming_events_test.go](../app/storage/incoming_events_test.go) and [app/events/listener_test.go](../app/events/listener_test.go), which prove deterministic Telegram idempotency keys and idempotent persistence before queue publication.
-- Replay coverage is in [app/storage/incoming_events_test.go](../app/storage/incoming_events_test.go) and [app/events/listener_test.go](../app/events/listener_test.go), which prove completed moderation snapshots are persisted and duplicate retries do not re-enter the worker.
-- Active-rule-set runtime coverage is in [app/main_test.go](../app/main_test.go), which proves a persisted active `RuleSet` overrides bootstrap defaults for detector behavior and listener moderation/report settings.
-- Text-normalization seam coverage is in [lib/textnorm/normalizer_test.go](../lib/textnorm/normalizer_test.go) plus the existing detector cleanup tests in [lib/tgspam/detector_test.go](../lib/tgspam/detector_test.go).
-- Action-journal and replay coverage is in [app/storage/moderation_actions_test.go](../app/storage/moderation_actions_test.go), [app/events/action_executor_test.go](../app/events/action_executor_test.go), and [app/main_test.go](../app/main_test.go).
-- Report-executor coverage is in [app/events/reports_test.go](../app/events/reports_test.go), which proves report approval and report auto-ban reuse the shared action executor.
-- Reporter-ban callback coverage is in [app/events/reports_test.go](../app/events/reports_test.go), which proves `callbackReportBanReporterConfirm` now uses the shared action executor.
-- Audit enrichment coverage is in [app/storage/detected_spam_test.go](../app/storage/detected_spam_test.go), [app/events/audit_writer_test.go](../app/events/audit_writer_test.go), and [app/main_test.go](../app/main_test.go), which prove enriched audit data including `idempotency_key` persists through the runtime spam logger into `detected_spam`.
-- Retry-recovery integration coverage is in [app/storage/incoming_events_test.go](../app/storage/incoming_events_test.go) and [app/events/listener_test.go](../app/events/listener_test.go), which prove processed duplicates are suppressed, failed Telegram actions stay retryable, and retries do not create duplicate final audit entries.
-- Shared warn-executor coverage is in [app/events/action_executor_test.go](../app/events/action_executor_test.go), [app/events/admin_test.go](../app/events/admin_test.go), and [app/events/listener_test.go](../app/events/listener_test.go), which prove `WarnUser` is journaled and runtime `/warn` flows reuse the shared action executor.
-- Schema migration coverage for phase-1 tables is in [app/storage/rule_sets_test.go](../app/storage/rule_sets_test.go), [app/storage/incoming_events_test.go](../app/storage/incoming_events_test.go), and [app/storage/moderation_actions_test.go](../app/storage/moderation_actions_test.go), which prove pre-gid old-schema databases upgrade correctly via `ALTER TABLE ADD COLUMN` probes and backfill, and new databases are created with the full DDL from the start.
+| Type | Location | Purpose |
+|------|----------|---------|
+| `TelegramListener` | `app/events/listener.go:36` | Main Telegram event loop |
+| `IncomingEvent` | `app/moderation/contracts.go:31` | Transport-neutral moderation input |
+| `DetectionResult` | `app/moderation/contracts.go:55` | Detection stage output |
+| `PolicyDecision` | `app/moderation/contracts.go:65` | Policy layer outcome |
+| `SpamFilter` | `app/bot/spam.go:30` | Wraps `Detector`, bridges event layer |
+| `Detector` | `lib/tgspam/detector.go:23` | Core spam detector with sequential checks |
+| `RuleSet` | `app/rules/ruleset.go:6` | Single-tenant moderation config snapshot |
+| `runtimeAssembly` | `app/runtime_assembly.go:25` | Assembled runtime with all stores, services, listeners |
+| `Metrics` | `app/observability/metrics.go` | sync/atomic counters and histograms |
+| `Server` | `app/webapi/webapi.go:55` | HTTP server for web UI and JSON API |
+| `Engine` | `app/policy/engine.go:42` | Policy engine with profiles and escalation |
+| `Normalizer` | `lib/textnorm/normalizer.go:22` | Configurable text normalization pipeline |
 
-## 4) Dependency rules
+## Dependency rules
 
-- Allowed dependencies:
-  - `app/events` may depend on `app/bot`, `app/storage`, and `app/moderation`
-  - `app/bot` may depend on `lib/tgspam` and storage-facing interfaces
-  - `app/webapi` may depend on storage-facing interfaces and runtime configuration
-- Forbidden dependencies:
-  - `lib/` packages should not depend on `app/`
-  - future `policy` and `audit` seams should not depend on Telegram-specific types
-- Integration style:
-  - current state: synchronous calls inside one process
-  - target phase-0 state: internal queue plus worker inside the same process
-- Shared code policy:
-  - cross-stage contracts live in `app/moderation` until a stronger shared-domain boundary is needed
+- `app/events` may depend on `app/bot`, `app/storage`, `app/moderation`, `app/policy`, `app/slowpath`
+- `app/bot` may depend on `lib/tgspam` and storage-facing interfaces
+- `app/webapi` may depend on storage-facing interfaces, control plane services, and runtime configuration
+- `lib/` packages MUST NOT depend on `app/`
+- Policy and audit seams MUST NOT depend on Telegram-specific types
+- Cross-boundary contracts live in `app/moderation`
 
-## 5) Key decisions (ADRs)
+## Verification status
+
+| Area | Test files | Coverage focus |
+|------|-----------|----------------|
+| Event pipeline | `app/events/*_test.go` (30+ files) | Listener, admin, reports, pipeline, policy, audit writer, action executor |
+| Web API | `app/webapi/*_test.go` (10+ files) | All handler groups, middleware, rate limiting, rules |
+| Storage | `app/storage/*_test.go` (20+ files) | Every store type, engine, backup, conversion |
+| Control plane | `app/controlplane/*_test.go` | All service-level tests |
+| Audit/feedback | `app/audit/*_test.go`, `app/feedback/*_test.go` | Incident, appeal, feedback, review services |
+| Detection | `lib/tgspam/*_test.go` | Detector, classifier, LLM, plugins, scoring, benchmarks |
+| Text processing | `lib/textnorm/*_test.go`, `lib/spamcheck/*_test.go` | Normalizer, confusables, scoring |
+| Runtime assembly | `app/main_part*_test.go` | Integration tests for runtime assembly |
+| E2E UI | `e2e-ui/e2e_test.go` | Playwright end-to-end UI tests |
+| Load/stress | Various `*_load_test.go`, `*_stress_test.go`, `*_benchmark_test.go` | Pipeline, storage engine, observability, detection |
+
+## Key decisions (ADRs)
 
 - [ADR-0001 internal moderation pipeline seams](./ADR/ADR-0001-internal-moderation-pipeline-seams.md) — maps current packages to roadmap bounded contexts and defines the initial queue seam
 
-## 6) Where to go next
+## Where to go next
 
 - Roadmap: [docs/ROADMAP.md](./ROADMAP.md)
 - Current phase plan: [docs/plans/roadmap/01-single-tenant-rules-and-idempotency.md](./plans/roadmap/01-single-tenant-rules-and-idempotency.md)
 - Decisions: [docs/ADR/](./ADR/)
 - Runtime entry point: [app/main.go](../app/main.go)
+- Completed plans: [docs/plans/completed/](./plans/completed/)
