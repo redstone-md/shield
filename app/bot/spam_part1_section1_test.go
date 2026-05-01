@@ -19,7 +19,7 @@ type spamFilterOnMessageCase struct {
 func runSpamFilterOnMessageCase(t *testing.T, tc spamFilterOnMessageCase) {
 	det := &mocks.MessageCheckerMock{
 		CheckFunc: func(req spamcheck.Request) (bool, []spamcheck.Response) {
-			if tc.wantRequest != (spamcheck.Request{}) {
+			if tc.wantRequest.Msg != "" || tc.wantRequest.UserID != "" {
 				assert.Equal(t, tc.wantRequest, req)
 			}
 			switch tc.message.Text {
