@@ -14,9 +14,11 @@ type Request struct {
 	LastName   string   `json:"last_name"`   // user's last name
 	IsPremium  bool     `json:"is_premium"`  // true if user has telegram premium
 	Meta       MetaData `json:"meta"`        // meta-info, provided by the client
-	CheckOnly  bool     `json:"check_only"`  // if true, only check the message, do not write newly approved user to the database
-	ForceLLM   bool     `json:"force_llm"`   // force LLM review regardless of regular gating logic
-	LLMContext string   `json:"llm_context"` // extra moderation context for LLM review
+	CheckOnly  bool     `json:"check_only"`  // if true, only check, don't write approved user
+	ForceLLM   bool     `json:"force_llm"`   // force LLM review
+	LLMContext string   `json:"llm_context"` // extra moderation context for LLM
+	ImageData  []byte   `json:"-"`           // downloaded image bytes for vision analysis
+	ImageMIME  string   `json:"-"`           // MIME type of the image (e.g. "image/jpeg")
 }
 
 // MetaData is a meta-info about the message, provided by the client.
@@ -57,10 +59,10 @@ type Response struct {
 
 // RiskScore is the aggregated scoring result from all detector signals.
 type RiskScore struct {
-	Total    float64   `json:"total"`              // weighted sum of all spam signal scores
-	Signals  []Response `json:"signals"`            // all signals that contributed
-	Decision bool      `json:"decision"`           // true if total >= threshold
-	Reason   string    `json:"reason,omitempty"`   // human-readable explanation
+	Total    float64    `json:"total"`            // weighted sum of all spam signal scores
+	Signals  []Response `json:"signals"`          // all signals that contributed
+	Decision bool       `json:"decision"`         // true if total >= threshold
+	Reason   string     `json:"reason,omitempty"` // human-readable explanation
 }
 
 func (r *Response) String() string {
