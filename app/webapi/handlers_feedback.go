@@ -33,6 +33,7 @@ func (s *Server) feedbackRoutes(mux *routegroup.Bundle) {
 			r.HandleFunc("POST /knowledge/snapshot", s.createKnowledgeSnapshotHandler)
 			r.HandleFunc("GET /knowledge/snapshots", s.listKnowledgeSnapshotsHandler)
 			r.HandleFunc("GET /knowledge/snapshots/{id}", s.getKnowledgeSnapshotHandler)
+			r.HandleFunc("POST /knowledge/snapshots/{id}/rollback", s.rollbackKnowledgeHandler)
 		}
 	})
 }
@@ -221,6 +222,27 @@ func (s *Server) getKnowledgeSnapshotHandler(w http.ResponseWriter, r *http.Requ
 	snap, err := s.KnowledgeService.GetSnapshot(r.Context(), id)
 	if err != nil {
 		_ = rest.EncodeJSON(w, http.StatusNotFound, rest.JSON{"error": err.Error()})
+		return
+	}
+	_ = rest.EncodeJSON(w, http.StatusOK, snap)
+}
+
+func (s *Server) rollbackKnowledgeHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": fmt.Sprintf("invalid snapshot id: %s", idStr)})
+		return
+	}
+
+	var req struct {
+		RolledBackBy string `json:"rolled_back_by"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	snap, err := s.KnowledgeService.Rollback(r.Context(), id, req.RolledBackBy)
+	if err != nil {
+		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": err.Error()})
 		return
 	}
 	_ = rest.EncodeJSON(w, http.StatusOK, snap)
