@@ -29,6 +29,7 @@ type TbAPI interface {
 	Request(c tbapi.Chattable) (*tbapi.APIResponse, error)
 	GetChat(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error)
 	GetChatAdministrators(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error)
+	GetFileDirectURL(fileID string) (string, error)
 }
 
 // SpamLogger is an interface for spam logger
