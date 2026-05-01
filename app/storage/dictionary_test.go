@@ -89,6 +89,39 @@ func (s *StorageTestSuite) TestDictionary_Delete() {
 	}
 }
 
+func (s *StorageTestSuite) TestDictionary_DeleteByType() {
+	ctx := context.Background()
+	for _, dbt := range s.getTestDB() {
+		db := dbt.DB
+		s.Run(fmt.Sprintf("with %s", db.Type()), func() {
+			d, err := NewDictionary(ctx, db)
+			s.Require().NoError(err)
+			defer db.Exec("DROP TABLE dictionary")
+
+			s.Require().NoError(d.Add(ctx, DictionaryTypeStopPhrase, "stop1"))
+			s.Require().NoError(d.Add(ctx, DictionaryTypeStopPhrase, "stop2"))
+			s.Require().NoError(d.Add(ctx, DictionaryTypeIgnoredWord, "ignored1"))
+
+			affected, err := d.DeleteByType(ctx, DictionaryTypeStopPhrase)
+			s.NoError(err)
+			s.Equal(int64(2), affected)
+
+			phrases, err := d.Read(ctx, DictionaryTypeStopPhrase)
+			s.NoError(err)
+			s.Empty(phrases)
+
+			ignored, err := d.Read(ctx, DictionaryTypeIgnoredWord)
+			s.NoError(err)
+			s.Len(ignored, 1)
+
+			s.Run("invalid type", func() {
+				_, err := d.DeleteByType(ctx, "invalid")
+				s.Error(err)
+			})
+		})
+	}
+}
+
 func (s *StorageTestSuite) TestDictionary_Read() {
 	ctx := context.Background()
 	for _, dbt := range s.getTestDB() {

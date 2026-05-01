@@ -153,6 +153,27 @@ func (d *Dictionary) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
+// DeleteByType removes all entries of the given type from the dictionary
+func (d *Dictionary) DeleteByType(ctx context.Context, t DictionaryType) (int64, error) {
+	if err := t.Validate(); err != nil {
+		return 0, err
+	}
+
+	d.Lock()
+	defer d.Unlock()
+
+	result, err := d.ExecContext(ctx, d.Adopt(`DELETE FROM dictionary WHERE type = ? AND tenant_id = ?`), t, d.TenantID())
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete entries by type: %w", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get affected rows: %w", err)
+	}
+	return affected, nil
+}
+
 // DictionaryEntry represents a dictionary entry with its database ID
 type DictionaryEntry struct {
 	ID   int64  `db:"id" json:"id"`
