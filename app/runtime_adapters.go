@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"io"
+	"log"
 	"time"
 
 	"github.com/umputun/tg-spam/app/controlplane"
+	"github.com/umputun/tg-spam/app/feedback"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/webapi"
 )
@@ -104,4 +106,52 @@ func (a *quotaLimitAdapter) Increment(ctx context.Context, limitType string) err
 
 func (a *quotaLimitAdapter) Set(ctx context.Context, limitType string, limitValue int) error {
 	return a.inner.Set(ctx, limitType, limitValue)
+}
+
+type sampleAdderAdapter struct {
+	samples *storage.Samples
+}
+
+func (a *sampleAdderAdapter) AddSpamSample(ctx context.Context, text string) error {
+	return a.samples.Add(ctx, storage.SampleTypeSpam, storage.SampleOriginUser, text)
+}
+
+func (a *sampleAdderAdapter) AddHamSample(ctx context.Context, text string) error {
+	return a.samples.Add(ctx, storage.SampleTypeHam, storage.SampleOriginUser, text)
+}
+
+type spamTextProviderAdapter struct {
+	store *storage.DetectedSpam
+}
+
+func (a *spamTextProviderAdapter) GetSpamText(ctx context.Context, spamID int64) (string, error) {
+	entry, err := a.store.GetByID(ctx, spamID)
+	if err != nil {
+		return "", err
+	}
+	if entry == nil {
+		return "", nil
+	}
+	return entry.Text, nil
+}
+
+type dictAdderAdapter struct {
+	dict *storage.Dictionary
+}
+
+func (a *dictAdderAdapter) AddStopPhrase(ctx context.Context, phrase string) error {
+	return a.dict.Add(ctx, storage.DictionaryTypeStopPhrase, phrase)
+}
+
+type candidateGeneratorAdapter struct {
+	svc *feedback.ReviewService
+}
+
+func (a *candidateGeneratorAdapter) GenerateCandidates(ctx context.Context, text string) {
+	if text == "" {
+		return
+	}
+	if _, err := a.svc.GenerateFromSpamText(ctx, 0, text); err != nil {
+		log.Printf("[WARN] auto candidate generation failed: %v", err)
+	}
 }

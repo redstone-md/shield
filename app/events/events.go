@@ -62,6 +62,11 @@ type DetectedSpamCounter interface {
 	Write(ctx context.Context, entry storage.DetectedSpamInfo, checks []spamcheck.Response) error
 }
 
+// CandidateGenerator generates review candidates from spam text.
+type CandidateGenerator interface {
+	GenerateCandidates(ctx context.Context, text string)
+}
+
 // IncomingEvents persists normalized ingress events before moderation processing.
 type IncomingEvents interface {
 	Record(ctx context.Context, event moderation.IncomingEvent) (bool, error)

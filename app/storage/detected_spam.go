@@ -226,6 +226,37 @@ func (ds *DetectedSpam) Read(ctx context.Context) ([]DetectedSpamInfo, error) {
 	return entries, nil
 }
 
+// GetByID returns a single detected spam entry by its ID
+func (ds *DetectedSpam) GetByID(ctx context.Context, id int64) (*DetectedSpamInfo, error) {
+	ds.RLock()
+	defer ds.RUnlock()
+
+	query := ds.Adopt("SELECT * FROM detected_spam WHERE tenant_id = ? AND id = ?")
+	var entry DetectedSpamInfo
+	err := ds.GetContext(ctx, &entry, query, ds.TenantID(), id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get detected spam entry %d: %w", id, err)
+	}
+
+	var checks []spamcheck.Response
+	if err := json.Unmarshal([]byte(entry.ChecksJSON), &checks); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal checks for entry %d: %w", id, err)
+	}
+	var matchedRules []string
+	if entry.MatchedRulesJSON != "" {
+		if err := json.Unmarshal([]byte(entry.MatchedRulesJSON), &matchedRules); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal matched rules for entry %d: %w", id, err)
+		}
+	}
+	entry.Checks = checks
+	entry.MatchedRules = matchedRules
+	entry.Timestamp = entry.Timestamp.Local()
+	return &entry, nil
+}
+
 // FindByUserID returns the latest detected spam entry for the given user ID
 func (ds *DetectedSpam) FindByUserID(ctx context.Context, userID int64) (*DetectedSpamInfo, error) {
 	ds.RLock()

@@ -77,6 +77,7 @@ type TelegramListener struct {
 	MetricsRecorder         MetricsRecorder
 	SlowPathEnabled         bool
 	SlowPathEngine          SlowPathChecker
+	CandidateGenerator      CandidateGenerator
 
 	adminHandler    *admin
 	reportsHandler  *userReports

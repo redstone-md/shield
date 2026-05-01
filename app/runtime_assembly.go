@@ -213,12 +213,15 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	if err != nil {
 		return nil, fmt.Errorf("can't make knowledge snapshots store, %w", err)
 	}
-	feedbackSvc := feedback.NewService(labelsStore, nil, nil)
-	reviewSvc := feedback.NewReviewService(candidatesStore, nil, feedbackSvc)
 	samplesStore, err := storage.NewSamples(ctx, dataDB)
 	if err != nil {
-		return nil, fmt.Errorf("can't make samples store for knowledge, %w", err)
+		return nil, fmt.Errorf("can't make samples store, %w", err)
 	}
+	feedbackSvc := feedback.NewService(labelsStore,
+		&sampleAdderAdapter{samples: samplesStore},
+		&spamTextProviderAdapter{store: detectedSpamStore},
+	)
+	reviewSvc := feedback.NewReviewService(candidatesStore, &dictAdderAdapter{dict: dictionaryStore}, feedbackSvc)
 	knowledgeSvc := feedback.NewKnowledgeService(knowledgeStore,
 		&knowledgeDictAdapter{dict: dictionaryStore},
 		&knowledgeSamplesAdapter{samples: samplesStore},
@@ -427,6 +430,9 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 	if a.SlowPathEngine != nil {
 		listener.SlowPathEngine = a.SlowPathEngine
 		listener.SlowPathEnabled = true
+	}
+	if a.ReviewService != nil {
+		listener.CandidateGenerator = &candidateGeneratorAdapter{svc: a.ReviewService}
 	}
 	a.TelegramListener = listener
 	a.Web.BotUsername = listener.BotUsername

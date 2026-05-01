@@ -403,6 +403,10 @@ func (l *TelegramListener) processEnforce(ctx context.Context, pc pipelineContex
 		}
 	}
 
+	if l.CandidateGenerator != nil && pc.msg.Text != "" {
+		l.CandidateGenerator.GenerateCandidates(ctx, pc.msg.Text)
+	}
+
 	if err := l.completeIncomingEvent(ctx, pc.event, pc.outcome.Decision, actionResult); err != nil {
 		errs = multierror.Append(errs, err)
 	}
