@@ -494,6 +494,7 @@ func (s *Samples) stats(ctx context.Context) (*SamplesStats, error) {
 	return &stats, nil
 }
 
-func (s *Samples) migrate(_ context.Context, _ *sqlx.Tx, _ string) error {
+func (s *Samples) migrate(ctx context.Context, tx *sqlx.Tx, _ string) error {
+	migrateTenantID(ctx, tx, s.Type(), "samples")
 	return nil
 }

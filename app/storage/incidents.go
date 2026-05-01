@@ -182,7 +182,8 @@ func (s *IncidentStorage) createCommentsTable(ctx context.Context) error {
 	return nil
 }
 
-func (s *IncidentStorage) migrate(_ context.Context, _ *sqlx.Tx, _ string) error {
+func (s *IncidentStorage) migrate(ctx context.Context, tx *sqlx.Tx, _ string) error {
+	migrateTenantID(ctx, tx, s.Type(), "incidents")
 	return nil
 }
 
