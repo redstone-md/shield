@@ -55,6 +55,7 @@ type runtimeAssembly struct {
 	RetentionSvc           *storage.RetentionService
 	Metrics                *observability.Metrics
 	SlowPathEngine         *slowpath.Engine
+	AutoLearner            events.AutoLearner
 	Web                    webRuntimeAssembly
 }
 
@@ -225,7 +226,13 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	knowledgeSvc := feedback.NewKnowledgeService(knowledgeStore,
 		&knowledgeDictAdapter{dict: dictionaryStore},
 		&knowledgeSamplesAdapter{samples: samplesStore},
+		&stopPhraseRestorerAdapter{dict: dictionaryStore},
 	)
+
+	autoLearner := &autoLearnerAdapter{
+		samples:   &sampleAdderAdapter{samples: samplesStore},
+		reviewSvc: reviewSvc,
+	}
 
 	usageMetering, err := storage.NewUsageMetering(ctx, dataDB)
 	if err != nil {
@@ -262,6 +269,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		AppealService:          appealSvc,
 		FeedbackService:        feedbackSvc,
 		ReviewService:          reviewSvc,
+		AutoLearner:            autoLearner,
 		UsageMetering:          usageMetering,
 		RetentionSvc: storage.NewRetentionService(dataDB, storage.RetentionConfig{
 			IncidentsTTL:         opts.Retention.IncidentsTTL,
@@ -433,6 +441,9 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 	}
 	if a.ReviewService != nil {
 		listener.CandidateGenerator = &candidateGeneratorAdapter{svc: a.ReviewService}
+	}
+	if a.AutoLearner != nil {
+		listener.AutoLearner = a.AutoLearner
 	}
 	a.TelegramListener = listener
 	a.Web.BotUsername = listener.BotUsername

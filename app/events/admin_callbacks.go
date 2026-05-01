@@ -88,6 +88,9 @@ func (a *admin) callbackBanConfirmed(ctx context.Context, query *tbapi.CallbackQ
 		if err = a.bot.UpdateSpam(cleanMsg); err != nil {
 			return fmt.Errorf("failed to update spam for %q: %w", cleanMsg, err)
 		}
+		if a.autoLearner != nil {
+			a.autoLearner.LearnSpam(ctx, cleanMsg, query.From.UserName)
+		}
 	} else {
 		log.Printf("[DEBUG] failed to get clean message: %v", err)
 	}
@@ -136,6 +139,9 @@ func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.Callbac
 	if cleanMsg, cleanErr := a.getCleanMessage(query.Message.Text); cleanErr == nil && cleanMsg != "" {
 		if upErr := a.bot.UpdateHam(cleanMsg); upErr != nil {
 			return fmt.Errorf("failed to update ham for %q: %w", cleanMsg, upErr)
+		}
+		if a.autoLearner != nil {
+			a.autoLearner.LearnHam(ctx, cleanMsg, query.From.UserName)
 		}
 	} else {
 		log.Printf("[DEBUG] failed to get clean message: %v", cleanErr)

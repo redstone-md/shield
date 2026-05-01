@@ -43,6 +43,7 @@ type userReports struct {
 	tenantID     string
 	superUsers   SuperUsers
 	actions      ActionExecutor
+	autoLearner  AutoLearner
 	primChatID   int64
 	adminChatID  int64
 	moderation   ModerationConfig
@@ -196,6 +197,9 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 	if !r.dry && msgTxt != "" {
 		if err := r.bot.UpdateSpam(msgTxt); err != nil {
 			log.Printf("[WARN] failed to update spam samples from LLM-reviewed report: %v", err)
+		}
+		if r.autoLearner != nil {
+			r.autoLearner.LearnSpam(ctx, msgTxt, "llm_auto")
 		}
 	}
 
@@ -405,6 +409,9 @@ func (r *userReports) executeAutoBan(ctx context.Context, reports []storage.Repo
 	if !r.dry && msgText != "" {
 		if spamErr := r.bot.UpdateSpam(msgText); spamErr != nil {
 			log.Printf("[WARN] failed to update spam samples: %v", spamErr)
+		}
+		if r.autoLearner != nil {
+			r.autoLearner.LearnSpam(ctx, msgText, "auto_ban")
 		}
 	}
 

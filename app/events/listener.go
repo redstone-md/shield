@@ -78,6 +78,7 @@ type TelegramListener struct {
 	SlowPathEnabled         bool
 	SlowPathEngine          SlowPathChecker
 	CandidateGenerator      CandidateGenerator
+	AutoLearner             AutoLearner
 
 	adminHandler    *admin
 	reportsHandler  *userReports
@@ -214,14 +215,15 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 func (l *TelegramListener) initHandlers() {
 	l.adminHandler = &admin{
 		tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers, actions: l.ActionExecutor,
-		primChatID: l.chatID, adminChatID: l.adminChatID,
+		autoLearner: l.AutoLearner,
+		primChatID:  l.chatID, adminChatID: l.adminChatID,
 		trainingMode: l.TrainingMode, softBan: l.SoftBanMode, dry: l.Dry, warnMsg: l.WarnMsg,
 		aggressiveCleanup: l.AggressiveCleanup, aggressiveCleanupLimit: l.AggressiveCleanupLimit,
 	}
 
 	l.reportsHandler = &userReports{
 		ReportConfig: l.ReportConfig, tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers,
-		actions:      l.ActionExecutor,
+		actions: l.ActionExecutor, autoLearner: l.AutoLearner,
 		detectedSpam: l.DetectedSpamCounter, tenantID: l.TenantID, moderation: l.ModerationConfig,
 		primChatID: l.chatID, adminChatID: l.adminChatID,
 		trainingMode: l.TrainingMode, softBanMode: l.SoftBanMode, dry: l.Dry,

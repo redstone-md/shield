@@ -63,6 +63,11 @@ type DetectedSpamCounter interface {
 }
 
 // CandidateGenerator generates review candidates from spam text.
+type AutoLearner interface {
+	LearnSpam(ctx context.Context, text, labeledBy string)
+	LearnHam(ctx context.Context, text, labeledBy string)
+}
+
 type CandidateGenerator interface {
 	GenerateCandidates(ctx context.Context, text string)
 }

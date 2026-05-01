@@ -21,6 +21,7 @@ type admin struct {
 	locator                Locator
 	superUsers             SuperUsers
 	actions                ActionExecutor
+	autoLearner            AutoLearner
 	primChatID             int64
 	adminChatID            int64
 	trainingMode           bool
@@ -142,6 +143,10 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 		return fmt.Errorf("failed to update spam for %q: %w", msgTxt, err)
 	}
 
+	if a.autoLearner != nil && msgTxt != "" {
+		a.autoLearner.LearnSpam(ctx, msgTxt, "admin_forward")
+	}
+
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
 		BaseChatMessage: tbapi.BaseChatMessage{
 			MessageID:  info.MsgID,
@@ -213,6 +218,9 @@ func (a *admin) msgHandlerFallback(ctx context.Context, update tbapi.Update, fwd
 
 	if err := a.bot.UpdateSpam(msgTxt); err != nil {
 		return fmt.Errorf("failed to update spam for %q: %w", msgTxt, err)
+	}
+	if a.autoLearner != nil && msgTxt != "" {
+		a.autoLearner.LearnSpam(ctx, msgTxt, "admin_forward")
 	}
 
 	banReq := banRequest{duration: bot.PermanentBanDuration, userID: fwdID, chatID: a.primChatID,

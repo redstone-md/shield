@@ -211,6 +211,9 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 		if err := a.bot.UpdateSpam(msgTxt); err != nil {
 			return fmt.Errorf("failed to update spam for %q: %w", msgTxt, err)
 		}
+		if a.autoLearner != nil {
+			a.autoLearner.LearnSpam(ctx, msgTxt, update.Message.From.UserName)
+		}
 	}
 
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{

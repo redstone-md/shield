@@ -38,6 +38,9 @@ func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.Callba
 		if spamErr := r.bot.UpdateSpam(msgText); spamErr != nil {
 			log.Printf("[WARN] failed to update spam samples: %v", spamErr)
 		}
+		if r.autoLearner != nil {
+			r.autoLearner.LearnSpam(ctx, msgText, query.From.UserName)
+		}
 	}
 
 	if r.actions != nil {
@@ -48,7 +51,7 @@ func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.Callba
 		}
 	} else if !r.dry {
 		_, err = r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID: msgID,
+			MessageID:  msgID,
 			ChatConfig: tbapi.ChatConfig{ChatID: chatID},
 		}})
 		if err != nil {

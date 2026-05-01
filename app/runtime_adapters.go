@@ -143,6 +143,59 @@ func (a *dictAdderAdapter) AddStopPhrase(ctx context.Context, phrase string) err
 	return a.dict.Add(ctx, storage.DictionaryTypeStopPhrase, phrase)
 }
 
+type stopPhraseRestorerAdapter struct {
+	dict *storage.Dictionary
+}
+
+func (a *stopPhraseRestorerAdapter) ReadStopPhrases(ctx context.Context) ([]string, error) {
+	return a.dict.Read(ctx, storage.DictionaryTypeStopPhrase)
+}
+
+func (a *stopPhraseRestorerAdapter) DeleteStopPhrases(ctx context.Context) error {
+	_, err := a.dict.DeleteByType(ctx, storage.DictionaryTypeStopPhrase)
+	return err
+}
+
+func (a *stopPhraseRestorerAdapter) AddStopPhrase(ctx context.Context, phrase string) error {
+	return a.dict.Add(ctx, storage.DictionaryTypeStopPhrase, phrase)
+}
+
+type candidateGenerator interface {
+	GenerateFromSpamText(ctx context.Context, sourceID int64, text string) ([]feedback.CandidateEntry, error)
+}
+
+type autoLearnerAdapter struct {
+	samples   feedback.SampleAdder
+	reviewSvc candidateGenerator
+}
+
+func (a *autoLearnerAdapter) LearnSpam(ctx context.Context, text, labeledBy string) {
+	if text == "" {
+		return
+	}
+	if a.samples != nil {
+		if err := a.samples.AddSpamSample(ctx, text); err != nil {
+			log.Printf("[WARN] auto-learn: add spam sample failed: %v", err)
+		}
+	}
+	if a.reviewSvc != nil {
+		if _, err := a.reviewSvc.GenerateFromSpamText(ctx, 0, text); err != nil {
+			log.Printf("[WARN] auto-learn: candidate generation failed: %v", err)
+		}
+	}
+}
+
+func (a *autoLearnerAdapter) LearnHam(ctx context.Context, text, labeledBy string) {
+	if text == "" {
+		return
+	}
+	if a.samples != nil {
+		if err := a.samples.AddHamSample(ctx, text); err != nil {
+			log.Printf("[WARN] auto-learn: add ham sample failed: %v", err)
+		}
+	}
+}
+
 type candidateGeneratorAdapter struct {
 	svc *feedback.ReviewService
 }
