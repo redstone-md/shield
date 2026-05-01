@@ -481,10 +481,18 @@ func makeSlowPathEngine(opts options) *slowpath.Engine {
 		if opts.OpenAI.APIBase != "" {
 			config.BaseURL = opts.OpenAI.APIBase
 		}
-		adapter := slowpath.NewOpenAIAdapter(openai.NewClientWithConfig(config), opts.OpenAI.Model, opts.OpenAI.MaxTokensResponse, opts.OpenAI.MaxSymbolsRequest)
-		eng.RegisterProvider(adapter, brk)
-		eng.RegisterVision(adapter, brk)
-		log.Printf("[INFO] slowpath openai registered (text+vision)")
+		oaClient := openai.NewClientWithConfig(config)
+		textAdapter := slowpath.NewOpenAIAdapter(oaClient, opts.OpenAI.Model, opts.OpenAI.MaxTokensResponse, opts.OpenAI.MaxSymbolsRequest)
+		eng.RegisterProvider(textAdapter, brk)
+
+		if vm := opts.OpenAI.VisionModel; vm != "" {
+			visionAdapter := slowpath.NewOpenAIAdapter(oaClient, vm, opts.OpenAI.MaxTokensResponse, opts.OpenAI.MaxSymbolsRequest)
+			eng.RegisterVision(visionAdapter, brk)
+			log.Printf("[INFO] slowpath openai registered (text: %s, vision: %s)", opts.OpenAI.Model, vm)
+		} else {
+			eng.RegisterVision(textAdapter, brk)
+			log.Printf("[INFO] slowpath openai registered (text+vision: %s)", opts.OpenAI.Model)
+		}
 	}
 
 	if opts.Gemini.Token != "" {
