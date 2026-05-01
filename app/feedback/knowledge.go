@@ -44,14 +44,21 @@ type SampleCounter interface {
 	CountSamples(ctx context.Context) (spamCount, hamCount int, err error)
 }
 
-type KnowledgeService struct {
-	store  KnowledgeStore
-	dict   DictionaryReader
-	sample SampleCounter
+type StopPhraseRestorer interface {
+	ReadStopPhrases(ctx context.Context) ([]string, error)
+	DeleteStopPhrases(ctx context.Context) error
+	AddStopPhrase(ctx context.Context, phrase string) error
 }
 
-func NewKnowledgeService(store KnowledgeStore, dict DictionaryReader, sample SampleCounter) *KnowledgeService {
-	return &KnowledgeService{store: store, dict: dict, sample: sample}
+type KnowledgeService struct {
+	store    KnowledgeStore
+	dict     DictionaryReader
+	sample   SampleCounter
+	restorer StopPhraseRestorer
+}
+
+func NewKnowledgeService(store KnowledgeStore, dict DictionaryReader, sample SampleCounter, restorer StopPhraseRestorer) *KnowledgeService {
+	return &KnowledgeService{store: store, dict: dict, sample: sample, restorer: restorer}
 }
 
 func (k *KnowledgeService) Snapshot(ctx context.Context, createdBy string) (KnowledgeSnapshot, error) {
@@ -124,4 +131,34 @@ func (k *KnowledgeService) ListSnapshots(ctx context.Context, limit, offset int)
 		_ = json.Unmarshal([]byte(snaps[i].DataJSON), &snaps[i].Data)
 	}
 	return snaps, nil
+}
+
+func (k *KnowledgeService) Rollback(ctx context.Context, snapshotID int64, rolledBackBy string) (KnowledgeSnapshot, error) {
+	if k.restorer == nil {
+		return KnowledgeSnapshot{}, fmt.Errorf("rollback not available: no restorer configured")
+	}
+
+	snap, err := k.GetSnapshot(ctx, snapshotID)
+	if err != nil {
+		return KnowledgeSnapshot{}, fmt.Errorf("get snapshot for rollback: %w", err)
+	}
+
+	if err = k.restorer.DeleteStopPhrases(ctx); err != nil {
+		return KnowledgeSnapshot{}, fmt.Errorf("delete current stop phrases: %w", err)
+	}
+
+	var added, failed int
+	for _, phrase := range snap.Data.StopPhrases {
+		if addErr := k.restorer.AddStopPhrase(ctx, phrase); addErr != nil {
+			log.Printf("[WARN] knowledge rollback: failed to add stop phrase %q: %v", phrase, addErr)
+			failed++
+			continue
+		}
+		added++
+	}
+
+	log.Printf("[INFO] knowledge rollback to snapshot %d by %q: restored %d stop phrases (%d failed)",
+		snapshotID, rolledBackBy, added, failed)
+
+	return snap, nil
 }
