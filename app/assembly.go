@@ -17,6 +17,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/rules"
+	"github.com/umputun/tg-spam/app/slowpath"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/app/webapi"
@@ -211,15 +212,15 @@ func activateServer(ctx context.Context, opts options, web webRuntimeAssembly, d
 		ApprovedUsersProvider: web.ApprovedUsersService,
 		RateLimiter:           webapi.NewTenantRateLimiter(50, 50),
 		TenantStatusProvider:  web.TenantStatusProvider,
-		AuditService:                web.AuditService,
-		AppealService:               web.AppealService,
-		FeedbackService:    web.FeedbackService,
-		ReviewService:      web.ReviewService,
-		KnowledgeService:   web.KnowledgeService,
-		OnboardingProvider: web.OnboardingProvider,
-		RestoreProvider:    web.RestoreProvider,
-		MetricsCollector:   web.Metrics,
-		AuthPasswd:         authPassswd,
+		AuditService:          web.AuditService,
+		AppealService:         web.AppealService,
+		FeedbackService:       web.FeedbackService,
+		ReviewService:         web.ReviewService,
+		KnowledgeService:      web.KnowledgeService,
+		OnboardingProvider:    web.OnboardingProvider,
+		RestoreProvider:       web.RestoreProvider,
+		MetricsCollector:      web.Metrics,
+		AuthPasswd:            authPassswd,
 		AuthHash:              opts.Server.AuthHash,
 		Version:               revision,
 		Dbg:                   opts.Dbg,
@@ -466,4 +467,43 @@ func expandPath(path string) string {
 	return ep
 }
 
+func makeSlowPathEngine(opts options) *slowpath.Engine {
+	hasProvider := opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "" || opts.Gemini.Token != ""
+	if !hasProvider {
+		return nil
+	}
 
+	eng := slowpath.NewEngine(slowpath.EngineConfig{})
+	brk := slowpath.DefaultBreakerConfig()
+
+	if opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "" {
+		config := openai.DefaultConfig(opts.OpenAI.Token)
+		if opts.OpenAI.APIBase != "" {
+			config.BaseURL = opts.OpenAI.APIBase
+		}
+		adapter := slowpath.NewOpenAIAdapter(openai.NewClientWithConfig(config), opts.OpenAI.Model, opts.OpenAI.MaxTokensResponse, opts.OpenAI.MaxSymbolsRequest)
+		eng.RegisterProvider(adapter, brk)
+		eng.RegisterVision(adapter, brk)
+		log.Printf("[INFO] slowpath openai registered (text+vision)")
+	}
+
+	if opts.Gemini.Token != "" {
+		client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
+			APIKey:  opts.Gemini.Token,
+			Backend: genai.BackendGeminiAPI,
+		})
+		if err != nil {
+			log.Printf("[WARN] slowpath gemini client failed: %v", err)
+		} else {
+			adapter := slowpath.NewGeminiAdapter(client.Models, opts.Gemini.Model, slowpath.GeminiAdapterConfig{
+				MaxOutputTokens:   opts.Gemini.MaxTokensResponse,
+				MaxSymbolsRequest: opts.Gemini.MaxSymbolsRequest,
+			})
+			eng.RegisterProvider(adapter, brk)
+			eng.RegisterVision(adapter, brk)
+			log.Printf("[INFO] slowpath gemini registered (text+vision)")
+		}
+	}
+
+	return eng
+}

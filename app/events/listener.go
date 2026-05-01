@@ -20,6 +20,7 @@ import (
 	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/policy"
 	"github.com/umputun/tg-spam/app/rules"
+	"github.com/umputun/tg-spam/app/slowpath"
 )
 
 type UsageMeter interface {
@@ -29,6 +30,10 @@ type UsageMeter interface {
 type MetricsRecorder interface {
 	Inc(name string)
 	Observe(name string, duration time.Duration)
+}
+
+type SlowPathChecker interface {
+	Check(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error)
 }
 
 // TelegramListener listens to tg update, forward to bots and send back responses
@@ -71,6 +76,7 @@ type TelegramListener struct {
 	UsageMeter              UsageMeter
 	MetricsRecorder         MetricsRecorder
 	SlowPathEnabled         bool
+	SlowPathEngine          SlowPathChecker
 
 	adminHandler    *admin
 	reportsHandler  *userReports

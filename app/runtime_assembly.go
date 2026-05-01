@@ -16,6 +16,7 @@ import (
 	"github.com/umputun/tg-spam/app/feedback"
 	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/rules"
+	"github.com/umputun/tg-spam/app/slowpath"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/app/webapi"
@@ -53,6 +54,7 @@ type runtimeAssembly struct {
 	UsageMetering          *storage.UsageMetering
 	RetentionSvc           *storage.RetentionService
 	Metrics                *observability.Metrics
+	SlowPathEngine         *slowpath.Engine
 	Web                    webRuntimeAssembly
 }
 
@@ -107,6 +109,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	}
 
 	detector := makeDetectorWithRuleSet(opts, activeRuleSet)
+	slowPathEngine := makeSlowPathEngine(opts)
 	spamBot, err := makeSpamBot(ctx, opts, activeRuleSet, dataDB, detector)
 	if err != nil {
 		return nil, fmt.Errorf("can't make spam bot, %w", err)
@@ -268,9 +271,10 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 			UsageCountersTTL:     opts.Retention.UsageCountersTTL,
 			Interval:             opts.Retention.Interval,
 		}),
-		Metrics:       metrics,
-		OnboardingSvc: onboardingSvc,
-		RestoreSvc:    restoreSvc,
+		Metrics:        metrics,
+		SlowPathEngine: slowPathEngine,
+		OnboardingSvc:  onboardingSvc,
+		RestoreSvc:     restoreSvc,
 		Web: webRuntimeAssembly{
 			Detector:             detector,
 			SpamFilter:           spamBot,
@@ -419,6 +423,10 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 	}
 	if a.Metrics != nil {
 		listener.MetricsRecorder = a.Metrics
+	}
+	if a.SlowPathEngine != nil {
+		listener.SlowPathEngine = a.SlowPathEngine
+		listener.SlowPathEnabled = true
 	}
 	a.TelegramListener = listener
 	a.Web.BotUsername = listener.BotUsername
