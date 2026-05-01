@@ -13,10 +13,10 @@ import (
 )
 
 type mockOnboardTenantStore struct {
-	record  storage.TenantRecord
-	exists  bool
-	addErr  error
-	updErr  error
+	record storage.TenantRecord
+	exists bool
+	addErr error
+	updErr error
 }
 
 func (m *mockOnboardTenantStore) Get(_ context.Context, id string) (storage.TenantRecord, error) {

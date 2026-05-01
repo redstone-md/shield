@@ -9,7 +9,7 @@ import (
 
 type EngineConfig struct {
 	DefaultProvider string
-	CostPerToken   float64
+	CostPerToken    float64
 }
 
 type Engine struct {
@@ -44,7 +44,7 @@ func (e *Engine) RegisterVision(p VisionProvider, breakerCfg BreakerConfig) {
 	}
 }
 
-func (e *Engine) SetBudgetTracker(bt BudgetTracker) { e.budget = bt }
+func (e *Engine) SetBudgetTracker(bt BudgetTracker)   { e.budget = bt }
 func (e *Engine) SetPromptRegistry(pr PromptRegistry) { e.registry = pr }
 
 func (e *Engine) Check(ctx context.Context, req SlowPathRequest) (*SlowPathResult, error) {

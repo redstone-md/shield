@@ -15,9 +15,9 @@ func TestRetentionService_CleanNow(t *testing.T) {
 	ctx := t.Context()
 
 	svc := NewRetentionService(db, RetentionConfig{
-		IncidentsTTL:       48 * time.Hour,
-		IncomingEventsTTL:  24 * time.Hour,
-		UsageCountersTTL:   1 * time.Hour,
+		IncidentsTTL:      48 * time.Hour,
+		IncomingEventsTTL: 24 * time.Hour,
+		UsageCountersTTL:  1 * time.Hour,
 	})
 
 	_, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS incidents (

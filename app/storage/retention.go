@@ -10,15 +10,15 @@ import (
 )
 
 type RetentionConfig struct {
-	IncidentsTTL          time.Duration
-	AppealsTTL            time.Duration
-	DetectedSpamTTL       time.Duration
-	IncomingEventsTTL     time.Duration
-	ModerationActionsTTL  time.Duration
-	LabelsTTL             time.Duration
-	CandidatesTTL         time.Duration
-	UsageCountersTTL      time.Duration
-	Interval              time.Duration
+	IncidentsTTL         time.Duration
+	AppealsTTL           time.Duration
+	DetectedSpamTTL      time.Duration
+	IncomingEventsTTL    time.Duration
+	ModerationActionsTTL time.Duration
+	LabelsTTL            time.Duration
+	CandidatesTTL        time.Duration
+	UsageCountersTTL     time.Duration
+	Interval             time.Duration
 }
 
 type RetentionService struct {

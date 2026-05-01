@@ -51,7 +51,7 @@ func TestSpamFilter_UpdateSpam(t *testing.T) {
 			s := NewSpamFilterWithRoles(nil, nil, updater, nil, SpamConfig{
 				SamplesStore: samplesStore,
 				DictStore:    dictStore,
-				TenantID:      "gr1",
+				TenantID:     "gr1",
 			})
 
 			err := s.UpdateSpam(tc.message)
@@ -102,7 +102,7 @@ func TestSpamFilter_UpdateHam(t *testing.T) {
 			s := NewSpamFilterWithRoles(nil, nil, updater, nil, SpamConfig{
 				SamplesStore: samplesStore,
 				DictStore:    dictStore,
-				TenantID:      "gr1",
+				TenantID:     "gr1",
 			})
 
 			err := s.UpdateHam(tc.message)
@@ -197,7 +197,7 @@ func TestSpamFilter_ApprovedUsers(t *testing.T) {
 			s := NewSpamFilterWithRoles(nil, nil, nil, approvedUsers, SpamConfig{
 				SamplesStore: samplesStore,
 				DictStore:    dictStore,
-				TenantID:      "gr1",
+				TenantID:     "gr1",
 			})
 
 			var err error
@@ -298,7 +298,7 @@ func TestSpamFilter_ReloadSamples(t *testing.T) {
 			s := NewSpamFilterWithRoles(nil, loader, nil, nil, SpamConfig{
 				SamplesStore: samplesStore,
 				DictStore:    dictStore,
-				TenantID:      "gr1",
+				TenantID:     "gr1",
 			})
 
 			err := s.ReloadSamples(context.Background())
@@ -359,7 +359,7 @@ func TestSpamFilter_RemoveDynamicSample(t *testing.T) {
 			s := NewSpamFilterWithRoles(nil, nil, updater, nil, SpamConfig{
 				SamplesStore: samplesStore,
 				DictStore:    dictStore,
-				TenantID:      "gr1",
+				TenantID:     "gr1",
 			})
 
 			err := s.RemoveDynamicSpamSample(tc.sample)

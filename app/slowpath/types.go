@@ -67,26 +67,26 @@ type HistoryMessage struct {
 }
 
 type ProviderResult struct {
-	Spam        bool
-	Confidence  int
-	Reason      string
-	Provider    string
-	Model       string
-	InputTokens int
-	OutputTokens int
-	Latency     time.Duration
-	RawResponse string
+	Spam          bool
+	Confidence    int
+	Reason        string
+	Provider      string
+	Model         string
+	InputTokens   int
+	OutputTokens  int
+	Latency       time.Duration
+	RawResponse   string
 	PromptVersion string
 }
 
 type PromptEntry struct {
-	ID           string
-	Version      string
-	Provider     string
-	SystemPrompt string
+	ID            string
+	Version       string
+	Provider      string
+	SystemPrompt  string
 	CustomPrompts []string
-	CreatedAt    time.Time
-	Active       bool
+	CreatedAt     time.Time
+	Active        bool
 }
 
 type SlowPathInvocation struct {

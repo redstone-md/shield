@@ -154,7 +154,7 @@ func (c *callableProvider) Check(ctx context.Context, req ProviderRequest) (*Pro
 
 func TestIntegration_PromptRegistryWithEngine(t *testing.T) {
 	provider := &stubLLMProvider{
-		name: "openai",
+		name:   "openai",
 		result: &ProviderResult{Spam: false, Confidence: 10, Provider: "openai"},
 	}
 

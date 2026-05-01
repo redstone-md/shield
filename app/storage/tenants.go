@@ -131,7 +131,7 @@ func (t *Tenants) Get(ctx context.Context, id string) (TenantRecord, error) {
 	query = t.Adopt(query)
 
 	var rec TenantRecord
-	if err := t.GetContext(ctx, &rec, query, 	t.TenantID(), id); err != nil {
+	if err := t.GetContext(ctx, &rec, query, t.TenantID(), id); err != nil {
 		if err == sql.ErrNoRows {
 			return TenantRecord{}, fmt.Errorf("tenant %q not found: %w", id, err)
 		}
@@ -151,7 +151,7 @@ func (t *Tenants) GetByName(ctx context.Context, name string) (TenantRecord, err
 	query = t.Adopt(query)
 
 	var rec TenantRecord
-	if err := t.GetContext(ctx, &rec, query, 	t.TenantID(), name); err != nil {
+	if err := t.GetContext(ctx, &rec, query, t.TenantID(), name); err != nil {
 		if err == sql.ErrNoRows {
 			return TenantRecord{}, fmt.Errorf("tenant %q not found: %w", name, err)
 		}
@@ -171,7 +171,7 @@ func (t *Tenants) List(ctx context.Context) ([]TenantRecord, error) {
 	query = t.Adopt(query)
 
 	var recs []TenantRecord
-	if err := t.SelectContext(ctx, &recs, query, 	t.TenantID()); err != nil {
+	if err := t.SelectContext(ctx, &recs, query, t.TenantID()); err != nil {
 		return nil, fmt.Errorf("failed to list tenants: %w", err)
 	}
 	return recs, nil
@@ -187,7 +187,7 @@ func (t *Tenants) UpdateStatus(ctx context.Context, id, status string) error {
 	}
 	query = t.Adopt(query)
 
-	if _, err := t.ExecContext(ctx, query, status, time.Now().UTC(), 	t.TenantID(), id); err != nil {
+	if _, err := t.ExecContext(ctx, query, status, time.Now().UTC(), t.TenantID(), id); err != nil {
 		return fmt.Errorf("failed to update tenant status: %w", err)
 	}
 	return nil
@@ -203,7 +203,7 @@ func (t *Tenants) UpdateName(ctx context.Context, id, name string) error {
 	}
 	query = t.Adopt(query)
 
-	if _, err := t.ExecContext(ctx, query, name, time.Now().UTC(), 	t.TenantID(), id); err != nil {
+	if _, err := t.ExecContext(ctx, query, name, time.Now().UTC(), t.TenantID(), id); err != nil {
 		return fmt.Errorf("failed to update tenant name: %w", err)
 	}
 	return nil

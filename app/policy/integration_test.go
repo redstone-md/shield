@@ -108,12 +108,12 @@ func TestIntegration_DryRunFlag(t *testing.T) {
 func TestIntegration_AllRiskTypes(t *testing.T) {
 	e := NewEngine(BalancedProfile())
 	cases := map[string]RiskType{
-		"stop-word":        RiskSpam,
-		"duplicate":        RiskRaid,
-		"mentions":         RiskAbuse,
-		"giveaway":         RiskScam,
-		"video-only":       RiskNSFW,
-		"unknown-check":    RiskUnknown,
+		"stop-word":     RiskSpam,
+		"duplicate":     RiskRaid,
+		"mentions":      RiskAbuse,
+		"giveaway":      RiskScam,
+		"video-only":    RiskNSFW,
+		"unknown-check": RiskUnknown,
 	}
 
 	for name, expected := range cases {

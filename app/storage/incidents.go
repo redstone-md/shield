@@ -390,26 +390,26 @@ func (s *IncidentStorage) ListComments(ctx context.Context, incidentID int64) ([
 }
 
 type incidentRecord struct {
-	ID              int64          `db:"id"`
-	GID             string         `db:"gid"`
-	TenantID        string         `db:"tenant_id"`
-	Source          string         `db:"source"`
-	Status          string         `db:"status"`
-	Severity        string         `db:"severity"`
-	IdempotencyKey  string         `db:"idempotency_key"`
-	DetectedSpamID  int64          `db:"detected_spam_id"`
-	ReportID        int64          `db:"report_id"`
-	ReasonCode      string         `db:"reason_code"`
-	ReasonText      string         `db:"reason_text"`
-	SpamUserID      int64          `db:"spam_user_id"`
-	SpamUserName    string         `db:"spam_user_name"`
-	ChatID          int64          `db:"chat_id"`
-	MessageText     string         `db:"message_text"`
-	ResolvedBy      string         `db:"resolved_by"`
-	Comment         string         `db:"comment"`
-	CreatedAt       time.Time      `db:"created_at"`
-	UpdatedAt       time.Time      `db:"updated_at"`
-	ResolvedAt      sql.NullTime   `db:"resolved_at"`
+	ID             int64        `db:"id"`
+	GID            string       `db:"gid"`
+	TenantID       string       `db:"tenant_id"`
+	Source         string       `db:"source"`
+	Status         string       `db:"status"`
+	Severity       string       `db:"severity"`
+	IdempotencyKey string       `db:"idempotency_key"`
+	DetectedSpamID int64        `db:"detected_spam_id"`
+	ReportID       int64        `db:"report_id"`
+	ReasonCode     string       `db:"reason_code"`
+	ReasonText     string       `db:"reason_text"`
+	SpamUserID     int64        `db:"spam_user_id"`
+	SpamUserName   string       `db:"spam_user_name"`
+	ChatID         int64        `db:"chat_id"`
+	MessageText    string       `db:"message_text"`
+	ResolvedBy     string       `db:"resolved_by"`
+	Comment        string       `db:"comment"`
+	CreatedAt      time.Time    `db:"created_at"`
+	UpdatedAt      time.Time    `db:"updated_at"`
+	ResolvedAt     sql.NullTime `db:"resolved_at"`
 }
 
 func (r incidentRecord) toIncident() audit.Incident {

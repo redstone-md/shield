@@ -362,13 +362,13 @@ func TestTelegramListener_ProcEventsBuildsEditedMessageIdempotencyKey(t *testing
 
 	spy := &processorSpy{}
 	l := TelegramListener{
-		Bot:        &mocks.BotMock{},
-		Locator:    locator,
-		Group:      "123",
-		TenantID: "tg-spam",
-		chatID:   123,
-		Queue:      moderation.NewInMemoryQueue(1),
-		processor:  spy,
+		Bot:       &mocks.BotMock{},
+		Locator:   locator,
+		Group:     "123",
+		TenantID:  "tg-spam",
+		chatID:    123,
+		Queue:     moderation.NewInMemoryQueue(1),
+		processor: spy,
 	}
 	defer l.shutdownPipeline()
 

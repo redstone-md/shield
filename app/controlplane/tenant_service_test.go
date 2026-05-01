@@ -12,12 +12,12 @@ import (
 )
 
 type mockTenantStore struct {
-	record  storage.TenantRecord
-	status  string
-	getErr  error
-	updErr  error
-	addErr  error
-	added   storage.TenantRecord
+	record storage.TenantRecord
+	status string
+	getErr error
+	updErr error
+	addErr error
+	added  storage.TenantRecord
 }
 
 func (m *mockTenantStore) Get(_ context.Context, id string) (storage.TenantRecord, error) {

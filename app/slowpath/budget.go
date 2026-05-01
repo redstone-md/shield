@@ -12,10 +12,10 @@ type BudgetConfig struct {
 }
 
 type budgetCounter struct {
-	requests  int
-	tokens    int
-	cost      float64
-	resetAt   time.Time
+	requests int
+	tokens   int
+	cost     float64
+	resetAt  time.Time
 }
 
 type InMemoryBudgetTracker struct {

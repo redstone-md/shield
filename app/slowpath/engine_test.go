@@ -10,7 +10,7 @@ import (
 
 func TestEngineCheckText(t *testing.T) {
 	provider := &stubLLMProvider{
-		name: "test",
+		name:   "test",
 		result: &ProviderResult{Spam: true, Confidence: 90, Reason: "spam", Provider: "test", Model: "m1"},
 	}
 	eng := NewEngine(EngineConfig{})
@@ -63,10 +63,10 @@ func TestEngineCheckBudgetDenied(t *testing.T) {
 	eng.SetBudgetTracker(budget)
 
 	result, err := eng.Check(context.Background(), SlowPathRequest{
-		EventID:    "evt-1",
-		TenantID:   "tenant-1",
+		EventID:     "evt-1",
+		TenantID:    "tenant-1",
 		BudgetClass: BudgetClassStandard,
-		Content:    Content{Text: "test"},
+		Content:     Content{Text: "test"},
 	})
 	assert.NoError(t, err)
 	assert.True(t, result.Skipped)
@@ -101,7 +101,7 @@ func TestEngineVision(t *testing.T) {
 	eng.RegisterVision(vision, DefaultBreakerConfig())
 
 	result, err := eng.Check(context.Background(), SlowPathRequest{
-		EventID:  "evt-img",
+		EventID:   "evt-img",
 		ImageData: []byte("fake"),
 		ImageMIME: "image/jpeg",
 	})

@@ -27,24 +27,24 @@ func (l *TelegramListener) makeIncomingEvent(update tbapi.Update, msg *bot.Messa
 	}
 
 	return moderation.IncomingEvent{
-		EventID:        l.nextEventID(),
-		CorrelationID:  l.currentCorrelationID(),
-		TenantID:       l.TenantID,
-		Source:         "telegram.update",
-		UpdateID:       update.UpdateID,
-		ChatID:         msg.ChatID,
-		MessageID:      msg.ID,
+		EventID:         l.nextEventID(),
+		CorrelationID:   l.currentCorrelationID(),
+		TenantID:        l.TenantID,
+		Source:          "telegram.update",
+		UpdateID:        update.UpdateID,
+		ChatID:          msg.ChatID,
+		MessageID:       msg.ID,
 		EditedMessageID: editedMessageID,
-		IdempotencyKey: telegramIdempotencyKey(update.UpdateID, msg.ChatID, msg.ID, editedMessageID),
+		IdempotencyKey:  telegramIdempotencyKey(update.UpdateID, msg.ChatID, msg.ID, editedMessageID),
 		Subject: moderation.Subject{
 			ID:       subjectID,
 			UserName: subjectUserName,
 			IsBot:    msg.From.ID == 136817688,
 		},
 		Content: moderation.Content{
-			Text:      msg.Text,
-			Links:     collectLinks(msg),
-			HasMedia:  msg.Image != nil || msg.WithVideo || msg.WithVideoNote || msg.WithAudio,
+			Text:       msg.Text,
+			Links:      collectLinks(msg),
+			HasMedia:   msg.Image != nil || msg.WithVideo || msg.WithVideoNote || msg.WithAudio,
 			Attributes: incomingEventAttributes(msg),
 		},
 		ReceivedAt: msg.Sent.UTC(),
@@ -66,13 +66,13 @@ func (l *TelegramListener) currentCorrelationID() string {
 
 func incomingEventAttributes(msg *bot.Message) map[string]string {
 	attrs := map[string]string{
-		"with_forward":     strconv.FormatBool(msg.WithForward),
-		"with_keyboard":    strconv.FormatBool(msg.WithKeyboard),
-		"with_contact":     strconv.FormatBool(msg.WithContact),
-		"with_giveaway":    strconv.FormatBool(msg.WithGiveaway),
-		"with_video":       strconv.FormatBool(msg.WithVideo),
-		"with_video_note":  strconv.FormatBool(msg.WithVideoNote),
-		"with_audio":       strconv.FormatBool(msg.WithAudio),
+		"with_forward":    strconv.FormatBool(msg.WithForward),
+		"with_keyboard":   strconv.FormatBool(msg.WithKeyboard),
+		"with_contact":    strconv.FormatBool(msg.WithContact),
+		"with_giveaway":   strconv.FormatBool(msg.WithGiveaway),
+		"with_video":      strconv.FormatBool(msg.WithVideo),
+		"with_video_note": strconv.FormatBool(msg.WithVideoNote),
+		"with_audio":      strconv.FormatBool(msg.WithAudio),
 	}
 	if msg.SenderChat.ID != 0 {
 		attrs["sender_chat_id"] = strconv.FormatInt(msg.SenderChat.ID, 10)

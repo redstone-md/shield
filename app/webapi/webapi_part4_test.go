@@ -228,7 +228,7 @@ func TestServer_getSettingsHandler(t *testing.T) {
 		}
 
 		settings := Settings{
-			TenantID:        "test",
+			TenantID:          "test",
 			LuaPluginsEnabled: true,
 			LuaPluginsDir:     "/path/to/plugins",
 			LuaEnabledPlugins: []string{"plugin1", "plugin2"},
@@ -264,7 +264,7 @@ func TestServer_getSettingsHandler(t *testing.T) {
 		}
 
 		settings := Settings{
-			TenantID:        "test",
+			TenantID:          "test",
 			LuaPluginsEnabled: false,
 		}
 

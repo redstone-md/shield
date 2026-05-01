@@ -11,31 +11,31 @@ import (
 )
 
 type Case struct {
-	Msg          string          `json:"msg"`
-	UserID       string          `json:"user_id"`
-	UserName     string          `json:"user_name"`
-	ExpectedSpam bool            `json:"expected_spam"`
+	Msg          string             `json:"msg"`
+	UserID       string             `json:"user_id"`
+	UserName     string             `json:"user_name"`
+	ExpectedSpam bool               `json:"expected_spam"`
 	Meta         spamcheck.MetaData `json:"meta"`
 }
 
 type Result struct {
-	Case         Case               `json:"case"`
-	ActualSpam   bool               `json:"actual_spam"`
-	Correct      bool               `json:"correct"`
-	Checks       []spamcheck.Response `json:"checks"`
-	Duration     time.Duration      `json:"duration"`
+	Case       Case                 `json:"case"`
+	ActualSpam bool                 `json:"actual_spam"`
+	Correct    bool                 `json:"correct"`
+	Checks     []spamcheck.Response `json:"checks"`
+	Duration   time.Duration        `json:"duration"`
 }
 
 type Report struct {
-	Total    int      `json:"total"`
-	TP       int      `json:"tp"`
-	FP       int      `json:"fp"`
-	TN       int      `json:"tn"`
-	FN       int      `json:"fn"`
-	Accuracy float64  `json:"accuracy"`
-	Precision float64 `json:"precision"`
-	Recall    float64 `json:"recall"`
-	Details  []Result `json:"details"`
+	Total     int      `json:"total"`
+	TP        int      `json:"tp"`
+	FP        int      `json:"fp"`
+	TN        int      `json:"tn"`
+	FN        int      `json:"fn"`
+	Accuracy  float64  `json:"accuracy"`
+	Precision float64  `json:"precision"`
+	Recall    float64  `json:"recall"`
+	Details   []Result `json:"details"`
 }
 
 type CheckFunc func(req spamcheck.Request) (bool, []spamcheck.Response)

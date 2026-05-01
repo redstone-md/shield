@@ -51,7 +51,7 @@ func (d *Detector) cosineSimilarity(a, b map[string]int) float64 {
 		return 0.0
 	}
 
-	dotProduct := 0 // sum of product of corresponding frequencies
+	dotProduct := 0      // sum of product of corresponding frequencies
 	normA, normB := 0, 0 // square root of sum of squares of frequencies
 
 	for key, val := range a {
@@ -91,10 +91,10 @@ func (d *Detector) isCasSpam(msgID string) spamcheck.Response {
 	var resp *http.Response
 	// wrap HTTP call with retry logic: 3 attempts, 500ms initial delay, exponential backoff with jitter
 	rptr := repeater.New(&strategy.Backoff{
-		Repeats: 3,
+		Repeats:  3,
 		Duration: 500 * time.Millisecond,
-		Factor:  2.0,
-		Jitter:  true,
+		Factor:   2.0,
+		Jitter:   true,
 	})
 
 	err = rptr.Do(context.Background(), func() error {
@@ -176,7 +176,7 @@ func (d *Detector) isSpamClassified(msg string) spamcheck.Response {
 
 	return spamcheck.Response{Name: "classifier", Spam: isSpam,
 		Details: fmt.Sprintf("probability of %s: %s%%", class, probStr),
-		RuleID: "classifier", Score: prob, Weight: 1.0, NormalizedText: truncateRunes(msg, 64)}
+		RuleID:  "classifier", Score: prob, Weight: 1.0, NormalizedText: truncateRunes(msg, 64)}
 }
 
 // isStopWord checks if a given message or username contains any of the stop words.
@@ -386,8 +386,8 @@ func normalizeSpaces(s string) string {
 
 func normalizeLookupText(text string) string {
 	return textnorm.New(textnorm.Options{
-		LowerCase:            true,
-		Trim:                 true,
+		LowerCase:           true,
+		Trim:                true,
 		CanonicalWhitespace: true,
 	}).Normalize(text)
 }

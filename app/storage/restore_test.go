@@ -2,9 +2,9 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
-	"fmt"
 	"strings"
 	"testing"
 

@@ -69,26 +69,26 @@ const (
 )
 
 type Incident struct {
-	ID              int64
-	GID             string
-	TenantID        string
-	Source          IncidentSource
-	Status          IncidentStatus
-	Severity        IncidentSeverity
-	IdempotencyKey  string
-	DetectedSpamID  int64
-	ReportID        int64
-	ReasonCode      ReasonCode
-	ReasonText      string
-	SpamUserID      int64
-	SpamUserName    string
-	ChatID          int64
-	MessageText     string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	ResolvedAt      *time.Time
-	ResolvedBy      string
-	Comment         string
+	ID             int64
+	GID            string
+	TenantID       string
+	Source         IncidentSource
+	Status         IncidentStatus
+	Severity       IncidentSeverity
+	IdempotencyKey string
+	DetectedSpamID int64
+	ReportID       int64
+	ReasonCode     ReasonCode
+	ReasonText     string
+	SpamUserID     int64
+	SpamUserName   string
+	ChatID         int64
+	MessageText    string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	ResolvedAt     *time.Time
+	ResolvedBy     string
+	Comment        string
 }
 
 type IncidentComment struct {
@@ -102,20 +102,20 @@ type IncidentComment struct {
 }
 
 type Appeal struct {
-	ID               int64
-	IncidentID       int64
-	GID              string
-	TenantID         string
-	AppellantUserID  int64
-	AppellantName    string
-	Status           AppealStatus
-	AppealText       string
-	ResolutionText   string
-	ResolvedBy       string
-	ReplayResult     string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	ResolvedAt       *time.Time
+	ID              int64
+	IncidentID      int64
+	GID             string
+	TenantID        string
+	AppellantUserID int64
+	AppellantName   string
+	Status          AppealStatus
+	AppealText      string
+	ResolutionText  string
+	ResolvedBy      string
+	ReplayResult    string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	ResolvedAt      *time.Time
 }
 
 type SpamCheckResult struct {
@@ -152,18 +152,18 @@ func ClassifySeverity(reason ReasonCode) IncidentSeverity {
 
 func MapCheckNameToReason(name string) ReasonCode {
 	mapping := map[string]ReasonCode{
-		"regex":         ReasonRegexMatch,
-		"stop word":     ReasonStopWord,
-		"similarity":    ReasonSimilarity,
-		"cas":           ReasonCAS,
-		"links":         ReasonMetaLink,
-		"mentions":      ReasonMetaMention,
-		"multi-lang":    ReasonMultiLang,
-		"spacing":       ReasonAbnormalSpacing,
-		"emoji":         ReasonEmojiSpam,
-		"openai":        ReasonLLMOpenAI,
-		"gemini":        ReasonLLMGemini,
-		"vision":        ReasonVision,
+		"regex":      ReasonRegexMatch,
+		"stop word":  ReasonStopWord,
+		"similarity": ReasonSimilarity,
+		"cas":        ReasonCAS,
+		"links":      ReasonMetaLink,
+		"mentions":   ReasonMetaMention,
+		"multi-lang": ReasonMultiLang,
+		"spacing":    ReasonAbnormalSpacing,
+		"emoji":      ReasonEmojiSpam,
+		"openai":     ReasonLLMOpenAI,
+		"gemini":     ReasonLLMGemini,
+		"vision":     ReasonVision,
 	}
 	if rc, ok := mapping[name]; ok {
 		return rc

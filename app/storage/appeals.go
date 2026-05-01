@@ -253,20 +253,20 @@ func (s *AppealStorage) UpdateReplayResult(ctx context.Context, id int64, result
 }
 
 type appealRecord struct {
-	ID               int64          `db:"id"`
-	GID              string         `db:"gid"`
-	TenantID         string         `db:"tenant_id"`
-	IncidentID       int64          `db:"incident_id"`
-	AppellantUserID  int64          `db:"appellant_user_id"`
-	AppellantName    string         `db:"appellant_name"`
-	Status           string         `db:"status"`
-	AppealText       string         `db:"appeal_text"`
-	ResolutionText   string         `db:"resolution_text"`
-	ResolvedBy       string         `db:"resolved_by"`
-	ReplayResultJSON string         `db:"replay_result"`
-	CreatedAt        time.Time      `db:"created_at"`
-	UpdatedAt        time.Time      `db:"updated_at"`
-	ResolvedAt       sql.NullTime   `db:"resolved_at"`
+	ID               int64        `db:"id"`
+	GID              string       `db:"gid"`
+	TenantID         string       `db:"tenant_id"`
+	IncidentID       int64        `db:"incident_id"`
+	AppellantUserID  int64        `db:"appellant_user_id"`
+	AppellantName    string       `db:"appellant_name"`
+	Status           string       `db:"status"`
+	AppealText       string       `db:"appeal_text"`
+	ResolutionText   string       `db:"resolution_text"`
+	ResolvedBy       string       `db:"resolved_by"`
+	ReplayResultJSON string       `db:"replay_result"`
+	CreatedAt        time.Time    `db:"created_at"`
+	UpdatedAt        time.Time    `db:"updated_at"`
+	ResolvedAt       sql.NullTime `db:"resolved_at"`
 }
 
 func (r appealRecord) toAppeal() audit.Appeal {

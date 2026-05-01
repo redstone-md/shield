@@ -146,7 +146,7 @@ func (r *Reports) Add(ctx context.Context, report Report) error {
 		report.MsgID, report.ChatID, report.ReporterUserID, report.ReportedUserID)
 
 	// set auto-populated fields
-	report.GID = 	r.TenantID()
+	report.GID = r.TenantID()
 	report.TenantID = r.TenantID()
 	if report.ReportTime.IsZero() {
 		report.ReportTime = time.Now()
@@ -186,7 +186,7 @@ func (r *Reports) GetByMessage(ctx context.Context, msgID int, chatID int64) ([]
 	query = r.Adopt(query)
 
 	var reports []Report
-	if err := r.SelectContext(ctx, &reports, query, 	r.TenantID(), msgID, chatID); err != nil {
+	if err := r.SelectContext(ctx, &reports, query, r.TenantID(), msgID, chatID); err != nil {
 		return nil, fmt.Errorf("failed to get reports: %w", err)
 	}
 
@@ -205,7 +205,7 @@ func (r *Reports) GetReporterCountSince(ctx context.Context, reporterID int64, s
 	query = r.Adopt(query)
 
 	var count int
-	if err := r.GetContext(ctx, &count, query, 	r.TenantID(), reporterID, since); err != nil {
+	if err := r.GetContext(ctx, &count, query, r.TenantID(), reporterID, since); err != nil {
 		return 0, fmt.Errorf("failed to get reporter count: %w", err)
 	}
 
@@ -223,7 +223,7 @@ func (r *Reports) UpdateAdminMsgID(ctx context.Context, msgID int, chatID int64,
 	}
 	query = r.Adopt(query)
 
-	if _, err := r.ExecContext(ctx, query, adminMsgID, 	r.TenantID(), msgID, chatID); err != nil {
+	if _, err := r.ExecContext(ctx, query, adminMsgID, r.TenantID(), msgID, chatID); err != nil {
 		return fmt.Errorf("failed to update admin message id: %w", err)
 	}
 
@@ -242,7 +242,7 @@ func (r *Reports) DeleteReporter(ctx context.Context, reporterID int64, msgID in
 	}
 	query = r.Adopt(query)
 
-	if _, err := r.ExecContext(ctx, query, 	r.TenantID(), reporterID, msgID, chatID); err != nil {
+	if _, err := r.ExecContext(ctx, query, r.TenantID(), reporterID, msgID, chatID); err != nil {
 		return fmt.Errorf("failed to delete reporter: %w", err)
 	}
 
@@ -261,7 +261,7 @@ func (r *Reports) DeleteByMessage(ctx context.Context, msgID int, chatID int64) 
 	}
 	query = r.Adopt(query)
 
-	if _, err := r.ExecContext(ctx, query, 	r.TenantID(), msgID, chatID); err != nil {
+	if _, err := r.ExecContext(ctx, query, r.TenantID(), msgID, chatID); err != nil {
 		return fmt.Errorf("failed to delete reports: %w", err)
 	}
 
@@ -281,7 +281,7 @@ func (r *Reports) cleanupOldReports(ctx context.Context) error {
 	query := r.Adopt("DELETE FROM reports WHERE tenant_id = ? AND report_time < ?")
 	cutoffTime := time.Now().Add(-retentionDays * 24 * time.Hour)
 
-	result, err := r.ExecContext(ctx, query, 	r.TenantID(), cutoffTime)
+	result, err := r.ExecContext(ctx, query, r.TenantID(), cutoffTime)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup old reports: %w", err)
 	}

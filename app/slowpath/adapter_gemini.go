@@ -11,9 +11,9 @@ import (
 )
 
 type GeminiAdapter struct {
-	client  GeminiClient
-	model   string
-	config  GeminiAdapterConfig
+	client GeminiClient
+	model  string
+	config GeminiAdapterConfig
 }
 
 type GeminiAdapterConfig struct {
@@ -71,8 +71,8 @@ func (g *GeminiAdapter) Check(ctx context.Context, req ProviderRequest) (*Provid
 	}
 
 	config := &genai.GenerateContentConfig{
-		MaxOutputTokens:  g.config.MaxOutputTokens,
-		ResponseMIMEType: "application/json",
+		MaxOutputTokens:   g.config.MaxOutputTokens,
+		ResponseMIMEType:  "application/json",
 		SystemInstruction: genai.NewContentFromText(systemPrompt, genai.RoleUser),
 		SafetySettings: []*genai.SafetySetting{
 			{Category: genai.HarmCategoryHarassment, Threshold: genai.HarmBlockThresholdOff},

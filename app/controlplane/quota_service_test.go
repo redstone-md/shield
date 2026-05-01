@@ -10,8 +10,8 @@ import (
 
 type mockLimitStore struct {
 	limits map[string]struct {
-		limit  int
-		usage  int
+		limit int
+		usage int
 	}
 }
 

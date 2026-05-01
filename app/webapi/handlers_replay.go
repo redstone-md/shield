@@ -15,12 +15,12 @@ import (
 )
 
 type replayResponse struct {
-	IncidentID    int64                    `json:"incident_id"`
-	OriginalText  string                   `json:"original_text"`
-	DetectionSpam bool                     `json:"detection_spam"`
-	Checks        []spamcheck.Response     `json:"checks"`
-	ReplayAt      time.Time                `json:"replay_at"`
-	ReplayResult  *audit.ReplayResult      `json:"replay_result,omitempty"`
+	IncidentID    int64                `json:"incident_id"`
+	OriginalText  string               `json:"original_text"`
+	DetectionSpam bool                 `json:"detection_spam"`
+	Checks        []spamcheck.Response `json:"checks"`
+	ReplayAt      time.Time            `json:"replay_at"`
+	ReplayResult  *audit.ReplayResult  `json:"replay_result,omitempty"`
 }
 
 func (s *Server) replayIncidentHandler(w http.ResponseWriter, r *http.Request) {
@@ -323,10 +323,10 @@ func (s *Server) createAppealHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		IncidentID     int64  `json:"incident_id"`
-		AppellantID    int64  `json:"appellant_user_id"`
-		AppellantName  string `json:"appellant_name"`
-		AppealText     string `json:"appeal_text"`
+		IncidentID    int64  `json:"incident_id"`
+		AppellantID   int64  `json:"appellant_user_id"`
+		AppellantName string `json:"appellant_name"`
+		AppealText    string `json:"appeal_text"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "invalid body", "details": err.Error()})

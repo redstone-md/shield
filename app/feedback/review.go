@@ -12,9 +12,9 @@ type DictionaryAdder interface {
 }
 
 type ReviewService struct {
-	store  CandidateStore
-	dict   DictionaryAdder
-	svc    *Service
+	store CandidateStore
+	dict  DictionaryAdder
+	svc   *Service
 }
 
 func NewReviewService(store CandidateStore, dict DictionaryAdder, svc *Service) *ReviewService {

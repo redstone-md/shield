@@ -22,17 +22,17 @@ import (
 // It uses a set of checks to determine if a message is spam, and also keeps a list of approved users.
 type Detector struct {
 	Config
-	classifier       classifier
-	openaiChecker    *openAIChecker
-	geminiChecker    *geminiChecker
+	classifier        classifier
+	openaiChecker     *openAIChecker
+	geminiChecker     *geminiChecker
 	duplicateDetector *duplicateDetector
-	metaChecks       []MetaCheck
-	luaChecks        []plugin.Check // separate field for Lua plugin checks
-	tokenizedSpam    []map[string]int
-	approvedUsers    map[string]approved.UserInfo
-	stopWords        []string
-	excludedTokens   map[string]struct{}
-	luaEngine        LuaPluginEngine
+	metaChecks        []MetaCheck
+	luaChecks         []plugin.Check // separate field for Lua plugin checks
+	tokenizedSpam     []map[string]int
+	approvedUsers     map[string]approved.UserInfo
+	stopWords         []string
+	excludedTokens    map[string]struct{}
+	luaEngine         LuaPluginEngine
 
 	spamSamplesUpd SampleUpdater
 	hamSamplesUpd  SampleUpdater
@@ -55,19 +55,19 @@ const (
 	// LLMConsensusAny flips the base decision if any eligible LLM agrees.
 	LLMConsensusAny LLMConsensusMode = "any"
 	// LLMConsensusAll flips the base decision only if all eligible LLMs agree.
-	LLMConsensusAll LLMConsensusMode = "all"
-	llmChatContextSize = 5
-	llmUserContextSize = 5
+	LLMConsensusAll    LLMConsensusMode = "all"
+	llmChatContextSize                  = 5
+	llmUserContextSize                  = 5
 )
 
 // detectorLLMCheck describes how a single LLM provider participates in Detector.Check.
 type detectorLLMCheck struct {
-	name string // provider name used in logs
-	enabled bool // whether this provider is configured
+	name    string // provider name used in logs
+	enabled bool   // whether this provider is configured
 	// whether short messages should still be sent to the provider
 	checkShortMessages bool
 	// whether the provider confirms spam instead of checking clean messages
-	veto bool
+	veto  bool
 	check func(context.Context, string, llmContext) (bool, spamcheck.Response) // provider check function
 }
 
@@ -78,19 +78,19 @@ type detectorLLMResult struct {
 
 // Config is a set of parameters for Detector.
 type Config struct {
-	SimilarityThreshold float64 // threshold for spam similarity, 0.0 - 1.0
-	MinMsgLen           int     // minimum message length to check
-	MaxAllowedEmoji     int     // maximum number of emojis allowed in a message
-	CasAPI              string  // CAS API URL
-	CasUserAgent        string  // CAS API User-Agent header value, set only if non-empty
-	FirstMessageOnly    bool    // if true, only the first message from a user is checked
-	FirstMessagesCount  int     // number of first messages to check for spam
-	HTTPClient          HTTPClient // http client to use for requests
-	MinSpamProbability  float64    // minimum spam probability to consider a message spam with classifier, if 0 - ignored
-	OpenAIVeto          bool // if true, openai vetos spam, otherwise vetos ham
-	OpenAIHistorySize   int  // history size for openai
-	GeminiVeto          bool // if true, gemini vetos spam, otherwise vetos ham
-	GeminiHistorySize   int  // history size for gemini
+	SimilarityThreshold float64          // threshold for spam similarity, 0.0 - 1.0
+	MinMsgLen           int              // minimum message length to check
+	MaxAllowedEmoji     int              // maximum number of emojis allowed in a message
+	CasAPI              string           // CAS API URL
+	CasUserAgent        string           // CAS API User-Agent header value, set only if non-empty
+	FirstMessageOnly    bool             // if true, only the first message from a user is checked
+	FirstMessagesCount  int              // number of first messages to check for spam
+	HTTPClient          HTTPClient       // http client to use for requests
+	MinSpamProbability  float64          // minimum spam probability to consider a message spam with classifier, if 0 - ignored
+	OpenAIVeto          bool             // if true, openai vetos spam, otherwise vetos ham
+	OpenAIHistorySize   int              // history size for openai
+	GeminiVeto          bool             // if true, gemini vetos spam, otherwise vetos ham
+	GeminiHistorySize   int              // history size for gemini
 	LLMConsensus        LLMConsensusMode // how eligible LLM checks flip the base decision
 	LLMRequestTimeout   time.Duration    // timeout for individual LLM requests, if not set - 30s default
 	MultiLangWords      int              // if true, check for number of multi-lingual words
@@ -104,11 +104,11 @@ type Config struct {
 	}
 
 	AbnormalSpacing struct {
-		Enabled                  bool    // if true, enable check for abnormal spacing
-		MinWordsCount            int     // the minimum number of words in the message to be considered
-		ShortWordLen             int     // the length of the word to be considered short (in rune characters)
-		ShortWordRatioThreshold  float64 // the ratio of short words to all words in the message
-		SpaceRatioThreshold      float64 // the ratio of spaces to all characters in the message
+		Enabled                 bool    // if true, enable check for abnormal spacing
+		MinWordsCount           int     // the minimum number of words in the message to be considered
+		ShortWordLen            int     // the length of the word to be considered short (in rune characters)
+		ShortWordRatioThreshold float64 // the ratio of short words to all words in the message
+		SpaceRatioThreshold     float64 // the ratio of spaces to all characters in the message
 	}
 
 	DuplicateDetection struct {
@@ -131,8 +131,8 @@ type SampleUpdater interface {
 // UserStorage is an interface for approved users storage.
 type UserStorage interface {
 	Read(ctx context.Context) ([]approved.UserInfo, error) // read approved users from storage
-	Write(ctx context.Context, au approved.UserInfo) error  // write approved user to storage
-	Delete(ctx context.Context, id string) error            // delete approved user from storage
+	Write(ctx context.Context, au approved.UserInfo) error // write approved user to storage
+	Delete(ctx context.Context, id string) error           // delete approved user from storage
 }
 
 // HTTPClient is an interface for http client, satisfied by http.Client.
@@ -142,12 +142,12 @@ type HTTPClient interface {
 
 // LuaPluginEngine defines an interface for the Lua plugin system
 type LuaPluginEngine interface {
-	LoadScript(path string) error                       // loads a single Lua script
-	ReloadScript(path string) error                     // reloads a single Lua script
-	LoadDirectory(dir string) error                     // loads all Lua scripts from a directory
-	GetCheck(name string) (plugin.Check, error)         // returns a specific named plugin check
-	GetAllChecks() map[string]plugin.Check              // returns all loaded plugin checks
-	Close()                                             // cleans up resources
+	LoadScript(path string) error               // loads a single Lua script
+	ReloadScript(path string) error             // reloads a single Lua script
+	LoadDirectory(dir string) error             // loads all Lua scripts from a directory
+	GetCheck(name string) (plugin.Check, error) // returns a specific named plugin check
+	GetAllChecks() map[string]plugin.Check      // returns all loaded plugin checks
+	Close()                                     // cleans up resources
 }
 
 // LoadResult is a result of loading samples.
@@ -491,5 +491,3 @@ func (d *Detector) Reset() {
 		d.luaChecks = nil
 	}
 }
-
-

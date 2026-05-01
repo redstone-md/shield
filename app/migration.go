@@ -98,17 +98,17 @@ func (l auditSpamLogger) baseEntry(msg *bot.Message) storage.DetectedSpamInfo {
 
 func (l auditSpamLogger) writeLog(entry storage.DetectedSpamInfo, displayName string) error {
 	m := struct {
-		TimeStamp  string `json:"ts"`
+		TimeStamp   string `json:"ts"`
 		DisplayName string `json:"display_name"`
-		UserName   string `json:"user_name"`
-		UserID     int64  `json:"user_id"`
-		Text       string `json:"text"`
+		UserName    string `json:"user_name"`
+		UserID      int64  `json:"user_id"`
+		Text        string `json:"text"`
 	}{
-		TimeStamp:  time.Now().In(time.Local).Format(time.RFC3339),
+		TimeStamp:   time.Now().In(time.Local).Format(time.RFC3339),
 		DisplayName: displayName,
-		UserName:   entry.UserName,
-		UserID:     entry.UserID,
-		Text:       entry.Text,
+		UserName:    entry.UserName,
+		UserID:      entry.UserID,
+		Text:        entry.Text,
 	}
 	line, err := json.Marshal(&m)
 	if err != nil {

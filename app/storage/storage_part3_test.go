@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/app/rules"
+	"github.com/umputun/tg-spam/app/storage/engine"
 )
 
 func (s *StorageTestSuite) TestTenantIsolation() {

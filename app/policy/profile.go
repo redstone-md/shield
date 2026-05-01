@@ -6,11 +6,11 @@ import (
 )
 
 type PolicyProfile struct {
-	Name      string               `json:"name"`
-	Version   int                  `json:"version"`
+	Name      string                   `json:"name"`
+	Version   int                      `json:"version"`
 	Matrix    map[RiskType]ActionLevel `json:"matrix"`
-	Escalate  EscalationConfig     `json:"escalate"`
-	CreatedAt time.Time            `json:"created_at"`
+	Escalate  EscalationConfig         `json:"escalate"`
+	CreatedAt time.Time                `json:"created_at"`
 }
 
 func PermissiveProfile() PolicyProfile {
@@ -18,11 +18,11 @@ func PermissiveProfile() PolicyProfile {
 		Name:    "permissive",
 		Version: 1,
 		Matrix: map[RiskType]ActionLevel{
-			RiskSpam:   LevelMute,
-			RiskAbuse:  LevelWarn,
-			RiskScam:   LevelMute,
-			RiskRaid:   LevelMute,
-			RiskNSFW:   LevelWarn,
+			RiskSpam:    LevelMute,
+			RiskAbuse:   LevelWarn,
+			RiskScam:    LevelMute,
+			RiskRaid:    LevelMute,
+			RiskNSFW:    LevelWarn,
 			RiskUnknown: LevelMute,
 		},
 		Escalate: EscalationConfig{
@@ -38,11 +38,11 @@ func BalancedProfile() PolicyProfile {
 		Name:    "balanced",
 		Version: 1,
 		Matrix: map[RiskType]ActionLevel{
-			RiskSpam:   LevelDeleteAndMute,
-			RiskAbuse:  LevelMute,
-			RiskScam:   LevelDeleteAndMute,
-			RiskRaid:   LevelDeleteAndMute,
-			RiskNSFW:   LevelMute,
+			RiskSpam:    LevelDeleteAndMute,
+			RiskAbuse:   LevelMute,
+			RiskScam:    LevelDeleteAndMute,
+			RiskRaid:    LevelDeleteAndMute,
+			RiskNSFW:    LevelMute,
 			RiskUnknown: LevelDeleteAndMute,
 		},
 		Escalate: EscalationConfig{
@@ -58,11 +58,11 @@ func StrictProfile() PolicyProfile {
 		Name:    "strict",
 		Version: 1,
 		Matrix: map[RiskType]ActionLevel{
-			RiskSpam:   LevelBan,
-			RiskAbuse:  LevelBan,
-			RiskScam:   LevelBan,
-			RiskRaid:   LevelBan,
-			RiskNSFW:   LevelDeleteAndMute,
+			RiskSpam:    LevelBan,
+			RiskAbuse:   LevelBan,
+			RiskScam:    LevelBan,
+			RiskRaid:    LevelBan,
+			RiskNSFW:    LevelDeleteAndMute,
 			RiskUnknown: LevelBan,
 		},
 		Escalate: EscalationConfig{

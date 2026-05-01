@@ -36,7 +36,7 @@ func TestScoringEngine_ThresholdBoundary(t *testing.T) {
 
 	se.AddSignal(spamcheck.Response{Name: "links", Spam: true, Score: 1.0, Weight: 1.5})
 	rs := se.Score()
-	assert.True(t, rs.Decision)           // 1.0 + 1.5 = 2.5 >= 2.0
+	assert.True(t, rs.Decision) // 1.0 + 1.5 = 2.5 >= 2.0
 	assert.InDelta(t, 2.5, rs.Total, 0.001)
 }
 

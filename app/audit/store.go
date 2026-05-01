@@ -27,15 +27,15 @@ type AppealStore interface {
 }
 
 type IncidentFilter struct {
-	TenantID  string
-	Status    IncidentStatus
-	Source    IncidentSource
-	Severity  IncidentSeverity
-	Reason    ReasonCode
-	From      time.Time
-	To        time.Time
-	Limit     int
-	Offset    int
+	TenantID string
+	Status   IncidentStatus
+	Source   IncidentSource
+	Severity IncidentSeverity
+	Reason   ReasonCode
+	From     time.Time
+	To       time.Time
+	Limit    int
+	Offset   int
 }
 
 type AppealFilter struct {
