@@ -13,10 +13,10 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		h.Set("X-XSS-Protection", "1; mode=block")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("Content-Security-Policy",
-			"default-src 'self' https://cdn.jsdelivr.net; "+
+			"default-src 'self'; "+
 				"img-src 'self' data:; "+
 				"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "+
-				"script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "+
+				"script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "+
 				"font-src 'self' https://cdn.jsdelivr.net")
 		h.Del("Server")
 		next.ServeHTTP(w, r)
