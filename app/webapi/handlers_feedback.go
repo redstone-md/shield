@@ -30,7 +30,7 @@ func (s *Server) feedbackRoutes(mux *routegroup.Bundle) {
 		}
 
 		if s.KnowledgeService != nil {
-			r.HandleFunc("POST /knowledge/snapshot", s.createKnowledgeSnapshotHandler)
+			r.HandleFunc("POST /knowledge/snapshots", s.createKnowledgeSnapshotHandler)
 			r.HandleFunc("GET /knowledge/snapshots", s.listKnowledgeSnapshotsHandler)
 			r.HandleFunc("GET /knowledge/snapshots/{id}", s.getKnowledgeSnapshotHandler)
 			r.HandleFunc("POST /knowledge/snapshots/{id}/rollback", s.rollbackKnowledgeHandler)
@@ -183,17 +183,22 @@ func (s *Server) generateCandidatesHandler(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) createKnowledgeSnapshotHandler(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		CreatedBy string `json:"created_by"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&req)
-
-	snap, err := s.KnowledgeService.Snapshot(r.Context(), req.CreatedBy)
+	_, err := s.KnowledgeService.Snapshot(r.Context(), "tg-spam")
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": err.Error()})
 		return
 	}
-	_ = rest.EncodeJSON(w, http.StatusCreated, snap)
+
+	snaps, err := s.KnowledgeService.ListSnapshots(r.Context(), 20, 0)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = tmpl.ExecuteTemplate(w, "knowledge_list", snaps)
 }
 
 func (s *Server) listKnowledgeSnapshotsHandler(w http.ResponseWriter, r *http.Request) {
@@ -231,19 +236,25 @@ func (s *Server) rollbackKnowledgeHandler(w http.ResponseWriter, r *http.Request
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": fmt.Sprintf("invalid snapshot id: %s", idStr)})
 		return
 	}
 
-	var req struct {
-		RolledBackBy string `json:"rolled_back_by"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&req)
-
-	snap, err := s.KnowledgeService.Rollback(r.Context(), id, req.RolledBackBy)
+	_, err = s.KnowledgeService.Rollback(r.Context(), id, "tg-spam")
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": err.Error()})
 		return
 	}
-	_ = rest.EncodeJSON(w, http.StatusOK, snap)
+
+	snaps, err := s.KnowledgeService.ListSnapshots(r.Context(), 20, 0)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = tmpl.ExecuteTemplate(w, "knowledge_list", snaps)
 }

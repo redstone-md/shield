@@ -86,9 +86,20 @@ func (s *Server) setupAPIRoutes(router *routegroup.Bundle) {
 				r.HandleFunc("POST /labels", s.createLabelHandler)
 				r.HandleFunc("GET /labels", s.listLabelsHandler)
 				r.HandleFunc("GET /labels/stats", s.labelStatsHandler)
-				r.HandleFunc("GET /candidates", s.listCandidatesHandler)
-				r.HandleFunc("POST /candidates/{id}/approve", s.approveCandidateHandler)
-				r.HandleFunc("POST /candidates/{id}/reject", s.rejectCandidateHandler)
+
+				if s.ReviewService != nil {
+					r.HandleFunc("GET /candidates", s.listCandidatesHandler)
+					r.HandleFunc("POST /candidates/{id}/approve", s.approveCandidateHandler)
+					r.HandleFunc("POST /candidates/{id}/reject", s.rejectCandidateHandler)
+					r.HandleFunc("POST /candidates/generate", s.generateCandidatesHandler)
+				}
+
+				if s.KnowledgeService != nil {
+					r.HandleFunc("POST /knowledge/snapshots", s.createKnowledgeSnapshotHandler)
+					r.HandleFunc("GET /knowledge/snapshots", s.listKnowledgeSnapshotsHandler)
+					r.HandleFunc("GET /knowledge/snapshots/{id}", s.getKnowledgeSnapshotHandler)
+					r.HandleFunc("POST /knowledge/snapshots/{id}/rollback", s.rollbackKnowledgeHandler)
+				}
 			})
 		}
 		if s.MetricsCollector != nil {

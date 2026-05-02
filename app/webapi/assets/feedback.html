@@ -71,7 +71,9 @@
             <div class="row mb-3">
                 <div class="col-md-3">
                     <button class="btn btn-primary btn-sm"
-                            hx-post="/api/feedback/knowledge/snapshots" hx-target="#knowledge-content" hx-swap="beforeend">
+                            hx-post="/api/feedback/knowledge/snapshots"
+                            hx-target="#knowledge-content"
+                            hx-swap="innerHTML">
                         <i class="bi bi-camera me-1"></i>Create Snapshot
                     </button>
                 </div>
@@ -175,7 +177,6 @@
         <thead class="custom-table-header">
             <tr>
                 <th>ID</th>
-                <th>Label</th>
                 <th>Stop Phrases</th>
                 <th>Spam Samples</th>
                 <th>Ham Samples</th>
@@ -188,7 +189,6 @@
             {{range .}}
             <tr>
                 <td>{{.ID}}</td>
-                <td>{{.Label}}</td>
                 <td>{{len .Data.StopPhrases}}</td>
                 <td>{{.Data.SpamSamples}}</td>
                 <td>{{.Data.HamSamples}}</td>
@@ -196,13 +196,15 @@
                 <td>{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
                 <td>
                     <button class="btn btn-sm btn-outline-warning"
-                            hx-post="/api/feedback/knowledge/snapshots/{{.ID}}/rollback" hx-confirm="Rollback to this snapshot?">
+                            hx-post="/api/feedback/knowledge/snapshots/{{.ID}}/rollback"
+                            hx-target="#knowledge-content" hx-swap="innerHTML"
+                            hx-confirm="Rollback to this snapshot?">
                         <i class="bi bi-arrow-counterclockwise"></i>
                     </button>
                 </td>
             </tr>
             {{else}}
-            <tr><td colspan="8" class="text-center text-muted">No snapshots found</td></tr>
+            <tr><td colspan="7" class="text-center text-muted">No snapshots found</td></tr>
             {{end}}
         </tbody>
     </table>

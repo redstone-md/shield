@@ -21,9 +21,9 @@ type KnowledgeSnapshot struct {
 	ID        int64         `db:"id" json:"id"`
 	GID       string        `db:"gid" json:"-"`
 	TenantID  string        `db:"tenant_id" json:"-"`
-	Label     string        `db:"label" json:"label"`
+	Version   int           `db:"version" json:"version"`
 	Data      KnowledgeData `db:"-" json:"data"`
-	DataJSON  string        `db:"snapshot_data" json:"-"`
+	DataJSON  string        `db:"data_json" json:"-"`
 	CreatedBy string        `db:"created_by" json:"-"`
 	CreatedAt time.Time     `db:"created_at" json:"created_at"`
 }

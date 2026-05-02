@@ -88,7 +88,7 @@ func (s *KnowledgeSnapshotStorage) Create(ctx context.Context, snap feedback.Kno
 	query = s.Adopt(query)
 
 	res, execErr := s.ExecContext(ctx, query,
-		s.GID(), s.TenantID(), snap.Label, snap.DataJSON,
+		s.GID(), s.TenantID(), 0, snap.DataJSON, snap.CreatedBy,
 	)
 	if execErr != nil {
 		return feedback.KnowledgeSnapshot{}, fmt.Errorf("failed to insert snapshot: %w", execErr)
