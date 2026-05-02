@@ -115,8 +115,8 @@ func TestEngine_Decide_EscalationBumpsAction(t *testing.T) {
 
 func TestActionLevelToAction_Defaults(t *testing.T) {
 	a, d, r := actionLevelToAction(LevelWarn, 0, 0)
-	if a != moderation.ActionDelete || d != 0 || r != false {
-		t.Errorf("warn: expected delete/0/false, got %s/%v/%v", a, d, r)
+	if a != moderation.ActionWarn || d != 0 || r != false {
+		t.Errorf("warn: expected warn/0/false, got %s/%v/%v", a, d, r)
 	}
 
 	a, d, r = actionLevelToAction(LevelMute, 0, 0)

@@ -8,6 +8,7 @@ type Action string
 const (
 	ActionAllow    Action = "allow"
 	ActionDelete   Action = "delete"
+	ActionWarn     Action = "warn"
 	ActionRestrict Action = "restrict"
 	ActionBan      Action = "ban"
 )

@@ -107,6 +107,7 @@ func (l *TelegramListener) ApplyRuleSet(rs rules.RuleSet) {
 	l.ModerationConfig = ModerationConfig{
 		FirstStrike:  rs.Moderation.FirstStrike,
 		SecondStrike: rs.Moderation.SecondStrike,
+		WarnStrikes:  rs.Moderation.WarnStrikes,
 	}
 	l.ReportConfig = ReportConfig{
 		Storage:          l.ReportConfig.Storage,

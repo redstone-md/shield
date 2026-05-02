@@ -197,13 +197,14 @@ func (l *TelegramListener) shutdownPipeline() {
 }
 
 type pipelineContext struct {
-	event      moderation.IncomingEvent
-	msg        *bot.Message
-	resp       bot.Response
-	fromChat   int64
-	spamUserID int64
-	banUserStr string
-	outcome    PolicyOutcome
+	event       moderation.IncomingEvent
+	msg         *bot.Message
+	resp        bot.Response
+	fromChat    int64
+	spamUserID  int64
+	banUserStr  string
+	outcome     PolicyOutcome
+	strikeCount int
 }
 
 func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error {
@@ -307,11 +308,14 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 	pc := pipelineContext{
 		event: event, msg: msg, resp: resp, fromChat: fromChat,
 		spamUserID: spamUserID, banUserStr: l.getBanUsername(resp, update), outcome: outcome,
+		strikeCount: strikeCount,
 	}
 
 	switch outcome.Decision.Action {
 	case moderation.ActionAllow:
 		return l.processAllow(ctx, pc)
+	case moderation.ActionWarn:
+		return l.processWarn(ctx, pc)
 	case moderation.ActionDelete:
 		return l.processEnforce(ctx, pc)
 	case moderation.ActionRestrict, moderation.ActionBan:
@@ -394,6 +398,64 @@ func (l *TelegramListener) processEnforce(ctx context.Context, pc pipelineContex
 	}
 
 	if actionResult.Error == "" {
+		if err := l.AuditWriter.Write(ctx, AuditRecord{
+			Event: pc.event, Message: pc.msg, Response: pc.resp,
+			Decision: pc.outcome.Decision, ActionResult: actionResult,
+			RuleSetVersion: l.RuleSetVersion, ChatID: pc.fromChat, SpamUserID: pc.spamUserID,
+		}); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("audit write failed: %w", err))
+		}
+	}
+
+	if l.CandidateGenerator != nil && pc.msg.Text != "" {
+		l.CandidateGenerator.GenerateCandidates(ctx, pc.msg.Text)
+	}
+
+	if err := l.completeIncomingEvent(ctx, pc.event, pc.outcome.Decision, actionResult); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	return l.cleanupAfterAction(ctx, pc, errs)
+}
+
+func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) error {
+	errs := new(multierror.Error)
+
+	if !pc.resp.Send {
+		return l.cleanupAfterAction(ctx, pc, errs)
+	}
+
+	warnNum := pc.strikeCount + 1
+	warnTotal := l.ModerationConfig.WarnStrikes
+	if warnTotal <= 0 {
+		warnTotal = 3
+	}
+
+	warnText := fmt.Sprintf("\u26a0\ufe0f Предупреждение %d/%d\n%s, вы нарушили правила чата. "+
+		"При получении %d предупреждений последует мьют на 30 мин, затем на 6 ч, и далее — перманентный бан.",
+		warnNum, warnTotal, pc.banUserStr, warnTotal)
+
+	if l.WarnMsg != "" {
+		warnText = fmt.Sprintf("\u26a0\ufe0f Предупреждение %d/%d\n%s", warnNum, warnTotal, l.WarnMsg)
+	}
+
+	actionResult := l.makeActionResult(pc.event, moderation.ActionWarn, false)
+
+	if err := l.ActionExecutor.WarnUser(ctx, warnRequest{
+		chatID:    pc.fromChat,
+		subjectID: pc.spamUserID,
+		text:      warnText,
+	}); err != nil {
+		errs = multierror.Append(errs, fmt.Errorf("failed to send warning: %w", err))
+		actionResult.Error = err.Error()
+	}
+
+	if err := l.ActionExecutor.DeleteMessage(ctx, pc.fromChat, pc.msg.ID); err != nil {
+		observability.Logf(ctx, "[WARN] failed to delete spam message %d in warn mode: %v", pc.msg.ID, err)
+	}
+
+	if actionResult.Error == "" {
+		actionResult.Applied = true
 		if err := l.AuditWriter.Write(ctx, AuditRecord{
 			Event: pc.event, Message: pc.msg, Response: pc.resp,
 			Decision: pc.outcome.Decision, ActionResult: actionResult,

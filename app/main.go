@@ -133,6 +133,7 @@ type options struct {
 	Moderation struct {
 		FirstStrike  time.Duration `long:"first-strike" env:"FIRST_STRIKE" default:"30m" description:"mute/restrict duration for the first automatic spam strike"`
 		SecondStrike time.Duration `long:"second-strike" env:"SECOND_STRIKE" default:"6h" description:"mute/restrict duration for the second automatic spam strike"`
+		WarnStrikes  int           `long:"warn-strikes" env:"WARN_STRIKES" default:"0" description:"number of warning-only strikes before first ban (0=disabled)"`
 	} `group:"moderation" namespace:"moderation" env-namespace:"MODERATION"`
 
 	Report struct {

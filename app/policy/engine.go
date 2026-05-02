@@ -16,6 +16,7 @@ type PolicyInput struct {
 	SoftBanMode  bool
 	FirstStrike  time.Duration
 	SecondStrike time.Duration
+	WarnStrikes  int
 	DryRun       bool
 }
 
@@ -86,6 +87,10 @@ func (e *Engine) Decide(input PolicyInput) PolicyResult {
 
 	finalLevel := ApplyEscalation(baseLevel, input.StrikeCount, e.Profile.Escalate)
 
+	if input.WarnStrikes > 0 && input.StrikeCount < input.WarnStrikes && finalLevel >= LevelMute {
+		finalLevel = LevelWarn
+	}
+
 	if input.SoftBanMode && finalLevel >= LevelBan {
 		finalLevel = LevelDeleteAndMute
 	}
@@ -123,6 +128,7 @@ func (e *Engine) Decide(input PolicyInput) PolicyResult {
 			SoftBanMode:  input.SoftBanMode,
 			FirstStrike:  input.FirstStrike,
 			SecondStrike: input.SecondStrike,
+			WarnStrikes:  input.WarnStrikes,
 		})
 		result.Shadow = &shadowResult
 	}
@@ -178,7 +184,7 @@ func actionLevelToAction(level ActionLevel, firstStrike, secondStrike time.Durat
 	case LevelNone:
 		return moderation.ActionAllow, 0, false
 	case LevelWarn:
-		return moderation.ActionDelete, 0, false
+		return moderation.ActionWarn, 0, false
 	case LevelMute:
 		return moderation.ActionRestrict, firstStrike, true
 	case LevelDeleteAndMute:

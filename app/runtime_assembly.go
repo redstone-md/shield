@@ -342,6 +342,7 @@ func bootstrapRuleSet(opts options) rules.RuleSet {
 		Moderation: rules.ModerationRules{
 			FirstStrike:  opts.Moderation.FirstStrike,
 			SecondStrike: opts.Moderation.SecondStrike,
+			WarnStrikes:  opts.Moderation.WarnStrikes,
 			SoftBan:      opts.SoftBan,
 			DryRun:       opts.Dry,
 		},
@@ -410,6 +411,7 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 		ModerationConfig: events.ModerationConfig{
 			FirstStrike:  a.ActiveRuleSet.Moderation.FirstStrike,
 			SecondStrike: a.ActiveRuleSet.Moderation.SecondStrike,
+			WarnStrikes:  a.ActiveRuleSet.Moderation.WarnStrikes,
 		},
 		ReportConfig: events.ReportConfig{
 			Storage:          a.ReportsStore,

@@ -91,6 +91,7 @@ type ModerationActions interface {
 type ModerationConfig struct {
 	FirstStrike  time.Duration
 	SecondStrike time.Duration
+	WarnStrikes  int
 }
 
 // Reports is an interface for user spam reports storage
@@ -193,7 +194,11 @@ func send(tbMsg tbapi.Chattable, tbAPI TbAPI) error {
 	return nil
 }
 
-func spamPenalty(strikes int, keepRestricted bool, cfg ModerationConfig) (duration time.Duration, restrict bool) {
+func spamPenalty(strikes int, keepRestricted bool, cfg ModerationConfig) (duration time.Duration, restrict bool, warn bool) {
+	if cfg.WarnStrikes > 0 && strikes < cfg.WarnStrikes {
+		return 0, false, true
+	}
+
 	firstStrike := cfg.FirstStrike
 	if firstStrike <= 0 {
 		firstStrike = 30 * time.Minute
@@ -205,13 +210,13 @@ func spamPenalty(strikes int, keepRestricted bool, cfg ModerationConfig) (durati
 
 	switch {
 	case keepRestricted:
-		return bot.PermanentBanDuration, true
+		return bot.PermanentBanDuration, true, false
 	case strikes <= 1:
-		return firstStrike, true
+		return firstStrike, true, false
 	case strikes == 2:
-		return secondStrike, true
+		return secondStrike, true, false
 	default:
-		return bot.PermanentBanDuration, false
+		return bot.PermanentBanDuration, false, false
 	}
 }
 

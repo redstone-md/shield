@@ -271,15 +271,17 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 }
 
 func (r *userReports) reportPenalty(ctx context.Context, userID int64) (time.Duration, bool) {
-	if r.detectedSpam == nil {
-		return spamPenalty(1, r.softBanMode, r.moderation)
+	strikes := 1
+	if r.detectedSpam != nil {
+		count, err := r.detectedSpam.CountByUserID(ctx, userID)
+		if err != nil {
+			log.Printf("[WARN] failed to count spam strikes for reported user %d: %v", userID, err)
+		} else {
+			strikes = count + 1
+		}
 	}
-	count, err := r.detectedSpam.CountByUserID(ctx, userID)
-	if err != nil {
-		log.Printf("[WARN] failed to count spam strikes for reported user %d: %v", userID, err)
-		return spamPenalty(1, r.softBanMode, r.moderation)
-	}
-	return spamPenalty(count+1, r.softBanMode, r.moderation)
+	duration, restrict, _ := spamPenalty(strikes, r.softBanMode, r.moderation)
+	return duration, restrict
 }
 
 func (r *userReports) recordDetectedSpam(ctx context.Context, origMsg *tbapi.Message, checks []spamcheck.Response) {

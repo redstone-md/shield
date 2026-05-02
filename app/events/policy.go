@@ -26,6 +26,7 @@ type PolicyRequest struct {
 	SoftBanMode   bool
 	Moderation    ModerationConfig
 	IsSuperUser   bool
+	WarnStrikes   int
 }
 
 type PolicyOutcome struct {
@@ -74,6 +75,7 @@ func (e defaultPolicyEngine) decideWithEngine(req PolicyRequest) (PolicyOutcome,
 		SoftBanMode:  req.SoftBanMode,
 		FirstStrike:  req.Moderation.FirstStrike,
 		SecondStrike: req.Moderation.SecondStrike,
+		WarnStrikes:  req.Moderation.WarnStrikes,
 	})
 
 	outcome.Decision.Score = spamScore(req.Response)
@@ -125,8 +127,14 @@ func (e defaultPolicyEngine) decideLegacy(req PolicyRequest) (PolicyOutcome, err
 	}
 
 	duration, restrict := req.Response.BanInterval, req.SoftBanMode
+	var warn bool
 	if req.UseEscalation {
-		duration, restrict = spamPenalty(req.StrikeCount, req.SoftBanMode, req.Moderation)
+		duration, restrict, warn = spamPenalty(req.StrikeCount, req.SoftBanMode, req.Moderation)
+	}
+	if warn {
+		outcome.Decision.Action = moderation.ActionWarn
+		outcome.Decision.Reason = "warning strike"
+		return outcome, nil
 	}
 	outcome.Duration = duration
 	outcome.Restrict = restrict
