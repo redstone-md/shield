@@ -176,7 +176,8 @@ func (au *ApprovedUsers) Delete(ctx context.Context, id string) error {
 
 // migrateTableTx handles migration within a transaction
 func (au *ApprovedUsers) migrate(ctx context.Context, tx *sqlx.Tx, gid string) error {
-	// try to select with new structure, if works - already migrated
+	migrateTenantID(ctx, tx, au.Type(), "approved_users")
+
 	var count int
 	err := tx.GetContext(ctx, &count, "SELECT COUNT(*) FROM approved_users WHERE uid='' AND gid=''")
 	if err == nil {
