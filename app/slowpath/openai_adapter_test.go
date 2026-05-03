@@ -2,6 +2,7 @@ package slowpath
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/sashabaranov/go-openai"
@@ -142,6 +143,27 @@ func TestOpenAIAdapterAPIError(t *testing.T) {
 	a := NewOpenAIAdapter(mock, "gpt-4o", 1024, 8192)
 	_, err := a.Check(context.Background(), ProviderRequest{Message: "test"})
 	assert.Error(t, err)
+}
+
+func TestOpenAIAdapterAnalyzeImageSendsMultimodalContent(t *testing.T) {
+	mock := &mockOpenAIClient{
+		fn: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+			payload, err := json.Marshal(req.Messages[1])
+			assert.NoError(t, err)
+			assert.Contains(t, string(payload), `"content":[`)
+			assert.NotContains(t, string(payload), `"content":null`)
+			return openai.ChatCompletionResponse{
+				Choices: []openai.ChatCompletionChoice{
+					{Message: openai.ChatCompletionMessage{Content: `{"spam":false,"reason":"ok","confidence":5}`}},
+				},
+				Usage: openai.Usage{},
+			}, nil
+		},
+	}
+	a := NewOpenAIAdapter(mock, "gpt-4o", 1024, 8192)
+	result, err := a.AnalyzeImage(context.Background(), []byte("fake-image"), "image/jpeg", "check image")
+	assert.NoError(t, err)
+	assert.False(t, result.Spam)
 }
 
 func TestBuildCustomPrompt(t *testing.T) {

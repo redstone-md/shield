@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -389,6 +390,11 @@ func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []
 		return detectorLLMResult{}, false
 	}
 
+	if shouldSkipTextLLM(cleanMsg) {
+		log.Printf("[DEBUG] %s skipped: empty message has no text content for LLM", cfg.name)
+		return detectorLLMResult{}, false
+	}
+
 	hist := d.llmContextForRequest(req)
 
 	ctx, cancel := d.ctxWithLLMTimeout()
@@ -412,6 +418,10 @@ func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []
 	}
 
 	return detectorLLMResult{details: details, flip: flip}, true
+}
+
+func shouldSkipTextLLM(msg string) bool {
+	return strings.TrimSpace(msg) == ""
 }
 
 func (d *Detector) llmContextForRequest(req spamcheck.Request) llmContext {

@@ -459,4 +459,30 @@ func TestDetector_CheckOpenAI(t *testing.T) {
 
 		assert.Len(t, mockOpenAIClient.CreateChatCompletionCalls(), 1)
 	})
+
+	t.Run("with openai and image-only empty text skips text llm", func(t *testing.T) {
+		d := NewDetector(Config{MaxAllowedEmoji: -1, FirstMessageOnly: true, MinMsgLen: 50})
+		mockOpenAIClient := &mocks.OpenAIClientMock{
+			CreateChatCompletionFunc: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+				return openai.ChatCompletionResponse{
+					Choices: []openai.ChatCompletionChoice{{
+						Message: openai.ChatCompletionMessage{Content: `{"spam": true, "reason":"bad image", "confidence":100}`},
+					}},
+				}, nil
+			},
+		}
+
+		d.WithOpenAIChecker(mockOpenAIClient, OpenAIConfig{
+			Model:                        "gpt4",
+			CheckShortMessagesWithOpenAI: true,
+		})
+
+		spam, cr := d.Check(spamcheck.Request{Msg: "", Meta: spamcheck.MetaData{Images: 1}})
+		assert.False(t, spam)
+		assert.NotEmpty(t, cr)
+		assert.Empty(t, mockOpenAIClient.CreateChatCompletionCalls())
+		for _, check := range cr {
+			assert.NotEqual(t, "openai", check.Name)
+		}
+	})
 }
