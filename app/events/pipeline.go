@@ -401,6 +401,8 @@ func (l *TelegramListener) processEnforce(ctx context.Context, pc pipelineContex
 	switch pc.outcome.Decision.Action {
 	case moderation.ActionRestrict, moderation.ActionBan:
 		l.applyBanAction(ctx, pc, &actionResult, errs)
+	case moderation.ActionDelete:
+		l.applyDeleteAction(ctx, pc, &actionResult, errs)
 	}
 
 	if actionResult.Error == "" {
@@ -515,6 +517,26 @@ func (l *TelegramListener) applyBanAction(ctx context.Context, pc pipelineContex
 	} else {
 		actionResult.Applied = true
 	}
+}
+
+func (l *TelegramListener) applyDeleteAction(ctx context.Context, pc pipelineContext, actionResult *moderation.ModerationActionResult, errs *multierror.Error) {
+	if l.Dry {
+		observability.Logf(ctx, "[INFO] dry run: delete message %d", pc.msg.ID)
+		actionResult.Applied = true
+		return
+	}
+	if l.TrainingMode {
+		observability.Logf(ctx, "[INFO] training mode: delete message %d", pc.msg.ID)
+		actionResult.Applied = true
+		return
+	}
+	if err := l.ActionExecutor.DeleteMessage(ctx, pc.fromChat, pc.msg.ID); err != nil {
+		actionResult.Applied = false
+		actionResult.Error = err.Error()
+		errs = multierror.Append(errs, fmt.Errorf("failed to delete message %d: %w", pc.msg.ID, err))
+		return
+	}
+	actionResult.Applied = true
 }
 
 func (l *TelegramListener) cleanupAfterAction(ctx context.Context, pc pipelineContext, errs *multierror.Error) error {

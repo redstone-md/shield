@@ -225,6 +225,57 @@ func TestTelegramListener_ProcessQueuedEventCompletesReplayState(t *testing.T) {
 	assert.True(t, store.completeCalls[0].ActionResult.Applied)
 }
 
+func TestTelegramListener_ProcessQueuedEventDeletesMessageForDeletePolicy(t *testing.T) {
+	locator := &locatorContextSpy{}
+	botMock := &contextualBotSpy{
+		onMessage: func(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response {
+			return bot.Response{
+				Send: true,
+				User: bot.User{ID: 42, Username: "user"},
+				CheckResults: []spamcheck.Response{
+					{Name: "slowpath", Spam: true, Details: "vision spam"},
+				},
+			}
+		},
+	}
+
+	actionSpy := &actionExecutorSpy{}
+	store := &incomingEventsSpy{}
+	l := TelegramListener{
+		Bot:            botMock,
+		Locator:        locator,
+		IncomingEvents: store,
+		NoSpamReply:    true,
+		PolicyEngine:   defaultPolicyEngine{},
+		ActionExecutor: actionSpy,
+		AuditWriter:    &auditWriterSpy{},
+	}
+
+	event := moderation.IncomingEvent{
+		EventID:        "evt-delete",
+		CorrelationID:  "corr-delete",
+		IdempotencyKey: "telegram:update:2:chat:123:message:226:edited:0",
+	}
+	update := tbapi.Update{
+		Message: &tbapi.Message{
+			MessageID: 226,
+			Chat:      tbapi.Chat{ID: 123},
+			Text:      "",
+			From:      &tbapi.User{ID: 42, UserName: "user"},
+			Date:      int(time.Now().Unix()),
+		},
+	}
+
+	err := l.processQueuedEvent(context.Background(), event, update)
+	require.NoError(t, err)
+	require.Len(t, actionSpy.deleteMessageCalls, 1)
+	assert.Equal(t, int64(123), actionSpy.deleteMessageCalls[0].ChatID)
+	assert.Equal(t, 226, actionSpy.deleteMessageCalls[0].MsgID)
+	require.Len(t, store.completeCalls, 1)
+	assert.Equal(t, moderation.ActionDelete, store.completeCalls[0].Decision.Action)
+	assert.True(t, store.completeCalls[0].ActionResult.Applied)
+}
+
 func TestTelegramListener_DuplicateRetryDoesNotRepeatSuccessfulActionOrAudit(t *testing.T) {
 	locator, teardown := prepTestLocator(t)
 	defer teardown()
