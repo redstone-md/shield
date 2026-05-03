@@ -108,6 +108,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	if err != nil {
 		return nil, fmt.Errorf("can't load active rule set, %w", err)
 	}
+	applyCLIOverrides(&activeRuleSet, opts)
 
 	detector := makeDetectorWithRuleSet(opts, activeRuleSet)
 	slowPathEngine := makeSlowPathEngine(opts)
@@ -523,4 +524,13 @@ func (a *runtimeAssembly) close() {
 	if a.DataDB != nil {
 		_ = a.DataDB.Close()
 	}
+}
+
+func applyCLIOverrides(rs *rules.RuleSet, opts options) {
+	boot := bootstrapRuleSet(opts)
+	rs.Meta = boot.Meta
+	rs.Duplicates = boot.Duplicates
+	rs.AbnormalSpacing = boot.AbnormalSpacing
+	rs.Moderation = boot.Moderation
+	rs.Reports = boot.Reports
 }
