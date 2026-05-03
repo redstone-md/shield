@@ -268,17 +268,23 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 
 			if slowErr != nil {
 				observability.Logf(ctx, "[WARN] slowpath check failed: %v", slowErr)
-			} else if slowResult != nil && !slowResult.Skipped && slowResult.Spam {
-				observability.Logf(ctx, "[INFO] slowpath detected spam: confidence=%d, reason=%s", slowResult.Confidence, slowResult.Reason)
-				l.meter(ctx, "slowpath_spam")
-				resp.Send = true
-				resp.User = msg.From
-				resp.ReplyTo = msg.ID
-				resp.CheckResults = append(resp.CheckResults, spamcheck.Response{
-					Name:    "slowpath",
-					Spam:    true,
-					Details: slowResult.Reason,
-				})
+			} else if slowResult == nil {
+				observability.Logf(ctx, "[WARN] slowpath check returned no result")
+			} else {
+				observability.Logf(ctx, "[INFO] slowpath completed: skipped=%v spam=%v confidence=%d providers=%s reason=%s",
+					slowResult.Skipped, slowResult.Spam, slowResult.Confidence, strings.Join(slowResult.Providers, ","), slowResult.Reason)
+				if !slowResult.Skipped && slowResult.Spam {
+					observability.Logf(ctx, "[INFO] slowpath detected spam: confidence=%d, reason=%s", slowResult.Confidence, slowResult.Reason)
+					l.meter(ctx, "slowpath_spam")
+					resp.Send = true
+					resp.User = msg.From
+					resp.ReplyTo = msg.ID
+					resp.CheckResults = append(resp.CheckResults, spamcheck.Response{
+						Name:    "slowpath",
+						Spam:    true,
+						Details: slowResult.Reason,
+					})
+				}
 			}
 		}
 	}
