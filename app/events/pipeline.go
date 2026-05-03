@@ -431,9 +431,17 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 		warnTotal = 3
 	}
 
+	userName := pc.msg.From.DisplayName
+	if userName == "" {
+		userName = pc.msg.From.Username
+	}
+	if userName == "" {
+		userName = fmt.Sprintf("user %d", pc.spamUserID)
+	}
+	userMention := fmt.Sprintf("[%s](tg://user?id=%d)", escapeMarkDownV1Text(userName), pc.spamUserID)
 	warnText := fmt.Sprintf("\u26a0\ufe0f Предупреждение %d/%d\n%s, вы нарушили правила чата. "+
 		"При получении %d предупреждений последует мьют на 30 мин, затем на 6 ч, и далее — перманентный бан.",
-		warnNum, warnTotal, pc.banUserStr, warnTotal)
+		warnNum, warnTotal, userMention, warnTotal)
 
 	if l.WarnMsg != "" {
 		warnText = fmt.Sprintf("\u26a0\ufe0f Предупреждение %d/%d\n%s", warnNum, warnTotal, l.WarnMsg)
