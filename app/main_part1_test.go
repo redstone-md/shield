@@ -438,6 +438,7 @@ func TestRuleSetServiceUpdateAppliesRuntimeWithoutRestart(t *testing.T) {
 	opts.Files.DynamicDataPath = tmpDir
 	opts.Moderation.FirstStrike = 30 * time.Minute
 	opts.Moderation.SecondStrike = 6 * time.Hour
+	opts.Moderation.WarnDeleteDuration = time.Minute
 	opts.Report.Threshold = 2
 	opts.Report.AutoBanThreshold = 3
 	opts.Meta.LinksLimit = 1
@@ -459,6 +460,7 @@ func TestRuleSetServiceUpdateAppliesRuntimeWithoutRestart(t *testing.T) {
 
 	require.Equal(t, 1, assembly.ActiveRuleSet.Version)
 	assert.Equal(t, 30*time.Minute, listener.ModerationConfig.FirstStrike)
+	assert.Equal(t, time.Minute, listener.ModerationConfig.WarnDeleteDuration)
 	assert.False(t, listener.Dry)
 	assert.Equal(t, 2, listener.ReportConfig.Threshold)
 	assert.Equal(t, 2, assembly.Detector.DuplicateDetection.Threshold)
