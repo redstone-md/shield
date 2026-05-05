@@ -394,6 +394,19 @@ func transform(msg *tbapi.Message) *bot.Message {
 	if msg.Giveaway != nil || msg.GiveawayCreated != nil || msg.GiveawayWinners != nil || msg.GiveawayCompleted != nil {
 		message.WithGiveaway = true
 	}
+	if msg.Sticker != nil {
+		message.WithSticker = true
+		info := &bot.StickerInfo{
+			FileID:     msg.Sticker.FileID,
+			IsAnimated: msg.Sticker.IsAnimated,
+			IsVideo:    msg.Sticker.IsVideo,
+			SetName:    msg.Sticker.SetName,
+		}
+		if msg.Sticker.Thumbnail != nil {
+			info.ThumbFileID = msg.Sticker.Thumbnail.FileID
+		}
+		message.Sticker = info
+	}
 
 	// handle reply-to message if present
 	if msg.ReplyToMessage != nil {

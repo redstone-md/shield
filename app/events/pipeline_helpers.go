@@ -44,7 +44,7 @@ func (l *TelegramListener) makeIncomingEvent(update tbapi.Update, msg *bot.Messa
 		Content: moderation.Content{
 			Text:       msg.Text,
 			Links:      collectLinks(msg),
-			HasMedia:   msg.Image != nil || msg.WithVideo || msg.WithVideoNote || msg.WithAudio,
+			HasMedia:   msg.Image != nil || msg.WithVideo || msg.WithVideoNote || msg.WithAudio || msg.WithSticker,
 			Attributes: incomingEventAttributes(msg),
 		},
 		ReceivedAt: msg.Sent.UTC(),
@@ -73,6 +73,7 @@ func incomingEventAttributes(msg *bot.Message) map[string]string {
 		"with_video":      strconv.FormatBool(msg.WithVideo),
 		"with_video_note": strconv.FormatBool(msg.WithVideoNote),
 		"with_audio":      strconv.FormatBool(msg.WithAudio),
+		"with_sticker":    strconv.FormatBool(msg.WithSticker),
 	}
 	if msg.SenderChat.ID != 0 {
 		attrs["sender_chat_id"] = strconv.FormatInt(msg.SenderChat.ID, 10)

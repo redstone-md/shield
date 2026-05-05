@@ -171,6 +171,9 @@ func (s *SpamFilter) OnMessageWithContext(ctx context.Context, msg Message, chec
 	if msg.WithGiveaway {
 		spamReq.Meta.HasGiveaway = true
 	}
+	if msg.WithSticker {
+		spamReq.Meta.HasSticker = true
+	}
 	spamReq.Meta.MessageID = msg.ID
 
 	// count mentions and links from entities (both regular and caption entities)

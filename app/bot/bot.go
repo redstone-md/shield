@@ -58,13 +58,15 @@ type Message struct {
 	} `json:",omitzero"`
 	Quote string `json:",omitempty"` // quoted text from TextQuote
 
-	WithVideo     bool `json:",omitempty"`
-	WithVideoNote bool `json:",omitempty"`
-	WithForward   bool `json:",omitempty"`
-	WithAudio     bool `json:",omitempty"`
-	WithKeyboard  bool `json:",omitempty"`
-	WithContact   bool `json:",omitempty"`
-	WithGiveaway  bool `json:",omitempty"`
+	WithVideo     bool         `json:",omitempty"`
+	WithVideoNote bool         `json:",omitempty"`
+	WithForward   bool         `json:",omitempty"`
+	WithAudio     bool         `json:",omitempty"`
+	WithKeyboard  bool         `json:",omitempty"`
+	WithContact   bool         `json:",omitempty"`
+	WithGiveaway  bool         `json:",omitempty"`
+	WithSticker   bool         `json:",omitempty"`
+	Sticker       *StickerInfo `json:",omitempty"`
 }
 
 // Entity represents one special entity in a text message.
@@ -85,6 +87,15 @@ type Image struct {
 	Height   int
 	Caption  string    `json:",omitempty"`
 	Entities *[]Entity `json:",omitempty"`
+}
+
+// StickerInfo represents sticker metadata
+type StickerInfo struct {
+	FileID      string `json:",omitempty"`
+	ThumbFileID string `json:",omitempty"`
+	IsAnimated  bool   `json:",omitempty"`
+	IsVideo     bool   `json:",omitempty"`
+	SetName     string `json:",omitempty"`
 }
 
 // User defines user info of the Message

@@ -77,7 +77,7 @@ func (l *TelegramListener) procEventsWithContext(ctx context.Context, update tba
 	}
 
 	msg := transform(update.Message)
-	if strings.TrimSpace(msg.Text) == "" && msg.Image == nil && !msg.WithVideoNote && !msg.WithVideo && !msg.WithForward {
+	if strings.TrimSpace(msg.Text) == "" && msg.Image == nil && !msg.WithVideoNote && !msg.WithVideo && !msg.WithForward && !msg.WithSticker {
 		return nil
 	}
 
@@ -237,53 +237,61 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 		l.meter(ctx, "spam_detected")
 	}
 
-	if resp.Send && !l.NoSpamReply && !l.TrainingMode {
-		if err := l.sendBotResponse(resp, fromChat, NotificationSilent); err != nil {
-			observability.Logf(ctx, "[WARN] failed to respond on update, %v", err)
-		}
-	}
-
-	if l.SlowPathEnabled && l.SlowPathEngine != nil && msg.Image != nil && msg.Image.FileID != "" && !resp.Send {
+	if l.SlowPathEnabled && l.SlowPathEngine != nil && !resp.Send {
 		dl := newImageDownloader(l.TbAPI)
-		data, mime, dlErr := dl.download(ctx, msg.Image.FileID)
-		if dlErr != nil {
-			observability.Logf(ctx, "[WARN] image download failed: %v", dlErr)
-		} else {
-			defer func() { data = nil }()
-			observability.Logf(ctx, "[DEBUG] downloaded image for slowpath: %d bytes, mime=%s", len(data), mime)
 
-			slowReq := slowpath.SlowPathRequest{
-				EventID:       event.EventID,
-				CorrelationID: event.CorrelationID,
-				TenantID:      l.TenantID,
-				Reason:        slowpath.EscalationImageContent,
-				Content:       slowpath.Content{Text: msg.Text, HasMedia: true},
-				ImageData:     data,
-				ImageMIME:     mime,
-			}
+		var fileID string
+		var slowReason slowpath.EscalationReason
 
-			slowStart := time.Now()
-			slowResult, slowErr := l.SlowPathEngine.Check(ctx, slowReq)
-			l.observeLatency("slow_path_latency", time.Since(slowStart))
+		if msg.Image != nil && msg.Image.FileID != "" {
+			fileID = msg.Image.FileID
+			slowReason = slowpath.EscalationImageContent
+		} else if msg.WithSticker && msg.Sticker != nil {
+			fileID = stickerDownloadFileID(msg.Sticker)
+			slowReason = slowpath.EscalationImageContent
+		}
 
-			if slowErr != nil {
-				observability.Logf(ctx, "[WARN] slowpath check failed: %v", slowErr)
-			} else if slowResult == nil {
-				observability.Logf(ctx, "[WARN] slowpath check returned no result")
+		if fileID != "" {
+			data, mime, dlErr := dl.download(ctx, fileID)
+			if dlErr != nil {
+				observability.Logf(ctx, "[WARN] file download failed for slowpath: %v", dlErr)
 			} else {
-				observability.Logf(ctx, "[INFO] slowpath completed: skipped=%v spam=%v confidence=%d providers=%s reason=%s",
-					slowResult.Skipped, slowResult.Spam, slowResult.Confidence, strings.Join(slowResult.Providers, ","), slowResult.Reason)
-				if !slowResult.Skipped && slowResult.Spam {
-					observability.Logf(ctx, "[INFO] slowpath detected spam: confidence=%d, reason=%s", slowResult.Confidence, slowResult.Reason)
-					l.meter(ctx, "slowpath_spam")
-					resp.Send = true
-					resp.User = msg.From
-					resp.ReplyTo = msg.ID
-					resp.CheckResults = append(resp.CheckResults, spamcheck.Response{
-						Name:    "slowpath",
-						Spam:    true,
-						Details: slowResult.Reason,
-					})
+				defer func() { data = nil }()
+				observability.Logf(ctx, "[DEBUG] downloaded file for slowpath: %d bytes, mime=%s", len(data), mime)
+
+				slowReq := slowpath.SlowPathRequest{
+					EventID:       event.EventID,
+					CorrelationID: event.CorrelationID,
+					TenantID:      l.TenantID,
+					Reason:        slowReason,
+					Content:       slowpath.Content{Text: msg.Text, HasMedia: true},
+					ImageData:     data,
+					ImageMIME:     mime,
+				}
+
+				slowStart := time.Now()
+				slowResult, slowErr := l.SlowPathEngine.Check(ctx, slowReq)
+				l.observeLatency("slow_path_latency", time.Since(slowStart))
+
+				if slowErr != nil {
+					observability.Logf(ctx, "[WARN] slowpath check failed: %v", slowErr)
+				} else if slowResult == nil {
+					observability.Logf(ctx, "[WARN] slowpath check returned no result")
+				} else {
+					observability.Logf(ctx, "[INFO] slowpath completed: skipped=%v spam=%v confidence=%d providers=%s reason=%s",
+						slowResult.Skipped, slowResult.Spam, slowResult.Confidence, strings.Join(slowResult.Providers, ","), slowResult.Reason)
+					if !slowResult.Skipped && slowResult.Spam {
+						observability.Logf(ctx, "[INFO] slowpath detected spam: confidence=%d, reason=%s", slowResult.Confidence, slowResult.Reason)
+						l.meter(ctx, "slowpath_spam")
+						resp.Send = true
+						resp.User = msg.From
+						resp.ReplyTo = msg.ID
+						resp.CheckResults = append(resp.CheckResults, spamcheck.Response{
+							Name:    "slowpath",
+							Spam:    true,
+							Details: slowResult.Reason,
+						})
+					}
 				}
 			}
 		}
@@ -606,4 +614,14 @@ func (l *TelegramListener) incMetric(name string) {
 		return
 	}
 	l.MetricsRecorder.Inc(name)
+}
+
+func stickerDownloadFileID(s *bot.StickerInfo) string {
+	if (s.IsAnimated || s.IsVideo) && s.ThumbFileID != "" {
+		return s.ThumbFileID
+	}
+	if s.FileID != "" {
+		return s.FileID
+	}
+	return s.ThumbFileID
 }

@@ -326,6 +326,118 @@ func TestTelegramListener_transformQuote(t *testing.T) {
 	}
 }
 
+func TestTelegramListener_transformSticker(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *tbapi.Message
+		expected *bot.Message
+	}{
+		{
+			name: "static sticker with thumbnail",
+			input: &tbapi.Message{
+				MessageID: 100,
+				Chat:      tbapi.Chat{ID: 123},
+				From:      &tbapi.User{ID: 456, UserName: "user1"},
+				Date:      1578627415,
+				Sticker: &tbapi.Sticker{
+					FileID:     "sticker_file_123",
+					Width:      512,
+					Height:     512,
+					IsAnimated: false,
+					IsVideo:    false,
+					SetName:    "CoolStickers",
+					Thumbnail:  &tbapi.PhotoSize{FileID: "thumb_456", Width: 128, Height: 128},
+				},
+			},
+			expected: &bot.Message{
+				ID:          100,
+				ChatID:      123,
+				Sent:        time.Unix(1578627415, 0),
+				From:        bot.User{ID: 456, Username: "user1"},
+				WithSticker: true,
+				Sticker: &bot.StickerInfo{
+					FileID:      "sticker_file_123",
+					ThumbFileID: "thumb_456",
+					IsAnimated:  false,
+					IsVideo:     false,
+					SetName:     "CoolStickers",
+				},
+			},
+		},
+		{
+			name: "animated sticker without thumbnail",
+			input: &tbapi.Message{
+				MessageID: 101,
+				Chat:      tbapi.Chat{ID: 123},
+				From:      &tbapi.User{ID: 456, UserName: "user1"},
+				Date:      1578627415,
+				Sticker: &tbapi.Sticker{
+					FileID:     "anim_sticker_789",
+					Width:      512,
+					Height:     512,
+					IsAnimated: true,
+					IsVideo:    false,
+					SetName:    "AnimatedPack",
+				},
+			},
+			expected: &bot.Message{
+				ID:          101,
+				ChatID:      123,
+				Sent:        time.Unix(1578627415, 0),
+				From:        bot.User{ID: 456, Username: "user1"},
+				WithSticker: true,
+				Sticker: &bot.StickerInfo{
+					FileID:      "anim_sticker_789",
+					ThumbFileID: "",
+					IsAnimated:  true,
+					IsVideo:     false,
+					SetName:     "AnimatedPack",
+				},
+			},
+		},
+		{
+			name: "video sticker with thumbnail",
+			input: &tbapi.Message{
+				MessageID: 102,
+				Chat:      tbapi.Chat{ID: 123},
+				From:      &tbapi.User{ID: 456, UserName: "user1"},
+				Date:      1578627415,
+				Sticker: &tbapi.Sticker{
+					FileID:     "vid_sticker_999",
+					Width:      512,
+					Height:     512,
+					IsAnimated: false,
+					IsVideo:    true,
+					SetName:    "VideoPack",
+					Thumbnail:  &tbapi.PhotoSize{FileID: "vid_thumb_111", Width: 128, Height: 128},
+				},
+			},
+			expected: &bot.Message{
+				ID:          102,
+				ChatID:      123,
+				Sent:        time.Unix(1578627415, 0),
+				From:        bot.User{ID: 456, Username: "user1"},
+				WithSticker: true,
+				Sticker: &bot.StickerInfo{
+					FileID:      "vid_sticker_999",
+					ThumbFileID: "vid_thumb_111",
+					IsAnimated:  false,
+					IsVideo:     true,
+					SetName:     "VideoPack",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := transform(tt.input)
+			assert.Equal(t, tt.expected.WithSticker, res.WithSticker)
+			assert.Equal(t, tt.expected.Sticker, res.Sticker)
+		})
+	}
+}
+
 func TestTelegramListener_transformForward(t *testing.T) {
 	tbl := []struct {
 		name string

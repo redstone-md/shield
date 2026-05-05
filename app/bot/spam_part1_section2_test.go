@@ -229,3 +229,29 @@ func TestSpamFilter_OnMessage_BothQuoteAndReplytoTextPresentQuoteTakesPrecedence
 		},
 	})
 }
+
+func TestSpamFilter_OnMessage_WithSticker(t *testing.T) {
+	runSpamFilterOnMessageCase(t, spamFilterOnMessageCase{
+		name: "with sticker",
+		message: Message{
+			Text:        "spam message",
+			From:        User{ID: 1, Username: "user1"},
+			WithSticker: true,
+			Sticker:     &StickerInfo{FileID: "stk123", SetName: "Cats"},
+		},
+		wantResponse: Response{
+			Text:          `detected: "user1" (1)`,
+			Send:          true,
+			BanInterval:   PermanentBanDuration,
+			DeleteReplyTo: true,
+			User:          User{ID: 1, Username: "user1"},
+			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
+		},
+		wantRequest: spamcheck.Request{
+			Msg:      "spam message",
+			UserID:   "1",
+			UserName: "user1",
+			Meta:     spamcheck.MetaData{HasSticker: true},
+		},
+	})
+}
