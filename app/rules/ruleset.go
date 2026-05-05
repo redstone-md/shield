@@ -48,11 +48,12 @@ type AbnormalSpacingRules struct {
 }
 
 type ModerationRules struct {
-	FirstStrike  time.Duration `json:"first_strike"`
-	SecondStrike time.Duration `json:"second_strike"`
-	WarnStrikes  int           `json:"warn_strikes"`
-	SoftBan      bool          `json:"soft_ban"`
-	DryRun       bool          `json:"dry_run"`
+	FirstStrike        time.Duration `json:"first_strike"`
+	SecondStrike     time.Duration `json:"second_strike"`
+	WarnStrikes      int           `json:"warn_strikes"`
+	SoftBan          bool          `json:"soft_ban"`
+	DryRun           bool          `json:"dry_run"`
+	WarnDeleteDuration time.Duration `json:"warn_delete_duration"`
 }
 
 type ReportRules struct {

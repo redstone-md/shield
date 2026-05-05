@@ -107,12 +107,31 @@ func (e telegramActionExecutor) WarnUser(ctx context.Context, req warnRequest) e
 		return nil
 	}
 
-	if err := send(tbapi.NewMessage(req.chatID, escapeMarkDownV1Text(req.text)), e.tbAPI); err != nil {
+	msgConfig := tbapi.NewMessage(req.chatID, req.text)
+	msgConfig.ParseMode = tbapi.ModeHTML
+	msgConfig.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
+	msg, err := e.tbAPI.Send(msgConfig)
+	if err != nil {
 		e.recordAction(ctx, commandWarnUser, req.chatID, req.subjectID, req.messageID, attempt, err)
 		return fmt.Errorf("warn user %d: %w", req.subjectID, err)
 	}
 
 	e.recordAction(ctx, commandWarnUser, req.chatID, req.subjectID, req.messageID, attempt, nil)
+
+	if req.warnDelTime > 0 {
+		warnMsgID := msg.MessageID
+		chatID := req.chatID
+		go func() {
+			observability.Logf(ctx, "[DEBUG] scheduled warning message %d deletion in %v", warnMsgID, req.warnDelTime)
+			time.Sleep(req.warnDelTime)
+			observability.Logf(ctx, "[DEBUG] deleting warning message %d after %v", warnMsgID, req.warnDelTime)
+			if err := e.DeleteMessage(context.Background(), chatID, warnMsgID); err != nil {
+				observability.Logf(ctx, "[WARN] failed to delete warning message %d: %v", warnMsgID, err)
+			} else {
+				observability.Logf(ctx, "[DEBUG] warning message %d deleted successfully", warnMsgID)
+			}
+		}()
+	}
 	return nil
 }
 
@@ -219,10 +238,11 @@ type banRequest struct {
 }
 
 type warnRequest struct {
-	chatID    int64
+	chatID     int64
 	subjectID int64
 	messageID int
 	text      string
+	warnDelTime time.Duration // time to delete the warning message, 0 to keep
 }
 
 // The bot must be an administrator in the supergroup for this to work

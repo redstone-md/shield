@@ -341,11 +341,12 @@ func bootstrapRuleSet(opts options) rules.RuleSet {
 			MinWords:                opts.AbnormalSpacing.MinWords,
 		},
 		Moderation: rules.ModerationRules{
-			FirstStrike:  opts.Moderation.FirstStrike,
-			SecondStrike: opts.Moderation.SecondStrike,
-			WarnStrikes:  opts.Moderation.WarnStrikes,
-			SoftBan:      opts.SoftBan,
-			DryRun:       opts.Dry,
+			FirstStrike:         opts.Moderation.FirstStrike,
+			SecondStrike:        opts.Moderation.SecondStrike,
+			WarnStrikes:         opts.Moderation.WarnStrikes,
+			SoftBan:             opts.SoftBan,
+			DryRun:              opts.Dry,
+			WarnDeleteDuration:   opts.Moderation.WarnDeleteDuration,
 		},
 		Reports: rules.ReportRules{
 			Enabled:          opts.Report.Enabled,

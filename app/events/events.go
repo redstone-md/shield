@@ -89,9 +89,10 @@ type ModerationActions interface {
 
 // ModerationConfig controls automatic penalty escalation.
 type ModerationConfig struct {
-	FirstStrike  time.Duration
-	SecondStrike time.Duration
-	WarnStrikes  int
+	FirstStrike      time.Duration
+	SecondStrike    time.Duration
+	WarnStrikes     int
+	WarnDeleteDuration time.Duration // duration to auto-delete warning messages
 }
 
 // Reports is an interface for user spam reports storage
@@ -122,6 +123,16 @@ func escapeMarkDownV1Text(text string) string {
 	for _, esc := range escSymbols {
 		text = strings.ReplaceAll(text, esc, "\\"+esc)
 	}
+	return text
+}
+
+// htmlEscape escapes special characters for HTML parse mode.
+// It escapes: & (ampersand), < (less than), > (greater than), " (quote)
+func htmlEscape(text string) string {
+	text = strings.ReplaceAll(text, "&", "&amp;")
+	text = strings.ReplaceAll(text, "<", "&lt;")
+	text = strings.ReplaceAll(text, ">", "&gt;")
+	text = strings.ReplaceAll(text, `"`, "&quot;")
 	return text
 }
 

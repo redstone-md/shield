@@ -44,27 +44,107 @@ func (a *admin) ReportBan(banUserStr string, msg *bot.Message, duration time.Dur
 	if msg.Quote != "" {
 		msgText = msg.Text + "\n" + msg.Quote
 	}
-	text := strings.ReplaceAll(escapeMarkDownV1Text(msgText), "\n", " ")
+	if msgText == "" {
+		switch {
+		case msg.WithSticker && msg.Sticker != nil:
+			parts := []string{"[sticker"}
+			if msg.Sticker.SetName != "" {
+				parts = append(parts, "from "+msg.Sticker.SetName)
+			}
+			if msg.Sticker.IsAnimated {
+				parts = append(parts, "(animated)")
+			}
+			if msg.Sticker.IsVideo {
+				parts = append(parts, "(video)")
+			}
+			parts = append(parts, "]")
+			msgText = strings.Join(parts, " ")
+		case msg.Image != nil:
+			msgText = "[image]"
+		case msg.WithVideo:
+			msgText = "[video]"
+		}
+	}
+	text := strings.ReplaceAll(htmlEscape(msgText), "\n", " ")
 	callbackUser := msg.From
 	if msg.SenderChat.ID != 0 {
 		callbackUser = bot.User{ID: msg.SenderChat.ID, Username: msg.SenderChat.UserName}
 	}
 
 	actionText := moderationActionText(duration, restrict, a.dry)
-	banLine := fmt.Sprintf("**%s [%s](tg://user?id=%d)**",
-		actionText, escapeMarkDownV1Text(banUserStr), msg.From.ID)
-	switch {
-	case msg.SenderChat.ID != 0 && msg.SenderChat.UserName != "":
-		banLine = fmt.Sprintf("**%s [%s](https://t.me/%s)**",
-			actionText, escapeMarkDownV1Text(banUserStr), msg.SenderChat.UserName)
-	case msg.SenderChat.ID != 0:
-		banLine = fmt.Sprintf("**%s %s (%d)**",
-			actionText, escapeMarkDownV1Text(banUserStr), msg.SenderChat.ID)
+	userID := msg.From.ID
+	username := msg.From.Username
+	if msg.SenderChat.ID != 0 {
+		userID = msg.SenderChat.ID
+		username = msg.SenderChat.UserName
+	}
+
+	banLine := ""
+	if username != "" {
+		banLine = fmt.Sprintf(`<b>%s</b> <a href="https://t.me/%s">%s</a>`,
+			htmlEscape(actionText), username, htmlEscape(adminDisplayName(msg.From)))
+	} else if msg.From.FirstName != "" {
+		banLine = fmt.Sprintf(`<b>%s</b> %s (%d)`, htmlEscape(actionText), htmlEscape(msg.From.FirstName), userID)
+	} else {
+		banLine = fmt.Sprintf(`<b>%s</b> user %d`, htmlEscape(actionText), userID)
 	}
 	forwardMsg := fmt.Sprintf("%s\n\n%s\n\n", banLine, text)
 	if err := a.sendWithUnbanMarkup(forwardMsg, "change ban", callbackUser, msg.ID, a.adminChatID); err != nil {
 		log.Printf("[WARN] failed to send admin message, %v", err)
 	}
+}
+
+func (a *admin) ReportWarn(warnUserStr string, msg *bot.Message, warnNum, warnTotal int) {
+	log.Printf("[DEBUG] report to admin chat, warn for %s, strike %d/%d", warnUserStr, warnNum, warnTotal)
+	msgText := msg.Text
+	if msgText == "" {
+		if msg.WithSticker {
+			msgText = "[sticker]"
+		} else if msg.Image != nil {
+			msgText = "[image]"
+		} else if msg.WithVideo {
+			msgText = "[video]"
+		}
+	}
+	text := strings.ReplaceAll(htmlEscape(msgText), "\n", " ")
+
+	userID := msg.From.ID
+	username := msg.From.Username
+	if msg.SenderChat.ID != 0 {
+		userID = msg.SenderChat.ID
+		username = msg.SenderChat.UserName
+	}
+	hasUsername := username != ""
+
+	var warnLine string
+	if hasUsername {
+		warnLine = fmt.Sprintf(`<b>⚠️ WARNING %d/%d</b> <a href="https://t.me/%s">%s</a>`,
+			warnNum, warnTotal, username, htmlEscape(adminDisplayName(msg.From)))
+	} else if msg.From.FirstName != "" {
+		warnLine = fmt.Sprintf(`<b>⚠️ WARNING %d/%d</b> %s (%d)`,
+			warnNum, warnTotal, htmlEscape(msg.From.FirstName), userID)
+	} else {
+		warnLine = fmt.Sprintf(`<b>⚠️ WARNING %d/%d</b> user %d`,
+			warnNum, warnTotal, userID)
+	}
+
+	forwardMsg := fmt.Sprintf("%s\n\n%s\n\n", warnLine, text)
+	msgConfig := tbapi.NewMessage(a.adminChatID, forwardMsg)
+	msgConfig.ParseMode = tbapi.ModeHTML
+	msgConfig.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
+	if _, err := a.tbAPI.Send(msgConfig); err != nil {
+		log.Printf("[WARN] failed to send admin warn message, %v", err)
+	}
+}
+
+func adminDisplayName(user bot.User) string {
+	if user.FirstName != "" {
+		return user.FirstName
+	}
+	if user.Username != "" {
+		return user.Username
+	}
+	return fmt.Sprintf("user %d", user.ID)
 }
 
 func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {

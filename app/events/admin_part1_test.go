@@ -71,6 +71,68 @@ func TestAdmin_reportBan(t *testing.T) {
 		assert.Contains(t, sentText, "Спасибо!!")
 		assert.Contains(t, sentText, "Бесплатный VPN для Telegram")
 	})
+
+	t.Run("no username uses first name and id without profile link", func(t *testing.T) {
+		mockAPI.ResetCalls()
+		msgWithoutUsername := &bot.Message{
+			From: bot.User{ID: 7187750383, FirstName: "Claude"},
+			Text: "spam text",
+		}
+		adm.ReportBan("", msgWithoutUsername, bot.PermanentBanDuration, true)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		sentText := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
+		assert.Contains(t, sentText, "<b>restricted</b> Claude (7187750383)")
+		assert.NotContains(t, sentText, "tg://user")
+	})
+}
+
+func TestAdmin_reportWarnNoUsernameUsesFirstNameAndID(t *testing.T) {
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			return tbapi.Message{}, nil
+		},
+	}
+
+	adm := admin{
+		tbAPI:       mockAPI,
+		adminChatID: 123,
+	}
+	msg := &bot.Message{
+		From: bot.User{ID: 7187750383, FirstName: "Claude"},
+		Text: "spam text",
+	}
+
+	adm.ReportWarn("", msg, 1, 3)
+
+	require.Len(t, mockAPI.SendCalls(), 1)
+	sentText := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
+	assert.Contains(t, sentText, "<b>⚠️ WARNING 1/3</b> Claude (7187750383)")
+	assert.NotContains(t, sentText, "tg://user")
+}
+
+func TestAdmin_reportWarnUsernameUsesFirstNameAsLinkText(t *testing.T) {
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			return tbapi.Message{}, nil
+		},
+	}
+
+	adm := admin{
+		tbAPI:       mockAPI,
+		adminChatID: 123,
+	}
+	msg := &bot.Message{
+		From: bot.User{ID: 7187750383, Username: "baz_02l_wss", FirstName: "Firstname"},
+		Text: "spam text",
+	}
+
+	adm.ReportWarn("baz_02l_wss", msg, 3, 3)
+
+	require.Len(t, mockAPI.SendCalls(), 1)
+	sentText := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
+	assert.Contains(t, sentText, `<b>⚠️ WARNING 3/3</b> <a href="https://t.me/baz_02l_wss">Firstname</a>`)
+	assert.NotContains(t, sentText, `>baz_02l_wss</a>`)
 }
 
 func TestAdmin_getCleanMessage(t *testing.T) {

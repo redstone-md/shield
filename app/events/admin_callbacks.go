@@ -347,8 +347,10 @@ func (a *admin) sendWithUnbanMarkup(text, action string, user bot.User, msgID in
 	log.Printf("[DEBUG] action response %q: user %+v, msgID:%d, text: %q",
 		action, user, msgID, strings.ReplaceAll(text, "\n", "\\n"))
 	tbMsg := tbapi.NewMessage(chatID, text)
-	tbMsg.ParseMode = tbapi.ModeMarkdown
+	tbMsg.ParseMode = tbapi.ModeHTML
 	tbMsg.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
+	log.Printf("[DEBUG] sending message with ParseMode=%q, text contains tg://user: %v",
+		tbMsg.ParseMode, strings.Contains(text, "tg://user?id="))
 
 	tbMsg.ReplyMarkup = tbapi.NewInlineKeyboardMarkup(
 		tbapi.NewInlineKeyboardRow(
@@ -358,19 +360,29 @@ func (a *admin) sendWithUnbanMarkup(text, action string, user bot.User, msgID in
 	)
 
 	if _, err := a.tbAPI.Send(tbMsg); err != nil {
-		return fmt.Errorf("can't send message to telegram %q: %w", text, err)
+		log.Printf("[ERROR] failed to send message with HTML ParseMode: %v", err)
+		log.Printf("[DEBUG] attempting to send without parse mode as fallback")
+		tbMsg.ParseMode = ""
+		if _, err := a.tbAPI.Send(tbMsg); err != nil {
+			return fmt.Errorf("can't send message to telegram %q: %w", text, err)
+		}
+		log.Printf("[WARN] message sent without parse mode (HTML failed)")
+	} else {
+		log.Printf("[DEBUG] message sent successfully with HTML ParseMode")
 	}
 	return nil
 }
 
 func (a *admin) extractUsername(text string) (string, error) {
-	markdownRegex := regexp.MustCompile(`\[(.*?)\]\(tg://user\?id=\d+\)`)
-	if matches := markdownRegex.FindStringSubmatch(text); len(matches) > 1 {
+	// HTML format: <a href="tg://user?id=123">name</a>
+	htmlUserRegex := regexp.MustCompile(`<a href="tg://user\?id=\d+">(.+?)</a>`)
+	if matches := htmlUserRegex.FindStringSubmatch(text); len(matches) > 1 {
 		return matches[1], nil
 	}
 
-	tmeRegex := regexp.MustCompile(`\[(.*?)\]\(https://t\.me/\S+\)`)
-	if matches := tmeRegex.FindStringSubmatch(text); len(matches) > 1 {
+	// HTML format: <a href="https://t.me/username">username</a>
+	htmlTmeRegex := regexp.MustCompile(`<a href="https://t\.me/(\S+?)">`)
+	if matches := htmlTmeRegex.FindStringSubmatch(text); len(matches) > 1 {
 		return matches[1], nil
 	}
 

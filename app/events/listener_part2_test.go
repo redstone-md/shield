@@ -131,6 +131,88 @@ func TestTelegramListener_TracerBulletSmoke(t *testing.T) {
 	assertContextMetadata(t, locator.addSpamCtxs[0], eventID, correlationID)
 }
 
+func TestTelegramListener_AutomaticWarnCarriesMessageIDAndDeleteDuration(t *testing.T) {
+	mockAPI := &mocks.TbAPIMock{
+		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
+			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+		},
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			return tbapi.Message{}, nil
+		},
+		GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
+			return nil, nil
+		},
+	}
+
+	botMock := &contextualBotSpy{
+		onMessage: func(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response {
+			return bot.Response{
+				Send: true,
+				User: bot.User{ID: 42, Username: "baz_02l_wss", DisplayName: "Asya Kilisa",
+					FirstName: "Asya", LastName: "Kilisa"},
+				CheckResults: []spamcheck.Response{{Name: "rule", Spam: true, Details: "spam"}},
+			}
+		},
+	}
+
+	policySpy := &policyEngineSpy{
+		decide: func(ctx context.Context, req PolicyRequest) (PolicyOutcome, error) {
+			return PolicyOutcome{
+				Decision: moderation.PolicyDecision{
+					EventID:       req.Event.EventID,
+					CorrelationID: req.Event.CorrelationID,
+					Action:        moderation.ActionWarn,
+					Reason:        "warn before mute",
+					Score:         1,
+					DecidedAt:     time.Now().UTC(),
+				},
+			}, nil
+		},
+	}
+
+	actionSpy := &actionExecutorSpy{}
+	l := TelegramListener{
+		TbAPI:          mockAPI,
+		Bot:            botMock,
+		Group:          "gr",
+		Locator:        &locatorContextSpy{},
+		NoSpamReply:    true,
+		PolicyEngine:   policySpy,
+		ActionExecutor: actionSpy,
+		ModerationConfig: ModerationConfig{
+			WarnStrikes:        3,
+			WarnDeleteDuration: time.Minute,
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	updChan := make(chan tbapi.Update, 1)
+	updChan <- tbapi.Update{
+		Message: &tbapi.Message{
+			MessageID: 55,
+			Chat:      tbapi.Chat{ID: 123},
+			Text:      "spam payload",
+			From: &tbapi.User{ID: 42, UserName: "baz_02l_wss",
+				FirstName: "Asya", LastName: "Kilisa"},
+			Date: int(time.Now().Unix()),
+		},
+	}
+	close(updChan)
+	mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updChan }
+
+	err := l.Do(ctx)
+	require.EqualError(t, err, "telegram update chan closed")
+
+	require.Len(t, actionSpy.warnCalls, 1)
+	assert.Equal(t, int64(123), actionSpy.warnCalls[0].chatID)
+	assert.Equal(t, int64(42), actionSpy.warnCalls[0].subjectID)
+	assert.Equal(t, 55, actionSpy.warnCalls[0].messageID)
+	assert.Equal(t, time.Minute, actionSpy.warnCalls[0].warnDelTime)
+	assert.Contains(t, actionSpy.warnCalls[0].text, `<a href="https://t.me/baz_02l_wss">Asya Kilisa</a>`)
+}
+
 func TestTelegramListener_ProcessQueuedEventLogsCorrelationIDs(t *testing.T) {
 	var buf bytes.Buffer
 	oldWriter := log.Writer()

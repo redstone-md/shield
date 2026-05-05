@@ -131,9 +131,10 @@ type options struct {
 	} `group:"duplicates" namespace:"duplicates" env-namespace:"DUPLICATES"`
 
 	Moderation struct {
-		FirstStrike  time.Duration `long:"first-strike" env:"FIRST_STRIKE" default:"30m" description:"mute/restrict duration for the first automatic spam strike"`
-		SecondStrike time.Duration `long:"second-strike" env:"SECOND_STRIKE" default:"6h" description:"mute/restrict duration for the second automatic spam strike"`
-		WarnStrikes  int           `long:"warn-strikes" env:"WARN_STRIKES" default:"0" description:"number of warning-only strikes before first ban (0=disabled)"`
+		FirstStrike          time.Duration `long:"first-strike" env:"FIRST_STRIKE" default:"30m" description:"mute/restrict duration for the first automatic spam strike"`
+		SecondStrike         time.Duration `long:"second-strike" env:"SECOND_STRIKE" default:"6h" description:"mute/restrict duration for the second automatic spam strike"`
+		WarnStrikes         int           `long:"warn-strikes" env:"WARN_STRIKES" default:"0" description:"number of warning-only strikes before first ban (0=disabled)"`
+		WarnDeleteDuration   time.Duration `long:"warn-delete-duration" env:"WARN_DELETE_DURATION" default:"0" description:"auto-delete warning messages after this duration (0=disabled)"`
 	} `group:"moderation" namespace:"moderation" env-namespace:"MODERATION"`
 
 	Report struct {
@@ -166,7 +167,7 @@ type options struct {
 		Startup string `long:"startup" env:"STARTUP" default:"" description:"startup message"`
 		Spam    string `long:"spam" env:"SPAM" default:"this is spam" description:"spam message"`
 		Dry     string `long:"dry" env:"DRY" default:"this is spam (dry mode)" description:"spam dry message"`
-		Warn    string `long:"warn" env:"WARN" default:"You've violated our rules and this is your first and last warning. Further violations will lead to permanent access denial. Stay compliant or face the consequences!" description:"warning message"`
+		Warn    string `long:"warn" env:"WARN" default:"" description:"warning message (if empty, uses default with strike info)"`
 	} `group:"message" namespace:"message" env-namespace:"MESSAGE"`
 
 	Server struct {

@@ -105,9 +105,10 @@ func (l *TelegramListener) GetDMUsers() []DMUser {
 func (l *TelegramListener) ApplyRuleSet(rs rules.RuleSet) {
 	l.RuleSetVersion = rs.Version
 	l.ModerationConfig = ModerationConfig{
-		FirstStrike:  rs.Moderation.FirstStrike,
-		SecondStrike: rs.Moderation.SecondStrike,
-		WarnStrikes:  rs.Moderation.WarnStrikes,
+		FirstStrike:        rs.Moderation.FirstStrike,
+		SecondStrike:     rs.Moderation.SecondStrike,
+		WarnStrikes:       rs.Moderation.WarnStrikes,
+		WarnDeleteDuration: rs.Moderation.WarnDeleteDuration,
 	}
 	l.ReportConfig = ReportConfig{
 		Storage:          l.ReportConfig.Storage,

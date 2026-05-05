@@ -446,24 +446,40 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 	if userName == "" {
 		userName = fmt.Sprintf("user %d", pc.spamUserID)
 	}
-	userMention := fmt.Sprintf("[%s](tg://user?id=%d)", escapeMarkDownV1Text(userName), pc.spamUserID)
+
+	var userMention string
+	if pc.msg.From.Username != "" {
+		userMention = fmt.Sprintf(`<a href="https://t.me/%s">%s</a>`, pc.msg.From.Username, htmlEscape(userName))
+	} else if pc.msg.From.FirstName != "" {
+		userMention = fmt.Sprintf(`<a href="tg://user?id=%d">%s</a>`, pc.spamUserID, htmlEscape(pc.msg.From.FirstName))
+	} else {
+		userMention = fmt.Sprintf(`<a href="tg://user?id=%d">user %d</a>`, pc.spamUserID, pc.spamUserID)
+	}
+
 	warnText := fmt.Sprintf("\u26a0\ufe0f Предупреждение %d/%d\n%s, вы нарушили правила чата. "+
 		"При получении %d предупреждений последует мьют на 30 мин, затем на 6 ч, и далее — перманентный бан.",
 		warnNum, warnTotal, userMention, warnTotal)
 
 	if l.WarnMsg != "" {
-		warnText = fmt.Sprintf("\u26a0\ufe0f Предупреждение %d/%d\n%s", warnNum, warnTotal, l.WarnMsg)
+		warnText = fmt.Sprintf("\u26a0\ufe0f Предупреждение %d/%d\n%s", warnNum, warnTotal, htmlEscape(l.WarnMsg))
 	}
 
 	actionResult := l.makeActionResult(pc.event, moderation.ActionWarn, false)
 
-	if err := l.ActionExecutor.WarnUser(ctx, warnRequest{
-		chatID:    pc.fromChat,
-		subjectID: pc.spamUserID,
-		text:      warnText,
-	}); err != nil {
+	warnReq := warnRequest{
+		chatID:      pc.fromChat,
+		subjectID:   pc.spamUserID,
+		messageID:   pc.msg.ID,
+		text:        warnText,
+		warnDelTime: l.ModerationConfig.WarnDeleteDuration,
+	}
+	if err := l.ActionExecutor.WarnUser(ctx, warnReq); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to send warning: %w", err))
 		actionResult.Error = err.Error()
+	}
+
+	if l.adminHandler != nil {
+		l.adminHandler.ReportWarn(pc.banUserStr, pc.msg, warnNum, warnTotal)
 	}
 
 	if err := l.ActionExecutor.DeleteMessage(ctx, pc.fromChat, pc.msg.ID); err != nil {
