@@ -4,22 +4,30 @@ ARG GIT_BRANCH
 ARG GITHUB_SHA
 ARG CI
 
-ADD . /build
 WORKDIR /build
+
+# Copy go.mod and go.sum first for better layer caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
 
 RUN go version
 
-RUN \
- if [ -z "$CI" ] ; then \
-   echo "runs outside of CI"; \
-   if git rev-parse --git-dir > /dev/null 2>&1; then \
-     version=$(git rev-parse --abbrev-ref HEAD)-$(git log -1 --format=%h)-$(date +%Y%m%dT%H:%M:%S); \
-   else \
-     version=local-$(date +%Y%m%dT%H:%M:%S); \
-   fi; \
- else version=${GIT_BRANCH}-${GITHUB_SHA:0:7}-$(date +%Y%m%dT%H:%M:%S); fi && \
- echo "version=$version" && \
- cd app && go build -o /build/tg-spam -ldflags "-X main.revision=${version} -s -w"
+# Build with cache mounts for faster rebuilds
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    if [ -z "$CI" ] ; then \
+      echo "runs outside of CI"; \
+      if git rev-parse --git-dir > /dev/null 2>&1; then \
+        version=$(git rev-parse --abbrev-ref HEAD)-$(git log -1 --format=%h)-$(date +%Y%m%dT%H:%M:%S); \
+      else \
+        version=local-$(date +%Y%m%dT%H:%M:%S); \
+      fi; \
+    else version=${GIT_BRANCH}-${GITHUB_SHA:0:7}-$(date +%Y%m%dT%H:%M:%S); fi && \
+    echo "version=$version" && \
+    cd app && go build -o /build/tg-spam -ldflags "-X main.revision=${version} -s -w"
 
 
 FROM alpine:3.22
