@@ -547,6 +547,9 @@ func (l *TelegramListener) applyDeleteAction(ctx context.Context, pc pipelineCon
 	if l.Dry {
 		observability.Logf(ctx, "[INFO] dry run: delete message %d", pc.msg.ID)
 		actionResult.Applied = true
+		if l.adminChatID != 0 && pc.msg.From.ID != 0 {
+			l.adminHandler.ReportBan(pc.banUserStr, pc.msg, 0, false)
+		}
 		return
 	}
 	if l.TrainingMode {
@@ -561,6 +564,9 @@ func (l *TelegramListener) applyDeleteAction(ctx context.Context, pc pipelineCon
 		return
 	}
 	actionResult.Applied = true
+	if l.adminChatID != 0 && pc.msg.From.ID != 0 {
+		l.adminHandler.ReportBan(pc.banUserStr, pc.msg, 0, false)
+	}
 }
 
 func (l *TelegramListener) cleanupAfterAction(ctx context.Context, pc pipelineContext, errs *multierror.Error) error {
