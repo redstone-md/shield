@@ -131,10 +131,10 @@ type options struct {
 	} `group:"duplicates" namespace:"duplicates" env-namespace:"DUPLICATES"`
 
 	Moderation struct {
-		FirstStrike          time.Duration `long:"first-strike" env:"FIRST_STRIKE" default:"30m" description:"mute/restrict duration for the first automatic spam strike"`
-		SecondStrike         time.Duration `long:"second-strike" env:"SECOND_STRIKE" default:"6h" description:"mute/restrict duration for the second automatic spam strike"`
-		WarnStrikes         int           `long:"warn-strikes" env:"WARN_STRIKES" default:"0" description:"number of warning-only strikes before first ban (0=disabled)"`
-		WarnDeleteDuration   time.Duration `long:"warn-delete-duration" env:"WARN_DELETE_DURATION" default:"0" description:"auto-delete warning messages after this duration (0=disabled)"`
+		FirstStrike        time.Duration `long:"first-strike" env:"FIRST_STRIKE" default:"30m" description:"mute/restrict duration for the first automatic spam strike"`
+		SecondStrike       time.Duration `long:"second-strike" env:"SECOND_STRIKE" default:"6h" description:"mute/restrict duration for the second automatic spam strike"`
+		WarnStrikes        int           `long:"warn-strikes" env:"WARN_STRIKES" default:"0" description:"number of warning-only strikes before first ban (0=disabled)"`
+		WarnDeleteDuration time.Duration `long:"warn-delete-duration" env:"WARN_DELETE_DURATION" default:"0" description:"auto-delete warning messages after this duration (0=disabled)"`
 	} `group:"moderation" namespace:"moderation" env-namespace:"MODERATION"`
 
 	Report struct {
@@ -351,9 +351,13 @@ func execute(ctx context.Context, opts options) error {
 }
 
 func setupLog(dbg bool, secrets ...string) {
-	logOpts := []lgr.Option{lgr.Msec, lgr.LevelBraces, lgr.StackTraceOnError}
+	logOpts := []lgr.Option{lgr.Format(`{{.DT.Format "15:04:05.000"}} [{{.Level}}] {{.Message}}`), lgr.StackTraceOnError}
 	if dbg {
-		logOpts = []lgr.Option{lgr.Debug, lgr.CallerFile, lgr.CallerFunc, lgr.Msec, lgr.LevelBraces, lgr.StackTraceOnError}
+		logOpts = []lgr.Option{
+			lgr.Debug,
+			lgr.Format(`{{.DT.Format "15:04:05.000"}} [{{.Level}}] {{.Message}}`),
+			lgr.StackTraceOnError,
+		}
 	}
 
 	colorizer := lgr.Mapper{

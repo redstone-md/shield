@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 )
 
 type metadataKey struct{}
@@ -53,9 +54,9 @@ func Prefix(ctx context.Context) string {
 	if !ok {
 		return ""
 	}
-	prefix := fmt.Sprintf("event_id=%s correlation_id=%s ", meta.EventID, meta.CorrelationID)
+	prefix := fmt.Sprintf("evt=%s corr=%s ", meta.EventID, meta.CorrelationID)
 	if meta.IdempotencyKey != "" {
-		prefix += fmt.Sprintf("idempotency_key=%s ", meta.IdempotencyKey)
+		prefix += fmt.Sprintf("idem=%s ", meta.IdempotencyKey)
 	}
 	return prefix
 }
@@ -63,8 +64,17 @@ func Prefix(ctx context.Context) string {
 // Logf writes a log line prefixed with correlation metadata when present.
 func Logf(ctx context.Context, format string, args ...any) {
 	if prefix := Prefix(ctx); prefix != "" {
-		log.Printf(prefix+format, args...)
+		log.Printf(withMetadataPrefix(format, prefix), args...)
 		return
 	}
 	log.Printf(format, args...)
+}
+
+func withMetadataPrefix(format, prefix string) string {
+	for _, level := range []string{"[TRACE]", "[DEBUG]", "[INFO]", "[WARN]", "[ERROR]", "[PANIC]", "[FATAL]"} {
+		if strings.HasPrefix(format, level) {
+			return level + " " + prefix + strings.TrimSpace(format[len(level):])
+		}
+	}
+	return prefix + format
 }
