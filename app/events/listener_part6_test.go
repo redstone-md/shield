@@ -76,7 +76,7 @@ func TestTelegramListener_DoWithAdminUnbanDecline(t *testing.T) {
 	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "unban user blah")
 	kb := mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).ReplyMarkup.InlineKeyboard
 	assert.Empty(t, kb, "buttons cleared")
-	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "confirmed by admin in ")
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "бан подтвержден администратором admin")
 	assert.Empty(t, mockAPI.RequestCalls())
 	assert.Len(t, b.UpdateSpamCalls(), 1)
 	assert.Empty(t, b.UpdateHamCalls())
@@ -148,7 +148,7 @@ func TestTelegramListener_DoWithAdminBanConfirmedTraining(t *testing.T) {
 	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "unban user blah")
 	kb := mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).ReplyMarkup.InlineKeyboard
 	assert.Empty(t, kb, "buttons cleared")
-	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "confirmed by admin in ")
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "бан подтвержден администратором admin")
 	require.Len(t, mockAPI.RequestCalls(), 2)
 	assert.Equal(t, int64(999), mockAPI.RequestCalls()[0].C.(tbapi.BanChatMemberConfig).UserID, "user banned")
 	assert.Equal(t, int64(123), mockAPI.RequestCalls()[0].C.(tbapi.BanChatMemberConfig).ChatID, "chat id")

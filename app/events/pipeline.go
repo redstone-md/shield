@@ -447,30 +447,7 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 		warnTotal = 3
 	}
 
-	userName := pc.msg.From.DisplayName
-	if userName == "" {
-		userName = pc.msg.From.Username
-	}
-	if userName == "" {
-		userName = fmt.Sprintf("user %d", pc.spamUserID)
-	}
-
-	var userMention string
-	if pc.msg.From.Username != "" {
-		userMention = fmt.Sprintf(`<a href="https://t.me/%s">%s</a>`, pc.msg.From.Username, htmlEscape(userName))
-	} else if pc.msg.From.FirstName != "" {
-		userMention = fmt.Sprintf(`<a href="tg://user?id=%d">%s</a>`, pc.spamUserID, htmlEscape(pc.msg.From.FirstName))
-	} else {
-		userMention = fmt.Sprintf(`<a href="tg://user?id=%d">user %d</a>`, pc.spamUserID, pc.spamUserID)
-	}
-
-	warnText := fmt.Sprintf("\u26a0\ufe0f Предупреждение %d/%d\n%s, вы нарушили правила чата. "+
-		"При получении %d предупреждений последует мьют на 30 мин, затем на 6 ч, и далее — перманентный бан.",
-		warnNum, warnTotal, userMention, warnTotal)
-
-	if l.WarnMsg != "" {
-		warnText = fmt.Sprintf("\u26a0\ufe0f Предупреждение %d/%d\n%s", warnNum, warnTotal, htmlEscape(l.WarnMsg))
-	}
+	warnText := buildWarningText(warnNum, warnTotal, pc.msg.From, pc.spamUserID, l.WarnMsg, slowpathReason(pc.resp.CheckResults))
 
 	actionResult := l.makeActionResult(pc.event, moderation.ActionWarn, false)
 
@@ -487,7 +464,7 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 	}
 
 	if l.adminHandler != nil {
-		l.adminHandler.ReportWarn(pc.banUserStr, pc.msg, warnNum, warnTotal)
+		l.adminHandler.ReportWarn(pc.banUserStr, pc.msg, warnNum, warnTotal, slowpathReason(pc.resp.CheckResults))
 	}
 
 	if err := l.ActionExecutor.DeleteMessage(ctx, pc.fromChat, pc.msg.ID); err != nil {
@@ -537,7 +514,8 @@ func (l *TelegramListener) applyBanAction(ctx context.Context, pc pipelineContex
 			pc.outcome.Decision.Action, pc.banUserStr, err))
 	} else if l.adminChatID != 0 && pc.msg.From.ID != 0 {
 		actionResult.Applied = true
-		l.adminHandler.ReportBan(pc.banUserStr, pc.msg, pc.outcome.Duration, pc.outcome.Restrict)
+		l.adminHandler.ReportBan(pc.banUserStr, pc.msg, pc.outcome.Duration, pc.outcome.Restrict,
+			slowpathReason(pc.resp.CheckResults))
 	} else {
 		actionResult.Applied = true
 	}
@@ -548,7 +526,7 @@ func (l *TelegramListener) applyDeleteAction(ctx context.Context, pc pipelineCon
 		observability.Logf(ctx, "[INFO] dry run: delete message %d", pc.msg.ID)
 		actionResult.Applied = true
 		if l.adminChatID != 0 && pc.msg.From.ID != 0 {
-			l.adminHandler.ReportBan(pc.banUserStr, pc.msg, 0, false)
+			l.adminHandler.ReportBan(pc.banUserStr, pc.msg, 0, false, slowpathReason(pc.resp.CheckResults))
 		}
 		return
 	}
@@ -565,7 +543,7 @@ func (l *TelegramListener) applyDeleteAction(ctx context.Context, pc pipelineCon
 	}
 	actionResult.Applied = true
 	if l.adminChatID != 0 && pc.msg.From.ID != 0 {
-		l.adminHandler.ReportBan(pc.banUserStr, pc.msg, 0, false)
+		l.adminHandler.ReportBan(pc.banUserStr, pc.msg, 0, false, slowpathReason(pc.resp.CheckResults))
 	}
 }
 

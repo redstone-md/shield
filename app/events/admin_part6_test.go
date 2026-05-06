@@ -71,9 +71,9 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 		assert.GreaterOrEqual(t, len(mockAPI.RequestCalls()), 1, "should make ban request")
 
 		require.Len(t, sentMessages, 2, "should send detection results and fallback warning")
-		assert.Contains(t, sentMessages[0], `original detection results for "spammer" (555)`)
-		assert.Contains(t, sentMessages[1], "locator fallback")
-		assert.Contains(t, sentMessages[1], "manual deletion")
+		assert.Contains(t, sentMessages[0], `исходная диагностика для "spammer" (555)`)
+		assert.Contains(t, sentMessages[1], "резервный режим locator")
+		assert.Contains(t, sentMessages[1], "удалить вручную")
 		assert.Contains(t, sentMessages[1], "spammer")
 	})
 
@@ -182,8 +182,8 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 		assert.Empty(t, botMock.UpdateSpamCalls(), "should not update spam in dry mode")
 
 		require.Len(t, sentMessages, 2)
-		assert.Contains(t, sentMessages[0], "original detection results")
-		assert.Contains(t, sentMessages[1], "locator fallback")
+		assert.Contains(t, sentMessages[0], "исходная диагностика")
+		assert.Contains(t, sentMessages[1], "резервный режим locator")
 		assert.Contains(t, sentMessages[1], "dry mode")
 	})
 

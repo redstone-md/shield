@@ -125,6 +125,8 @@ func (l *TelegramListener) ApplyRuleSet(rs rules.RuleSet) {
 	if l.adminHandler != nil {
 		l.adminHandler.softBan = rs.Moderation.SoftBan
 		l.adminHandler.dry = rs.Moderation.DryRun
+		l.adminHandler.moderation = l.ModerationConfig
+		l.adminHandler.warnDeleteDuration = rs.Moderation.WarnDeleteDuration
 	}
 	if l.reportsHandler != nil {
 		l.reportsHandler.ReportConfig = l.ReportConfig
@@ -219,9 +221,10 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 func (l *TelegramListener) initHandlers() {
 	l.adminHandler = &admin{
 		tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers, actions: l.ActionExecutor,
-		autoLearner: l.AutoLearner,
-		primChatID:  l.chatID, adminChatID: l.adminChatID,
+		autoLearner: l.AutoLearner, detectedSpam: l.DetectedSpamCounter,
+		primChatID: l.chatID, adminChatID: l.adminChatID,
 		trainingMode: l.TrainingMode, softBan: l.SoftBanMode, dry: l.Dry, warnMsg: l.WarnMsg,
+		moderation: l.ModerationConfig, warnDeleteDuration: l.ModerationConfig.WarnDeleteDuration,
 		aggressiveCleanup: l.AggressiveCleanup, aggressiveCleanupLimit: l.AggressiveCleanupLimit,
 	}
 
@@ -346,7 +349,7 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 		return nil
 	}
 
-	if update.Message.ReplyToMessage != nil && !fromSuper {
+	if update.Message.ReplyToMessage != nil {
 		if l.procUserReply(ctx, update) {
 			return nil
 		}

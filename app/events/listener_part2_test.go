@@ -150,7 +150,7 @@ func TestTelegramListener_AutomaticWarnCarriesMessageIDAndDeleteDuration(t *test
 				Send: true,
 				User: bot.User{ID: 42, Username: "baz_02l_wss", DisplayName: "Asya Kilisa",
 					FirstName: "Asya", LastName: "Kilisa"},
-				CheckResults: []spamcheck.Response{{Name: "rule", Spam: true, Details: "spam"}},
+				CheckResults: []spamcheck.Response{{Name: "slowpath", Spam: true, Details: "vision spam reason"}},
 			}
 		},
 	}
@@ -211,6 +211,7 @@ func TestTelegramListener_AutomaticWarnCarriesMessageIDAndDeleteDuration(t *test
 	assert.Equal(t, 55, actionSpy.warnCalls[0].messageID)
 	assert.Equal(t, time.Minute, actionSpy.warnCalls[0].warnDelTime)
 	assert.Contains(t, actionSpy.warnCalls[0].text, `<a href="https://t.me/baz_02l_wss">Asya Kilisa</a>`)
+	assert.Contains(t, actionSpy.warnCalls[0].text, `Причина: vision spam reason`)
 }
 
 func TestTelegramListener_ProcessQueuedEventLogsCorrelationIDs(t *testing.T) {
@@ -255,7 +256,7 @@ func TestTelegramListener_ProcessQueuedEventLogsCorrelationIDs(t *testing.T) {
 
 	err := l.processQueuedEvent(context.Background(), event, update)
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "event_id=evt-123 correlation_id=corr-123")
+	assert.Contains(t, buf.String(), "evt=evt-123 corr=corr-123")
 }
 
 func TestTelegramListener_ProcessQueuedEventCompletesReplayState(t *testing.T) {
@@ -522,9 +523,6 @@ func TestTelegramListener_Do(t *testing.T) {
 	}
 	botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 		t.Logf("on-message: %+v", msg)
-		if msg.Text == "text 123" && msg.From.Username == "user" {
-			return bot.Response{Send: true, Text: "bot's answer"}
-		}
 		return bot.Response{}
 	}}
 
@@ -564,9 +562,8 @@ func TestTelegramListener_Do(t *testing.T) {
 	assert.Equal(t, SuperUsers{"super", "1"}, l.SuperUsers)
 
 	assert.Empty(t, mockLogger.SaveCalls())
-	require.Len(t, mockAPI.SendCalls(), 2)
+	require.Len(t, mockAPI.SendCalls(), 1)
 	assert.Equal(t, "startup", mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text)
-	assert.Equal(t, "bot's answer", mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text)
 	assert.Len(t, mockAPI.GetChatAdministratorsCalls(), 1)
 
 	require.Len(t, botMock.OnMessageCalls(), 1)

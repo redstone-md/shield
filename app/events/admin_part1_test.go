@@ -35,8 +35,8 @@ func TestAdmin_reportBan(t *testing.T) {
 		require.Len(t, mockAPI.SendCalls(), 1)
 		t.Logf("sent text: %+v", mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text)
 		assert.Equal(t, int64(123), mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).ChatID)
-		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "permanently banned [testUser](tg://user?id=456)")
-		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "Test  \\_message\\_")
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "<b>забанен навсегда</b> user 456")
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "Test  _message_")
 		assert.NotNil(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).ReplyMarkup)
 		assert.Equal(t, "⛔︎ change ban",
 			mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).ReplyMarkup.(tbapi.InlineKeyboardMarkup).InlineKeyboard[0][0].Text)
@@ -49,8 +49,8 @@ func TestAdmin_reportBan(t *testing.T) {
 		require.Len(t, mockAPI.SendCalls(), 1)
 		t.Logf("sent text: %+v", mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text)
 		assert.Equal(t, int64(123), mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).ChatID)
-		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "permanently banned [test\\_User](tg://user?id=456)")
-		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "Test  \\_message\\_")
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "<b>забанен навсегда</b> user 456")
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "Test  _message_")
 		assert.NotNil(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).ReplyMarkup)
 		assert.Equal(t, "⛔︎ change ban",
 			mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).ReplyMarkup.(tbapi.InlineKeyboardMarkup).InlineKeyboard[0][0].Text)
@@ -82,9 +82,32 @@ func TestAdmin_reportBan(t *testing.T) {
 
 		require.Len(t, mockAPI.SendCalls(), 1)
 		sentText := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
-		assert.Contains(t, sentText, "<b>restricted</b> Claude (7187750383)")
+		assert.Contains(t, sentText, "<b>ограничен</b> Claude (7187750383)")
 		assert.NotContains(t, sentText, "tg://user")
 	})
+}
+
+func TestAdmin_reportBanIncludesSlowpathReason(t *testing.T) {
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			return tbapi.Message{}, nil
+		},
+	}
+
+	adm := admin{
+		tbAPI:       mockAPI,
+		adminChatID: 123,
+	}
+	msg := &bot.Message{
+		From: bot.User{ID: 456},
+		Text: "Test message",
+	}
+
+	adm.ReportBan("spammer", msg, bot.PermanentBanDuration, false, "vision spam reason")
+
+	require.Len(t, mockAPI.SendCalls(), 1)
+	sentText := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
+	assert.Contains(t, sentText, "Причина: vision spam reason")
 }
 
 func TestAdmin_reportWarnNoUsernameUsesFirstNameAndID(t *testing.T) {
@@ -133,6 +156,29 @@ func TestAdmin_reportWarnUsernameUsesFirstNameAsLinkText(t *testing.T) {
 	sentText := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
 	assert.Contains(t, sentText, `<b>⚠️ WARNING 3/3</b> <a href="https://t.me/baz_02l_wss">Firstname</a>`)
 	assert.NotContains(t, sentText, `>baz_02l_wss</a>`)
+}
+
+func TestAdmin_reportWarnIncludesSlowpathReason(t *testing.T) {
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			return tbapi.Message{}, nil
+		},
+	}
+
+	adm := admin{
+		tbAPI:       mockAPI,
+		adminChatID: 123,
+	}
+	msg := &bot.Message{
+		From: bot.User{ID: 7187750383, Username: "baz_02l_wss", FirstName: "Firstname"},
+		Text: "spam text",
+	}
+
+	adm.ReportWarn("baz_02l_wss", msg, 1, 3, "vision spam reason")
+
+	require.Len(t, mockAPI.SendCalls(), 1)
+	sentText := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
+	assert.Contains(t, sentText, "Причина: vision spam reason")
 }
 
 func TestAdmin_getCleanMessage(t *testing.T) {
@@ -257,7 +303,7 @@ func TestAdmin_dryModeForwardMessage(t *testing.T) {
 	msg := &bot.Message{}
 
 	adm.ReportBan("testUser", msg, bot.PermanentBanDuration, false)
-	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "would have permanently banned [testUser]")
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "<b>был бы забанен навсегда</b> user 0")
 }
 
 func TestAdmin_reportBanChannel(t *testing.T) {
@@ -301,7 +347,7 @@ func TestAdmin_reportBanChannel(t *testing.T) {
 
 		require.Len(t, mockAPI.SendCalls(), 1)
 		sentText := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
-		assert.Contains(t, sentText, "permanently banned Some Channel (-100999888)")
+		assert.Contains(t, sentText, "<b>забанен навсегда</b> user -100999888")
 		assert.NotContains(t, sentText, "tg://user")
 	})
 
@@ -319,6 +365,6 @@ func TestAdmin_reportBanChannel(t *testing.T) {
 		require.NotNil(t, markup.InlineKeyboard[0][0].CallbackData)
 		assert.Contains(t, *markup.InlineKeyboard[0][0].CallbackData, "456:")
 
-		assert.Contains(t, sentText, "tg://user?id=456")
+		assert.Contains(t, sentText, `https://t.me/spammer`)
 	})
 }

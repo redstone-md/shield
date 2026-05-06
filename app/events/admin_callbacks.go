@@ -58,14 +58,14 @@ func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.Callback
 func (a *admin) callbackAskBanConfirmation(query *tbapi.CallbackQuery) error {
 	callbackData := query.Data
 
-	keepBanned := "Keep it banned"
+	keepBanned := "Оставить бан"
 	if a.trainingMode {
-		keepBanned = "Confirm ban"
+		keepBanned = "Подтвердить бан"
 	}
 
 	confirmationKeyboard := tbapi.NewInlineKeyboardMarkup(
 		tbapi.NewInlineKeyboardRow(
-			tbapi.NewInlineKeyboardButtonData("Unban for real", callbackData[1:]),
+			tbapi.NewInlineKeyboardButtonData("Разбанить", callbackData[1:]),
 			tbapi.NewInlineKeyboardButtonData(keepBanned, banPrefix+callbackData[1:]),
 		),
 	)
@@ -77,7 +77,7 @@ func (a *admin) callbackAskBanConfirmation(query *tbapi.CallbackQuery) error {
 }
 
 func (a *admin) callbackBanConfirmed(ctx context.Context, query *tbapi.CallbackQuery) error {
-	updText := query.Message.Text + fmt.Sprintf("\n\n_ban confirmed by %s in %v_", query.From.UserName, sinceQuery(query))
+	updText := query.Message.Text + fmt.Sprintf("\n\n_бан подтвержден администратором %s за %v_", query.From.UserName, sinceQuery(query))
 	editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, updText)
 	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
 	if err := send(editMsg, a.tbAPI); err != nil {
@@ -126,7 +126,7 @@ func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.Callbac
 	callbackData := query.Data
 	chatID := query.Message.Chat.ID
 	log.Printf("[DEBUG] unban action activated, chatID: %d, userID: %s", chatID, callbackData)
-	callbackResponse := tbapi.NewCallback(query.ID, "accepted")
+	callbackResponse := tbapi.NewCallback(query.ID, "принято")
 	if _, err := a.tbAPI.Request(callbackResponse); err != nil {
 		return fmt.Errorf("failed to send callback response: %w", err)
 	}
@@ -168,10 +168,10 @@ func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.Callbac
 		return fmt.Errorf("failed to add user %d to approved list: %w", userID, err)
 	}
 
-	updText := query.Message.Text + fmt.Sprintf("\n\n_unbanned by %s in %v_", query.From.UserName, sinceQuery(query))
+	updText := query.Message.Text + fmt.Sprintf("\n\n_разбанено администратором %s за %v_", query.From.UserName, sinceQuery(query))
 
-	if !strings.Contains(query.Message.Text, "spam detection results") && userID != 0 {
-		spamInfoText := []string{"\n\n**original detection results**\n"}
+	if !strings.Contains(query.Message.Text, "диагностика") && !strings.Contains(query.Message.Text, "spam detection results") && userID != 0 {
+		spamInfoText := []string{"\n\n**исходная диагностика**\n"}
 
 		info, found := a.locator.Spam(ctx, userID)
 		if found {
@@ -386,7 +386,12 @@ func (a *admin) extractUsername(text string) (string, error) {
 		return matches[1], nil
 	}
 
-	plainChannelRegex := regexp.MustCompile(`permanently banned (.+?) \(-?\d+\)`)
+	markdownLinkRegex := regexp.MustCompile(`\[(.+?)\]\((?:tg://user\?id=\d+|https://t\.me/[^)]+)\)`)
+	if matches := markdownLinkRegex.FindStringSubmatch(text); len(matches) > 1 {
+		return matches[1], nil
+	}
+
+	plainChannelRegex := regexp.MustCompile(`(?:permanently banned|забанен навсегда) (.+?) \(-?\d+\)`)
 	if matches := plainChannelRegex.FindStringSubmatch(text); len(matches) > 1 {
 		return matches[1], nil
 	}

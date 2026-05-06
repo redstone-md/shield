@@ -257,7 +257,7 @@ func TestTelegramListener_DoWithForwarded(t *testing.T) {
 
 	require.Len(t, mockAPI.SendCalls(), 2)
 	assert.Equal(t, "startup", mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text)
-	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, "detection results")
+	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, "исходная диагностика")
 	assert.Equal(t, int64(123), mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).ChatID)
 
 	require.Len(t, b.UpdateSpamCalls(), 1)
@@ -344,8 +344,8 @@ func TestTelegramListener_DoWithDirectSpamReport(t *testing.T) {
 
 	require.Len(t, mockAPI.SendCalls(), 2)
 	assert.Equal(t, "startup", mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text)
-	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, "detection results")
-	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, `the user banned by "superuser1"`)
+	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, "исходная диагностика")
+	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, `пользователь забанен администратором "superuser1"`)
 
 	require.Len(t, botMock.OnMessageCalls(), 1)
 	assert.Equal(t, "text 123", botMock.OnMessageCalls()[0].Msg.Text)
@@ -408,7 +408,10 @@ func TestTelegramListener_DoWithDirectWarnReport(t *testing.T) {
 		StartupMsg: "startup",
 		SuperUsers: SuperUsers{"superuser1"},
 		Locator:    locator,
-		WarnMsg:    "You've violated our rules",
+		WarnMsg:    "Не нарушайте правила чата.",
+		ModerationConfig: ModerationConfig{
+			WarnStrikes: 3,
+		},
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Minute)
@@ -439,8 +442,8 @@ func TestTelegramListener_DoWithDirectWarnReport(t *testing.T) {
 	require.Len(t, mockAPI.SendCalls(), 2)
 	assert.Equal(t, "startup", mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text)
 	assert.True(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).DisableNotification)
-	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, "warning from superuser1")
-	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, `@user You've violated our rules`)
+	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, "Предупреждение 1/3")
+	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, `Не нарушайте правила чата`)
 
 	require.Empty(t, b.OnMessageCalls())
 	require.Empty(t, b.UpdateSpamCalls())

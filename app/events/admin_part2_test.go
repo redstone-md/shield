@@ -2,6 +2,9 @@ package events
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -10,7 +13,6 @@ import (
 	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/lib/spamcheck"
-	"testing"
 )
 
 func TestAdmin_DirectCommands(t *testing.T) {
@@ -63,13 +65,15 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		}
 
 		adm := &admin{
-			tbAPI:       mockAPI,
-			bot:         botMock,
-			primChatID:  123,
-			adminChatID: 456,
-			locator:     locatorMock,
-			superUsers:  SuperUsers{"superuser"},
-			warnMsg:     "please follow our rules",
+			tbAPI:              mockAPI,
+			bot:                botMock,
+			primChatID:         123,
+			adminChatID:        456,
+			locator:            locatorMock,
+			superUsers:         SuperUsers{"superuser"},
+			warnMsg:            "Не нарушайте правила чата.",
+			moderation:         ModerationConfig{WarnStrikes: 3, FirstStrike: 30 * time.Minute, SecondStrike: 6 * time.Hour},
+			warnDeleteDuration: time.Minute,
 		}
 
 		teardown := func() {}
@@ -87,8 +91,8 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		require.Len(t, mockAPI.SendCalls(), 1)
 		adminMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
 		assert.Equal(t, int64(456), adminMsg.ChatID)
-		assert.Contains(t, adminMsg.Text, "original detection results for spammer (222)")
-		assert.Contains(t, adminMsg.Text, "the user banned by")
+		assert.Contains(t, adminMsg.Text, "исходная диагностика для spammer (222)")
+		assert.Contains(t, adminMsg.Text, "пользователь забанен администратором")
 
 		require.Len(t, botMock.RemoveApprovedUserCalls(), 1)
 		assert.Equal(t, int64(222), botMock.RemoveApprovedUserCalls()[0].ID)
@@ -156,7 +160,7 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		require.Len(t, mockAPI.SendCalls(), 1)
 		adminMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
 		assert.Equal(t, int64(456), adminMsg.ChatID)
-		assert.Contains(t, adminMsg.Text, "original detection results for spammer (222)")
+		assert.Contains(t, adminMsg.Text, "исходная диагностика для spammer (222)")
 
 		assert.Empty(t, mockAPI.RequestCalls())
 		assert.Empty(t, botMock.UpdateSpamCalls())
@@ -180,8 +184,8 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		require.Len(t, mockAPI.SendCalls(), 1)
 		warnMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
 		assert.Equal(t, int64(123), warnMsg.ChatID)
-		assert.Contains(t, warnMsg.Text, "warning from admin")
-		assert.Contains(t, warnMsg.Text, "@user please follow our rules")
+		assert.Contains(t, warnMsg.Text, "Предупреждение 1/3")
+		assert.Contains(t, warnMsg.Text, "Не нарушайте правила чата")
 	})
 
 	t.Run("DirectWarnReport_UsesActionExecutor", func(t *testing.T) {
@@ -189,7 +193,9 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		defer teardown()
 
 		actionSpy := &actionExecutorSpy{}
+		detectedSpy := &detectedSpamCounterSpy{}
 		adm.actions = actionSpy
+		adm.detectedSpam = detectedSpy
 
 		update := createReplyUpdate("admin", 111, "user", 222, "inappropriate message")
 		err := adm.DirectWarnReport(update)
@@ -203,8 +209,11 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		assert.Equal(t, int64(123), actionSpy.warnCalls[0].chatID)
 		assert.Equal(t, int64(222), actionSpy.warnCalls[0].subjectID)
 		assert.Equal(t, 999, actionSpy.warnCalls[0].messageID)
-		assert.Contains(t, actionSpy.warnCalls[0].text, "warning from admin")
-		assert.Contains(t, actionSpy.warnCalls[0].text, "@user please follow our rules")
+		assert.Equal(t, time.Minute, actionSpy.warnCalls[0].warnDelTime)
+		assert.Contains(t, actionSpy.warnCalls[0].text, "Предупреждение 1/3")
+		assert.Contains(t, actionSpy.warnCalls[0].text, "Не нарушайте правила чата.")
+		require.Len(t, detectedSpy.writes, 1)
+		assert.Equal(t, int64(222), detectedSpy.writes[0].UserID)
 
 		meta, ok := observability.MetadataFromContext(actionSpy.warnCtxs[0])
 		require.True(t, ok)
@@ -212,6 +221,28 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		assert.Equal(t, "corr-warn-999", meta.CorrelationID)
 		assert.Equal(t, "warn:chat:123:msg:999:cmd:789", meta.IdempotencyKey)
 
+		assert.Empty(t, mockAPI.RequestCalls())
+		assert.Empty(t, mockAPI.SendCalls())
+	})
+
+	t.Run("DirectWarnReport_EscalatesAfterWarnLimit", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		actionSpy := &actionExecutorSpy{}
+		adm.actions = actionSpy
+		adm.detectedSpam = &detectedSpamCounterSpy{count: 3}
+
+		update := createReplyUpdate("admin", 111, "user", 222, "inappropriate message")
+		err := adm.DirectWarnReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, actionSpy.deleteMessageCalls, 2)
+		assert.Empty(t, actionSpy.warnCalls)
+		require.Len(t, actionSpy.banCalls, 1)
+		assert.Equal(t, int64(222), actionSpy.banCalls[0].userID)
+		assert.True(t, actionSpy.banCalls[0].restrict)
+		assert.Equal(t, 30*time.Minute, actionSpy.banCalls[0].duration)
 		assert.Empty(t, mockAPI.RequestCalls())
 		assert.Empty(t, mockAPI.SendCalls())
 	})
@@ -316,9 +347,10 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		require.Len(t, mockAPI.SendCalls(), 1)
 		warnMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
 		assert.Equal(t, int64(123), warnMsg.ChatID)
-		assert.Contains(t, warnMsg.Text, "@spam\\_channel")
+		assert.Contains(t, warnMsg.Text, "spam\\_channel")
 		assert.NotContains(t, warnMsg.Text, "@Channel\\_Bot")
-		assert.Contains(t, warnMsg.Text, "please follow our rules")
+		assert.Contains(t, warnMsg.Text, "Предупреждение 1/3")
+		assert.Contains(t, warnMsg.Text, "Не нарушайте правила чата")
 	})
 
 	t.Run("DirectWarnReport_ChannelMessage_TitleOnly", func(t *testing.T) {
@@ -349,7 +381,8 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		assert.Contains(t, warnMsg.Text, "Spam Channel")
 		assert.NotContains(t, warnMsg.Text, "@Spam Channel")
 		assert.NotContains(t, warnMsg.Text, "@Channel")
-		assert.Contains(t, warnMsg.Text, "please follow our rules")
+		assert.Contains(t, warnMsg.Text, "Предупреждение 1/3")
+		assert.Contains(t, warnMsg.Text, "Не нарушайте правила чата")
 	})
 
 	t.Run("DirectSpamReport_ChannelMessage_TitleOnly", func(t *testing.T) {

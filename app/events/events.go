@@ -89,9 +89,9 @@ type ModerationActions interface {
 
 // ModerationConfig controls automatic penalty escalation.
 type ModerationConfig struct {
-	FirstStrike      time.Duration
-	SecondStrike    time.Duration
-	WarnStrikes     int
+	FirstStrike        time.Duration
+	SecondStrike       time.Duration
+	WarnStrikes        int
 	WarnDeleteDuration time.Duration // duration to auto-delete warning messages
 }
 
@@ -206,8 +206,11 @@ func send(tbMsg tbapi.Chattable, tbAPI TbAPI) error {
 }
 
 func spamPenalty(strikes int, keepRestricted bool, cfg ModerationConfig) (duration time.Duration, restrict bool, warn bool) {
-	if cfg.WarnStrikes > 0 && strikes < cfg.WarnStrikes {
-		return 0, false, true
+	if cfg.WarnStrikes > 0 {
+		if strikes < cfg.WarnStrikes {
+			return 0, false, true
+		}
+		strikes = strikes - cfg.WarnStrikes + 1
 	}
 
 	firstStrike := cfg.FirstStrike
@@ -236,48 +239,51 @@ func moderationActionText(duration time.Duration, restrict, dry bool) string {
 		switch {
 		case duration <= 30*time.Minute:
 			if dry {
-				return "would have muted for 30m"
+				return "был бы замучен на 30 минут"
 			}
-			return "muted for 30m"
+			return "замучен на 30 минут"
 		case duration <= 6*time.Hour:
 			if dry {
-				return "would have muted for 6h"
+				return "был бы замучен на 6 часов"
 			}
-			return "muted for 6h"
+			return "замучен на 6 часов"
 		default:
 			if dry {
-				return "would have restricted"
+				return "был бы ограничен"
 			}
-			return "restricted"
+			return "ограничен"
 		}
 	}
 	if dry {
-		return "would have permanently banned"
+		return "был бы забанен навсегда"
 	}
-	return "permanently banned"
+	return "забанен навсегда"
 }
 
 func reportStatusText(duration time.Duration, restrict, dry bool) string {
-	action := moderationActionText(duration, restrict, dry)
-	switch action {
-	case "would have muted for 30m":
-		return "Репорт подтвержден. DRY mode: пользователь был бы замучен на 30 минут."
-	case "muted for 30m":
-		return "Репорт подтвержден. Пользователь замучен на 30 минут."
-	case "would have muted for 6h":
-		return "Репорт подтвержден. DRY mode: пользователь был бы замучен на 6 часов."
-	case "muted for 6h":
-		return "Репорт подтвержден. Пользователь замучен на 6 часов."
-	case "would have permanently banned":
-		return "Репорт подтвержден. DRY mode: пользователь был бы забанен."
-	case "permanently banned":
-		return "Репорт подтвержден. Пользователь забанен."
-	default:
-		if dry {
-			return "Репорт подтвержден. DRY mode: пользователь был бы ограничен."
+	if restrict {
+		switch {
+		case duration <= 30*time.Minute:
+			if dry {
+				return "Репорт подтвержден. DRY mode: пользователь был бы замучен на 30 минут."
+			}
+			return "Репорт подтвержден. Пользователь замучен на 30 минут."
+		case duration <= 6*time.Hour:
+			if dry {
+				return "Репорт подтвержден. DRY mode: пользователь был бы замучен на 6 часов."
+			}
+			return "Репорт подтвержден. Пользователь замучен на 6 часов."
+		default:
+			if dry {
+				return "Репорт подтвержден. DRY mode: пользователь был бы ограничен."
+			}
+			return "Репорт подтвержден. Пользователь ограничен."
 		}
-		return "Репорт подтвержден. Пользователь ограничен."
 	}
+	if dry {
+		return "Репорт подтвержден. DRY mode: пользователь был бы забанен."
+	}
+	return "Репорт подтвержден. Пользователь забанен."
 }
 
 // transform converts telegram message to internal message format.

@@ -97,7 +97,10 @@ func TestTelegramListener_LinkedChannelBanSpam(t *testing.T) {
 				Group:      fmt.Sprintf("%d", groupChatID),
 				Locator:    locator,
 				SuperUsers: SuperUsers{},
-				WarnMsg:    "You have been warned",
+				WarnMsg:    "Не нарушайте правила чата.",
+				ModerationConfig: ModerationConfig{
+					WarnStrikes: 3,
+				},
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -163,7 +166,7 @@ func TestTelegramListener_LinkedChannelBanSpam(t *testing.T) {
 				var foundWarn bool
 				for _, call := range mockAPI.SendCalls() {
 					mc := call.C.(tbapi.MessageConfig)
-					if strings.Contains(mc.Text, "warning from") && strings.Contains(mc.Text, "You have been warned") {
+					if strings.Contains(mc.Text, "Предупреждение 1/3") && strings.Contains(mc.Text, "Не нарушайте правила чата") {
 						foundWarn = true
 					}
 				}

@@ -303,6 +303,67 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 		require.EqualError(t, err, "telegram update chan closed")
 		assert.False(t, deleteCalled, "superuser orphaned /report should NOT be auto-deleted")
 	})
+
+	t.Run("reply /report from superuser is handled before spam check", func(t *testing.T) {
+		mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
+		mockAPI := &mocks.TbAPIMock{
+			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
+				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			},
+			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+				return &tbapi.APIResponse{Ok: true}, nil
+			},
+			GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
+				return []tbapi.ChatMember{}, nil
+			},
+		}
+		botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+			return bot.Response{Send: true, Text: "should not run"}
+		}}
+
+		locator, teardown := prepTestLocator(t)
+		defer teardown()
+
+		l := TelegramListener{
+			SpamLogger: mockLogger,
+			TbAPI:      mockAPI,
+			Bot:        botMock,
+			SuperUsers: SuperUsers{"superuser"},
+			Locator:    locator,
+			ReportConfig: ReportConfig{
+				Enabled: true,
+			},
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		updMsg := tbapi.Update{
+			Message: &tbapi.Message{
+				MessageID: 100,
+				Chat:      tbapi.Chat{ID: 123},
+				Text:      "/report",
+				From:      &tbapi.User{UserName: "superuser", ID: 888},
+				Date:      int(time.Now().Unix()),
+				ReplyToMessage: &tbapi.Message{
+					MessageID: 99,
+					Chat:      tbapi.Chat{ID: 123},
+					Text:      "reported spam text",
+					From:      &tbapi.User{UserName: "spammer", ID: 999},
+					Date:      int(time.Now().Unix()),
+				},
+			},
+		}
+
+		updChan := make(chan tbapi.Update, 1)
+		updChan <- updMsg
+		close(updChan)
+		mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updChan }
+
+		err := l.Do(ctx)
+		require.EqualError(t, err, "telegram update chan closed")
+		assert.Empty(t, botMock.OnMessageCalls(), "superuser reply /report should not reach spam check")
+	})
 }
 
 func TestTelegramListener_isReportCommand(t *testing.T) {

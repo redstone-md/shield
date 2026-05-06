@@ -108,7 +108,7 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 		var notificationMsg string
 		for _, call := range sendCalls {
 			if msg, ok := call.C.(tbapi.MessageConfig); ok {
-				if strings.Contains(msg.Text, "deleted 3 messages from spammer") {
+				if strings.Contains(msg.Text, "удалено 3 сообщений спамера") {
 					foundNotification = true
 					notificationMsg = msg.Text
 					break
@@ -116,7 +116,7 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 			}
 		}
 		assert.True(t, foundNotification, "Should send notification about deleted messages")
-		assert.Contains(t, notificationMsg, "deleted 3 messages from spammer \"spammer\" (666)", "Notification should include username and ID")
+		assert.Contains(t, notificationMsg, "удалено 3 сообщений спамера \"spammer\" (666)", "Notification should include username and ID")
 	})
 
 	t.Run("aggressive cleanup disabled", func(t *testing.T) {

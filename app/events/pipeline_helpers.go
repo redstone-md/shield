@@ -11,6 +11,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
+	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
 func (l *TelegramListener) makeIncomingEvent(update tbapi.Update, msg *bot.Message) moderation.IncomingEvent {
@@ -130,4 +131,59 @@ func (l *TelegramListener) botOnMessage(ctx context.Context, msg bot.Message, ch
 		return b.OnMessageWithContext(ctx, msg, checkOnly)
 	}
 	return l.Bot.OnMessage(msg, checkOnly)
+}
+
+func slowpathReason(checks []spamcheck.Response) string {
+	for _, check := range checks {
+		if check.Spam && check.Name == "slowpath" {
+			return strings.TrimSpace(check.Details)
+		}
+	}
+	return ""
+}
+
+func appendReasonHTML(text, reason string) string {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return text
+	}
+	return fmt.Sprintf("%s\nПричина: %s", text, htmlEscape(reason))
+}
+
+func firstNotificationReason(reasons []string) string {
+	if len(reasons) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(reasons[0])
+}
+
+func buildWarningText(warnNum, warnTotal int, user bot.User, userID int64, customMsg, reason string) string {
+	userMention := warningUserMention(user, userID)
+	if customMsg != "" {
+		text := fmt.Sprintf("\u26a0\ufe0f Предупреждение %d/%d\n%s, %s", warnNum, warnTotal, userMention, htmlEscape(customMsg))
+		return appendReasonHTML(text, reason)
+	}
+
+	warnText := fmt.Sprintf("\u26a0\ufe0f Предупреждение %d/%d\n%s, вы нарушили правила чата. "+
+		"При получении %d предупреждений последует мьют на 30 мин, затем на 6 ч, и далее — перманентный бан.",
+		warnNum, warnTotal, userMention, warnTotal)
+	return appendReasonHTML(warnText, reason)
+}
+
+func warningUserMention(user bot.User, userID int64) string {
+	userName := user.DisplayName
+	if userName == "" {
+		userName = user.Username
+	}
+	if userName == "" {
+		userName = fmt.Sprintf("user %d", userID)
+	}
+
+	if user.Username != "" {
+		return fmt.Sprintf(`<a href="https://t.me/%s">%s</a>`, user.Username, htmlEscape(userName))
+	}
+	if user.FirstName != "" {
+		return fmt.Sprintf(`<a href="tg://user?id=%d">%s</a>`, userID, htmlEscape(user.FirstName))
+	}
+	return fmt.Sprintf(`<a href="tg://user?id=%d">user %d</a>`, userID, userID)
 }

@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/observability"
+	"github.com/umputun/tg-spam/app/storage"
+	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
 func (a *admin) DirectSpamReport(ctx context.Context, update tbapi.Update) error {
@@ -52,16 +55,105 @@ func (a *admin) DirectWarnReport(update tbapi.Update) error {
 		errs = multierror.Append(errs, err)
 	}
 
-	warnMsg := fmt.Sprintf("warning from %s\n\n%s %s", update.Message.From.UserName,
-		a.warnTarget(origMsg), a.warnMsg)
+	origBotMsg := transform(origMsg)
+	subjectID := warnSubjectID(origMsg)
+	strikeCount := a.warnStrikeCount(ctx, subjectID)
+	duration, restrict, warn := spamPenalty(strikeCount, a.softBan, a.moderation)
+	if !warn {
+		if err := a.applyWarnEscalation(ctx, origMsg, duration, restrict); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+		if err := errs.ErrorOrNil(); err != nil {
+			return fmt.Errorf("direct warn report failed: %w", err)
+		}
+		return nil
+	}
+
+	warnNum := strikeCount + 1
+	warnMsg := buildWarningText(warnNum, a.moderation.WarnStrikes, warnDisplayUser(origMsg), subjectID, a.warnMsg, "")
 	if err := a.sendWarnMessage(ctx, origMsg, warnMsg); err != nil {
 		errs = multierror.Append(errs, err)
+	} else {
+		a.recordManualWarn(ctx, origBotMsg, subjectID, warnNum)
 	}
 
 	if err := errs.ErrorOrNil(); err != nil {
 		return fmt.Errorf("direct warn report failed: %w", err)
 	}
 	return nil
+}
+
+func warnDisplayUser(msg *tbapi.Message) bot.User {
+	if msg != nil && msg.SenderChat != nil && msg.SenderChat.ID != 0 {
+		return bot.User{ID: msg.SenderChat.ID, Username: msg.SenderChat.UserName, FirstName: msg.SenderChat.Title}
+	}
+	if msg == nil || msg.From == nil {
+		return bot.User{}
+	}
+	return bot.User{ID: msg.From.ID, Username: msg.From.UserName, FirstName: msg.From.FirstName}
+}
+
+func (a *admin) warnStrikeCount(ctx context.Context, subjectID int64) int {
+	if a.detectedSpam == nil || subjectID == 0 {
+		return 0
+	}
+	count, err := a.detectedSpam.CountByUserID(ctx, subjectID)
+	if err != nil {
+		log.Printf("[WARN] failed to count warning strikes for user %d: %v", subjectID, err)
+		return 0
+	}
+	return count
+}
+
+func (a *admin) applyWarnEscalation(ctx context.Context, origMsg *tbapi.Message, duration time.Duration, restrict bool) error {
+	req := banRequest{
+		duration: duration,
+		userID:   origMsg.From.ID,
+		chatID:   a.primChatID,
+		dry:      a.dry,
+		training: a.trainingMode,
+		userName: origMsg.From.UserName,
+		restrict: restrict,
+	}
+	if origMsg.SenderChat != nil && origMsg.SenderChat.ID != 0 {
+		req.channelID = origMsg.SenderChat.ID
+		req.userName = origMsg.SenderChat.UserName
+	}
+	if a.actions != nil {
+		if err := a.actions.ApplyBan(ctx, req); err != nil {
+			return fmt.Errorf("failed to escalate warning for %d: %w", warnSubjectID(origMsg), err)
+		}
+		return nil
+	}
+	req.tbAPI = a.tbAPI
+	if err := banUserOrChannel(ctx, req); err != nil {
+		return fmt.Errorf("failed to escalate warning for %d: %w", warnSubjectID(origMsg), err)
+	}
+	return nil
+}
+
+func (a *admin) recordManualWarn(ctx context.Context, msg *bot.Message, subjectID int64, warnNum int) {
+	if a.detectedSpam == nil || msg == nil || subjectID == 0 {
+		return
+	}
+	checks := []spamcheck.Response{{Name: "manual_warn", Spam: true, Details: fmt.Sprintf("ручное предупреждение %d/%d", warnNum, a.moderation.WarnStrikes)}}
+	userName := msg.From.Username
+	if msg.SenderChat.UserName != "" {
+		userName = msg.SenderChat.UserName
+	}
+	entry := storage.DetectedSpamInfo{
+		GID:            fmt.Sprint(a.primChatID),
+		Text:           msg.Text,
+		UserID:         subjectID,
+		UserName:       userName,
+		Timestamp:      time.Now().UTC(),
+		SignalSource:   "manual_warn",
+		Score:          1,
+		RuleSetVersion: 0,
+	}
+	if err := a.detectedSpam.Write(ctx, entry, checks); err != nil {
+		log.Printf("[WARN] failed to record manual warning for user %d: %v", subjectID, err)
+	}
 }
 
 func (a *admin) deleteWarnMessage(ctx context.Context, msgID int, label string) error {
@@ -87,10 +179,11 @@ func (a *admin) deleteWarnMessage(ctx context.Context, msgID int, label string) 
 func (a *admin) sendWarnMessage(ctx context.Context, origMsg *tbapi.Message, warnMsg string) error {
 	if a.actions != nil {
 		if err := a.actions.WarnUser(ctx, warnRequest{
-			chatID:    a.primChatID,
-			subjectID: warnSubjectID(origMsg),
-			messageID: origMsg.MessageID,
-			text:      warnMsg,
+			chatID:      a.primChatID,
+			subjectID:   warnSubjectID(origMsg),
+			messageID:   origMsg.MessageID,
+			text:        warnMsg,
+			warnDelTime: a.warnDeleteDuration,
 		}); err != nil {
 			return fmt.Errorf("failed to send warning to main chat: %w", err)
 		}
@@ -179,7 +272,7 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 		diagMsg.SenderChat = bot.SenderChat{ID: origMsg.SenderChat.ID, UserName: origMsg.SenderChat.UserName}
 	}
 	resp := a.bot.OnMessage(diagMsg, true)
-	spamInfoText := "**can't get spam info**"
+	spamInfoText := "**не удалось получить диагностику спама**"
 	for _, check := range resp.CheckResults {
 		spamInfo = append(spamInfo, "- "+escapeMarkDownV1Text(check.String()))
 	}
@@ -192,8 +285,8 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 		displayName = a.channelDisplayName(origMsg.SenderChat)
 		displayID = channelID
 	}
-	newMsgText := fmt.Sprintf("**original detection results for %s (%d)**\n\n%s\n\n%s\n\n\n"+
-		"*the user banned by %q and message deleted*",
+	newMsgText := fmt.Sprintf("**исходная диагностика для %s (%d)**\n\n%s\n\n%s\n\n\n"+
+		"*пользователь забанен администратором %q, сообщение удалено*",
 		escapeMarkDownV1Text(displayName), displayID, msgTxt, escapeMarkDownV1Text(spamInfoText),
 		escapeMarkDownV1Text(update.Message.From.UserName))
 	if err := send(tbapi.NewMessage(a.adminChatID, newMsgText), a.tbAPI); err != nil {
@@ -270,7 +363,7 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 					cleanupName = origMsg.SenderChat.UserName
 				}
 				log.Printf("[INFO] aggressive cleanup: deleted %d messages from %d", deleted, cleanupUserID)
-				notifyMsg := fmt.Sprintf("_deleted %d messages from spammer %q (%d)_",
+				notifyMsg := fmt.Sprintf("_удалено %d сообщений спамера %q (%d)_",
 					deleted, escapeMarkDownV1Text(cleanupName), cleanupUserID)
 				if err := send(tbapi.NewMessage(a.adminChatID, notifyMsg), a.tbAPI); err != nil {
 					log.Printf("[WARN] failed to send deletion notification: %v", err)

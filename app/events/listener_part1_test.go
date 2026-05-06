@@ -69,6 +69,22 @@ type actionExecutorSpy struct {
 	}
 }
 
+type detectedSpamCounterSpy struct {
+	count  int
+	writes []storage.DetectedSpamInfo
+	checks [][]spamcheck.Response
+}
+
+func (s *detectedSpamCounterSpy) CountByUserID(_ context.Context, _ int64) (int, error) {
+	return s.count, nil
+}
+
+func (s *detectedSpamCounterSpy) Write(_ context.Context, entry storage.DetectedSpamInfo, checks []spamcheck.Response) error {
+	s.writes = append(s.writes, entry)
+	s.checks = append(s.checks, checks)
+	return nil
+}
+
 func (s *actionExecutorSpy) ApplyBan(ctx context.Context, req banRequest) error {
 	s.banCtxs = append(s.banCtxs, ctx)
 	s.banCalls = append(s.banCalls, req)
