@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -59,8 +60,11 @@ func (d *imageDownloader) download(ctx context.Context, fileID string) ([]byte, 
 		return nil, "", fmt.Errorf("file exceeds max size: %d", d.maxSize)
 	}
 
-	mime := http.DetectContentType(data)
-	if mime == "application/octet-stream" {
+	mime := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(mime, "image/") {
+		mime = http.DetectContentType(data)
+	}
+	if !strings.HasPrefix(mime, "image/") {
 		mime = "image/jpeg"
 	}
 
