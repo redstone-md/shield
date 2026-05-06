@@ -102,8 +102,8 @@ func TestServer_CheckMsgHandlerLogsRequestMetadata(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Contains(t, buf.String(), "event_id=")
-	assert.Contains(t, buf.String(), "correlation_id=req-456")
+	assert.Contains(t, buf.String(), "evt=web-inst-")
+	assert.Contains(t, buf.String(), "corr=req-456")
 	assert.Equal(t, "req-456", rr.Header().Get(requestHeaderCorrelationID))
 }
 
