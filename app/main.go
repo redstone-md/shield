@@ -243,7 +243,7 @@ func main() {
 
 	setupLog(opts.Dbg, masked...)
 
-	log.Printf("[DEBUG] options: %+v", opts)
+	debugLogFields("options", opts)
 
 	// validate auto-ban threshold
 	if opts.Report.AutoBanThreshold > 0 && opts.Report.AutoBanThreshold < opts.Report.Threshold {

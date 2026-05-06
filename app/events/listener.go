@@ -18,6 +18,7 @@ import (
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
+	"github.com/umputun/tg-spam/app/observability"
 	"github.com/umputun/tg-spam/app/policy"
 	"github.com/umputun/tg-spam/app/rules"
 	"github.com/umputun/tg-spam/app/slowpath"
@@ -106,8 +107,8 @@ func (l *TelegramListener) ApplyRuleSet(rs rules.RuleSet) {
 	l.RuleSetVersion = rs.Version
 	l.ModerationConfig = ModerationConfig{
 		FirstStrike:        rs.Moderation.FirstStrike,
-		SecondStrike:     rs.Moderation.SecondStrike,
-		WarnStrikes:       rs.Moderation.WarnStrikes,
+		SecondStrike:       rs.Moderation.SecondStrike,
+		WarnStrikes:        rs.Moderation.WarnStrikes,
 		WarnDeleteDuration: rs.Moderation.WarnDeleteDuration,
 	}
 	l.ReportConfig = ReportConfig{
@@ -204,7 +205,8 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 	if l.DisableAdminSpamForward {
 		adminForwardStatus = "disabled"
 	}
-	log.Printf("[DEBUG] admin handler created, spam forwarding %s, %+v", adminForwardStatus, l.adminHandler)
+	log.Printf("[DEBUG] admin handler created, spam forwarding %s:\n%s",
+		adminForwardStatus, observability.FormatFields(l.adminHandler.logConfig()))
 
 	if l.AggressiveCleanup {
 		log.Printf("[INFO] aggressive cleanup enabled, messages from user will be deleted on ban, limit %d",

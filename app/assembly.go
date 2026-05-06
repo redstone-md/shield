@@ -263,7 +263,7 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 		if opts.OpenAI.APIBase != "" {
 			config.BaseURL = opts.OpenAI.APIBase
 		}
-		log.Printf("[DEBUG] openai config: %+v", openAIConfig)
+		debugLogFields("openai config", openAIConfig)
 
 		detector.WithOpenAIChecker(openai.NewClientWithConfig(config), openAIConfig)
 	}
@@ -287,12 +287,12 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 		if err != nil {
 			log.Fatalf("[ERROR] failed to create gemini client: %v", err)
 		}
-		log.Printf("[DEBUG] gemini config: %+v", geminiConfig)
+		debugLogFields("gemini config", geminiConfig)
 		detector.WithGeminiChecker(client.Models, geminiConfig)
 	}
 
 	detector.WithMetaChecks(buildMetaChecks(ruleSet, opts.MinMsgLen)...)
-	log.Printf("[DEBUG] detector config: %+v", detectorConfig)
+	debugLogFields("detector config", detectorConfig)
 
 	// initialize Lua plugins if enabled
 	if opts.LuaPlugins.Enabled {
@@ -435,7 +435,7 @@ func makeSpamBot(ctx context.Context, opts options, ruleSet rules.RuleSet, dataD
 		Dry:          ruleSet.Moderation.DryRun,
 	}
 	spamBot := bot.NewSpamFilter(detector, spamBotParams)
-	log.Printf("[DEBUG] spam bot config: %+v", spamBotParams)
+	debugLogFields("spam bot config", spamBotParams)
 
 	if err := spamBot.ReloadSamples(ctx); err != nil {
 		return nil, fmt.Errorf("can't reload samples, %w", err)

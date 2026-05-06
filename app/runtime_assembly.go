@@ -463,11 +463,7 @@ func logListenerConfig(listener *events.TelegramListener) {
 		log.Print("[INFO] delete leave messages enabled")
 	}
 
-	log.Printf("[DEBUG] telegram listener config: {bot: %s, group: %s, idle: %v, super: %v, admin: %s, "+
-		"testing: %v, no-reply: %v, suppress: %v, dry: %v, training: %v}",
-		listener.BotUsername, listener.Group, listener.IdleDuration, listener.SuperUsers,
-		listener.AdminGroup, listener.TestingIDs, listener.NoSpamReply, listener.SuppressJoinMessage,
-		listener.Dry, listener.TrainingMode)
+	debugLogFields("telegram listener config", loggableTelegramListenerConfig(listener))
 }
 
 func activateWebRuntime(ctx context.Context, opts options, web webRuntimeAssembly, dmUsersProvider webapi.DMUsersProvider) error {
