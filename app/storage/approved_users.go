@@ -211,7 +211,10 @@ func (au *ApprovedUsers) migrate(ctx context.Context, tx *sqlx.Tx, gid string) e
 		return fmt.Errorf("failed to migrate data: %w", err)
 	}
 
-	migrateTenantID(ctx, tx, au.Type(), "approved_users")
+	backfillTenantQuery := au.Adopt("UPDATE approved_users SET tenant_id = ? WHERE tenant_id = ''")
+	if _, err = tx.ExecContext(ctx, backfillTenantQuery, gid); err != nil {
+		return fmt.Errorf("failed to backfill tenant id: %w", err)
+	}
 
 	log.Printf("[DEBUG] approved_users table migrated")
 	return nil

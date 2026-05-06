@@ -48,7 +48,7 @@ func (s *StorageTestSuite) TestApprovedUsers_NewApprovedUsers() {
 				var columnCount int
 				err = db.Get(&columnCount, "SELECT COUNT(*) FROM pragma_table_info('approved_users')")
 				s.Require().NoError(err)
-				s.Equal(5, columnCount)
+				s.Equal(6, columnCount)
 			})
 
 			s.Run("nil db connection", func() {
