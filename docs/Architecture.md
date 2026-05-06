@@ -10,7 +10,7 @@ This file is the primary start-here card for humans and AI agents. Detailed deci
 - **Where is the code:** `app/` for runtime and adapters, `lib/` for reusable detection logic, `site/` for documentation site assets, `e2e-ui/` for Playwright tests
 - **Entry points:** [`app/main.go`](../app/main.go), [`app/events/listener.go`](../app/events/listener.go), [`app/webapi/webapi.go`](../app/webapi/webapi.go), [`app/runtime_assembly.go`](../app/runtime_assembly.go)
 - **Dependencies:** Telegram Bot API, SQLite/Postgres storage, optional OpenAI/Gemini integrations, Docker-based local/runtime packaging
-- **Config:** CLI flags + env vars via `go-flags`, ~100 parameters in [`app/main.go`](../app/main.go)
+- **Config:** CLI flags + env vars via `go-flags`, ~100 parameters in [`app/main.go`](../app/main.go); explicit CLI/env values override database rule sets
 
 ## Scoping
 

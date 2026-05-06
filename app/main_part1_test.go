@@ -385,6 +385,8 @@ func TestAssembleRuntimeUsesActiveRuleSet(t *testing.T) {
 	opts.Report.Threshold = 2
 	opts.Dry = false
 	opts.SoftBan = false
+	t.Setenv("DRY", "false")
+	t.Setenv("SOFT_BAN", "false")
 
 	require.NoError(t, os.WriteFile(path.Join(tmpDir, "spam-samples.txt"), []byte("spam1\n"), 0o600))
 	require.NoError(t, os.WriteFile(path.Join(tmpDir, "ham-samples.txt"), []byte("ham1\n"), 0o600))
@@ -421,8 +423,8 @@ func TestAssembleRuntimeUsesActiveRuleSet(t *testing.T) {
 	tbAPI := &tbapi.BotAPI{Self: tbapi.User{UserName: "bot"}}
 	listener := assembly.makeTelegramListener(opts, tbAPI)
 	assert.Equal(t, 15*time.Minute, listener.ModerationConfig.FirstStrike)
-	assert.True(t, listener.SoftBanMode)
-	assert.True(t, listener.Dry)
+	assert.False(t, listener.SoftBanMode)
+	assert.False(t, listener.Dry)
 	assert.Equal(t, 5, listener.ReportConfig.Threshold)
 	assert.Equal(t, 6, listener.ReportConfig.AutoBanThreshold)
 }
@@ -446,6 +448,8 @@ func TestRuleSetServiceUpdateAppliesRuntimeWithoutRestart(t *testing.T) {
 	opts.Duplicates.Window = time.Minute
 	opts.Dry = false
 	opts.SoftBan = false
+	t.Setenv("DRY", "false")
+	t.Setenv("SOFT_BAN", "false")
 
 	require.NoError(t, os.WriteFile(path.Join(tmpDir, "spam-samples.txt"), []byte("spam1\n"), 0o600))
 	require.NoError(t, os.WriteFile(path.Join(tmpDir, "ham-samples.txt"), []byte("ham1\n"), 0o600))
@@ -491,8 +495,8 @@ func TestRuleSetServiceUpdateAppliesRuntimeWithoutRestart(t *testing.T) {
 	assert.Equal(t, 2, assembly.ActiveRuleSet.Version)
 	assert.Equal(t, 10*time.Minute, listener.ModerationConfig.FirstStrike)
 	assert.Equal(t, time.Hour, listener.ModerationConfig.SecondStrike)
-	assert.True(t, listener.SoftBanMode)
-	assert.True(t, listener.Dry)
+	assert.False(t, listener.SoftBanMode)
+	assert.False(t, listener.Dry)
 	assert.Equal(t, 5, listener.ReportConfig.Threshold)
 	assert.Equal(t, 6, listener.ReportConfig.AutoBanThreshold)
 	assert.Equal(t, 2, listener.RuleSetVersion)
