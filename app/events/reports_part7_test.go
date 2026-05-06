@@ -168,11 +168,11 @@ func TestUserReports_CallbackReportCancel(t *testing.T) {
 					assert.Equal(t, 999, editMarkup.MessageID)
 					require.Len(t, editMarkup.ReplyMarkup.InlineKeyboard, 1, "should have 1 row of buttons")
 					require.Len(t, editMarkup.ReplyMarkup.InlineKeyboard[0], 3, "row should have 3 buttons")
-					assert.Equal(t, "✅ Approve Ban", editMarkup.ReplyMarkup.InlineKeyboard[0][0].Text)
+					assert.Equal(t, "✅ Забанить", editMarkup.ReplyMarkup.InlineKeyboard[0][0].Text)
 					assert.Equal(t, "R+666:100", *editMarkup.ReplyMarkup.InlineKeyboard[0][0].CallbackData)
-					assert.Equal(t, "❌ Reject", editMarkup.ReplyMarkup.InlineKeyboard[0][1].Text)
+					assert.Equal(t, "❌ Отклонить", editMarkup.ReplyMarkup.InlineKeyboard[0][1].Text)
 					assert.Equal(t, "R-666:100", *editMarkup.ReplyMarkup.InlineKeyboard[0][1].CallbackData)
-					assert.Equal(t, "⛔️ Ban Reporter", editMarkup.ReplyMarkup.InlineKeyboard[0][2].Text)
+					assert.Equal(t, "⛔️ Забанить репортера", editMarkup.ReplyMarkup.InlineKeyboard[0][2].Text)
 					assert.Equal(t, "R?666:100", *editMarkup.ReplyMarkup.InlineKeyboard[0][2].CallbackData)
 				}
 				return tbapi.Message{}, nil

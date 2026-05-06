@@ -227,8 +227,8 @@ func TestUserReports_AutoBan(t *testing.T) {
 					if editMsg.ReplyMarkup != nil && len(editMsg.ReplyMarkup.InlineKeyboard) == 0 {
 						buttonsRemoved = true
 					}
-					assert.Contains(t, editMsg.Text, "auto-banned", "should mention auto-ban in updated text")
-					assert.Contains(t, editMsg.Text, "5 reports", "should show report count")
+					assert.Contains(t, editMsg.Text, "автоматически забанен", "should mention auto-ban in updated text")
+					assert.Contains(t, editMsg.Text, "5 репортов", "should show report count")
 				}
 				return tbapi.Message{MessageID: 123}, nil
 			},

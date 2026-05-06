@@ -390,11 +390,11 @@ func TestUserReports_CallbackReportBanReporterAsk(t *testing.T) {
 					assert.Equal(t, int64(456), editMarkup.ChatID)
 					assert.Equal(t, 999, editMarkup.MessageID)
 					require.Len(t, editMarkup.ReplyMarkup.InlineKeyboard, 3)
-					assert.Equal(t, "Ban reporter1", editMarkup.ReplyMarkup.InlineKeyboard[0][0].Text)
+					assert.Equal(t, "Забанить reporter1", editMarkup.ReplyMarkup.InlineKeyboard[0][0].Text)
 					assert.Equal(t, "R!111:100", *editMarkup.ReplyMarkup.InlineKeyboard[0][0].CallbackData)
-					assert.Equal(t, "Ban reporter2", editMarkup.ReplyMarkup.InlineKeyboard[1][0].Text)
+					assert.Equal(t, "Забанить reporter2", editMarkup.ReplyMarkup.InlineKeyboard[1][0].Text)
 					assert.Equal(t, "R!222:100", *editMarkup.ReplyMarkup.InlineKeyboard[1][0].CallbackData)
-					assert.Equal(t, "Cancel", editMarkup.ReplyMarkup.InlineKeyboard[2][0].Text)
+					assert.Equal(t, "Отмена", editMarkup.ReplyMarkup.InlineKeyboard[2][0].Text)
 					assert.Equal(t, "RX666:100", *editMarkup.ReplyMarkup.InlineKeyboard[2][0].CallbackData)
 				}
 				return tbapi.Message{}, nil

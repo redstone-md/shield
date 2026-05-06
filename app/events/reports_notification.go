@@ -33,12 +33,12 @@ func (r *userReports) sendAutoBanNotification(reports []storage.Report) error {
 			escapeMarkDownV1Text(reporterName), report.ReporterUserID))
 	}
 
-	actionType := "banned"
+	actionType := "забанен"
 	if r.softBanMode {
-		actionType = "restricted"
+		actionType = "ограничен"
 	}
 
-	notificationText := fmt.Sprintf("**Auto-%s user after %d reports**\n\n[%s](tg://user?id=%d)\n\n%s\n\n**Reporters:**\n%s",
+	notificationText := fmt.Sprintf("**Пользователь автоматически %s после %d репортов**\n\n[%s](tg://user?id=%d)\n\n%s\n\n**Кто пожаловался:**\n%s",
 		actionType,
 		len(reports),
 		escapeMarkDownV1Text(reportedUserName),
@@ -85,13 +85,13 @@ func (r *userReports) updateNotificationForAutoBan(reports []storage.Report) err
 			escapeMarkDownV1Text(reporterName), report.ReporterUserID))
 	}
 
-	actionType := "banned"
+	actionType := "забанен"
 	if r.softBanMode {
-		actionType = "restricted"
+		actionType = "ограничен"
 	}
 
-	updatedText := fmt.Sprintf("**User spam reported (%d reports)**\n\n[%s](tg://user?id=%d)\n\n%s\n\n"+
-		"**Reporters:**\n%s\n\n_auto-%s after reaching %d reports_",
+	updatedText := fmt.Sprintf("**Жалобы на спам (%d)**\n\n[%s](tg://user?id=%d)\n\n%s\n\n"+
+		"**Кто пожаловался:**\n%s\n\n_автоматически %s после %d репортов_",
 		len(reports),
 		escapeMarkDownV1Text(reportedUserName),
 		reportedUserID,
@@ -142,7 +142,7 @@ func (r *userReports) sendReportNotification(ctx context.Context, reports []stor
 			escapeMarkDownV1Text(reporterName), report.ReporterUserID))
 	}
 
-	notificationText := fmt.Sprintf("**User spam reported (%d reports)**\n\n[%s](tg://user?id=%d)\n\n%s\n\n**Reporters:**\n%s",
+	notificationText := fmt.Sprintf("**Жалобы на спам (%d)**\n\n[%s](tg://user?id=%d)\n\n%s\n\n**Кто пожаловался:**\n%s",
 		len(reports),
 		escapeMarkDownV1Text(reportedUserName),
 		reportedUserID,
@@ -154,9 +154,9 @@ func (r *userReports) sendReportNotification(ctx context.Context, reports []stor
 
 	keyboard := tbapi.NewInlineKeyboardMarkup(
 		tbapi.NewInlineKeyboardRow(
-			tbapi.NewInlineKeyboardButtonData("✅ Approve Ban", fmt.Sprintf("R+%d:%d", reportedUserID, msgID)),
-			tbapi.NewInlineKeyboardButtonData("❌ Reject", fmt.Sprintf("R-%d:%d", reportedUserID, msgID)),
-			tbapi.NewInlineKeyboardButtonData("⛔️ Ban Reporter", fmt.Sprintf("R?%d:%d", reportedUserID, msgID)),
+			tbapi.NewInlineKeyboardButtonData("✅ Забанить", fmt.Sprintf("R+%d:%d", reportedUserID, msgID)),
+			tbapi.NewInlineKeyboardButtonData("❌ Отклонить", fmt.Sprintf("R-%d:%d", reportedUserID, msgID)),
+			tbapi.NewInlineKeyboardButtonData("⛔️ Забанить репортера", fmt.Sprintf("R?%d:%d", reportedUserID, msgID)),
 		),
 	)
 
@@ -209,19 +209,19 @@ func (r *userReports) updateReportNotification(_ context.Context, reports []stor
 			escapeMarkDownV1Text(reporterName), report.ReporterUserID))
 	}
 
-	notification := fmt.Sprintf("**User spam reported (%d reports)**\n\n", len(reports)) +
+	notification := fmt.Sprintf("**Жалобы на спам (%d)**\n\n", len(reports)) +
 		fmt.Sprintf("[%s](tg://user?id=%d)\n\n", escapeMarkDownV1Text(reportedUserName), reportedUserID) +
 		fmt.Sprintf("%s\n\n", msgText) +
-		fmt.Sprintf("**Reporters:**\n%s", strings.Join(reporterList, "\n"))
+		fmt.Sprintf("**Кто пожаловался:**\n%s", strings.Join(reporterList, "\n"))
 
 	padding := strings.Repeat("\u2800", 30)
 	notification += "\n\n" + padding
 
 	keyboard := tbapi.NewInlineKeyboardMarkup(
 		tbapi.NewInlineKeyboardRow(
-			tbapi.NewInlineKeyboardButtonData("✅ Approve Ban", fmt.Sprintf("R+%d:%d", reportedUserID, msgID)),
-			tbapi.NewInlineKeyboardButtonData("❌ Reject", fmt.Sprintf("R-%d:%d", reportedUserID, msgID)),
-			tbapi.NewInlineKeyboardButtonData("⛔️ Ban Reporter", fmt.Sprintf("R?%d:%d", reportedUserID, msgID)),
+			tbapi.NewInlineKeyboardButtonData("✅ Забанить", fmt.Sprintf("R+%d:%d", reportedUserID, msgID)),
+			tbapi.NewInlineKeyboardButtonData("❌ Отклонить", fmt.Sprintf("R-%d:%d", reportedUserID, msgID)),
+			tbapi.NewInlineKeyboardButtonData("⛔️ Забанить репортера", fmt.Sprintf("R?%d:%d", reportedUserID, msgID)),
 		),
 	)
 
