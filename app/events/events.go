@@ -59,6 +59,10 @@ type Locator interface {
 // DetectedSpamCounter provides spam strike count for escalation.
 type DetectedSpamCounter interface {
 	CountByUserID(ctx context.Context, userID int64) (int, error)
+	CountByUserIDAndSignalSource(ctx context.Context, userID int64, signalSource string) (int, error)
+	CountByUserNameAndSignalSource(ctx context.Context, userName, signalSource string) (int, error)
+	DeleteLatestByUserIDAndSignalSource(ctx context.Context, userID int64, signalSource string) (bool, error)
+	DeleteLatestByUserNameAndSignalSource(ctx context.Context, userName, signalSource string) (bool, error)
 	Write(ctx context.Context, entry storage.DetectedSpamInfo, checks []spamcheck.Response) error
 }
 

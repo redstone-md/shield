@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,12 +18,31 @@ import (
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
+const manualWarnSignalSource = "manual_warn"
+
 func (a *admin) DirectSpamReport(ctx context.Context, update tbapi.Update) error {
 	return a.directReport(ctx, update, true)
 }
 
 func (a *admin) DirectBanReport(ctx context.Context, update tbapi.Update) error {
 	return a.directReport(ctx, update, false)
+}
+
+func (a *admin) DirectDeleteReply(ctx context.Context, update tbapi.Update) error {
+	if update.Message == nil || update.Message.ReplyToMessage == nil {
+		return fmt.Errorf("delete command requires a reply message")
+	}
+	chatID := update.Message.Chat.ID
+	if update.Message.ReplyToMessage.Chat.ID != 0 {
+		chatID = update.Message.ReplyToMessage.Chat.ID
+	}
+	if err := a.deleteMessage(ctx, chatID, update.Message.ReplyToMessage.MessageID, "reply target"); err != nil {
+		return fmt.Errorf("direct delete reply failed: %w", err)
+	}
+	if err := a.deleteMessage(ctx, update.Message.Chat.ID, update.Message.MessageID, "delete command"); err != nil {
+		return fmt.Errorf("direct delete reply failed: %w", err)
+	}
+	return nil
 }
 
 func (a *admin) DirectWarnReport(update tbapi.Update) error {
@@ -83,6 +104,97 @@ func (a *admin) DirectWarnReport(update tbapi.Update) error {
 	return nil
 }
 
+func (a *admin) DirectUnwarnReport(update tbapi.Update) error {
+	origMsg := update.Message.ReplyToMessage
+	ctx := a.warnContext(update, origMsg)
+	if err := a.deleteWarnMessage(ctx, update.Message.MessageID, "admin unwarn report"); err != nil {
+		return fmt.Errorf("direct unwarn report failed: %w", err)
+	}
+	if a.detectedSpam == nil {
+		return fmt.Errorf("direct unwarn report failed: detected spam storage is not configured")
+	}
+
+	subjectID, userName := unwarnSubject(origMsg)
+	if subjectID == 0 && userName == "" {
+		return fmt.Errorf("direct unwarn report failed: can't identify warning subject")
+	}
+
+	remaining, deleted, err := a.deleteManualWarn(ctx, subjectID, userName)
+	if err != nil {
+		return fmt.Errorf("direct unwarn report failed: %w", err)
+	}
+
+	text := unwarnResultText(subjectID, userName, remaining, deleted)
+	if err := send(tbapi.NewMessage(a.adminChatID, text), a.tbAPI); err != nil {
+		return fmt.Errorf("direct unwarn report failed: %w", err)
+	}
+	return nil
+}
+
+func (a *admin) deleteManualWarn(ctx context.Context, subjectID int64, userName string) (remaining int, deleted bool, err error) {
+	if subjectID != 0 {
+		deleted, err = a.detectedSpam.DeleteLatestByUserIDAndSignalSource(ctx, subjectID, manualWarnSignalSource)
+		if err != nil {
+			return 0, false, err
+		}
+		remaining, err = a.detectedSpam.CountByUserIDAndSignalSource(ctx, subjectID, manualWarnSignalSource)
+		return remaining, deleted, err
+	}
+	deleted, err = a.detectedSpam.DeleteLatestByUserNameAndSignalSource(ctx, userName, manualWarnSignalSource)
+	if err != nil {
+		return 0, false, err
+	}
+	remaining, err = a.detectedSpam.CountByUserNameAndSignalSource(ctx, userName, manualWarnSignalSource)
+	return remaining, deleted, err
+}
+
+func unwarnResultText(subjectID int64, userName string, remaining int, deleted bool) string {
+	subject := userName
+	if subject == "" {
+		subject = fmt.Sprintf("user %d", subjectID)
+	}
+	if subjectID != 0 && userName != "" {
+		subject = fmt.Sprintf("%s (%d)", userName, subjectID)
+	}
+	if !deleted {
+		return fmt.Sprintf("Предупреждений для %s не найдено", subject)
+	}
+	return fmt.Sprintf("Предупреждение снято: %s, осталось %d", subject, remaining)
+}
+
+func unwarnSubject(msg *tbapi.Message) (int64, string) {
+	if msg == nil {
+		return 0, ""
+	}
+	if id, userName, ok := unwarnSubjectFromText(msg.Text); ok {
+		return id, userName
+	}
+	if msg.SenderChat != nil && msg.SenderChat.ID != 0 {
+		return msg.SenderChat.ID, msg.SenderChat.UserName
+	}
+	if msg.From != nil {
+		return msg.From.ID, msg.From.UserName
+	}
+	return 0, ""
+}
+
+func unwarnSubjectFromText(text string) (int64, string, bool) {
+	for _, expr := range []string{`tg://user\?id=(-?\d+)`, `\((-?\d+)\)`, `user (-?\d+)`} {
+		re := regexp.MustCompile(expr)
+		if match := re.FindStringSubmatch(text); len(match) > 1 {
+			id, err := strconv.ParseInt(match[1], 10, 64)
+			if err == nil {
+				return id, "", true
+			}
+		}
+	}
+	re := regexp.MustCompile(`https://t\.me/([A-Za-z0-9_]+)`)
+	if match := re.FindStringSubmatch(text); len(match) > 1 {
+		return 0, match[1], true
+	}
+	return 0, "", false
+}
+
 func warnDisplayUser(msg *tbapi.Message) bot.User {
 	if msg != nil && msg.SenderChat != nil && msg.SenderChat.ID != 0 {
 		return bot.User{ID: msg.SenderChat.ID, Username: msg.SenderChat.UserName, FirstName: msg.SenderChat.Title}
@@ -97,7 +209,7 @@ func (a *admin) warnStrikeCount(ctx context.Context, subjectID int64) int {
 	if a.detectedSpam == nil || subjectID == 0 {
 		return 0
 	}
-	count, err := a.detectedSpam.CountByUserID(ctx, subjectID)
+	count, err := a.detectedSpam.CountByUserIDAndSignalSource(ctx, subjectID, manualWarnSignalSource)
 	if err != nil {
 		log.Printf("[WARN] failed to count warning strikes for user %d: %v", subjectID, err)
 		return 0
@@ -136,7 +248,7 @@ func (a *admin) recordManualWarn(ctx context.Context, msg *bot.Message, subjectI
 	if a.detectedSpam == nil || msg == nil || subjectID == 0 {
 		return
 	}
-	checks := []spamcheck.Response{{Name: "manual_warn", Spam: true, Details: fmt.Sprintf("ручное предупреждение %d/%d", warnNum, a.moderation.WarnStrikes)}}
+	checks := []spamcheck.Response{{Name: manualWarnSignalSource, Spam: true, Details: fmt.Sprintf("ручное предупреждение %d/%d", warnNum, a.moderation.WarnStrikes)}}
 	userName := msg.From.Username
 	if msg.SenderChat.UserName != "" {
 		userName = msg.SenderChat.UserName
@@ -147,7 +259,7 @@ func (a *admin) recordManualWarn(ctx context.Context, msg *bot.Message, subjectI
 		UserID:         subjectID,
 		UserName:       userName,
 		Timestamp:      time.Now().UTC(),
-		SignalSource:   "manual_warn",
+		SignalSource:   manualWarnSignalSource,
 		Score:          1,
 		RuleSetVersion: 0,
 	}
@@ -157,8 +269,12 @@ func (a *admin) recordManualWarn(ctx context.Context, msg *bot.Message, subjectI
 }
 
 func (a *admin) deleteWarnMessage(ctx context.Context, msgID int, label string) error {
+	return a.deleteMessage(ctx, a.primChatID, msgID, label)
+}
+
+func (a *admin) deleteMessage(ctx context.Context, chatID int64, msgID int, label string) error {
 	if a.actions != nil {
-		if err := a.actions.DeleteMessage(ctx, a.primChatID, msgID); err != nil {
+		if err := a.actions.DeleteMessage(ctx, chatID, msgID); err != nil {
 			return fmt.Errorf("failed to delete message %d: %w", msgID, err)
 		}
 		log.Printf("[INFO] %s message %d deleted", label, msgID)
@@ -167,7 +283,7 @@ func (a *admin) deleteWarnMessage(ctx context.Context, msgID int, label string) 
 
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 		MessageID:  msgID,
-		ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
+		ChatConfig: tbapi.ChatConfig{ChatID: chatID},
 	}})
 	if err != nil {
 		return fmt.Errorf("failed to delete message %d: %w", msgID, err)

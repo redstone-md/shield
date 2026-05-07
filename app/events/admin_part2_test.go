@@ -166,6 +166,27 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		assert.Empty(t, botMock.UpdateSpamCalls())
 	})
 
+	t.Run("DirectDeleteReply", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		update := createReplyUpdate("admin", 111, "bot", 777, "message to delete")
+		update.Message.Text = "/del"
+		update.Message.MessageID = 789
+		update.Message.Chat.ID = 456
+		update.Message.ReplyToMessage.MessageID = 999
+		update.Message.ReplyToMessage.Chat.ID = 456
+
+		err := adm.DirectDeleteReply(context.Background(), update)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.RequestCalls(), 2)
+		assert.Equal(t, 999, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
+		assert.Equal(t, int64(456), mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).ChatID)
+		assert.Equal(t, 789, mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).MessageID)
+		assert.Equal(t, int64(456), mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).ChatID)
+	})
+
 	t.Run("DirectWarnReport", func(t *testing.T) {
 		mockAPI, _, adm, teardown := setupTest()
 		defer teardown()
@@ -245,6 +266,47 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		assert.Equal(t, 30*time.Minute, actionSpy.banCalls[0].duration)
 		assert.Empty(t, mockAPI.RequestCalls())
 		assert.Empty(t, mockAPI.SendCalls())
+	})
+
+	t.Run("DirectUnwarnReport_RemovesLatestManualWarning", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		detectedSpy := &detectedSpamCounterSpy{count: 2, deleteResult: true}
+		adm.detectedSpam = detectedSpy
+
+		update := createReplyUpdate("admin", 111, "bot", 777, "")
+		update.Message.Text = "/unwarn"
+		update.Message.ReplyToMessage.Text = `<b>⚠️ WARNING 2/3</b> <a href="https://t.me/user">Firstname</a> (222)`
+
+		err := adm.DirectUnwarnReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.RequestCalls(), 1)
+		assert.Equal(t, 789, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
+		require.Len(t, detectedSpy.deleteByIDCalls, 1)
+		assert.Equal(t, int64(222), detectedSpy.deleteByIDCalls[0].userID)
+		assert.Equal(t, manualWarnSignalSource, detectedSpy.deleteByIDCalls[0].signalSource)
+		require.Len(t, mockAPI.SendCalls(), 1)
+		adminMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Contains(t, adminMsg.Text, "Предупреждение снято")
+		assert.Contains(t, adminMsg.Text, "осталось 2")
+	})
+
+	t.Run("DirectUnwarnReport_NoManualWarning", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		adm.detectedSpam = &detectedSpamCounterSpy{deleteResult: false}
+
+		update := createReplyUpdate("admin", 111, "user", 222, "regular message")
+		update.Message.Text = "/unwarn"
+
+		err := adm.DirectUnwarnReport(update)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "Предупреждений для user (222) не найдено")
 	})
 
 	t.Run("DirectSpamReport_ChannelMessage", func(t *testing.T) {

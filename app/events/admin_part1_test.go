@@ -154,7 +154,7 @@ func TestAdmin_reportWarnUsernameUsesFirstNameAsLinkText(t *testing.T) {
 
 	require.Len(t, mockAPI.SendCalls(), 1)
 	sentText := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
-	assert.Contains(t, sentText, `<b>⚠️ WARNING 3/3</b> <a href="https://t.me/baz_02l_wss">Firstname</a>`)
+	assert.Contains(t, sentText, `<b>⚠️ WARNING 3/3</b> <a href="https://t.me/baz_02l_wss">Firstname</a> (7187750383)`)
 	assert.NotContains(t, sentText, `>baz_02l_wss</a>`)
 }
 

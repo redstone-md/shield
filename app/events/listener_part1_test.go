@@ -70,13 +70,47 @@ type actionExecutorSpy struct {
 }
 
 type detectedSpamCounterSpy struct {
-	count  int
-	writes []storage.DetectedSpamInfo
-	checks [][]spamcheck.Response
+	count           int
+	nameCount       int
+	deleteByIDCalls []struct {
+		userID       int64
+		signalSource string
+	}
+	deleteByNameCalls []struct {
+		userName     string
+		signalSource string
+	}
+	deleteResult bool
+	writes       []storage.DetectedSpamInfo
+	checks       [][]spamcheck.Response
 }
 
 func (s *detectedSpamCounterSpy) CountByUserID(_ context.Context, _ int64) (int, error) {
 	return s.count, nil
+}
+
+func (s *detectedSpamCounterSpy) CountByUserIDAndSignalSource(_ context.Context, _ int64, _ string) (int, error) {
+	return s.count, nil
+}
+
+func (s *detectedSpamCounterSpy) CountByUserNameAndSignalSource(_ context.Context, _ string, _ string) (int, error) {
+	return s.nameCount, nil
+}
+
+func (s *detectedSpamCounterSpy) DeleteLatestByUserIDAndSignalSource(_ context.Context, userID int64, signalSource string) (bool, error) {
+	s.deleteByIDCalls = append(s.deleteByIDCalls, struct {
+		userID       int64
+		signalSource string
+	}{userID: userID, signalSource: signalSource})
+	return s.deleteResult, nil
+}
+
+func (s *detectedSpamCounterSpy) DeleteLatestByUserNameAndSignalSource(_ context.Context, userName, signalSource string) (bool, error) {
+	s.deleteByNameCalls = append(s.deleteByNameCalls, struct {
+		userName     string
+		signalSource string
+	}{userName: userName, signalSource: signalSource})
+	return s.deleteResult, nil
 }
 
 func (s *detectedSpamCounterSpy) Write(_ context.Context, entry storage.DetectedSpamInfo, checks []spamcheck.Response) error {

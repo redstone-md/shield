@@ -483,3 +483,46 @@ func (s *StorageTestSuite) TestDetectedSpam_FindByUserID() {
 		})
 	}
 }
+
+func (s *StorageTestSuite) TestDetectedSpam_DeleteLatestByUserIDAndSignalSource() {
+	ctx := context.Background()
+	for _, dbt := range s.getTestDB() {
+		db := dbt.DB
+		s.Run(fmt.Sprintf("with %s", db.Type()), func() {
+			ds, err := NewDetectedSpam(ctx, db)
+			s.Require().NoError(err)
+			defer db.Exec("DROP TABLE detected_spam")
+
+			entries := []DetectedSpamInfo{
+				{GID: db.GID(), Text: "first warning", UserID: 123, UserName: "spammer", Timestamp: time.Now().Add(-time.Hour), SignalSource: "manual_warn"},
+				{GID: db.GID(), Text: "spam detection", UserID: 123, UserName: "spammer", Timestamp: time.Now().Add(-time.Minute), SignalSource: "duplicates"},
+				{GID: db.GID(), Text: "second warning", UserID: 123, UserName: "spammer", Timestamp: time.Now(), SignalSource: "manual_warn"},
+			}
+			for _, entry := range entries {
+				err = ds.Write(ctx, entry, []spamcheck.Response{{Name: entry.SignalSource, Spam: true}})
+				s.Require().NoError(err)
+			}
+
+			count, err := ds.CountByUserIDAndSignalSource(ctx, 123, "manual_warn")
+			s.Require().NoError(err)
+			s.Equal(2, count)
+
+			deleted, err := ds.DeleteLatestByUserIDAndSignalSource(ctx, 123, "manual_warn")
+			s.Require().NoError(err)
+			s.True(deleted)
+
+			count, err = ds.CountByUserIDAndSignalSource(ctx, 123, "manual_warn")
+			s.Require().NoError(err)
+			s.Equal(1, count)
+
+			latest, err := ds.FindByUserID(ctx, 123)
+			s.Require().NoError(err)
+			s.Require().NotNil(latest)
+			s.Equal("spam detection", latest.Text)
+
+			deleted, err = ds.DeleteLatestByUserIDAndSignalSource(ctx, 999, "manual_warn")
+			s.Require().NoError(err)
+			s.False(deleted)
+		})
+	}
+}

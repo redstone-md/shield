@@ -385,7 +385,7 @@ func (l *TelegramListener) handleCallback(ctx context.Context, cb *tbapi.Callbac
 	}
 }
 
-// procSuperReply processes superuser commands (reply) /spam, /ban, /warn
+// procSuperReply processes superuser reply commands: /spam, /ban, /warn, /unwarn.
 func (l *TelegramListener) procSuperReply(ctx context.Context, update tbapi.Update) (handled bool) {
 	switch {
 	case strings.EqualFold(update.Message.Text, "/spam") || strings.EqualFold(update.Message.Text, "spam"):
@@ -404,6 +404,22 @@ func (l *TelegramListener) procSuperReply(ctx context.Context, update tbapi.Upda
 		log.Printf("[DEBUG] superuser %s requested warning", update.Message.From.UserName)
 		if err := l.adminHandler.DirectWarnReport(update); err != nil {
 			log.Printf("[WARN] failed to process direct warning request: %v", err)
+		}
+		return true
+	case strings.EqualFold(update.Message.Text, "/del") || strings.EqualFold(update.Message.Text, "del"):
+		if !l.SuperUsers.IsSuper(update.Message.From.UserName, update.Message.From.ID) {
+			log.Printf("[WARN] non-superuser %s attempted direct delete", update.Message.From.UserName)
+			return false
+		}
+		log.Printf("[DEBUG] superuser %s requested message deletion", update.Message.From.UserName)
+		if err := l.adminHandler.DirectDeleteReply(ctx, update); err != nil {
+			log.Printf("[WARN] failed to process direct delete request: %v", err)
+		}
+		return true
+	case strings.EqualFold(update.Message.Text, "/unwarn") || strings.EqualFold(update.Message.Text, "unwarn"):
+		log.Printf("[DEBUG] superuser %s requested warning removal", update.Message.From.UserName)
+		if err := l.adminHandler.DirectUnwarnReport(update); err != nil {
+			log.Printf("[WARN] failed to process direct unwarn request: %v", err)
 		}
 		return true
 	}

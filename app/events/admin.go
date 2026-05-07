@@ -122,8 +122,8 @@ func (a *admin) ReportWarn(warnUserStr string, msg *bot.Message, warnNum, warnTo
 
 	var warnLine string
 	if hasUsername {
-		warnLine = fmt.Sprintf(`<b>⚠️ WARNING %d/%d</b> <a href="https://t.me/%s">%s</a>`,
-			warnNum, warnTotal, username, htmlEscape(adminDisplayName(msg.From)))
+		warnLine = fmt.Sprintf(`<b>⚠️ WARNING %d/%d</b> <a href="https://t.me/%s">%s</a> (%d)`,
+			warnNum, warnTotal, username, htmlEscape(adminDisplayName(msg.From)), userID)
 	} else if msg.From.FirstName != "" {
 		warnLine = fmt.Sprintf(`<b>⚠️ WARNING %d/%d</b> %s (%d)`,
 			warnNum, warnTotal, htmlEscape(msg.From.FirstName), userID)

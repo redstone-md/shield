@@ -302,6 +302,70 @@ func (ds *DetectedSpam) CountByUserID(ctx context.Context, userID int64) (int, e
 	return count, nil
 }
 
+// CountByUserIDAndSignalSource returns the number of detected spam entries for the given user and signal source.
+func (ds *DetectedSpam) CountByUserIDAndSignalSource(ctx context.Context, userID int64, signalSource string) (int, error) {
+	ds.RLock()
+	defer ds.RUnlock()
+
+	query := ds.Adopt("SELECT COUNT(*) FROM detected_spam WHERE user_id = ? AND signal_source = ? AND tenant_id = ?")
+	var count int
+	if err := ds.GetContext(ctx, &count, query, userID, signalSource, ds.TenantID()); err != nil {
+		return 0, fmt.Errorf("failed to count detected spam entries for user_id %d and signal_source %q: %w", userID, signalSource, err)
+	}
+	return count, nil
+}
+
+// DeleteLatestByUserIDAndSignalSource removes the newest detected spam entry for a user and signal source.
+func (ds *DetectedSpam) DeleteLatestByUserIDAndSignalSource(ctx context.Context, userID int64, signalSource string) (bool, error) {
+	ds.Lock()
+	defer ds.Unlock()
+
+	query := ds.Adopt(`DELETE FROM detected_spam WHERE id = (
+		SELECT id FROM detected_spam WHERE user_id = ? AND signal_source = ? AND tenant_id = ? ORDER BY timestamp DESC, id DESC LIMIT 1
+	)`)
+	res, err := ds.ExecContext(ctx, query, userID, signalSource, ds.TenantID())
+	if err != nil {
+		return false, fmt.Errorf("failed to delete latest detected spam entry for user_id %d and signal_source %q: %w", userID, signalSource, err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("failed to read deleted detected spam row count: %w", err)
+	}
+	return rows > 0, nil
+}
+
+// CountByUserNameAndSignalSource returns the number of detected spam entries for the given username and signal source.
+func (ds *DetectedSpam) CountByUserNameAndSignalSource(ctx context.Context, userName, signalSource string) (int, error) {
+	ds.RLock()
+	defer ds.RUnlock()
+
+	query := ds.Adopt("SELECT COUNT(*) FROM detected_spam WHERE user_name = ? AND signal_source = ? AND tenant_id = ?")
+	var count int
+	if err := ds.GetContext(ctx, &count, query, userName, signalSource, ds.TenantID()); err != nil {
+		return 0, fmt.Errorf("failed to count detected spam entries for user_name %q and signal_source %q: %w", userName, signalSource, err)
+	}
+	return count, nil
+}
+
+// DeleteLatestByUserNameAndSignalSource removes the newest detected spam entry for a username and signal source.
+func (ds *DetectedSpam) DeleteLatestByUserNameAndSignalSource(ctx context.Context, userName, signalSource string) (bool, error) {
+	ds.Lock()
+	defer ds.Unlock()
+
+	query := ds.Adopt(`DELETE FROM detected_spam WHERE id = (
+		SELECT id FROM detected_spam WHERE user_name = ? AND signal_source = ? AND tenant_id = ? ORDER BY timestamp DESC, id DESC LIMIT 1
+	)`)
+	res, err := ds.ExecContext(ctx, query, userName, signalSource, ds.TenantID())
+	if err != nil {
+		return false, fmt.Errorf("failed to delete latest detected spam entry for user_name %q and signal_source %q: %w", userName, signalSource, err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("failed to read deleted detected spam row count: %w", err)
+	}
+	return rows > 0, nil
+}
+
 func (ds *DetectedSpam) migrate(ctx context.Context, tx *sqlx.Tx, gid string) error {
 	var count int
 	err := tx.GetContext(ctx, &count, "SELECT COUNT(*) FROM detected_spam WHERE gid = '' AND signal_source = ''")

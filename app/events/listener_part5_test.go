@@ -82,6 +82,108 @@ func TestTelegramListener_DoWithDirectWarnReportUsesActionExecutor(t *testing.T)
 	assert.Empty(t, mockAPI.RequestCalls())
 }
 
+func TestTelegramListener_DoWithDirectDeleteReply(t *testing.T) {
+	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
+	mockAPI := &mocks.TbAPIMock{
+		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
+			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+		},
+		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+			return &tbapi.APIResponse{Ok: true}, nil
+		},
+		GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) { return nil, nil },
+	}
+	l := TelegramListener{
+		SpamLogger: mockLogger,
+		TbAPI:      mockAPI,
+		Bot:        &mocks.BotMock{},
+		Group:      "gr",
+		SuperUsers: SuperUsers{"superuser1"},
+		Locator:    &locatorContextSpy{},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	updMsg := tbapi.Update{Message: &tbapi.Message{
+		MessageID: 101,
+		Chat:      tbapi.Chat{ID: 456},
+		Text:      "/del",
+		From:      &tbapi.User{UserName: "superuser1", ID: 77},
+		ReplyToMessage: &tbapi.Message{
+			MessageID: 202,
+			Chat:      tbapi.Chat{ID: 456},
+			From:      &tbapi.User{ID: 777, UserName: "bot"},
+			Text:      "bot message",
+		},
+	}}
+	updChan := make(chan tbapi.Update, 1)
+	updChan <- updMsg
+	close(updChan)
+	mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updChan }
+
+	err := l.Do(ctx)
+	require.EqualError(t, err, "telegram update chan closed")
+
+	require.Len(t, mockAPI.RequestCalls(), 2)
+	assert.Equal(t, 202, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
+	assert.Equal(t, int64(456), mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).ChatID)
+	assert.Equal(t, 101, mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).MessageID)
+	assert.Equal(t, int64(456), mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).ChatID)
+	assert.Empty(t, mockLogger.SaveCalls())
+}
+
+func TestTelegramListener_DirectDeleteReplyRequiresSuperUser(t *testing.T) {
+	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
+	mockAPI := &mocks.TbAPIMock{
+		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
+			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+		},
+		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+			return &tbapi.APIResponse{Ok: true}, nil
+		},
+		GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) { return nil, nil },
+	}
+	botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} }}
+	l := TelegramListener{
+		SpamLogger: mockLogger,
+		TbAPI:      mockAPI,
+		Bot:        botMock,
+		Group:      "gr",
+		SuperUsers: SuperUsers{"superuser1"},
+		Locator:    &locatorContextSpy{},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	updMsg := tbapi.Update{Message: &tbapi.Message{
+		MessageID: 101,
+		Chat:      tbapi.Chat{ID: 456},
+		Text:      "/del",
+		From:      &tbapi.User{UserName: "linked", ID: 77},
+		SenderChat: &tbapi.Chat{
+			ID: 123,
+		},
+		ReplyToMessage: &tbapi.Message{
+			MessageID: 202,
+			Chat:      tbapi.Chat{ID: 456},
+			From:      &tbapi.User{ID: 777, UserName: "bot"},
+			Text:      "bot message",
+		},
+	}}
+	updChan := make(chan tbapi.Update, 1)
+	updChan <- updMsg
+	close(updChan)
+	mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updChan }
+
+	err := l.Do(ctx)
+	require.EqualError(t, err, "telegram update chan closed")
+
+	assert.Empty(t, mockAPI.RequestCalls())
+	assert.Empty(t, botMock.OnMessageCalls())
+}
+
 func TestTelegramListener_DoWithAdminUnBan(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{}
 	mockAPI := &mocks.TbAPIMock{
