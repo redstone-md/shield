@@ -28,7 +28,7 @@ func TestUserReports_CallbackReportBanReporterConfirm(t *testing.T) {
 				callCount++
 				if callCount == 1 {
 					return []storage.Report{
-						{MsgID: 100, ChatID: 200, ReporterUserID: 111, ReporterUserName: "reporter1", ReportedUserID: 666, ReportedUserName: "spammer"},
+						{MsgID: 100, ChatID: 200, ReporterUserID: 111, ReporterUserName: "reporter_1", ReportedUserID: 666, ReportedUserName: "spammer"},
 						{MsgID: 100, ChatID: 200, ReporterUserID: 222, ReporterUserName: "reporter2", ReportedUserID: 666, ReportedUserName: "spammer"},
 					}, nil
 				}
@@ -49,7 +49,7 @@ func TestUserReports_CallbackReportBanReporterConfirm(t *testing.T) {
 
 		query := &tbapi.CallbackQuery{
 			Data:    "R!111:100",
-			From:    &tbapi.User{UserName: "admin"},
+			From:    &tbapi.User{UserName: "admin", ID: 333},
 			Message: &tbapi.Message{Chat: tbapi.Chat{ID: 456}, MessageID: 999, Text: "Test", Date: int(time.Now().Unix())},
 		}
 
@@ -57,6 +57,8 @@ func TestUserReports_CallbackReportBanReporterConfirm(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, mockReports.GetByMessageCalls(), 2)
 		assert.Len(t, mockReports.DeleteReporterCalls(), 1)
+		require.Len(t, mockAPI.SendCalls(), 1)
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "репортер [reporter\\_1](tg://user?id=111) забанен администратором [admin](tg://user?id=333)")
 	})
 
 	t.Run("ban last reporter", func(t *testing.T) {

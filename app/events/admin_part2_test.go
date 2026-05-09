@@ -62,6 +62,12 @@ func TestAdmin_DirectCommands(t *testing.T) {
 			UserNameByIDFunc: func(ctx context.Context, userID int64) string {
 				return "testuser"
 			},
+			UserIDByNameFunc: func(ctx context.Context, userName string) int64 {
+				if userName == "spammer" {
+					return 222
+				}
+				return 0
+			},
 		}
 
 		adm := &admin{
@@ -92,7 +98,7 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		adminMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
 		assert.Equal(t, int64(456), adminMsg.ChatID)
 		assert.Contains(t, adminMsg.Text, "исходная диагностика для spammer (222)")
-		assert.Contains(t, adminMsg.Text, "пользователь забанен администратором")
+		assert.Contains(t, adminMsg.Text, "пользователь забанен администратором [admin](tg://user?id=111)")
 
 		require.Len(t, botMock.RemoveApprovedUserCalls(), 1)
 		assert.Equal(t, int64(222), botMock.RemoveApprovedUserCalls()[0].ID)
@@ -130,6 +136,105 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		verifyDirectReportResults(t, mockAPI, botMock)
 
 		assert.Empty(t, botMock.UpdateSpamCalls())
+	})
+
+	t.Run("DirectBanTarget_ByID", func(t *testing.T) {
+		mockAPI, botMock, adm, teardown := setupTest()
+		defer teardown()
+
+		update := createReplyUpdate("admin", 111, "", 0, "")
+		update.Message.Text = "/ban 222"
+		update.Message.ReplyToMessage = nil
+
+		err := adm.DirectBanTarget(context.Background(), update, "222")
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "[testuser](tg://user?id=222) (222)")
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "[admin](tg://user?id=111)")
+		require.Len(t, mockAPI.RequestCalls(), 2)
+		assert.Equal(t, 789, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
+		banCfg := mockAPI.RequestCalls()[1].C.(tbapi.BanChatMemberConfig)
+		assert.Equal(t, int64(123), banCfg.ChatID)
+		assert.Equal(t, int64(222), banCfg.UserID)
+		require.Len(t, botMock.RemoveApprovedUserCalls(), 1)
+		assert.Equal(t, int64(222), botMock.RemoveApprovedUserCalls()[0].ID)
+	})
+
+	t.Run("DirectBanTarget_ByIDWithoutKnownUsername", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		adm.locator = &mocks.LocatorMock{
+			UserNameByIDFunc: func(ctx context.Context, userID int64) string { return "" },
+			UserIDByNameFunc: func(ctx context.Context, userName string) int64 { return 0 },
+		}
+		update := createReplyUpdate("admin", 111, "", 0, "")
+		update.Message.Text = "/ban 8642668745"
+		update.Message.ReplyToMessage = nil
+
+		err := adm.DirectBanTarget(context.Background(), update, "8642668745")
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		text := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
+		assert.Contains(t, text, "пользователь [8642668745](tg://user?id=8642668745) забанен")
+		assert.NotContains(t, text, "user 8642668745")
+		assert.NotContains(t, text, "](tg://user?id=8642668745) (8642668745)")
+	})
+
+	t.Run("DirectBanTarget_ByUsernameWithAt", func(t *testing.T) {
+		mockAPI, botMock, adm, teardown := setupTest()
+		defer teardown()
+
+		update := createReplyUpdate("admin", 111, "", 0, "")
+		update.Message.Text = "/ban @spammer"
+		update.Message.ReplyToMessage = nil
+
+		err := adm.DirectBanTarget(context.Background(), update, "@spammer")
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "[spammer](tg://user?id=222) (222)")
+		require.Len(t, mockAPI.RequestCalls(), 2)
+		banCfg := mockAPI.RequestCalls()[1].C.(tbapi.BanChatMemberConfig)
+		assert.Equal(t, int64(222), banCfg.UserID)
+		require.Len(t, botMock.RemoveApprovedUserCalls(), 1)
+		assert.Equal(t, int64(222), botMock.RemoveApprovedUserCalls()[0].ID)
+	})
+
+	t.Run("DirectBanTarget_ByUsernameWithoutAt", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		update := createReplyUpdate("admin", 111, "", 0, "")
+		update.Message.Text = "/ban spammer"
+		update.Message.ReplyToMessage = nil
+
+		err := adm.DirectBanTarget(context.Background(), update, "spammer")
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "[spammer](tg://user?id=222) (222)")
+		require.Len(t, mockAPI.RequestCalls(), 2)
+		banCfg := mockAPI.RequestCalls()[1].C.(tbapi.BanChatMemberConfig)
+		assert.Equal(t, int64(222), banCfg.UserID)
+	})
+
+	t.Run("DirectBanTarget_UnknownUsername", func(t *testing.T) {
+		mockAPI, botMock, adm, teardown := setupTest()
+		defer teardown()
+
+		update := createReplyUpdate("admin", 111, "", 0, "")
+		update.Message.Text = "/ban @unknown"
+		update.Message.ReplyToMessage = nil
+
+		err := adm.DirectBanTarget(context.Background(), update, "@unknown")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `can't resolve username "unknown" to user id`)
+		assert.Empty(t, mockAPI.SendCalls())
+		assert.Empty(t, mockAPI.RequestCalls())
+		assert.Empty(t, botMock.RemoveApprovedUserCalls())
 	})
 
 	t.Run("DirectSpamReport", func(t *testing.T) {

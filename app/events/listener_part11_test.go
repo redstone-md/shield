@@ -304,11 +304,14 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 		assert.False(t, deleteCalled, "superuser orphaned /report should NOT be auto-deleted")
 	})
 
-	t.Run("reply /report from superuser is handled before spam check", func(t *testing.T) {
+	t.Run("reply /report from superuser is direct spam report alias", func(t *testing.T) {
 		mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
 				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			},
+			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+				return tbapi.Message{Text: c.(tbapi.MessageConfig).Text, From: &tbapi.User{UserName: "bot"}}, nil
 			},
 			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 				return &tbapi.APIResponse{Ok: true}, nil
@@ -317,9 +320,13 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 				return []tbapi.ChatMember{}, nil
 			},
 		}
-		botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
-			return bot.Response{Send: true, Text: "should not run"}
-		}}
+		botMock := &mocks.BotMock{
+			RemoveApprovedUserFunc: func(id int64) error { return nil },
+			OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+				return bot.Response{Send: true, Text: "diagnostic"}
+			},
+			UpdateSpamFunc: func(msg string) error { return nil },
+		}
 
 		locator, teardown := prepTestLocator(t)
 		defer teardown()
@@ -362,7 +369,11 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 
 		err := l.Do(ctx)
 		require.EqualError(t, err, "telegram update chan closed")
-		assert.Empty(t, botMock.OnMessageCalls(), "superuser reply /report should not reach spam check")
+		require.Len(t, botMock.OnMessageCalls(), 1)
+		assert.Equal(t, "reported spam text", botMock.OnMessageCalls()[0].Msg.Text)
+		assert.True(t, botMock.OnMessageCalls()[0].CheckOnly)
+		require.Len(t, botMock.UpdateSpamCalls(), 1)
+		assert.Equal(t, "reported spam text", botMock.UpdateSpamCalls()[0].Msg)
 	})
 }
 

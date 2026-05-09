@@ -85,7 +85,8 @@ func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.Callba
 		log.Printf("[WARN] failed to delete reports for msgID:%d: %v", msgID, err)
 	}
 
-	updText := query.Message.Text + fmt.Sprintf("\n\n_забанено администратором %s за %v_", query.From.UserName, sinceQuery(query))
+	updText := query.Message.Text + fmt.Sprintf("\n\nзабанено администратором %s за %v",
+		markdownUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
 	editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, updText)
 	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
 	if err := send(editMsg, r.tbAPI); err != nil {
@@ -117,7 +118,8 @@ func (r *userReports) callbackReportReject(ctx context.Context, query *tbapi.Cal
 		log.Printf("[WARN] failed to delete reports for msgID:%d: %v", msgID, err)
 	}
 
-	updText := query.Message.Text + fmt.Sprintf("\n\n_отклонено администратором %s за %v_", query.From.UserName, sinceQuery(query))
+	updText := query.Message.Text + fmt.Sprintf("\n\nотклонено администратором %s за %v",
+		markdownUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
 	editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, updText)
 	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
 	if err := send(editMsg, r.tbAPI); err != nil {
@@ -237,7 +239,8 @@ func (r *userReports) callbackReportBanReporterConfirm(ctx context.Context, quer
 			log.Printf("[WARN] failed to delete reports for msgID:%d: %v", msgID, delErr)
 		}
 
-		updText := query.Message.Text + fmt.Sprintf("\n\n_все репортеры забанены администратором %s за %v_", query.From.UserName, sinceQuery(query))
+		updText := query.Message.Text + fmt.Sprintf("\n\nвсе репортеры забанены администратором %s за %v",
+			markdownUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
 		editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, updText)
 		editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
 		if err := send(editMsg, r.tbAPI); err != nil {
@@ -267,7 +270,8 @@ func (r *userReports) callbackReportBanReporterConfirm(ctx context.Context, quer
 			reportedUserID,
 			msgText,
 			strings.Join(reporterList, "\n"))
-		updText += fmt.Sprintf("\n\n_репортер %s забанен администратором %s_", escapeMarkDownV1Text(reporterName), query.From.UserName)
+		updText += fmt.Sprintf("\n\nрепортер %s забанен администратором %s",
+			markdownUserLink(reporterName, reporterID), markdownUserLink(query.From.UserName, query.From.ID))
 
 		padding := strings.Repeat("\u2800", 30)
 		updText += "\n\n" + padding

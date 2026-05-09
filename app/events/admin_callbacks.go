@@ -77,7 +77,8 @@ func (a *admin) callbackAskBanConfirmation(query *tbapi.CallbackQuery) error {
 }
 
 func (a *admin) callbackBanConfirmed(ctx context.Context, query *tbapi.CallbackQuery) error {
-	updText := query.Message.Text + fmt.Sprintf("\n\n_бан подтвержден администратором %s за %v_", query.From.UserName, sinceQuery(query))
+	updText := query.Message.Text + fmt.Sprintf("\n\nбан подтвержден администратором %s за %v",
+		markdownUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
 	editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, updText)
 	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
 	if err := send(editMsg, a.tbAPI); err != nil {
@@ -168,7 +169,8 @@ func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.Callbac
 		return fmt.Errorf("failed to add user %d to approved list: %w", userID, err)
 	}
 
-	updText := query.Message.Text + fmt.Sprintf("\n\n_разбанено администратором %s за %v_", query.From.UserName, sinceQuery(query))
+	updText := query.Message.Text + fmt.Sprintf("\n\nразбанено администратором %s за %v",
+		markdownUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
 
 	if !strings.Contains(query.Message.Text, "диагностика") && !strings.Contains(query.Message.Text, "spam detection results") && userID != 0 {
 		spamInfoText := []string{"\n\n**исходная диагностика**\n"}

@@ -29,7 +29,7 @@ func (l *TelegramListener) procNewChatMemberMessage(ctx context.Context, update 
 
 	member := update.Message.NewChatMembers[0]
 	msg := fmt.Sprintf("new_%d_%d", fromChat, member.ID)
-	if err := l.Locator.AddMessage(ctx, msg, fromChat, member.ID, "", update.Message.MessageID); err != nil {
+	if err := l.Locator.AddMessage(ctx, msg, fromChat, member.ID, member.UserName, update.Message.MessageID); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to add new chat member message to locator: %w", err))
 	}
 

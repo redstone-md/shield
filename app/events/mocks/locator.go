@@ -37,6 +37,9 @@ import (
 //			UserNameByIDFunc: func(ctx context.Context, userID int64) string {
 //				panic("mock out the UserNameByID method")
 //			},
+//			UserIDByNameFunc: func(ctx context.Context, userName string) int64 {
+//				panic("mock out the UserIDByName method")
+//			},
 //		}
 //
 //		// use mockedLocator in code that requires events.Locator
@@ -64,6 +67,9 @@ type LocatorMock struct {
 
 	// UserNameByIDFunc mocks the UserNameByID method.
 	UserNameByIDFunc func(ctx context.Context, userID int64) string
+
+	// UserIDByNameFunc mocks the UserIDByName method.
+	UserIDByNameFunc func(ctx context.Context, userName string) int64
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -126,6 +132,13 @@ type LocatorMock struct {
 			// UserID is the userID argument value.
 			UserID int64
 		}
+		// UserIDByName holds details about calls to the UserIDByName method.
+		UserIDByName []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserName is the userName argument value.
+			UserName string
+		}
 	}
 	lockAddMessage        sync.RWMutex
 	lockAddSpam           sync.RWMutex
@@ -134,6 +147,7 @@ type LocatorMock struct {
 	lockMsgHash           sync.RWMutex
 	lockSpam              sync.RWMutex
 	lockUserNameByID      sync.RWMutex
+	lockUserIDByName      sync.RWMutex
 }
 
 // AddMessage calls AddMessageFunc.
@@ -457,6 +471,49 @@ func (mock *LocatorMock) ResetUserNameByIDCalls() {
 	mock.lockUserNameByID.Unlock()
 }
 
+// UserIDByName calls UserIDByNameFunc.
+func (mock *LocatorMock) UserIDByName(ctx context.Context, userName string) int64 {
+	if mock.UserIDByNameFunc == nil {
+		panic("LocatorMock.UserIDByNameFunc: method is nil but Locator.UserIDByName was just called")
+	}
+	callInfo := struct {
+		Ctx      context.Context
+		UserName string
+	}{
+		Ctx:      ctx,
+		UserName: userName,
+	}
+	mock.lockUserIDByName.Lock()
+	mock.calls.UserIDByName = append(mock.calls.UserIDByName, callInfo)
+	mock.lockUserIDByName.Unlock()
+	return mock.UserIDByNameFunc(ctx, userName)
+}
+
+// UserIDByNameCalls gets all the calls that were made to UserIDByName.
+// Check the length with:
+//
+//	len(mockedLocator.UserIDByNameCalls())
+func (mock *LocatorMock) UserIDByNameCalls() []struct {
+	Ctx      context.Context
+	UserName string
+} {
+	var calls []struct {
+		Ctx      context.Context
+		UserName string
+	}
+	mock.lockUserIDByName.RLock()
+	calls = mock.calls.UserIDByName
+	mock.lockUserIDByName.RUnlock()
+	return calls
+}
+
+// ResetUserIDByNameCalls reset all the calls that were made to UserIDByName.
+func (mock *LocatorMock) ResetUserIDByNameCalls() {
+	mock.lockUserIDByName.Lock()
+	mock.calls.UserIDByName = nil
+	mock.lockUserIDByName.Unlock()
+}
+
 // ResetCalls reset all the calls that were made to all mocked methods.
 func (mock *LocatorMock) ResetCalls() {
 	mock.lockAddMessage.Lock()
@@ -486,4 +543,8 @@ func (mock *LocatorMock) ResetCalls() {
 	mock.lockUserNameByID.Lock()
 	mock.calls.UserNameByID = nil
 	mock.lockUserNameByID.Unlock()
+
+	mock.lockUserIDByName.Lock()
+	mock.calls.UserIDByName = nil
+	mock.lockUserIDByName.Unlock()
 }

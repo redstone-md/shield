@@ -53,6 +53,7 @@ type Locator interface {
 	Spam(ctx context.Context, userID int64) (storage.SpamData, bool)
 	MsgHash(msg string) string
 	UserNameByID(ctx context.Context, userID int64) string
+	UserIDByName(ctx context.Context, userName string) int64
 	GetUserMessageIDs(ctx context.Context, userID int64, limit int) ([]int, error)
 }
 
@@ -128,6 +129,22 @@ func escapeMarkDownV1Text(text string) string {
 		text = strings.ReplaceAll(text, esc, "\\"+esc)
 	}
 	return text
+}
+
+func markdownUserLink(userName string, userID int64) string {
+	userName = strings.TrimPrefix(strings.TrimSpace(userName), "@")
+	display := userName
+	if display == "" {
+		display = fmt.Sprintf("%d", userID)
+	}
+	display = escapeMarkDownV1Text(display)
+	if userID != 0 {
+		return fmt.Sprintf("[%s](tg://user?id=%d)", display, userID)
+	}
+	if userName != "" {
+		return fmt.Sprintf("[%s](https://t.me/%s)", display, userName)
+	}
+	return display
 }
 
 // htmlEscape escapes special characters for HTML parse mode.

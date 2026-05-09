@@ -345,7 +345,7 @@ func TestTelegramListener_DoWithDirectSpamReport(t *testing.T) {
 	require.Len(t, mockAPI.SendCalls(), 2)
 	assert.Equal(t, "startup", mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text)
 	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, "исходная диагностика")
-	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, `пользователь забанен администратором "superuser1"`)
+	assert.Contains(t, mockAPI.SendCalls()[1].C.(tbapi.MessageConfig).Text, `пользователь забанен администратором [superuser1](tg://user?id=77)`)
 
 	require.Len(t, botMock.OnMessageCalls(), 1)
 	assert.Equal(t, "text 123", botMock.OnMessageCalls()[0].Msg.Text)

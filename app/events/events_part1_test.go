@@ -82,6 +82,44 @@ func TestEvents_escapeMarkDownV1Text(t *testing.T) {
 	}
 }
 
+func TestEvents_markdownUserLink(t *testing.T) {
+	tests := []struct {
+		name     string
+		userName string
+		userID   int64
+		expected string
+	}{
+		{
+			name:     "with id",
+			userName: "admin",
+			userID:   111,
+			expected: "[admin](tg://user?id=111)",
+		},
+		{
+			name:     "escapes underscore",
+			userName: "verka_87",
+			userID:   8651562434,
+			expected: "[verka\\_87](tg://user?id=8651562434)",
+		},
+		{
+			name:     "username fallback",
+			userName: "@nevermorelove",
+			expected: "[nevermorelove](https://t.me/nevermorelove)",
+		},
+		{
+			name:     "id fallback",
+			userID:   222,
+			expected: "[222](tg://user?id=222)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, markdownUserLink(tt.userName, tt.userID))
+		})
+	}
+}
+
 func TestEvents_truncateString(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -181,6 +219,15 @@ func TestEvents_send(t *testing.T) {
 		assert.Len(t, mockAPI.SendCalls(), 1)
 		assert.Equal(t, int64(123), mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).ChatID)
 		assert.Equal(t, "test", mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text)
+		assert.Equal(t, "Markdown", mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).ParseMode)
+	})
+
+	t.Run("send markdown link without fallback", func(t *testing.T) {
+		mockAPI.ResetCalls()
+		err := send(tbapi.NewMessage(123, "пользователь [123](tg://user?id=123) забанен"), mockAPI)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
 		assert.Equal(t, "Markdown", mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).ParseMode)
 	})
 

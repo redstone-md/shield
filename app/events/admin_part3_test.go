@@ -87,7 +87,7 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 		editMsg := mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig)
 		assert.Equal(t, query.Message.Chat.ID, editMsg.ChatID)
 		assert.Equal(t, query.Message.MessageID, editMsg.MessageID)
-		assert.Contains(t, editMsg.Text, "бан подтвержден администратором")
+		assert.Contains(t, editMsg.Text, "бан подтвержден администратором [admin](tg://user?id=111)")
 		assert.Empty(t, editMsg.ReplyMarkup.InlineKeyboard)
 
 		require.Len(t, botMock.UpdateSpamCalls(), 1)

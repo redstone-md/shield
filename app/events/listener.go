@@ -332,6 +332,10 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 
 	fromSuper := l.SuperUsers.IsSuper(update.Message.From.UserName, update.Message.From.ID) ||
 		l.isLinkedChannel(update.Message)
+	if fromSuper && l.procSuperCommand(ctx, update) {
+		return nil
+	}
+
 	if update.Message.ReplyToMessage != nil && fromSuper {
 		if l.procSuperReply(ctx, update) {
 			return nil
@@ -385,16 +389,31 @@ func (l *TelegramListener) handleCallback(ctx context.Context, cb *tbapi.Callbac
 	}
 }
 
+func (l *TelegramListener) procSuperCommand(ctx context.Context, update tbapi.Update) (handled bool) {
+	if update.Message == nil || update.Message.ReplyToMessage != nil {
+		return false
+	}
+	cmd, arg := splitCommand(update.Message.Text)
+	if !isBanCommand(cmd) || arg == "" {
+		return false
+	}
+	log.Printf("[DEBUG] superuser %s requested ban for %q", update.Message.From.UserName, arg)
+	if err := l.adminHandler.DirectBanTarget(ctx, update, arg); err != nil {
+		log.Printf("[WARN] failed to process direct ban target: %v", err)
+	}
+	return true
+}
+
 // procSuperReply processes superuser reply commands: /spam, /ban, /warn, /unwarn.
 func (l *TelegramListener) procSuperReply(ctx context.Context, update tbapi.Update) (handled bool) {
 	switch {
-	case strings.EqualFold(update.Message.Text, "/spam") || strings.EqualFold(update.Message.Text, "spam"):
+	case strings.EqualFold(update.Message.Text, "/spam") || strings.EqualFold(update.Message.Text, "spam") || l.isReportCommand(update.Message.Text):
 		log.Printf("[DEBUG] superuser %s reported spam", update.Message.From.UserName)
 		if err := l.adminHandler.DirectSpamReport(ctx, update); err != nil {
 			log.Printf("[WARN] failed to process direct spam report: %v", err)
 		}
 		return true
-	case strings.EqualFold(update.Message.Text, "/ban") || strings.EqualFold(update.Message.Text, "ban"):
+	case isBanCommand(strings.TrimSpace(update.Message.Text)):
 		log.Printf("[DEBUG] superuser %s requested ban", update.Message.From.UserName)
 		if err := l.adminHandler.DirectBanReport(ctx, update); err != nil {
 			log.Printf("[WARN] failed to process direct ban request: %v", err)
@@ -424,6 +443,23 @@ func (l *TelegramListener) procSuperReply(ctx context.Context, update tbapi.Upda
 		return true
 	}
 	return false
+}
+
+func splitCommand(text string) (cmd, arg string) {
+	fields := strings.Fields(strings.TrimSpace(text))
+	if len(fields) == 0 {
+		return "", ""
+	}
+	cmd = fields[0]
+	if len(fields) > 1 {
+		arg = fields[1]
+	}
+	return cmd, arg
+}
+
+func isBanCommand(cmd string) bool {
+	cmd = strings.TrimSpace(cmd)
+	return strings.EqualFold(cmd, "/ban") || strings.EqualFold(cmd, "ban")
 }
 
 // isReportCommand checks if message text is a /report command variant
