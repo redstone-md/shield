@@ -7,18 +7,20 @@ import (
 
 // Request is a request to check a message for spam.
 type Request struct {
-	Msg        string   `json:"msg"`         // message to check
-	UserID     string   `json:"user_id"`     // user id
-	UserName   string   `json:"user_name"`   // user name
-	FirstName  string   `json:"first_name"`  // user's first name
-	LastName   string   `json:"last_name"`   // user's last name
-	IsPremium  bool     `json:"is_premium"`  // true if user has telegram premium
-	Meta       MetaData `json:"meta"`        // meta-info, provided by the client
-	CheckOnly  bool     `json:"check_only"`  // if true, only check, don't write approved user
-	ForceLLM   bool     `json:"force_llm"`   // force LLM review
-	LLMContext string   `json:"llm_context"` // extra moderation context for LLM
-	ImageData  []byte   `json:"-"`           // downloaded image bytes for vision analysis
-	ImageMIME  string   `json:"-"`           // MIME type of the image (e.g. "image/jpeg")
+	Msg        string   `json:"msg"`                   // message to check
+	UserID     string   `json:"user_id"`               // user id
+	UserName   string   `json:"user_name"`             // user name
+	FirstName  string   `json:"first_name"`            // user's first name
+	LastName   string   `json:"last_name"`             // user's last name
+	IsPremium  bool     `json:"is_premium"`            // true if user has telegram premium
+	Meta       MetaData `json:"meta"`                  // meta-info, provided by the client
+	CheckOnly  bool     `json:"check_only"`            // if true, only check, don't write approved user
+	ForceLLM   bool     `json:"force_llm"`             // force LLM review
+	LLMContext string   `json:"llm_context"`           // extra moderation context for LLM
+	LLMMessage string   `json:"llm_message,omitempty"` // message text formatted for LLM, if different from Msg
+	HistoryMsg string   `json:"history_msg,omitempty"` // author text to keep in LLM chat history
+	ImageData  []byte   `json:"-"`                     // downloaded image bytes for vision analysis
+	ImageMIME  string   `json:"-"`                     // MIME type of the image (e.g. "image/jpeg")
 }
 
 // MetaData is a meta-info about the message, provided by the client.

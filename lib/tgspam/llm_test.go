@@ -23,9 +23,6 @@ func TestAppendHistoryToLLMMessage(t *testing.T) {
 				{Msg: "first message", UserName: "user1"},
 				{Msg: "second message", UserName: ""},
 			},
-			RecentUserMessages: []spamcheck.Request{
-				{Msg: "my previous message", UserName: "user1"},
-			},
 		}
 
 		got := appendHistoryToLLMMessage("current message", history)
@@ -33,15 +30,12 @@ func TestAppendHistoryToLLMMessage(t *testing.T) {
 		assert.Equal(t, `Moderation context:
 manual report
 
-User message:
+Current checked user message:
 current message
 
 Recent chat messages:
 "user1": "first message"
 "": "second message"
-
-Recent messages from the same user:
-"user1": "my previous message"
 `, got)
 	})
 }
@@ -73,7 +67,7 @@ func TestRunLLMProviderCheck(t *testing.T) {
 			Name: "gemini", ErrorPrefix: "Gemini", RetryCount: 3, Msg: "current", History: history,
 			Send: func(_ context.Context, msg string) (llmResponse, error) {
 				calls++
-				assert.Equal(t, "User message:\ncurrent\n\nRecent chat messages:\n\"alice\": \"prev\"\n", msg)
+				assert.Equal(t, "Current checked user message:\ncurrent\n\nRecent chat messages:\n\"alice\": \"prev\"\n", msg)
 				if calls < 3 {
 					return llmResponse{}, errors.New("temporary failure")
 				}

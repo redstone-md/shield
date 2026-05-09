@@ -128,11 +128,14 @@ func (s *SpamFilter) OnMessageWithContext(ctx context.Context, msg Message, chec
 	// include quoted/reply-to text in spam check - spammers use quotes from external channels to spread spam
 	// quote (TextQuote) takes precedence over ReplyTo.Text as it contains the actual quoted portion
 	msgText := msg.Text
+	llmText := msg.Text
 	switch {
 	case msg.Quote != "":
 		msgText = msg.Text + "\n" + msg.Quote
+		llmText = currentMessageWithContext(msg.Text, "Quoted text selected by the sender", msg.Quote)
 	case msg.ReplyTo.Text != "":
 		msgText = msg.Text + "\n" + msg.ReplyTo.Text
+		llmText = currentMessageWithContext(msg.Text, "Replied-to message context, not part of the current message", msg.ReplyTo.Text)
 	}
 
 	// use channel identity for spam check when message is from a channel,
@@ -150,6 +153,12 @@ func (s *SpamFilter) OnMessageWithContext(ctx context.Context, msg Message, chec
 		UserID: strconv.FormatInt(checkUserID, 10), UserName: checkUserName,
 		FirstName: firstName, LastName: lastName, IsPremium: isPremium,
 		ForceLLM: msg.ForceLLM, LLMContext: msg.LLMContext}
+	if llmText != msgText {
+		spamReq.LLMMessage = llmText
+	}
+	if msg.Text != msgText {
+		spamReq.HistoryMsg = msg.Text
+	}
 	if msg.Image != nil {
 		spamReq.Meta.Images = 1
 	}
@@ -239,6 +248,10 @@ func spamVerdictText(results []spamcheck.Response, fallback string) string {
 		}
 	}
 	return fallback
+}
+
+func currentMessageWithContext(current, label, contextText string) string {
+	return fmt.Sprintf("Current message text:\n%s\n\n%s:\n%s", current, label, contextText)
 }
 
 // UpdateSpam appends a message to the spam samples file and updates the classifier

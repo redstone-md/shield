@@ -20,7 +20,6 @@ type llmResponse struct {
 type llmContext struct {
 	RequestContext     string
 	RecentChatMessages []spamcheck.Request
-	RecentUserMessages []spamcheck.Request
 }
 
 const maxLLMProviderRetries = 20
@@ -76,7 +75,7 @@ func runLLMProviderCheck(ctx context.Context, p llmCheckParams) (spam bool, cr s
 }
 
 func appendHistoryToLLMMessage(msg string, history llmContext) string {
-	if history.RequestContext == "" && len(history.RecentChatMessages) == 0 && len(history.RecentUserMessages) == 0 {
+	if history.RequestContext == "" && len(history.RecentChatMessages) == 0 {
 		return msg
 	}
 
@@ -86,7 +85,7 @@ func appendHistoryToLLMMessage(msg string, history llmContext) string {
 		sb.WriteString(history.RequestContext)
 		sb.WriteString("\n\n")
 	}
-	sb.WriteString("User message:\n")
+	sb.WriteString("Current checked user message:\n")
 	sb.WriteString(msg)
 
 	if len(history.RecentChatMessages) > 0 {
@@ -95,22 +94,19 @@ func appendHistoryToLLMMessage(msg string, history llmContext) string {
 			if i > 0 {
 				sb.WriteByte('\n')
 			}
-			sb.WriteString(fmt.Sprintf("%q: %q", h.UserName, h.Msg))
-		}
-	}
-
-	if len(history.RecentUserMessages) > 0 {
-		sb.WriteString("\n\nRecent messages from the same user:\n")
-		for i, h := range history.RecentUserMessages {
-			if i > 0 {
-				sb.WriteByte('\n')
-			}
-			sb.WriteString(fmt.Sprintf("%q: %q", h.UserName, h.Msg))
+			sb.WriteString(fmt.Sprintf("%q: %q", h.UserName, llmHistoryMessage(h)))
 		}
 	}
 
 	sb.WriteByte('\n')
 	return sb.String()
+}
+
+func llmHistoryMessage(req spamcheck.Request) string {
+	if req.HistoryMsg != "" {
+		return req.HistoryMsg
+	}
+	return req.Msg
 }
 
 func parseLLMResponse(content string) (llmResponse, error) {

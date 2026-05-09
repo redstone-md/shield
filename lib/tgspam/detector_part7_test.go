@@ -183,7 +183,7 @@ func TestDetector_CheckWithLLMInParanoidMode(t *testing.T) {
 	assert.NotNil(t, findResponseByName(cr, "openai"))
 }
 
-func TestDetector_LLMContextIncludesChatAndUserHistory(t *testing.T) {
+func TestDetector_LLMContextIncludesLastFiveChatMessages(t *testing.T) {
 	d := NewDetector(Config{MaxAllowedEmoji: -1, MinMsgLen: 5})
 	var captured string
 	openAIMock := &mocks.OpenAIClientMock{
@@ -214,10 +214,13 @@ func TestDetector_LLMContextIncludesChatAndUserHistory(t *testing.T) {
 
 	_, _ = d.Check(spamcheck.Request{Msg: "trigger message", UserID: "42", UserName: "u42"})
 	assert.Contains(t, captured, "Recent chat messages:")
-	assert.Contains(t, captured, "Recent messages from the same user:")
-	assert.Contains(t, captured, `"u42": "msg-0"`)
+	assert.NotContains(t, captured, `"u42": "msg-0"`)
+	assert.Contains(t, captured, `"other": "msg-1"`)
 	assert.Contains(t, captured, `"u42": "msg-2"`)
+	assert.Contains(t, captured, `"other": "msg-3"`)
 	assert.Contains(t, captured, `"u42": "msg-4"`)
+	assert.Contains(t, captured, `"other": "msg-5"`)
+	assert.NotContains(t, captured, "Recent messages from the same user:")
 }
 
 func TestDetector_CheckWithLLMConsensus(t *testing.T) {

@@ -201,8 +201,8 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 	}
 
 	cleanMsg := d.cleanText(req.Msg)
-	d.lock.RLock()
-	defer d.lock.RUnlock()
+	d.lock.Lock()
+	defer d.lock.Unlock()
 
 	// check for duplicate messages FIRST - behavioral check that applies to all users
 	if d.duplicateDetector != nil {
@@ -400,7 +400,11 @@ func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []
 	ctx, cancel := d.ctxWithLLMTimeout()
 	defer cancel()
 
-	spam, details := cfg.check(ctx, cleanMsg, hist)
+	llmMsg := cleanMsg
+	if req.LLMMessage != "" {
+		llmMsg = req.LLMMessage
+	}
+	spam, details := cfg.check(ctx, llmMsg, hist)
 	if baseSpam && details.Error != nil {
 		log.Printf("[WARN] %s error: %v", cfg.name, details.Error)
 	}
@@ -428,14 +432,6 @@ func (d *Detector) llmContextForRequest(req spamcheck.Request) llmContext {
 	ctx := llmContext{
 		RequestContext:     req.LLMContext,
 		RecentChatMessages: d.llmHistory.Last(llmChatContextSize),
-	}
-
-	if req.UserID == "" {
-		return ctx
-	}
-
-	if h, ok := d.userHistory[req.UserID]; ok {
-		ctx.RecentUserMessages = h.Last(llmUserContextSize)
 	}
 	return ctx
 }

@@ -199,7 +199,7 @@ func TestOpenAIChecker_FormatMessage(t *testing.T) {
 				{Msg: "first message", UserName: "user1"},
 				{Msg: "second message", UserName: "user2"},
 			}},
-			expectedMessage: `User message:
+			expectedMessage: `Current checked user message:
 current message
 
 Recent chat messages:
@@ -214,33 +214,12 @@ Recent chat messages:
 				{Msg: "first message", UserName: ""},
 				{Msg: "second message", UserName: "user2"},
 			}},
-			expectedMessage: `User message:
+			expectedMessage: `Current checked user message:
 current message
 
 Recent chat messages:
 "": "first message"
 "user2": "second message"
-`,
-		},
-		{
-			name:       "message with chat and same-user history",
-			currentMsg: "current message",
-			history: llmContext{
-				RecentChatMessages: []spamcheck.Request{
-					{Msg: "chat one", UserName: "user1"},
-				},
-				RecentUserMessages: []spamcheck.Request{
-					{Msg: "user one", UserName: "user1"},
-				},
-			},
-			expectedMessage: `User message:
-current message
-
-Recent chat messages:
-"user1": "chat one"
-
-Recent messages from the same user:
-"user1": "user one"
 `,
 		},
 	}

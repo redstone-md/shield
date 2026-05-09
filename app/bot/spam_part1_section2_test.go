@@ -59,9 +59,11 @@ func TestSpamFilter_OnMessage_SpamInQuotedReplyToTextFromExternalChannel(t *test
 			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
 		},
 		wantRequest: spamcheck.Request{
-			Msg:      "Есть в наличии\nМефедрон VHQ Кристалл 1г",
-			UserID:   "1",
-			UserName: "user1",
+			Msg:        "Есть в наличии\nМефедрон VHQ Кристалл 1г",
+			UserID:     "1",
+			UserName:   "user1",
+			LLMMessage: "Current message text:\nЕсть в наличии\n\nReplied-to message context, not part of the current message:\nМефедрон VHQ Кристалл 1г",
+			HistoryMsg: "Есть в наличии",
 		},
 	})
 }
@@ -123,9 +125,10 @@ func TestSpamFilter_OnMessage_EmptyMainTextWithSpamInReplyTo(t *testing.T) {
 			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
 		},
 		wantRequest: spamcheck.Request{
-			Msg:      "\nspam in quoted message",
-			UserID:   "1",
-			UserName: "user1",
+			Msg:        "\nspam in quoted message",
+			UserID:     "1",
+			UserName:   "user1",
+			LLMMessage: "Current message text:\n\n\nReplied-to message context, not part of the current message:\nspam in quoted message",
 		},
 	})
 }
@@ -147,9 +150,11 @@ func TestSpamFilter_OnMessage_SpamInQuoteFieldTelegramTextquote(t *testing.T) {
 			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
 		},
 		wantRequest: spamcheck.Request{
-			Msg:      "Мяу в наличии!\nМефедрон VHQ Кристалл 1г",
-			UserID:   "1",
-			UserName: "user1",
+			Msg:        "Мяу в наличии!\nМефедрон VHQ Кристалл 1г",
+			UserID:     "1",
+			UserName:   "user1",
+			LLMMessage: "Current message text:\nМяу в наличии!\n\nQuoted text selected by the sender:\nМефедрон VHQ Кристалл 1г",
+			HistoryMsg: "Мяу в наличии!",
 		},
 	})
 }
@@ -223,9 +228,11 @@ func TestSpamFilter_OnMessage_BothQuoteAndReplytoTextPresentQuoteTakesPrecedence
 			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
 		},
 		wantRequest: spamcheck.Request{
-			Msg:      "check this\nspam quote text",
-			UserID:   "1",
-			UserName: "user1",
+			Msg:        "check this\nspam quote text",
+			UserID:     "1",
+			UserName:   "user1",
+			LLMMessage: "Current message text:\ncheck this\n\nQuoted text selected by the sender:\nspam quote text",
+			HistoryMsg: "check this",
 		},
 	})
 }
