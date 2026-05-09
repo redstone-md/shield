@@ -151,6 +151,8 @@ func TestEngineWithPromptRegistry(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.False(t, result.Spam)
+	assert.Equal(t, "custom prompt", provider.req.SystemPrompt)
+	assert.Equal(t, "v2", provider.req.PromptVersion)
 }
 
 func TestEngineInvocationFromResult(t *testing.T) {
@@ -206,10 +208,12 @@ type stubLLMProvider struct {
 	name   string
 	result *ProviderResult
 	err    error
+	req    ProviderRequest
 }
 
 func (s *stubLLMProvider) Name() string { return s.name }
-func (s *stubLLMProvider) Check(_ context.Context, _ ProviderRequest) (*ProviderResult, error) {
+func (s *stubLLMProvider) Check(_ context.Context, req ProviderRequest) (*ProviderResult, error) {
+	s.req = req
 	return s.result, s.err
 }
 

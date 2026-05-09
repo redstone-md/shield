@@ -68,6 +68,7 @@ The bot is configured through command-line flags or environment variables. Out o
 | `OPENAI_TOKEN` | `--openai.token` | Enable OpenAI text and vision checks |
 | `OPENAI_API_BASE` | `--openai.apibase` | Custom OpenAI-compatible endpoint |
 | `GEMINI_TOKEN` | `--gemini.token` | Enable Gemini text and vision checks |
+| `FILES_DYNAMIC` | `--files.dynamic` | Dynamic data directory; put `prompt-override.md` here to override the slow-path system prompt |
 | `LLM_CONSENSUS` | `--llm.consensus` | `any` or `all` when multiple LLMs are eligible |
 | `REPORT_ENABLED` | `--report.enabled` | Enable user `/report` flow |
 | `SERVER_ENABLED` | `--server.enabled` | Enable HTTP server/API/UI |
@@ -138,6 +139,30 @@ When multiple LLM providers are eligible for the same message, Shield resolves t
 - `any` (default): if any eligible LLM disagrees with the base decision, the base decision flips.
 - `all`: all eligible LLMs must agree before the base decision flips.
 - Each request is subject to `--llm.request-timeout` (default 30s).
+
+### Custom slow-path system prompt
+
+To override the built-in slow-path text system prompt, create `prompt-override.md` in the dynamic data directory. With the Docker quick start this means `./data/prompt-override.md`, mounted as `/srv/data/prompt-override.md` in the container. The same file is used for OpenAI and Gemini slow-path text checks.
+
+Explicit provider prompts have higher priority than the file: `--openai.prompt` or `OPENAI_PROMPT` wins for OpenAI, and `--gemini.prompt` or `GEMINI_PROMPT` wins for Gemini. If neither an explicit provider prompt nor `prompt-override.md` is present, Shield uses the built-in default prompt.
+
+The custom system prompt must preserve the response contract expected by Shield:
+
+- Return only valid JSON, with no Markdown fences or explanatory text outside JSON.
+- Use exactly these fields: `spam` as boolean, `reason` as short string, and `confidence` as integer from 1 to 100.
+- Keep the same decision meaning: mark spam only when confidence is above 80.
+- Write `reason` in the language your moderators expect; the built-in prompt uses Russian.
+- Include your local spam priorities, such as crypto exchange ads, illegal work, repeated ads, fraud, abuse, drugs, suspicious links, QR-code scams, and emoji spam.
+- Do not ask the model to reveal hidden reasoning; keep the reason concise and operator-readable.
+
+Minimal example:
+
+```md
+Return only JSON: {"spam":true/false,"reason":"why","confidence":1-100}.
+Spam only if confidence > 80.
+This is a Russian-speaking Telegram chat, write reason in Russian.
+Prioritize crypto exchange ads, illegal work, repeated ads, fraud, suspicious links, drugs, abuse, and emoji spam.
+```
 
 ### Emoji count
 
