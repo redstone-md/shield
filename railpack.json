@@ -6,13 +6,36 @@
   },
   "steps": {
     "build": {
+      "inputs": [
+        {
+          "local": true,
+          "include": [
+            "."
+          ]
+        }
+      ],
       "commands": [
-        "...",
+        "go mod download",
         "go build -o out ./app"
+      ],
+      "deployOutputs": [
+        {
+          "include": [
+            "out"
+          ]
+        }
       ]
     }
   },
   "deploy": {
+    "inputs": [
+      {
+        "step": "build",
+        "include": [
+          "out"
+        ]
+      }
+    ],
     "startCommand": "./out"
   }
 }
