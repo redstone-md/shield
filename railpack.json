@@ -12,6 +12,15 @@
     }
   },
   "deploy": {
-    "startCommand": "./out"
+    "inputs": [
+      "...",
+      {
+        "step": "build",
+        "include": [
+          "data"
+        ]
+      }
+    ],
+    "startCommand": "sh -c 'set -e; data_dir=${FILES_DYNAMIC:-data}; mkdir -p \"$data_dir\"; if [ \"$data_dir\" != data ] && [ ! -f \"$data_dir/tg-spam.db\" ]; then for f in data/*.txt; do dest=\"$data_dir/${f##*/}\"; [ -e \"$dest\" ] || cp \"$f\" \"$dest\"; done; fi; exec ./out'"
   }
 }
