@@ -57,6 +57,28 @@ func TestImageDownloader_download_defaultMime(t *testing.T) {
 	assert.Equal(t, "image/jpeg", mime)
 }
 
+func TestImageDownloader_download_prefersDetectedImageMime(t *testing.T) {
+	webpData := []byte("RIFF\x1a\x00\x00\x00WEBPVP8 ")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write(webpData)
+	}))
+	defer srv.Close()
+
+	mockAPI := &mocks.TbAPIMock{
+		GetFileDirectURLFunc: func(fileID string) (string, error) {
+			return srv.URL + "/file.jpg", nil
+		},
+	}
+
+	d := newImageDownloader(mockAPI)
+	data, mime, err := d.download(context.Background(), "fid")
+
+	require.NoError(t, err)
+	assert.Equal(t, webpData, data)
+	assert.Equal(t, "image/webp", mime)
+}
+
 func TestImageDownloader_download_getURLFails(t *testing.T) {
 	mockAPI := &mocks.TbAPIMock{
 		GetFileDirectURLFunc: func(fileID string) (string, error) {

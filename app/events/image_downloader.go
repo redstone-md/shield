@@ -60,9 +60,9 @@ func (d *imageDownloader) download(ctx context.Context, fileID string) ([]byte, 
 		return nil, "", fmt.Errorf("file exceeds max size: %d", d.maxSize)
 	}
 
-	mime := resp.Header.Get("Content-Type")
+	mime := http.DetectContentType(data)
 	if !strings.HasPrefix(mime, "image/") {
-		mime = http.DetectContentType(data)
+		mime = resp.Header.Get("Content-Type")
 	}
 	if !strings.HasPrefix(mime, "image/") {
 		mime = "image/jpeg"

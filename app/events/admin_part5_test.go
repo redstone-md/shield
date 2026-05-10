@@ -735,8 +735,9 @@ func TestTelegramListener_AdminChatDemoCheckUsesSlowPathForSticker(t *testing.T)
 	require.Len(t, mockAPI.SendCalls(), 1)
 	sent := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
 	assert.Contains(t, sent.Text, "сообщение НЕ пройдет")
-	assert.Contains(t, sent.Text, "slowpath")
+	assert.Contains(t, sent.Text, "vision: spam")
 	assert.Contains(t, sent.Text, "vision sticker spam")
+	assert.Contains(t, sent.Text, "confidence: 91%")
 }
 
 func TestTelegramListener_AdminChatDemoCheckUsesSlowPathForGIF(t *testing.T) {
@@ -777,6 +778,55 @@ func TestTelegramListener_AdminChatDemoCheckUsesSlowPathForGIF(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, slowSpy.calls, 1)
 	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "gif spam")
+}
+
+func TestTelegramListener_AdminChatDemoCheckShowsSlowPathHamSummary(t *testing.T) {
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("jpeg frame"))
+	}))
+	defer imgSrv.Close()
+
+	slowSpy := &slowPathCheckerSpy{check: func(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
+		assert.Equal(t, slowpath.EscalationImageContent, req.Reason)
+		return &slowpath.SlowPathResult{
+			Spam:       false,
+			Confidence: 15,
+			Reason:     "Упоминание другого пользователя без рекламного или оскорбительного содержания не считается спамом",
+			Providers:  []string{"openai"},
+		}, nil
+	}}
+	mockAPI := &mocks.TbAPIMock{
+		GetFileDirectURLFunc: func(fileID string) (string, error) {
+			assert.Equal(t, "image-file", fileID)
+			return imgSrv.URL, nil
+		},
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{MessageID: 102}, nil },
+	}
+	botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+		assert.True(t, checkOnly)
+		assert.NotNil(t, msg.Image)
+		return bot.Response{}
+	}}
+
+	l := TelegramListener{TbAPI: mockAPI, Bot: botMock, SuperUsers: SuperUsers{"admin"}, SlowPathEnabled: true,
+		SlowPathEngine: slowSpy, TenantID: "tg-spam", adminChatID: 456}
+	l.adminHandler = &admin{tbAPI: mockAPI, bot: botMock, adminChatID: 456, mediaSlowPath: l.mediaSlowPathConfig()}
+
+	err := l.handleUpdate(context.Background(), tbapi.Update{Message: &tbapi.Message{
+		MessageID: 12,
+		Chat:      tbapi.Chat{ID: 456},
+		From:      &tbapi.User{UserName: "admin", ID: 1},
+		Photo:     []tbapi.PhotoSize{{FileID: "image-file", Width: 256, Height: 256}},
+	}})
+	require.NoError(t, err)
+	require.Len(t, slowSpy.calls, 1)
+	require.Len(t, mockAPI.SendCalls(), 1)
+	sent := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
+	assert.Contains(t, sent, "сообщение пройдет")
+	assert.Contains(t, sent, "openai: ham")
+	assert.Contains(t, sent, "Упоминание другого пользователя")
+	assert.Contains(t, sent, "confidence: 15%")
 }
 
 func TestTelegramListener_AdminChatDemoCheckUsesSlowPathForCustomEmoji(t *testing.T) {
@@ -852,5 +902,28 @@ func TestApplyMediaSlowPathRetriesRetryableErrors(t *testing.T) {
 	assert.Equal(t, 2, attempts)
 	assert.Equal(t, []time.Duration{3 * time.Second}, sleeps)
 	require.Len(t, resp.CheckResults, 1)
-	assert.Equal(t, "retried spam", resp.CheckResults[0].Details)
+	assert.Equal(t, "retried spam, confidence: 91%", resp.CheckResults[0].Details)
+}
+
+func TestApplyMediaSlowPathReportsSlowPathError(t *testing.T) {
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("jpeg frame"))
+	}))
+	defer imgSrv.Close()
+
+	slowSpy := &slowPathCheckerSpy{check: func(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
+		return nil, errors.New("openai vision: error, status code: 400")
+	}}
+	mockAPI := &mocks.TbAPIMock{GetFileDirectURLFunc: func(fileID string) (string, error) { return imgSrv.URL, nil }}
+	cfg := mediaSlowPathConfig{enabled: true, api: mockAPI, engine: slowSpy, tenantID: "tg-spam"}
+
+	resp := applyMediaSlowPath(context.Background(), cfg, moderation.IncomingEvent{EventID: "e1"},
+		&bot.Message{ID: 42, From: bot.User{ID: 1}, Image: &bot.Image{FileID: "image-file"}}, bot.Response{})
+
+	assert.False(t, resp.Send)
+	require.Len(t, resp.CheckResults, 1)
+	assert.Equal(t, "slowpath", resp.CheckResults[0].Name)
+	assert.False(t, resp.CheckResults[0].Spam)
+	assert.Contains(t, resp.CheckResults[0].Details, "openai vision: error, status code: 400")
 }

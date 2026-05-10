@@ -201,6 +201,7 @@ func applyMediaSlowPath(ctx context.Context, cfg mediaSlowPathConfig, event mode
 
 	if slowErr != nil {
 		observability.Logf(ctx, "[WARN] slowpath check failed: %v", slowErr)
+		resp.CheckResults = append(resp.CheckResults, slowPathErrorCheck(slowErr))
 		return resp
 	}
 	if slowResult == nil {
@@ -210,7 +211,11 @@ func applyMediaSlowPath(ctx context.Context, cfg mediaSlowPathConfig, event mode
 
 	observability.Logf(ctx, "[INFO] slowpath completed: skipped=%v spam=%v confidence=%d providers=%s reason=%s",
 		slowResult.Skipped, slowResult.Spam, slowResult.Confidence, strings.Join(slowResult.Providers, ","), slowResult.Reason)
-	if slowResult.Skipped || !slowResult.Spam {
+	if slowResult.Skipped {
+		return resp
+	}
+	resp.CheckResults = append(resp.CheckResults, slowPathCheckResponses(slowResult)...)
+	if !slowResult.Spam {
 		return resp
 	}
 
@@ -221,12 +226,48 @@ func applyMediaSlowPath(ctx context.Context, cfg mediaSlowPathConfig, event mode
 	resp.Send = true
 	resp.User = msg.From
 	resp.ReplyTo = msg.ID
-	resp.CheckResults = append(resp.CheckResults, spamcheck.Response{
-		Name:    "slowpath",
-		Spam:    true,
-		Details: slowResult.Reason,
-	})
 	return resp
+}
+
+func slowPathCheckResponses(result *slowpath.SlowPathResult) []spamcheck.Response {
+	if len(result.Signals) > 0 {
+		checks := make([]spamcheck.Response, 0, len(result.Signals))
+		for _, signal := range result.Signals {
+			checks = append(checks, spamcheck.Response{
+				Name:    slowPathCheckName(signal.Provider),
+				Spam:    signal.Spam,
+				Details: slowPathCheckDetails(signal.Reason, signal.Confidence),
+			})
+		}
+		return checks
+	}
+
+	return []spamcheck.Response{{
+		Name:    slowPathCheckName(strings.Join(result.Providers, ",")),
+		Spam:    result.Spam,
+		Details: slowPathCheckDetails(result.Reason, result.Confidence),
+	}}
+}
+
+func slowPathErrorCheck(err error) spamcheck.Response {
+	return spamcheck.Response{Name: "slowpath", Spam: false, Details: "error: " + err.Error(), Error: err}
+}
+
+func slowPathCheckName(provider string) string {
+	provider = strings.TrimSpace(provider)
+	if provider == "" {
+		return "slowpath"
+	}
+	return provider
+}
+
+func slowPathCheckDetails(reason string, confidence int) string {
+	reason = strings.TrimSpace(reason)
+	confidenceText := fmt.Sprintf("confidence: %d%%", confidence)
+	if reason == "" {
+		return confidenceText
+	}
+	return reason + ", " + confidenceText
 }
 
 func mediaSlowPathFile(ctx context.Context, cfg mediaSlowPathConfig, msg *bot.Message) (string, slowpath.EscalationReason) {
