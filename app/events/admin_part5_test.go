@@ -3,14 +3,18 @@ package events
 import (
 	"context"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/events/mocks"
+	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/lib/spamcheck"
-	"testing"
 )
 
 func TestAdmin_MsgHandler(t *testing.T) {
@@ -24,7 +28,15 @@ func TestAdmin_MsgHandler(t *testing.T) {
 			},
 		}
 
-		botMock := &mocks.BotMock{}
+		botMock := &mocks.BotMock{
+			OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+				assert.True(t, checkOnly)
+				assert.Equal(t, "regular message", msg.Text)
+				return bot.Response{CheckResults: []spamcheck.Response{
+					{Name: "message length", Spam: false, Details: "ok"},
+				}}
+			},
+		}
 		locatorMock := &mocks.LocatorMock{}
 
 		adminHandler := admin{
@@ -47,8 +59,62 @@ func TestAdmin_MsgHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Empty(t, mockAPI.RequestCalls())
-		assert.Empty(t, mockAPI.SendCalls())
+		require.Len(t, mockAPI.SendCalls(), 1)
+		sent, ok := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		require.True(t, ok)
+		assert.Equal(t, int64(456), sent.ChatID)
+		assert.Contains(t, sent.Text, "демо-проверка")
+		assert.Contains(t, sent.Text, "сообщение пройдет")
+		assert.Contains(t, sent.Text, "message length")
 		assert.Empty(t, botMock.UpdateSpamCalls())
+		assert.Empty(t, botMock.RemoveApprovedUserCalls())
+	})
+
+	t.Run("non-forwarded spam message is diagnostic only", func(t *testing.T) {
+		mockAPI := &mocks.TbAPIMock{
+			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+				return tbapi.Message{Text: "test"}, nil
+			},
+		}
+
+		botMock := &mocks.BotMock{
+			OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+				assert.True(t, checkOnly)
+				return bot.Response{
+					Send:        true,
+					BanInterval: bot.PermanentBanDuration,
+					CheckResults: []spamcheck.Response{
+						{Name: "stop-word", Spam: true, Details: "matched casino"},
+					},
+				}
+			},
+			UpdateSpamFunc: func(msg string) error {
+				return nil
+			},
+			RemoveApprovedUserFunc: func(id int64) error {
+				return nil
+			},
+		}
+
+		adm := admin{tbAPI: mockAPI, bot: botMock, locator: &mocks.LocatorMock{}, primChatID: 123, adminChatID: 456}
+		msg := &tbapi.Message{
+			MessageID: 789,
+			Chat:      tbapi.Chat{ID: 456},
+			From:      &tbapi.User{UserName: "admin", ID: 123},
+			Text:      "casino spam",
+		}
+
+		err := adm.MsgHandler(context.Background(), tbapi.Update{Message: msg})
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		sent := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+		assert.Contains(t, sent.Text, "сообщение НЕ пройдет")
+		assert.Contains(t, sent.Text, "stop-word")
+		assert.Contains(t, sent.Text, "matched casino")
+		assert.Empty(t, mockAPI.RequestCalls())
+		assert.Empty(t, botMock.UpdateSpamCalls())
+		assert.Empty(t, botMock.RemoveApprovedUserCalls())
 	})
 
 	t.Run("forwarded message from super-user", func(t *testing.T) {
@@ -481,4 +547,79 @@ func TestAdmin_MsgHandler(t *testing.T) {
 		assert.GreaterOrEqual(t, len(mockAPI.RequestCalls()), 2, "Should request to delete the message and ban user")
 		assert.Len(t, botMock.UpdateSpamCalls(), 1, "Should update spam samples")
 	})
+}
+
+func TestTelegramListener_AdminChatPlainMessageDemoCheck(t *testing.T) {
+	callOrder := make([]string, 0, 2)
+	mockAPI := &mocks.TbAPIMock{
+		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
+			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: config.ChatID}}, nil
+		},
+		GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
+			return []tbapi.ChatMember{{User: &tbapi.User{UserName: "admin", ID: 1}}}, nil
+		},
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			callOrder = append(callOrder, "send")
+			return tbapi.Message{MessageID: 100}, nil
+		},
+		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+			t.Fatalf("admin demo check must not call Request: %T", c)
+			return nil, nil
+		},
+	}
+
+	botMock := &mocks.BotMock{
+		OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+			callOrder = append(callOrder, "detect")
+			assert.True(t, checkOnly)
+			assert.Equal(t, "buy casino", msg.Text)
+			return bot.Response{Send: true, BanInterval: bot.PermanentBanDuration, CheckResults: []spamcheck.Response{
+				{Name: "stop-word", Spam: true, Details: "casino"},
+			}}
+		},
+	}
+	policySpy := &policyEngineSpy{decide: func(ctx context.Context, req PolicyRequest) (PolicyOutcome, error) {
+		return PolicyOutcome{Decision: moderation.PolicyDecision{Action: moderation.ActionBan}}, nil
+	}}
+	actionSpy := &actionExecutorSpy{}
+
+	l := TelegramListener{
+		TbAPI:          mockAPI,
+		Bot:            botMock,
+		SuperUsers:     SuperUsers{"admin"},
+		Group:          "123",
+		AdminGroup:     "456",
+		Locator:        &locatorContextSpy{},
+		PolicyEngine:   policySpy,
+		ActionExecutor: actionSpy,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	updates := make(chan tbapi.Update, 1)
+	updates <- tbapi.Update{Message: &tbapi.Message{
+		MessageID: 10,
+		Chat:      tbapi.Chat{ID: 456},
+		From:      &tbapi.User{UserName: "admin", ID: 1},
+		Text:      "buy casino",
+		Date:      int(time.Now().Unix()),
+	}}
+	close(updates)
+	mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updates }
+
+	err := l.Do(ctx)
+	require.EqualError(t, err, "telegram update chan closed")
+
+	assert.Equal(t, []string{"detect", "send"}, callOrder)
+	assert.Empty(t, policySpy.calls)
+	assert.Empty(t, actionSpy.banCalls)
+	assert.Empty(t, actionSpy.warnCalls)
+	assert.Empty(t, actionSpy.deleteMessageCalls)
+	assert.Empty(t, botMock.UpdateSpamCalls())
+
+	require.Len(t, mockAPI.SendCalls(), 1)
+	sent := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+	assert.Equal(t, int64(456), sent.ChatID)
+	assert.True(t, strings.Contains(sent.Text, "сообщение НЕ пройдет"), sent.Text)
 }

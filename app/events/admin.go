@@ -167,7 +167,7 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 		username, fwdID)
 
 	if username == "" && update.Message.ForwardOrigin == nil {
-		return nil
+		return a.demoCheck(update)
 	}
 
 	msgTxt := update.Message.Text
@@ -259,6 +259,54 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 		return fmt.Errorf("spam notification failed: %w", err)
 	}
 	return nil
+}
+
+func (a *admin) demoCheck(update tbapi.Update) error {
+	msg := transform(update.Message)
+	if strings.TrimSpace(msg.Text) == "" && msg.Image == nil && !msg.WithVideoNote && !msg.WithVideo && !msg.WithSticker {
+		return nil
+	}
+
+	resp := a.bot.OnMessage(*msg, true)
+	status := "сообщение пройдет"
+	if resp.Send && resp.BanInterval > 0 {
+		status = "сообщение НЕ пройдет"
+	}
+
+	checks := make([]string, 0, len(resp.CheckResults))
+	for _, check := range resp.CheckResults {
+		checks = append(checks, "- "+escapeMarkDownV1Text(check.String()))
+	}
+	checksText := "проверки не вернули диагностических сигналов"
+	if len(checks) > 0 {
+		checksText = strings.Join(checks, "\n")
+	}
+
+	msgText := msg.Text
+	if msgText == "" {
+		msgText = adminDemoContentLabel(msg)
+	}
+	text := fmt.Sprintf("**демо-проверка**: %s\n\n%s\n\n%s",
+		escapeMarkDownV1Text(status), escapeMarkDownV1Text(msgText), checksText)
+	if err := send(tbapi.NewMessage(a.adminChatID, text), a.tbAPI); err != nil {
+		return fmt.Errorf("failed to send demo check results to admin chat: %w", err)
+	}
+	return nil
+}
+
+func adminDemoContentLabel(msg *bot.Message) string {
+	switch {
+	case msg.WithSticker:
+		return "[sticker]"
+	case msg.Image != nil:
+		return "[image]"
+	case msg.WithVideo:
+		return "[video]"
+	case msg.WithVideoNote:
+		return "[video note]"
+	default:
+		return "[message]"
+	}
 }
 
 func (a *admin) msgHandlerFallback(ctx context.Context, update tbapi.Update, fwdID int64, username, msgTxt string) error {
