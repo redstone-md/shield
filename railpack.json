@@ -7,7 +7,7 @@
   "steps": {
     "build": {
       "commands": [
-        "go build -o out -ldflags=\"-w -s\" ./app"
+        "go build -o out ./app"
       ]
     }
   },
