@@ -2,8 +2,10 @@ package slowpath
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -63,7 +65,6 @@ func (a *OpenAIAdapter) Check(ctx context.Context, req ProviderRequest) (*Provid
 		MaxTokens:      a.maxTokens,
 		ResponseFormat: &openai.ChatCompletionResponseFormat{Type: "json_object"},
 	}
-
 	resp, err := a.client.CreateChatCompletion(ctx, chatReq)
 	if err != nil {
 		return nil, fmt.Errorf("openai chat completion: %w", err)
@@ -124,6 +125,7 @@ func (a *OpenAIAdapter) AnalyzeImage(ctx context.Context, imageData []byte, mime
 		MaxTokens:      a.maxTokens,
 		ResponseFormat: &openai.ChatCompletionResponseFormat{Type: "json_object"},
 	}
+	logVisionPayloadDebug(a.model, mime, imageData, b64URL, prompt, chatReq)
 
 	resp, err := a.client.CreateChatCompletion(ctx, chatReq)
 	if err != nil {
@@ -151,6 +153,16 @@ func (a *OpenAIAdapter) AnalyzeImage(ctx context.Context, imageData []byte, mime
 		Latency:      time.Since(start),
 		RawResponse:  content,
 	}, nil
+}
+
+func logVisionPayloadDebug(model string, mime string, imageData []byte, dataURL string, prompt string, req openai.ChatCompletionRequest) {
+	headLen := min(len(imageData), 64)
+	urlPreviewLen := min(len(dataURL), 160)
+	sum := sha256.Sum256(imageData)
+	log.Printf(
+		"[DEBUG] openai vision payload: model=%q max_tokens=%d response_format=%q messages=%d prompt_len=%d mime=%q image_bytes=%d image_sha256=%x image_head_hex=%x data_url_len=%d data_url_prefix=%q",
+		model, req.MaxTokens, req.ResponseFormat.Type, len(req.Messages), len(prompt), mime, len(imageData), sum, imageData[:headLen], len(dataURL), dataURL[:urlPreviewLen],
+	)
 }
 
 func (a *OpenAIAdapter) truncateMessage(msg string, fullMsg string) string {
