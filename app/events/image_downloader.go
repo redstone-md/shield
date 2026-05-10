@@ -64,21 +64,28 @@ func (d *imageDownloader) download(ctx context.Context, fileID string) ([]byte, 
 		return nil, "", fmt.Errorf("file exceeds max size: %d", d.maxSize)
 	}
 
-	mime := http.DetectContentType(data)
+	detectedMime := http.DetectContentType(data)
+	mime := detectedMime
 	if !strings.HasPrefix(mime, "image/") {
 		mime = resp.Header.Get("Content-Type")
 	}
 	if !strings.HasPrefix(mime, "image/") {
 		mime = "image/jpeg"
 	}
-	if mime == "image/webp" {
+	if detectedMime == "image/webp" {
 		data, mime, err = convertWebPToJPEG(data)
 		if err != nil {
 			return nil, "", err
 		}
-		if int64(len(data)) > d.maxSize {
-			return nil, "", fmt.Errorf("converted file exceeds max size: %d", d.maxSize)
+	}
+	if detectedMime == "image/jpeg" {
+		data, mime, err = normalizeJPEG(data)
+		if err != nil {
+			return nil, "", err
 		}
+	}
+	if int64(len(data)) > d.maxSize {
+		return nil, "", fmt.Errorf("converted file exceeds max size: %d", d.maxSize)
 	}
 
 	return data, mime, nil
@@ -93,6 +100,19 @@ func convertWebPToJPEG(data []byte) ([]byte, string, error) {
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}); err != nil {
 		return nil, "", fmt.Errorf("convert webp: encode jpeg: %w", err)
+	}
+	return buf.Bytes(), "image/jpeg", nil
+}
+
+func normalizeJPEG(data []byte) ([]byte, string, error) {
+	img, err := jpeg.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", fmt.Errorf("normalize jpeg: decode: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}); err != nil {
+		return nil, "", fmt.Errorf("normalize jpeg: encode: %w", err)
 	}
 	return buf.Bytes(), "image/jpeg", nil
 }

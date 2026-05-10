@@ -112,6 +112,35 @@ func TestImageDownloader_download_convertsWebPToJPEG(t *testing.T) {
 	assert.NotEqual(t, color.RGBA{}, img.At(0, 0))
 }
 
+func TestImageDownloader_download_normalizesJPEG(t *testing.T) {
+	var original bytes.Buffer
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	img.Set(0, 0, color.RGBA{R: 255, A: 255})
+	require.NoError(t, jpeg.Encode(&original, img, &jpeg.Options{Quality: 75}))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write(original.Bytes())
+	}))
+	defer srv.Close()
+
+	mockAPI := &mocks.TbAPIMock{
+		GetFileDirectURLFunc: func(fileID string) (string, error) {
+			return srv.URL + "/file.jpg", nil
+		},
+	}
+
+	d := newImageDownloader(mockAPI)
+	data, mime, err := d.download(context.Background(), "fid")
+
+	require.NoError(t, err)
+	assert.Equal(t, "image/jpeg", mime)
+	assert.NotEqual(t, original.Bytes(), data)
+	decoded, err := jpeg.Decode(bytes.NewReader(data))
+	require.NoError(t, err)
+	assert.Equal(t, image.Rect(0, 0, 2, 2), decoded.Bounds())
+}
+
 func TestImageDownloader_download_getURLFails(t *testing.T) {
 	mockAPI := &mocks.TbAPIMock{
 		GetFileDirectURLFunc: func(fileID string) (string, error) {
