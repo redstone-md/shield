@@ -2,6 +2,8 @@ package events
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strconv"
@@ -182,6 +184,7 @@ func applyMediaSlowPath(ctx context.Context, cfg mediaSlowPathConfig, event mode
 	}
 	defer func() { data = nil }()
 	observability.Logf(ctx, "[DEBUG] downloaded file for slowpath: %d bytes, mime=%s", len(data), mime)
+	logMediaSlowPathPayload(ctx, mime, data)
 
 	slowReq := slowpath.SlowPathRequest{
 		EventID:       event.EventID,
@@ -227,6 +230,18 @@ func applyMediaSlowPath(ctx context.Context, cfg mediaSlowPathConfig, event mode
 	resp.User = msg.From
 	resp.ReplyTo = msg.ID
 	return resp
+}
+
+func logMediaSlowPathPayload(ctx context.Context, mime string, data []byte) {
+	headLen := min(len(data), 64)
+	encoded := base64.StdEncoding.EncodeToString(data)
+	prefix := "data:" + mime + ";base64,"
+	previewLen := min(len(encoded), 128)
+	sum := sha256.Sum256(data)
+	observability.Logf(ctx,
+		"[DEBUG] slowpath image payload: mime=%s image_bytes=%d image_sha256=%x image_head_hex=%x data_url_len=%d data_url_prefix=%q",
+		mime, len(data), sum, data[:headLen], len(prefix)+len(encoded), prefix+encoded[:previewLen],
+	)
 }
 
 func slowPathCheckResponses(result *slowpath.SlowPathResult) []spamcheck.Response {
