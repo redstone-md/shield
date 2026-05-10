@@ -7,7 +7,6 @@
   "steps": {
     "build": {
       "commands": [
-        "...",
         "go build -o out ./app"
       ]
     }
