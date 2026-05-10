@@ -408,12 +408,19 @@ func transform(msg *tbapi.Message) *bot.Message {
 			message.Animation.ThumbFileID = msg.Animation.Thumbnail.FileID
 		}
 	}
-	if msg.Animation == nil && msg.Document != nil && strings.EqualFold(msg.Document.MimeType, "image/gif") {
+	if message.Animation == nil && msg.PremiumAnimation != nil {
+		message.Animation = &bot.MediaInfo{FileID: msg.PremiumAnimation.FileID, MimeType: msg.PremiumAnimation.MimeType}
+		if msg.PremiumAnimation.Thumbnail != nil {
+			message.Animation.ThumbFileID = msg.PremiumAnimation.Thumbnail.FileID
+		}
+	}
+	if message.Animation == nil && msg.Document != nil && strings.EqualFold(msg.Document.MimeType, "image/gif") {
 		message.Animation = &bot.MediaInfo{FileID: msg.Document.FileID, MimeType: msg.Document.MimeType}
 		if msg.Document.Thumbnail != nil {
 			message.Animation.ThumbFileID = msg.Document.Thumbnail.FileID
 		}
 	}
+	logAnimationTransformDetails(msg, message.Animation)
 	if msg.VideoNote != nil {
 		message.WithVideoNote = true
 	}
@@ -501,6 +508,43 @@ func transform(msg *tbapi.Message) *bot.Message {
 	}
 
 	return &message
+}
+
+func logAnimationTransformDetails(msg *tbapi.Message, animation *bot.MediaInfo) {
+	if msg.Animation == nil && msg.PremiumAnimation == nil && msg.Document == nil {
+		return
+	}
+	log.Printf("[DEBUG] animation transform: animation=%s premium_animation=%s document=%s result=%s",
+		telegramAnimationDetails(msg.Animation), telegramAnimationDetails(msg.PremiumAnimation), telegramDocumentDetails(msg.Document), mediaInfoDetails(animation))
+}
+
+func telegramAnimationDetails(animation *tbapi.Animation) string {
+	if animation == nil {
+		return "nil"
+	}
+	thumbID := ""
+	if animation.Thumbnail != nil {
+		thumbID = animation.Thumbnail.FileID
+	}
+	return fmt.Sprintf("file_id=%q mime=%q thumb=%q", animation.FileID, animation.MimeType, thumbID)
+}
+
+func telegramDocumentDetails(document *tbapi.Document) string {
+	if document == nil {
+		return "nil"
+	}
+	thumbID := ""
+	if document.Thumbnail != nil {
+		thumbID = document.Thumbnail.FileID
+	}
+	return fmt.Sprintf("file_id=%q mime=%q thumb=%q", document.FileID, document.MimeType, thumbID)
+}
+
+func mediaInfoDetails(info *bot.MediaInfo) string {
+	if info == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("file_id=%q mime=%q thumb=%q", info.FileID, info.MimeType, info.ThumbFileID)
 }
 
 // parseCallbackData parses callback data format: [prefix]userID:msgID

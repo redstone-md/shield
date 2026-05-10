@@ -474,6 +474,21 @@ func TestTelegramListener_transformAnimationKeepsThumbnailWhenDocumentAlsoSet(t 
 	assert.Equal(t, "video/mp4", res.Animation.MimeType)
 }
 
+func TestTelegramListener_transformPremiumAnimationThumbnail(t *testing.T) {
+	res := transform(&tbapi.Message{
+		MessageID:        202,
+		Chat:             tbapi.Chat{ID: 123},
+		From:             &tbapi.User{ID: 456, UserName: "user1"},
+		Date:             1578627415,
+		PremiumAnimation: &tbapi.Animation{FileID: "premium-file", MimeType: "video/mp4", Thumbnail: &tbapi.PhotoSize{FileID: "premium-thumb"}},
+	})
+
+	require.NotNil(t, res.Animation)
+	assert.Equal(t, "premium-file", res.Animation.FileID)
+	assert.Equal(t, "premium-thumb", res.Animation.ThumbFileID)
+	assert.Equal(t, "video/mp4", res.Animation.MimeType)
+}
+
 func TestTelegramListener_transformForward(t *testing.T) {
 	tbl := []struct {
 		name string
