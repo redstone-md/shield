@@ -1,41 +1,18 @@
 {
   "$schema": "https://schema.railpack.com",
-  "provider": "go",
+  "provider": "golang",
   "packages": {
     "go": "1.25"
   },
   "steps": {
     "build": {
-      "inputs": [
-        {
-          "local": true,
-          "include": [
-            "."
-          ]
-        }
-      ],
       "commands": [
-        "go mod download",
+        "...",
         "go build -o out ./app"
-      ],
-      "deployOutputs": [
-        {
-          "include": [
-            "out"
-          ]
-        }
       ]
     }
   },
   "deploy": {
-    "inputs": [
-      {
-        "step": "build",
-        "include": [
-          "out"
-        ]
-      }
-    ],
     "startCommand": "./out"
   }
 }
