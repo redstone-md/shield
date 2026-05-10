@@ -6,11 +6,14 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
+	"github.com/umputun/tg-spam/app/observability"
+	"github.com/umputun/tg-spam/app/slowpath"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
@@ -131,6 +134,103 @@ func (l *TelegramListener) botOnMessage(ctx context.Context, msg bot.Message, ch
 		return b.OnMessageWithContext(ctx, msg, checkOnly)
 	}
 	return l.Bot.OnMessage(msg, checkOnly)
+}
+
+func (l *TelegramListener) mediaSlowPathConfig() mediaSlowPathConfig {
+	return mediaSlowPathConfig{
+		enabled:        l.SlowPathEnabled,
+		api:            l.TbAPI,
+		engine:         l.SlowPathEngine,
+		tenantID:       l.TenantID,
+		observeLatency: l.observeLatency,
+		meter:          l.meter,
+	}
+}
+
+type mediaSlowPathConfig struct {
+	enabled        bool
+	api            TbAPI
+	engine         SlowPathChecker
+	tenantID       string
+	observeLatency func(string, time.Duration)
+	meter          func(context.Context, string)
+}
+
+func applyMediaSlowPath(ctx context.Context, cfg mediaSlowPathConfig, event moderation.IncomingEvent,
+	msg *bot.Message, resp bot.Response,
+) bot.Response {
+	if !cfg.enabled || cfg.engine == nil || resp.Send {
+		return resp
+	}
+
+	dl := newImageDownloader(cfg.api)
+	fileID, slowReason := mediaSlowPathFile(msg)
+	if fileID == "" {
+		return resp
+	}
+
+	data, mime, dlErr := dl.download(ctx, fileID)
+	if dlErr != nil {
+		observability.Logf(ctx, "[WARN] file download failed for slowpath: %v", dlErr)
+		return resp
+	}
+	defer func() { data = nil }()
+	observability.Logf(ctx, "[DEBUG] downloaded file for slowpath: %d bytes, mime=%s", len(data), mime)
+
+	slowReq := slowpath.SlowPathRequest{
+		EventID:       event.EventID,
+		CorrelationID: event.CorrelationID,
+		TenantID:      cfg.tenantID,
+		Reason:        slowReason,
+		Content:       slowpath.Content{Text: msg.Text, HasMedia: true},
+		ImageData:     data,
+		ImageMIME:     mime,
+	}
+
+	slowStart := time.Now()
+	slowResult, slowErr := cfg.engine.Check(ctx, slowReq)
+	if cfg.observeLatency != nil {
+		cfg.observeLatency("slow_path_latency", time.Since(slowStart))
+	}
+
+	if slowErr != nil {
+		observability.Logf(ctx, "[WARN] slowpath check failed: %v", slowErr)
+		return resp
+	}
+	if slowResult == nil {
+		observability.Logf(ctx, "[WARN] slowpath check returned no result")
+		return resp
+	}
+
+	observability.Logf(ctx, "[INFO] slowpath completed: skipped=%v spam=%v confidence=%d providers=%s reason=%s",
+		slowResult.Skipped, slowResult.Spam, slowResult.Confidence, strings.Join(slowResult.Providers, ","), slowResult.Reason)
+	if slowResult.Skipped || !slowResult.Spam {
+		return resp
+	}
+
+	observability.Logf(ctx, "[INFO] slowpath detected spam: confidence=%d, reason=%s", slowResult.Confidence, slowResult.Reason)
+	if cfg.meter != nil {
+		cfg.meter(ctx, "slowpath_spam")
+	}
+	resp.Send = true
+	resp.User = msg.From
+	resp.ReplyTo = msg.ID
+	resp.CheckResults = append(resp.CheckResults, spamcheck.Response{
+		Name:    "slowpath",
+		Spam:    true,
+		Details: slowResult.Reason,
+	})
+	return resp
+}
+
+func mediaSlowPathFile(msg *bot.Message) (string, slowpath.EscalationReason) {
+	if msg.Image != nil && msg.Image.FileID != "" {
+		return msg.Image.FileID, slowpath.EscalationImageContent
+	}
+	if msg.WithSticker && msg.Sticker != nil {
+		return stickerDownloadFileID(msg.Sticker), slowpath.EscalationImageContent
+	}
+	return "", ""
 }
 
 func slowpathReason(checks []spamcheck.Response) string {

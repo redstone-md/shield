@@ -3,6 +3,8 @@ package events
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -13,9 +15,23 @@ import (
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/events/mocks"
 	"github.com/umputun/tg-spam/app/moderation"
+	"github.com/umputun/tg-spam/app/slowpath"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
+
+type slowPathCheckerSpy struct {
+	check func(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error)
+	calls []slowpath.SlowPathRequest
+}
+
+func (s *slowPathCheckerSpy) Check(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
+	s.calls = append(s.calls, req)
+	if s.check != nil {
+		return s.check(ctx, req)
+	}
+	return &slowpath.SlowPathResult{}, nil
+}
 
 func TestAdmin_MsgHandler(t *testing.T) {
 	t.Run("non-forwarded message", func(t *testing.T) {
@@ -662,4 +678,62 @@ func TestTelegramListener_AdminChatPlainMessageDemoCheckIgnoresForwardDisable(t 
 	assert.Equal(t, int64(456), sent.ChatID)
 	assert.Contains(t, sent.Text, "демо-проверка")
 	assert.Contains(t, sent.Text, "сообщение НЕ пройдет")
+}
+
+func TestTelegramListener_AdminChatDemoCheckUsesSlowPathForSticker(t *testing.T) {
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/webp")
+		_, _ = w.Write([]byte("RIFFxxxxWEBPVP8 "))
+	}))
+	defer imgSrv.Close()
+
+	slowSpy := &slowPathCheckerSpy{check: func(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
+		assert.Equal(t, slowpath.EscalationImageContent, req.Reason)
+		assert.Equal(t, "image/webp", req.ImageMIME)
+		assert.NotEmpty(t, req.ImageData)
+		return &slowpath.SlowPathResult{Spam: true, Confidence: 91, Reason: "vision sticker spam", Providers: []string{"vision"}}, nil
+	}}
+	mockAPI := &mocks.TbAPIMock{
+		GetFileDirectURLFunc: func(fileID string) (string, error) {
+			assert.Equal(t, "sticker-file", fileID)
+			return imgSrv.URL, nil
+		},
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			return tbapi.Message{MessageID: 100}, nil
+		},
+	}
+	botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+		assert.True(t, checkOnly)
+		assert.True(t, msg.WithSticker)
+		return bot.Response{CheckResults: []spamcheck.Response{{Name: "message length", Spam: false, Details: "too short"}}}
+	}}
+
+	l := TelegramListener{
+		TbAPI:           mockAPI,
+		Bot:             botMock,
+		SuperUsers:      SuperUsers{"admin"},
+		SlowPathEnabled: true,
+		SlowPathEngine:  slowSpy,
+		TenantID:        "tg-spam",
+		adminChatID:     456,
+	}
+	l.adminHandler = &admin{tbAPI: mockAPI, bot: botMock, adminChatID: 456, mediaSlowPath: l.mediaSlowPathConfig()}
+
+	err := l.handleUpdate(context.Background(), tbapi.Update{Message: &tbapi.Message{
+		MessageID: 10,
+		Chat:      tbapi.Chat{ID: 456},
+		From:      &tbapi.User{UserName: "admin", ID: 1},
+		Sticker: &tbapi.Sticker{
+			FileID:    "sticker-file",
+			Thumbnail: &tbapi.PhotoSize{FileID: "thumb-file"},
+		},
+	}})
+	require.NoError(t, err)
+
+	require.Len(t, slowSpy.calls, 1)
+	require.Len(t, mockAPI.SendCalls(), 1)
+	sent := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+	assert.Contains(t, sent.Text, "сообщение НЕ пройдет")
+	assert.Contains(t, sent.Text, "slowpath")
+	assert.Contains(t, sent.Text, "vision sticker spam")
 }

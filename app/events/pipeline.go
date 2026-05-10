@@ -15,8 +15,6 @@ import (
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/app/slowpath"
-	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
 type incomingEventProcessor interface {
@@ -237,65 +235,7 @@ func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderat
 		l.meter(ctx, "spam_detected")
 	}
 
-	if l.SlowPathEnabled && l.SlowPathEngine != nil && !resp.Send {
-		dl := newImageDownloader(l.TbAPI)
-
-		var fileID string
-		var slowReason slowpath.EscalationReason
-
-		if msg.Image != nil && msg.Image.FileID != "" {
-			fileID = msg.Image.FileID
-			slowReason = slowpath.EscalationImageContent
-		} else if msg.WithSticker && msg.Sticker != nil {
-			fileID = stickerDownloadFileID(msg.Sticker)
-			slowReason = slowpath.EscalationImageContent
-		}
-
-		if fileID != "" {
-			data, mime, dlErr := dl.download(ctx, fileID)
-			if dlErr != nil {
-				observability.Logf(ctx, "[WARN] file download failed for slowpath: %v", dlErr)
-			} else {
-				defer func() { data = nil }()
-				observability.Logf(ctx, "[DEBUG] downloaded file for slowpath: %d bytes, mime=%s", len(data), mime)
-
-				slowReq := slowpath.SlowPathRequest{
-					EventID:       event.EventID,
-					CorrelationID: event.CorrelationID,
-					TenantID:      l.TenantID,
-					Reason:        slowReason,
-					Content:       slowpath.Content{Text: msg.Text, HasMedia: true},
-					ImageData:     data,
-					ImageMIME:     mime,
-				}
-
-				slowStart := time.Now()
-				slowResult, slowErr := l.SlowPathEngine.Check(ctx, slowReq)
-				l.observeLatency("slow_path_latency", time.Since(slowStart))
-
-				if slowErr != nil {
-					observability.Logf(ctx, "[WARN] slowpath check failed: %v", slowErr)
-				} else if slowResult == nil {
-					observability.Logf(ctx, "[WARN] slowpath check returned no result")
-				} else {
-					observability.Logf(ctx, "[INFO] slowpath completed: skipped=%v spam=%v confidence=%d providers=%s reason=%s",
-						slowResult.Skipped, slowResult.Spam, slowResult.Confidence, strings.Join(slowResult.Providers, ","), slowResult.Reason)
-					if !slowResult.Skipped && slowResult.Spam {
-						observability.Logf(ctx, "[INFO] slowpath detected spam: confidence=%d, reason=%s", slowResult.Confidence, slowResult.Reason)
-						l.meter(ctx, "slowpath_spam")
-						resp.Send = true
-						resp.User = msg.From
-						resp.ReplyTo = msg.ID
-						resp.CheckResults = append(resp.CheckResults, spamcheck.Response{
-							Name:    "slowpath",
-							Spam:    true,
-							Details: slowResult.Reason,
-						})
-					}
-				}
-			}
-		}
-	}
+	resp = applyMediaSlowPath(ctx, l.mediaSlowPathConfig(), event, msg, resp)
 
 	spamUserID := msg.From.ID
 	if msg.SenderChat.ID != 0 {

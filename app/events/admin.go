@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/umputun/tg-spam/app/bot"
+	"github.com/umputun/tg-spam/app/moderation"
 )
 
 type admin struct {
@@ -23,6 +24,7 @@ type admin struct {
 	actions                ActionExecutor
 	autoLearner            AutoLearner
 	detectedSpam           DetectedSpamCounter
+	mediaSlowPath          mediaSlowPathConfig
 	primChatID             int64
 	adminChatID            int64
 	trainingMode           bool
@@ -268,8 +270,13 @@ func (a *admin) demoCheck(update tbapi.Update) error {
 	}
 
 	resp := a.bot.OnMessage(*msg, true)
+	resp = applyMediaSlowPath(context.Background(), a.mediaSlowPath, moderation.IncomingEvent{
+		EventID:       fmt.Sprintf("admin-demo-%d", update.Message.MessageID),
+		CorrelationID: "admin-demo",
+		TenantID:      a.mediaSlowPath.tenantID,
+	}, msg, resp)
 	status := "сообщение пройдет"
-	if resp.Send && resp.BanInterval > 0 {
+	if resp.Send {
 		status = "сообщение НЕ пройдет"
 	}
 

@@ -222,7 +222,8 @@ func (l *TelegramListener) initHandlers() {
 	l.adminHandler = &admin{
 		tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers, actions: l.ActionExecutor,
 		autoLearner: l.AutoLearner, detectedSpam: l.DetectedSpamCounter,
-		primChatID: l.chatID, adminChatID: l.adminChatID,
+		mediaSlowPath: l.mediaSlowPathConfig(),
+		primChatID:    l.chatID, adminChatID: l.adminChatID,
 		trainingMode: l.TrainingMode, softBan: l.SoftBanMode, dry: l.Dry, warnMsg: l.WarnMsg,
 		moderation: l.ModerationConfig, warnDeleteDuration: l.ModerationConfig.WarnDeleteDuration,
 		aggressiveCleanup: l.AggressiveCleanup, aggressiveCleanupLimit: l.AggressiveCleanupLimit,
