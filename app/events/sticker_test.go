@@ -15,9 +15,9 @@ func Test_stickerDownloadFileID(t *testing.T) {
 		want string
 	}{
 		{
-			name: "static sticker uses FileID",
+			name: "static sticker uses thumbnail",
 			info: &bot.StickerInfo{FileID: "file123", ThumbFileID: "thumb456"},
-			want: "file123",
+			want: "thumb456",
 		},
 		{
 			name: "animated sticker uses thumbnail",

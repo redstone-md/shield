@@ -1,12 +1,16 @@
 package events
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"image/jpeg"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"golang.org/x/image/webp"
 )
 
 type imageDownloader struct {
@@ -67,6 +71,28 @@ func (d *imageDownloader) download(ctx context.Context, fileID string) ([]byte, 
 	if !strings.HasPrefix(mime, "image/") {
 		mime = "image/jpeg"
 	}
+	if mime == "image/webp" {
+		data, mime, err = convertWebPToJPEG(data)
+		if err != nil {
+			return nil, "", err
+		}
+		if int64(len(data)) > d.maxSize {
+			return nil, "", fmt.Errorf("converted file exceeds max size: %d", d.maxSize)
+		}
+	}
 
 	return data, mime, nil
+}
+
+func convertWebPToJPEG(data []byte) ([]byte, string, error) {
+	img, err := webp.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", fmt.Errorf("convert webp: decode: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}); err != nil {
+		return nil, "", fmt.Errorf("convert webp: encode jpeg: %w", err)
+	}
+	return buf.Bytes(), "image/jpeg", nil
 }

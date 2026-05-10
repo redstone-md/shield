@@ -21,8 +21,11 @@ require (
 	github.com/playwright-community/playwright-go v0.5200.1
 	github.com/sandwich-go/gpt3-encoder v0.0.0-20230203030618-cd99729dd0dd
 	github.com/sashabaranov/go-openai v1.41.2
+	github.com/sony/gobreaker/v2 v2.4.0
 	github.com/stretchr/testify v1.10.0
 	github.com/yuin/gopher-lua v1.1.1
+	golang.org/x/image v0.33.0
+	golang.org/x/text v0.32.0
 	golang.org/x/time v0.11.0
 	google.golang.org/genai v1.52.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -111,7 +114,6 @@ require (
 	github.com/samber/lo v1.52.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.25.3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/sony/gobreaker/v2 v2.4.0 // indirect
 	github.com/testcontainers/testcontainers-go v0.36.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect
@@ -132,7 +134,6 @@ require (
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	google.golang.org/grpc v1.66.2 // indirect
 	google.golang.org/protobuf v1.35.2 // indirect

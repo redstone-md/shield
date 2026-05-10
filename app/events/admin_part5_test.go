@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -683,20 +684,20 @@ func TestTelegramListener_AdminChatPlainMessageDemoCheckIgnoresForwardDisable(t 
 
 func TestTelegramListener_AdminChatDemoCheckUsesSlowPathForSticker(t *testing.T) {
 	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "image/webp")
-		_, _ = w.Write([]byte("RIFFxxxxWEBPVP8 "))
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("jpeg thumbnail"))
 	}))
 	defer imgSrv.Close()
 
 	slowSpy := &slowPathCheckerSpy{check: func(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
 		assert.Equal(t, slowpath.EscalationImageContent, req.Reason)
-		assert.Equal(t, "image/webp", req.ImageMIME)
+		assert.Equal(t, "image/jpeg", req.ImageMIME)
 		assert.NotEmpty(t, req.ImageData)
 		return &slowpath.SlowPathResult{Spam: true, Confidence: 91, Reason: "vision sticker spam", Providers: []string{"vision"}}, nil
 	}}
 	mockAPI := &mocks.TbAPIMock{
 		GetFileDirectURLFunc: func(fileID string) (string, error) {
-			assert.Equal(t, "sticker-file", fileID)
+			assert.Equal(t, "thumb-file", fileID)
 			return imgSrv.URL, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
@@ -830,14 +831,16 @@ func TestTelegramListener_AdminChatDemoCheckShowsSlowPathHamSummary(t *testing.T
 }
 
 func TestTelegramListener_AdminChatDemoCheckUsesSlowPathForCustomEmoji(t *testing.T) {
+	webpData, decodeErr := base64.StdEncoding.DecodeString("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA")
+	require.NoError(t, decodeErr)
 	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/webp")
-		_, _ = w.Write([]byte("webp frame"))
+		_, _ = w.Write(webpData)
 	}))
 	defer imgSrv.Close()
 
 	slowSpy := &slowPathCheckerSpy{check: func(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
-		assert.Equal(t, "image/webp", req.ImageMIME)
+		assert.Equal(t, "image/jpeg", req.ImageMIME)
 		return &slowpath.SlowPathResult{Spam: true, Confidence: 90, Reason: "emoji spam", Providers: []string{"vision"}}, nil
 	}}
 	mockAPI := &mocks.TbAPIMock{

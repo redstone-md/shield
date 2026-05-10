@@ -1,8 +1,13 @@
 package events
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -74,9 +79,37 @@ func TestImageDownloader_download_prefersDetectedImageMime(t *testing.T) {
 	d := newImageDownloader(mockAPI)
 	data, mime, err := d.download(context.Background(), "fid")
 
+	require.Error(t, err)
+	assert.Nil(t, data)
+	assert.Empty(t, mime)
+	assert.Contains(t, err.Error(), "convert webp")
+}
+
+func TestImageDownloader_download_convertsWebPToJPEG(t *testing.T) {
+	webpData, err := base64.StdEncoding.DecodeString("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA")
 	require.NoError(t, err)
-	assert.Equal(t, webpData, data)
-	assert.Equal(t, "image/webp", mime)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/webp")
+		w.Write(webpData)
+	}))
+	defer srv.Close()
+
+	mockAPI := &mocks.TbAPIMock{
+		GetFileDirectURLFunc: func(fileID string) (string, error) {
+			return srv.URL + "/file.webp", nil
+		},
+	}
+
+	d := newImageDownloader(mockAPI)
+	data, mime, err := d.download(context.Background(), "fid")
+
+	require.NoError(t, err)
+	assert.Equal(t, "image/jpeg", mime)
+	assert.NotEqual(t, webpData, data)
+	img, err := jpeg.Decode(bytes.NewReader(data))
+	require.NoError(t, err)
+	assert.Equal(t, image.Rect(0, 0, 1, 1), img.Bounds())
+	assert.NotEqual(t, color.RGBA{}, img.At(0, 0))
 }
 
 func TestImageDownloader_download_getURLFails(t *testing.T) {

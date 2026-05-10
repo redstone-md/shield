@@ -542,7 +542,7 @@ func (l *TelegramListener) incMetric(name string) {
 }
 
 func stickerDownloadFileID(s *bot.StickerInfo) string {
-	if (s.IsAnimated || s.IsVideo) && s.ThumbFileID != "" {
+	if s.ThumbFileID != "" {
 		return s.ThumbFileID
 	}
 	if s.FileID != "" {
