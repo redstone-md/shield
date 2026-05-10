@@ -75,7 +75,8 @@ func (l *TelegramListener) procEventsWithContext(ctx context.Context, update tba
 	}
 
 	msg := transform(update.Message)
-	if strings.TrimSpace(msg.Text) == "" && msg.Image == nil && !msg.WithVideoNote && !msg.WithVideo && !msg.WithForward && !msg.WithSticker {
+	if strings.TrimSpace(msg.Text) == "" && msg.Image == nil && !msg.WithVideoNote && !msg.WithVideo && !msg.WithForward &&
+		!msg.WithSticker && msg.Animation == nil && msg.CustomEmojiID == "" {
 		return nil
 	}
 

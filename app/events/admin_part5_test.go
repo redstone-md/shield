@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -736,4 +737,120 @@ func TestTelegramListener_AdminChatDemoCheckUsesSlowPathForSticker(t *testing.T)
 	assert.Contains(t, sent.Text, "сообщение НЕ пройдет")
 	assert.Contains(t, sent.Text, "slowpath")
 	assert.Contains(t, sent.Text, "vision sticker spam")
+}
+
+func TestTelegramListener_AdminChatDemoCheckUsesSlowPathForGIF(t *testing.T) {
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("jpeg frame"))
+	}))
+	defer imgSrv.Close()
+
+	slowSpy := &slowPathCheckerSpy{check: func(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
+		assert.Equal(t, slowpath.EscalationImageContent, req.Reason)
+		assert.Equal(t, "image/jpeg", req.ImageMIME)
+		return &slowpath.SlowPathResult{Spam: true, Confidence: 88, Reason: "gif spam", Providers: []string{"vision"}}, nil
+	}}
+	mockAPI := &mocks.TbAPIMock{
+		GetFileDirectURLFunc: func(fileID string) (string, error) {
+			assert.Equal(t, "gif-thumb", fileID)
+			return imgSrv.URL, nil
+		},
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{MessageID: 101}, nil },
+	}
+	botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+		assert.True(t, checkOnly)
+		assert.NotNil(t, msg.Animation)
+		return bot.Response{}
+	}}
+
+	l := TelegramListener{TbAPI: mockAPI, Bot: botMock, SuperUsers: SuperUsers{"admin"}, SlowPathEnabled: true,
+		SlowPathEngine: slowSpy, TenantID: "tg-spam", adminChatID: 456}
+	l.adminHandler = &admin{tbAPI: mockAPI, bot: botMock, adminChatID: 456, mediaSlowPath: l.mediaSlowPathConfig()}
+
+	err := l.handleUpdate(context.Background(), tbapi.Update{Message: &tbapi.Message{
+		MessageID: 11,
+		Chat:      tbapi.Chat{ID: 456},
+		From:      &tbapi.User{UserName: "admin", ID: 1},
+		Animation: &tbapi.Animation{FileID: "gif-file", MimeType: "image/gif", Thumbnail: &tbapi.PhotoSize{FileID: "gif-thumb"}},
+	}})
+	require.NoError(t, err)
+	require.Len(t, slowSpy.calls, 1)
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "gif spam")
+}
+
+func TestTelegramListener_AdminChatDemoCheckUsesSlowPathForCustomEmoji(t *testing.T) {
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/webp")
+		_, _ = w.Write([]byte("webp frame"))
+	}))
+	defer imgSrv.Close()
+
+	slowSpy := &slowPathCheckerSpy{check: func(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
+		assert.Equal(t, "image/webp", req.ImageMIME)
+		return &slowpath.SlowPathResult{Spam: true, Confidence: 90, Reason: "emoji spam", Providers: []string{"vision"}}, nil
+	}}
+	mockAPI := &mocks.TbAPIMock{
+		GetCustomEmojiStickersFunc: func(config tbapi.GetCustomEmojiStickersConfig) ([]tbapi.Sticker, error) {
+			require.Equal(t, []string{"emoji-1"}, config.CustomEmojiIDs)
+			return []tbapi.Sticker{{FileID: "emoji-file", IsAnimated: true, Thumbnail: &tbapi.PhotoSize{FileID: "emoji-thumb"}}}, nil
+		},
+		GetFileDirectURLFunc: func(fileID string) (string, error) {
+			assert.Equal(t, "emoji-thumb", fileID)
+			return imgSrv.URL, nil
+		},
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{MessageID: 102}, nil },
+	}
+	botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+		assert.True(t, checkOnly)
+		assert.Equal(t, "emoji-1", msg.CustomEmojiID)
+		return bot.Response{}
+	}}
+
+	l := TelegramListener{TbAPI: mockAPI, Bot: botMock, SuperUsers: SuperUsers{"admin"}, SlowPathEnabled: true,
+		SlowPathEngine: slowSpy, TenantID: "tg-spam", adminChatID: 456}
+	l.adminHandler = &admin{tbAPI: mockAPI, bot: botMock, adminChatID: 456, mediaSlowPath: l.mediaSlowPathConfig()}
+
+	err := l.handleUpdate(context.Background(), tbapi.Update{Message: &tbapi.Message{
+		MessageID: 12,
+		Chat:      tbapi.Chat{ID: 456},
+		From:      &tbapi.User{UserName: "admin", ID: 1},
+		Text:      "🔥",
+		Entities:  []tbapi.MessageEntity{{Type: "custom_emoji", Offset: 0, Length: 2, CustomEmojiID: "emoji-1"}},
+	}})
+	require.NoError(t, err)
+	require.Len(t, slowSpy.calls, 1)
+	require.Len(t, mockAPI.GetCustomEmojiStickersCalls(), 1)
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "emoji spam")
+}
+
+func TestApplyMediaSlowPathRetriesRetryableErrors(t *testing.T) {
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("jpeg frame"))
+	}))
+	defer imgSrv.Close()
+
+	attempts := 0
+	slowSpy := &slowPathCheckerSpy{check: func(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
+		attempts++
+		if attempts == 1 {
+			return nil, errors.New("openai vision: 502 Bad Gateway retryable")
+		}
+		return &slowpath.SlowPathResult{Spam: true, Confidence: 91, Reason: "retried spam", Providers: []string{"vision"}}, nil
+	}}
+	mockAPI := &mocks.TbAPIMock{GetFileDirectURLFunc: func(fileID string) (string, error) { return imgSrv.URL, nil }}
+	sleeps := []time.Duration{}
+	cfg := mediaSlowPathConfig{enabled: true, api: mockAPI, engine: slowSpy, tenantID: "tg-spam", sleep: func(d time.Duration) {
+		sleeps = append(sleeps, d)
+	}}
+
+	resp := applyMediaSlowPath(context.Background(), cfg, moderation.IncomingEvent{EventID: "e1"},
+		&bot.Message{ID: 42, From: bot.User{ID: 1}, Image: &bot.Image{FileID: "image-file"}}, bot.Response{})
+
+	assert.True(t, resp.Send)
+	assert.Equal(t, 2, attempts)
+	assert.Equal(t, []time.Duration{3 * time.Second}, sleeps)
+	require.Len(t, resp.CheckResults, 1)
+	assert.Equal(t, "retried spam", resp.CheckResults[0].Details)
 }

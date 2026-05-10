@@ -24,6 +24,9 @@ import (
 //			GetFileDirectURLFunc: func(fileID string) (string, error) {
 //				panic("mock out the GetFileDirectURL method")
 //			},
+//			GetCustomEmojiStickersFunc: func(config tbapi.GetCustomEmojiStickersConfig) ([]tbapi.Sticker, error) {
+//				panic("mock out the GetCustomEmojiStickers method")
+//			},
 //			GetUpdatesChanFunc: func(config tbapi.UpdateConfig) tbapi.UpdatesChannel {
 //				panic("mock out the GetUpdatesChan method")
 //			},
@@ -48,6 +51,9 @@ type TbAPIMock struct {
 
 	// GetFileDirectURLFunc mocks the GetFileDirectURL method.
 	GetFileDirectURLFunc func(fileID string) (string, error)
+
+	// GetCustomEmojiStickersFunc mocks the GetCustomEmojiStickers method.
+	GetCustomEmojiStickersFunc func(config tbapi.GetCustomEmojiStickersConfig) ([]tbapi.Sticker, error)
 
 	// GetUpdatesChanFunc mocks the GetUpdatesChan method.
 	GetUpdatesChanFunc func(config tbapi.UpdateConfig) tbapi.UpdatesChannel
@@ -75,6 +81,11 @@ type TbAPIMock struct {
 			// FileID is the fileID argument value.
 			FileID string
 		}
+		// GetCustomEmojiStickers holds details about calls to the GetCustomEmojiStickers method.
+		GetCustomEmojiStickers []struct {
+			// Config is the config argument value.
+			Config tbapi.GetCustomEmojiStickersConfig
+		}
 		// GetUpdatesChan holds details about calls to the GetUpdatesChan method.
 		GetUpdatesChan []struct {
 			// Config is the config argument value.
@@ -91,12 +102,13 @@ type TbAPIMock struct {
 			C tbapi.Chattable
 		}
 	}
-	lockGetChat               sync.RWMutex
-	lockGetChatAdministrators sync.RWMutex
-	lockGetFileDirectURL      sync.RWMutex
-	lockGetUpdatesChan        sync.RWMutex
-	lockRequest               sync.RWMutex
-	lockSend                  sync.RWMutex
+	lockGetChat                sync.RWMutex
+	lockGetChatAdministrators  sync.RWMutex
+	lockGetFileDirectURL       sync.RWMutex
+	lockGetCustomEmojiStickers sync.RWMutex
+	lockGetUpdatesChan         sync.RWMutex
+	lockRequest                sync.RWMutex
+	lockSend                   sync.RWMutex
 }
 
 // GetChat calls GetChatFunc.
@@ -214,6 +226,45 @@ func (mock *TbAPIMock) ResetGetFileDirectURLCalls() {
 	mock.lockGetFileDirectURL.Lock()
 	mock.calls.GetFileDirectURL = nil
 	mock.lockGetFileDirectURL.Unlock()
+}
+
+// GetCustomEmojiStickers calls GetCustomEmojiStickersFunc.
+func (mock *TbAPIMock) GetCustomEmojiStickers(config tbapi.GetCustomEmojiStickersConfig) ([]tbapi.Sticker, error) {
+	if mock.GetCustomEmojiStickersFunc == nil {
+		panic("TbAPIMock.GetCustomEmojiStickersFunc: method is nil but TbAPI.GetCustomEmojiStickers was just called")
+	}
+	callInfo := struct {
+		Config tbapi.GetCustomEmojiStickersConfig
+	}{
+		Config: config,
+	}
+	mock.lockGetCustomEmojiStickers.Lock()
+	mock.calls.GetCustomEmojiStickers = append(mock.calls.GetCustomEmojiStickers, callInfo)
+	mock.lockGetCustomEmojiStickers.Unlock()
+	return mock.GetCustomEmojiStickersFunc(config)
+}
+
+// GetCustomEmojiStickersCalls gets all the calls that were made to GetCustomEmojiStickers.
+// Check the length with:
+//
+//	len(mockedTbAPI.GetCustomEmojiStickersCalls())
+func (mock *TbAPIMock) GetCustomEmojiStickersCalls() []struct {
+	Config tbapi.GetCustomEmojiStickersConfig
+} {
+	var calls []struct {
+		Config tbapi.GetCustomEmojiStickersConfig
+	}
+	mock.lockGetCustomEmojiStickers.RLock()
+	calls = mock.calls.GetCustomEmojiStickers
+	mock.lockGetCustomEmojiStickers.RUnlock()
+	return calls
+}
+
+// ResetGetCustomEmojiStickersCalls reset all the calls that were made to GetCustomEmojiStickers.
+func (mock *TbAPIMock) ResetGetCustomEmojiStickersCalls() {
+	mock.lockGetCustomEmojiStickers.Lock()
+	mock.calls.GetCustomEmojiStickers = nil
+	mock.lockGetCustomEmojiStickers.Unlock()
 }
 
 // GetUpdatesChan calls GetUpdatesChanFunc.
@@ -346,6 +397,10 @@ func (mock *TbAPIMock) ResetCalls() {
 	mock.lockGetFileDirectURL.Lock()
 	mock.calls.GetFileDirectURL = nil
 	mock.lockGetFileDirectURL.Unlock()
+
+	mock.lockGetCustomEmojiStickers.Lock()
+	mock.calls.GetCustomEmojiStickers = nil
+	mock.lockGetCustomEmojiStickers.Unlock()
 
 	mock.lockGetUpdatesChan.Lock()
 	mock.calls.GetUpdatesChan = nil

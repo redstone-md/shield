@@ -30,6 +30,7 @@ type TbAPI interface {
 	GetChat(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error)
 	GetChatAdministrators(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error)
 	GetFileDirectURL(fileID string) (string, error)
+	GetCustomEmojiStickers(config tbapi.GetCustomEmojiStickersConfig) ([]tbapi.Sticker, error)
 }
 
 // SpamLogger is an interface for spam logger
@@ -320,10 +321,11 @@ func transform(msg *tbapi.Message) *bot.Message {
 		result := make([]bot.Entity, 0, len(entities))
 		for _, entity := range entities {
 			e := bot.Entity{
-				Type:   entity.Type,
-				Offset: entity.Offset,
-				Length: entity.Length,
-				URL:    entity.URL,
+				Type:          entity.Type,
+				Offset:        entity.Offset,
+				Length:        entity.Length,
+				URL:           entity.URL,
+				CustomEmojiID: entity.CustomEmojiID,
 			}
 			if entity.User != nil {
 				e.User = &bot.User{
@@ -400,6 +402,18 @@ func transform(msg *tbapi.Message) *bot.Message {
 	if msg.Video != nil {
 		message.WithVideo = true
 	}
+	if msg.Animation != nil {
+		message.Animation = &bot.MediaInfo{FileID: msg.Animation.FileID, MimeType: msg.Animation.MimeType}
+		if msg.Animation.Thumbnail != nil {
+			message.Animation.ThumbFileID = msg.Animation.Thumbnail.FileID
+		}
+	}
+	if msg.Document != nil && strings.EqualFold(msg.Document.MimeType, "image/gif") {
+		message.Animation = &bot.MediaInfo{FileID: msg.Document.FileID, MimeType: msg.Document.MimeType}
+		if msg.Document.Thumbnail != nil {
+			message.Animation.ThumbFileID = msg.Document.Thumbnail.FileID
+		}
+	}
 	if msg.VideoNote != nil {
 		message.WithVideoNote = true
 	}
@@ -433,6 +447,14 @@ func transform(msg *tbapi.Message) *bot.Message {
 			info.ThumbFileID = msg.Sticker.Thumbnail.FileID
 		}
 		message.Sticker = info
+	}
+	if message.Entities != nil {
+		for _, entity := range *message.Entities {
+			if entity.Type == "custom_emoji" && entity.CustomEmojiID != "" {
+				message.CustomEmojiID = entity.CustomEmojiID
+				break
+			}
+		}
 	}
 
 	// handle reply-to message if present

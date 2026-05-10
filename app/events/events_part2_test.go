@@ -438,6 +438,26 @@ func TestTelegramListener_transformSticker(t *testing.T) {
 	}
 }
 
+func TestTelegramListener_transformAnimationAndCustomEmoji(t *testing.T) {
+	res := transform(&tbapi.Message{
+		MessageID: 200,
+		Chat:      tbapi.Chat{ID: 123},
+		From:      &tbapi.User{ID: 456, UserName: "user1"},
+		Date:      1578627415,
+		Text:      "🔥",
+		Entities:  []tbapi.MessageEntity{{Type: "custom_emoji", Offset: 0, Length: 2, CustomEmojiID: "emoji-1"}},
+		Animation: &tbapi.Animation{FileID: "gif-file", MimeType: "image/gif", Thumbnail: &tbapi.PhotoSize{FileID: "gif-thumb"}},
+	})
+
+	require.NotNil(t, res.Animation)
+	assert.Equal(t, "gif-file", res.Animation.FileID)
+	assert.Equal(t, "gif-thumb", res.Animation.ThumbFileID)
+	assert.Equal(t, "image/gif", res.Animation.MimeType)
+	assert.Equal(t, "emoji-1", res.CustomEmojiID)
+	require.NotNil(t, res.Entities)
+	assert.Equal(t, "emoji-1", (*res.Entities)[0].CustomEmojiID)
+}
+
 func TestTelegramListener_transformForward(t *testing.T) {
 	tbl := []struct {
 		name string

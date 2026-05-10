@@ -67,16 +67,19 @@ type Message struct {
 	WithGiveaway  bool         `json:",omitempty"`
 	WithSticker   bool         `json:",omitempty"`
 	Sticker       *StickerInfo `json:",omitempty"`
+	Animation     *MediaInfo   `json:",omitempty"`
+	CustomEmojiID string       `json:",omitempty"`
 }
 
 // Entity represents one special entity in a text message.
 // For example, hashtags, usernames, URLs, etc.
 type Entity struct {
-	Type   string
-	Offset int
-	Length int
-	URL    string `json:",omitempty"` // for “text_link” only, url that will be opened after user taps on the text
-	User   *User  `json:",omitempty"` // for “text_mention” only, the mentioned user
+	Type          string
+	Offset        int
+	Length        int
+	URL           string `json:",omitempty"` // for “text_link” only, url that will be opened after user taps on the text
+	User          *User  `json:",omitempty"` // for “text_mention” only, the mentioned user
+	CustomEmojiID string `json:",omitempty"`
 }
 
 // Image represents image
@@ -96,6 +99,13 @@ type StickerInfo struct {
 	IsAnimated  bool   `json:",omitempty"`
 	IsVideo     bool   `json:",omitempty"`
 	SetName     string `json:",omitempty"`
+}
+
+// MediaInfo represents downloadable Telegram media metadata.
+type MediaInfo struct {
+	FileID      string `json:",omitempty"`
+	ThumbFileID string `json:",omitempty"`
+	MimeType    string `json:",omitempty"`
 }
 
 // User defines user info of the Message

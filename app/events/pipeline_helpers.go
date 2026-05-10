@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -46,9 +47,10 @@ func (l *TelegramListener) makeIncomingEvent(update tbapi.Update, msg *bot.Messa
 			IsBot:    msg.From.ID == 136817688,
 		},
 		Content: moderation.Content{
-			Text:       msg.Text,
-			Links:      collectLinks(msg),
-			HasMedia:   msg.Image != nil || msg.WithVideo || msg.WithVideoNote || msg.WithAudio || msg.WithSticker,
+			Text:  msg.Text,
+			Links: collectLinks(msg),
+			HasMedia: msg.Image != nil || msg.WithVideo || msg.WithVideoNote || msg.WithAudio || msg.WithSticker ||
+				msg.Animation != nil || msg.CustomEmojiID != "",
 			Attributes: incomingEventAttributes(msg),
 		},
 		ReceivedAt: msg.Sent.UTC(),
@@ -78,6 +80,8 @@ func incomingEventAttributes(msg *bot.Message) map[string]string {
 		"with_video_note": strconv.FormatBool(msg.WithVideoNote),
 		"with_audio":      strconv.FormatBool(msg.WithAudio),
 		"with_sticker":    strconv.FormatBool(msg.WithSticker),
+		"with_animation":  strconv.FormatBool(msg.Animation != nil),
+		"custom_emoji_id": msg.CustomEmojiID,
 	}
 	if msg.SenderChat.ID != 0 {
 		attrs["sender_chat_id"] = strconv.FormatInt(msg.SenderChat.ID, 10)
@@ -144,6 +148,7 @@ func (l *TelegramListener) mediaSlowPathConfig() mediaSlowPathConfig {
 		tenantID:       l.TenantID,
 		observeLatency: l.observeLatency,
 		meter:          l.meter,
+		sleep:          time.Sleep,
 	}
 }
 
@@ -154,6 +159,7 @@ type mediaSlowPathConfig struct {
 	tenantID       string
 	observeLatency func(string, time.Duration)
 	meter          func(context.Context, string)
+	sleep          func(time.Duration)
 }
 
 func applyMediaSlowPath(ctx context.Context, cfg mediaSlowPathConfig, event moderation.IncomingEvent,
@@ -164,7 +170,7 @@ func applyMediaSlowPath(ctx context.Context, cfg mediaSlowPathConfig, event mode
 	}
 
 	dl := newImageDownloader(cfg.api)
-	fileID, slowReason := mediaSlowPathFile(msg)
+	fileID, slowReason := mediaSlowPathFile(ctx, cfg, msg)
 	if fileID == "" {
 		return resp
 	}
@@ -188,7 +194,7 @@ func applyMediaSlowPath(ctx context.Context, cfg mediaSlowPathConfig, event mode
 	}
 
 	slowStart := time.Now()
-	slowResult, slowErr := cfg.engine.Check(ctx, slowReq)
+	slowResult, slowErr := checkSlowPathWithRetry(ctx, cfg, slowReq)
 	if cfg.observeLatency != nil {
 		cfg.observeLatency("slow_path_latency", time.Since(slowStart))
 	}
@@ -223,14 +229,90 @@ func applyMediaSlowPath(ctx context.Context, cfg mediaSlowPathConfig, event mode
 	return resp
 }
 
-func mediaSlowPathFile(msg *bot.Message) (string, slowpath.EscalationReason) {
+func mediaSlowPathFile(ctx context.Context, cfg mediaSlowPathConfig, msg *bot.Message) (string, slowpath.EscalationReason) {
 	if msg.Image != nil && msg.Image.FileID != "" {
 		return msg.Image.FileID, slowpath.EscalationImageContent
+	}
+	if msg.Animation != nil {
+		if msg.Animation.ThumbFileID != "" {
+			return msg.Animation.ThumbFileID, slowpath.EscalationImageContent
+		}
+		return msg.Animation.FileID, slowpath.EscalationImageContent
 	}
 	if msg.WithSticker && msg.Sticker != nil {
 		return stickerDownloadFileID(msg.Sticker), slowpath.EscalationImageContent
 	}
+	if msg.CustomEmojiID != "" {
+		return customEmojiDownloadFileID(ctx, cfg.api, msg.CustomEmojiID), slowpath.EscalationImageContent
+	}
 	return "", ""
+}
+
+func customEmojiDownloadFileID(ctx context.Context, api TbAPI, customEmojiID string) string {
+	if api == nil || customEmojiID == "" {
+		return ""
+	}
+	stickers, err := api.GetCustomEmojiStickers(tbapi.GetCustomEmojiStickersConfig{CustomEmojiIDs: []string{customEmojiID}})
+	if err != nil {
+		observability.Logf(ctx, "[WARN] get custom emoji sticker failed for slowpath: %v", err)
+		return ""
+	}
+	if len(stickers) == 0 {
+		return ""
+	}
+	info := &bot.StickerInfo{FileID: stickers[0].FileID, IsAnimated: stickers[0].IsAnimated, IsVideo: stickers[0].IsVideo}
+	if stickers[0].Thumbnail != nil {
+		info.ThumbFileID = stickers[0].Thumbnail.FileID
+	}
+	return stickerDownloadFileID(info)
+}
+
+func checkSlowPathWithRetry(ctx context.Context, cfg mediaSlowPathConfig, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
+	var lastErr error
+	for attempt := 0; attempt < 10; attempt++ {
+		result, err := cfg.engine.Check(ctx, req)
+		if err == nil || !retryableSlowPathError(err) || attempt == 9 {
+			return result, err
+		}
+		lastErr = err
+		delay := 3 * time.Second
+		observability.Logf(ctx, "[WARN] slowpath check failed, retrying in %s: %v", delay, err)
+		if !sleepContext(ctx, cfg.sleep, delay) {
+			return nil, errors.Join(ctx.Err(), lastErr)
+		}
+	}
+	return nil, lastErr
+}
+
+func retryableSlowPathError(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(err.Error())
+	retryableMarkers := []string{"retryable", "bad gateway", "502", "503", "504", "429", "rate limit", "timeout", "temporarily unavailable"}
+	for _, marker := range retryableMarkers {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func sleepContext(ctx context.Context, sleep func(time.Duration), delay time.Duration) bool {
+	if sleep == nil {
+		sleep = time.Sleep
+	}
+	done := make(chan struct{})
+	go func() {
+		sleep(delay)
+		close(done)
+	}()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-done:
+		return true
+	}
 }
 
 func slowpathReason(checks []spamcheck.Response) string {

@@ -265,7 +265,8 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 
 func (a *admin) demoCheck(update tbapi.Update) error {
 	msg := transform(update.Message)
-	if strings.TrimSpace(msg.Text) == "" && msg.Image == nil && !msg.WithVideoNote && !msg.WithVideo && !msg.WithSticker {
+	if strings.TrimSpace(msg.Text) == "" && msg.Image == nil && !msg.WithVideoNote && !msg.WithVideo && !msg.WithSticker &&
+		msg.Animation == nil && msg.CustomEmojiID == "" {
 		return nil
 	}
 
@@ -307,6 +308,10 @@ func adminDemoContentLabel(msg *bot.Message) string {
 		return "[sticker]"
 	case msg.Image != nil:
 		return "[image]"
+	case msg.Animation != nil:
+		return "[gif]"
+	case msg.CustomEmojiID != "":
+		return "[custom emoji]"
 	case msg.WithVideo:
 		return "[video]"
 	case msg.WithVideoNote:
