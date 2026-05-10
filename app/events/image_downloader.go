@@ -65,6 +65,9 @@ func (d *imageDownloader) download(ctx context.Context, fileID string) ([]byte, 
 	}
 
 	detectedMime := http.DetectContentType(data)
+	if isKnownNonImageMedia(detectedMime) {
+		return nil, "", fmt.Errorf("unsupported media content for image slowpath: detected %s", detectedMime)
+	}
 	mime := detectedMime
 	if !strings.HasPrefix(mime, "image/") {
 		mime = resp.Header.Get("Content-Type")
@@ -89,6 +92,10 @@ func (d *imageDownloader) download(ctx context.Context, fileID string) ([]byte, 
 	}
 
 	return data, mime, nil
+}
+
+func isKnownNonImageMedia(mime string) bool {
+	return strings.HasPrefix(mime, "video/") || strings.HasPrefix(mime, "audio/")
 }
 
 func convertWebPToJPEG(data []byte) ([]byte, string, error) {

@@ -141,6 +141,30 @@ func TestImageDownloader_download_normalizesJPEG(t *testing.T) {
 	assert.Equal(t, image.Rect(0, 0, 2, 2), decoded.Bounds())
 }
 
+func TestImageDownloader_downloadRejectsVideoBytesWithImageHeader(t *testing.T) {
+	videoData := []byte("\x00\x00\x00\x20ftypisom\x00\x00\x02\x00isomiso2avc1mp41")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write(videoData)
+	}))
+	defer srv.Close()
+
+	mockAPI := &mocks.TbAPIMock{
+		GetFileDirectURLFunc: func(fileID string) (string, error) {
+			return srv.URL + "/file.jpg", nil
+		},
+	}
+
+	d := newImageDownloader(mockAPI)
+	data, mime, err := d.download(context.Background(), "fid")
+
+	require.Error(t, err)
+	assert.Nil(t, data)
+	assert.Empty(t, mime)
+	assert.Contains(t, err.Error(), "unsupported media content")
+	assert.Contains(t, err.Error(), "video/mp4")
+}
+
 func TestImageDownloader_download_getURLFails(t *testing.T) {
 	mockAPI := &mocks.TbAPIMock{
 		GetFileDirectURLFunc: func(fileID string) (string, error) {
