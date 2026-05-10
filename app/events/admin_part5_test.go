@@ -623,3 +623,43 @@ func TestTelegramListener_AdminChatPlainMessageDemoCheck(t *testing.T) {
 	assert.Equal(t, int64(456), sent.ChatID)
 	assert.True(t, strings.Contains(sent.Text, "сообщение НЕ пройдет"), sent.Text)
 }
+
+func TestTelegramListener_AdminChatPlainMessageDemoCheckIgnoresForwardDisable(t *testing.T) {
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			return tbapi.Message{MessageID: 100}, nil
+		},
+	}
+	botMock := &mocks.BotMock{
+		OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+			assert.True(t, checkOnly)
+			assert.Equal(t, "buy casino", msg.Text)
+			return bot.Response{Send: true, BanInterval: bot.PermanentBanDuration, CheckResults: []spamcheck.Response{
+				{Name: "stop-word", Spam: true, Details: "casino"},
+			}}
+		},
+	}
+
+	l := TelegramListener{
+		TbAPI:                   mockAPI,
+		Bot:                     botMock,
+		SuperUsers:              SuperUsers{"admin"},
+		DisableAdminSpamForward: true,
+		adminChatID:             456,
+		adminHandler:            &admin{tbAPI: mockAPI, bot: botMock, adminChatID: 456},
+	}
+
+	err := l.handleUpdate(context.Background(), tbapi.Update{Message: &tbapi.Message{
+		MessageID: 10,
+		Chat:      tbapi.Chat{ID: 456},
+		From:      &tbapi.User{UserName: "admin", ID: 1},
+		Text:      "buy casino",
+	}})
+	require.NoError(t, err)
+
+	require.Len(t, mockAPI.SendCalls(), 1)
+	sent := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+	assert.Equal(t, int64(456), sent.ChatID)
+	assert.Contains(t, sent.Text, "демо-проверка")
+	assert.Contains(t, sent.Text, "сообщение НЕ пройдет")
+}

@@ -269,9 +269,6 @@ func (l *TelegramListener) eventLoop(ctx context.Context) error {
 
 func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update) error {
 	if update.Message != nil && l.isAdminChat(update.Message.Chat.ID, update.Message.From.UserName, update.Message.From.ID) {
-		if l.DisableAdminSpamForward {
-			return nil
-		}
 		l.incMetric("admin_messages")
 		if err := l.adminHandler.MsgHandler(ctx, update); err != nil {
 			l.incMetric("admin_errors")
