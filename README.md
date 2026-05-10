@@ -27,16 +27,15 @@ Shield is a self-hosted Telegram moderation and anti-spam bot. It watches group 
 
 ## Quick start
 
-Create a Telegram bot with BotFather, add it to your group as an admin, then run the container with a persistent data volume:
+Create a Telegram bot with BotFather, add it to your group as an admin, then run the standard tgadmin Compose setup:
 
 ```bash
-docker run --rm \
-  -e TELEGRAM_TOKEN="<bot-token>" \
-  -e TELEGRAM_GROUP="<group-name-or-id>" \
-  -v "$PWD/data:/srv/data" \
-  -p 8080:8080 \
-  umputun/tg-spam
+cp .env.example .env
+$EDITOR .env
+docker compose up -d
 ```
+
+The default `docker-compose.yml` starts `tg-spam` with persistent data in `./var/tg-spam`, logs in `./logs`, and a `cloudflared-tgadmin` tunnel sidecar. If you do not use Cloudflare Tunnel, remove or disable the `cloudflared-tgadmin` service before starting.
 
 For non-technical setup instructions, see [INSTALL.md](/INSTALL.md).
 
@@ -308,6 +307,20 @@ The web UI provides management interfaces:
 ![manage-users](https://github.com/umputun/tg-spam/raw/master/site/docs/manage-users.png)
 </details>
 
+## Docker compose
+
+The standard Docker Compose entry point is [`docker-compose.yml`](docker-compose.yml):
+
+```bash
+cp .env.example .env
+$EDITOR .env
+docker compose up -d
+```
+
+Set at least `TELEGRAM_TOKEN`, `TELEGRAM_GROUP`, and `SERVER_ENABLED=true` in `.env` for the tgadmin web UI. For the bundled Cloudflare Tunnel sidecar, add `CLOUDFLARED_TOKEN=<tunnel-token>` to `.env`; Compose interpolates `${CLOUDFLARED_TOKEN}` before service-level `env_file` values are loaded.
+
+[`docker-compose-tgadmin.yml`](docker-compose-tgadmin.yml) is kept as a compatibility alias for the same tgadmin topology.
+
 ## Docker compose examples
 
 ### Minimal
@@ -358,11 +371,27 @@ services:
 
 ### With web server and reverse proxy
 
-See [docker-compose-with-server.yml](docker-compose-with-server.yml) for a complete example with [reproxy](https://reproxy.io) and automatic SSL.
+See [docker-compose.yml](docker-compose.yml) for the standard tgadmin setup with web UI and Cloudflare Tunnel, or [docker-compose-with-server.yml](docker-compose-with-server.yml) for the older web-server compose example.
 
 ### With PostgreSQL
 
 See [docker-compose-with-psql.yml](docker-compose-with-psql.yml).
+
+## Railway
+
+Railway deploys this repository as a single `tg-spam` service built from [`Dockerfile`](Dockerfile). The checked-in [`railway.toml`](railway.toml) pins that behavior explicitly.
+
+Set the required Railway variables in the service settings:
+
+```env
+TELEGRAM_TOKEN=<bot-token>
+TELEGRAM_GROUP=<group-name-or-id>
+SERVER_ENABLED=true
+SERVER_LISTEN=:8080
+FILES_DYNAMIC=/srv/data
+```
+
+Do not run the Compose `cloudflared-tgadmin` sidecar on Railway; Railway provides its own public ingress/domain for the web UI.
 
 ## Multiple groups
 

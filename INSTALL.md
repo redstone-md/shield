@@ -101,26 +101,36 @@ sudo systemctl enable docker
 4. Test Docker by running: `docker --version`
 
 
-## Step 3: Creating Your Configuration File
+## Step 3: Getting the Standard Compose Setup
 
-1. Create a new folder on your computer called "tg-spam"
-2. Inside this folder, create a new text file named `docker-compose.yml`
-3. Copy and paste this template into the file:
+1. Download or clone this repository to a folder called `tg-spam`.
+2. Open Terminal (Mac and Linux) or Command Prompt (Windows).
+3. Go into the repository folder.
+4. Copy the example environment file:
 
-```yaml
-services:
-  tg-spam:
-    image: ghcr.io/umputun/tg-spam:latest
-    restart: always
-    environment:
-      - TELEGRAM_TOKEN=YOUR_BOT_TOKEN_HERE
-      - TELEGRAM_GROUP=YOUR_GROUP_NAME_HERE
-    volumes:
-      - ./data:/srv/data
+```bash
+cp .env.example .env
 ```
 
-4. Replace `YOUR_BOT_TOKEN_HERE` with the token you got from BotFather
-5. Replace `YOUR_GROUP_NAME_HERE` with your Telegram group's username (without the @ symbol)
+5. Open `.env` in a text editor and fill in at least these values:
+
+```env
+TELEGRAM_TOKEN=YOUR_BOT_TOKEN_HERE
+TELEGRAM_GROUP=YOUR_GROUP_NAME_HERE
+SERVER_ENABLED=true
+```
+
+Replace `YOUR_BOT_TOKEN_HERE` with the token you got from BotFather. Replace `YOUR_GROUP_NAME_HERE` with your Telegram group's username without `@`, or with the numeric group ID.
+
+The repository already includes the standard `docker-compose.yml`. It starts TG-Spam with persistent data in `./var/tg-spam`, logs in `./logs`, and an optional Cloudflare Tunnel sidecar named `cloudflared-tgadmin`.
+
+If you use Cloudflare Tunnel, add this to `.env`:
+
+```env
+CLOUDFLARED_TOKEN=YOUR_CLOUDFLARE_TUNNEL_TOKEN
+```
+
+If you do not use Cloudflare Tunnel, remove or disable the `cloudflared-tgadmin` service in `docker-compose.yml` before starting.
 
 ## Step 4: Starting TG-Spam
 
@@ -129,7 +139,7 @@ services:
 3. Press Enter
 4. Type this command and press Enter:
 ```
-docker-compose up -d
+docker compose up -d
 ```
 
 ## Step 5: Adding the Bot to Your Group
@@ -152,16 +162,16 @@ docker-compose up -d
 ## Common Questions
 
 **Q: How do I know if it's working?**
-A: The bot will automatically start monitoring messages. Try sending a test message in your group - the bot should be active and monitoring. You can inspect the bot's logs by running `docker-compose logs -f tg-spam` in your tg-spam folder.
+A: The bot will automatically start monitoring messages. Try sending a test message in your group - the bot should be active and monitoring. You can inspect the bot's logs by running `docker compose logs -f tg-spam` in your tg-spam folder.
 
 **Q: How do I stop the bot?**
-A: In Terminal/Command Prompt, go to your tg-spam folder and type: `docker-compose down`
+A: In Terminal/Command Prompt, go to your tg-spam folder and type: `docker compose down`
 
 **Q: How do I update the bot?**
 A: In Terminal/Command Prompt, go to your tg-spam folder and type:
 ```
-docker-compose pull
-docker-compose up -d
+docker compose pull
+docker compose up -d
 ```
 
 **Q: Something's not working. What should I check?**
@@ -169,4 +179,3 @@ docker-compose up -d
 2. Verify your bot token is correct
 3. Confirm the bot has admin rights in your group
 4. Check that your group name is entered correctly in the configuration
-

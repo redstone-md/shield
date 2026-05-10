@@ -1,3 +1,5 @@
+# standard tgadmin compose setup: tg-spam web UI behind a Cloudflare tunnel
+# copy .env.example to .env and create .env.tg-spam.local with CLOUDFLARED_TOKEN before starting
 services:
   tg-spam:
     build:
