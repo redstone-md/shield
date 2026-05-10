@@ -381,6 +381,8 @@ See [docker-compose-with-psql.yml](docker-compose-with-psql.yml).
 
 Railway deploys this repository as a single `tg-spam` service built from [`Dockerfile`](Dockerfile). The checked-in [`railway.toml`](railway.toml) pins that behavior explicitly.
 
+Dokploy/Railpack deployments use [`railpack.json`](railpack.json), which pins the Go entrypoint to `./app`. This is required because the repository root has `go.mod`, while the executable package lives under `app/` rather than the root or `cmd/`.
+
 Set the required Railway variables in the service settings:
 
 ```env

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "go",
+  "packages": {
+    "go": "1.25"
+  },
+  "steps": {
+    "build": {
+      "commands": [
+        "go build -o out -ldflags=\"-w -s\" ./app"
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "./out"
+  }
+}
