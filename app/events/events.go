@@ -408,7 +408,7 @@ func transform(msg *tbapi.Message) *bot.Message {
 			message.Animation.ThumbFileID = msg.Animation.Thumbnail.FileID
 		}
 	}
-	if msg.Document != nil && strings.EqualFold(msg.Document.MimeType, "image/gif") {
+	if msg.Animation == nil && msg.Document != nil && strings.EqualFold(msg.Document.MimeType, "image/gif") {
 		message.Animation = &bot.MediaInfo{FileID: msg.Document.FileID, MimeType: msg.Document.MimeType}
 		if msg.Document.Thumbnail != nil {
 			message.Animation.ThumbFileID = msg.Document.Thumbnail.FileID

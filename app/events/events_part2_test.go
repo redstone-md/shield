@@ -458,6 +458,22 @@ func TestTelegramListener_transformAnimationAndCustomEmoji(t *testing.T) {
 	assert.Equal(t, "emoji-1", (*res.Entities)[0].CustomEmojiID)
 }
 
+func TestTelegramListener_transformAnimationKeepsThumbnailWhenDocumentAlsoSet(t *testing.T) {
+	res := transform(&tbapi.Message{
+		MessageID: 201,
+		Chat:      tbapi.Chat{ID: 123},
+		From:      &tbapi.User{ID: 456, UserName: "user1"},
+		Date:      1578627415,
+		Animation: &tbapi.Animation{FileID: "animation-file", MimeType: "video/mp4", Thumbnail: &tbapi.PhotoSize{FileID: "animation-thumb"}},
+		Document:  &tbapi.Document{FileID: "document-file", MimeType: "image/gif"},
+	})
+
+	require.NotNil(t, res.Animation)
+	assert.Equal(t, "animation-file", res.Animation.FileID)
+	assert.Equal(t, "animation-thumb", res.Animation.ThumbFileID)
+	assert.Equal(t, "video/mp4", res.Animation.MimeType)
+}
+
 func TestTelegramListener_transformForward(t *testing.T) {
 	tbl := []struct {
 		name string

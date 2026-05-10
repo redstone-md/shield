@@ -781,6 +781,38 @@ func TestTelegramListener_AdminChatDemoCheckUsesSlowPathForGIF(t *testing.T) {
 	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "gif spam")
 }
 
+func TestTelegramListener_AdminChatDemoCheckSkipsAnimationWithoutThumbnail(t *testing.T) {
+	slowSpy := &slowPathCheckerSpy{}
+	mockAPI := &mocks.TbAPIMock{
+		GetFileDirectURLFunc: func(fileID string) (string, error) {
+			t.Fatalf("must not download original animation file %q", fileID)
+			return "", nil
+		},
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{MessageID: 101}, nil },
+	}
+	botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
+		assert.True(t, checkOnly)
+		assert.NotNil(t, msg.Animation)
+		return bot.Response{}
+	}}
+
+	l := TelegramListener{TbAPI: mockAPI, Bot: botMock, SuperUsers: SuperUsers{"admin"}, SlowPathEnabled: true,
+		SlowPathEngine: slowSpy, TenantID: "tg-spam", adminChatID: 456}
+	l.adminHandler = &admin{tbAPI: mockAPI, bot: botMock, adminChatID: 456, mediaSlowPath: l.mediaSlowPathConfig()}
+
+	err := l.handleUpdate(context.Background(), tbapi.Update{Message: &tbapi.Message{
+		MessageID: 11,
+		Chat:      tbapi.Chat{ID: 456},
+		From:      &tbapi.User{UserName: "admin", ID: 1},
+		Animation: &tbapi.Animation{FileID: "gif-file", MimeType: "video/mp4"},
+	}})
+
+	require.NoError(t, err)
+	assert.Empty(t, slowSpy.calls)
+	require.Len(t, mockAPI.SendCalls(), 1)
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "сообщение пройдет")
+}
+
 func TestTelegramListener_AdminChatDemoCheckShowsSlowPathHamSummary(t *testing.T) {
 	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
