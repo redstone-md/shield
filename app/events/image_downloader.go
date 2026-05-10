@@ -7,6 +7,7 @@ import (
 	"image/jpeg"
 	"io"
 	"net/http"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ type imageDownloader struct {
 	api     TbAPI
 	client  *http.Client
 	maxSize int64
+	extract func(context.Context, []byte, string, int64) ([]byte, string, error)
 }
 
 func newImageDownloader(api TbAPI) *imageDownloader {
@@ -26,6 +28,7 @@ func newImageDownloader(api TbAPI) *imageDownloader {
 			Timeout: 30 * time.Second,
 		},
 		maxSize: 10 * 1024 * 1024,
+		extract: ffmpegExtractFirstFrameJPEG,
 	}
 }
 
@@ -66,7 +69,11 @@ func (d *imageDownloader) download(ctx context.Context, fileID string) ([]byte, 
 
 	detectedMime := http.DetectContentType(data)
 	if isKnownNonImageMedia(detectedMime) {
-		return nil, "", fmt.Errorf("unsupported media content for image slowpath: detected %s", detectedMime)
+		data, mime, err := d.extract(ctx, data, detectedMime, d.maxSize)
+		if err != nil {
+			return nil, "", err
+		}
+		return data, mime, nil
 	}
 	mime := detectedMime
 	if !strings.HasPrefix(mime, "image/") {
@@ -96,6 +103,25 @@ func (d *imageDownloader) download(ctx context.Context, fileID string) ([]byte, 
 
 func isKnownNonImageMedia(mime string) bool {
 	return strings.HasPrefix(mime, "video/") || strings.HasPrefix(mime, "audio/")
+}
+
+func ffmpegExtractFirstFrameJPEG(ctx context.Context, data []byte, mime string, maxSize int64) ([]byte, string, error) {
+	cmd := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-frames:v", "1", "-f", "image2", "-vcodec", "mjpeg", "pipe:1")
+	cmd.Stdin = bytes.NewReader(data)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, "", fmt.Errorf("extract first frame from %s: %w: %s", mime, err, strings.TrimSpace(stderr.String()))
+	}
+	if int64(stdout.Len()) > maxSize {
+		return nil, "", fmt.Errorf("extracted frame exceeds max size: %d", maxSize)
+	}
+	frame := stdout.Bytes()
+	if http.DetectContentType(frame) != "image/jpeg" {
+		return nil, "", fmt.Errorf("extract first frame from %s: unexpected output mime %s", mime, http.DetectContentType(frame))
+	}
+	return frame, "image/jpeg", nil
 }
 
 func convertWebPToJPEG(data []byte) ([]byte, string, error) {

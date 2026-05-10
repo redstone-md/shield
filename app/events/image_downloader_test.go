@@ -143,6 +143,10 @@ func TestImageDownloader_download_normalizesJPEG(t *testing.T) {
 
 func TestImageDownloader_downloadRejectsVideoBytesWithImageHeader(t *testing.T) {
 	videoData := []byte("\x00\x00\x00\x20ftypisom\x00\x00\x02\x00isomiso2avc1mp41")
+	var frame bytes.Buffer
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.RGBA{B: 255, A: 255})
+	require.NoError(t, jpeg.Encode(&frame, img, &jpeg.Options{Quality: 90}))
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
 		w.Write(videoData)
@@ -156,13 +160,17 @@ func TestImageDownloader_downloadRejectsVideoBytesWithImageHeader(t *testing.T) 
 	}
 
 	d := newImageDownloader(mockAPI)
+	d.extract = func(ctx context.Context, data []byte, mime string, maxSize int64) ([]byte, string, error) {
+		assert.Equal(t, videoData, data)
+		assert.Equal(t, "video/mp4", mime)
+		assert.Equal(t, d.maxSize, maxSize)
+		return frame.Bytes(), "image/jpeg", nil
+	}
 	data, mime, err := d.download(context.Background(), "fid")
 
-	require.Error(t, err)
-	assert.Nil(t, data)
-	assert.Empty(t, mime)
-	assert.Contains(t, err.Error(), "unsupported media content")
-	assert.Contains(t, err.Error(), "video/mp4")
+	require.NoError(t, err)
+	assert.Equal(t, frame.Bytes(), data)
+	assert.Equal(t, "image/jpeg", mime)
 }
 
 func TestImageDownloader_download_getURLFails(t *testing.T) {

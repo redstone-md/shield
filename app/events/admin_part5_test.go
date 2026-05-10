@@ -781,12 +781,22 @@ func TestTelegramListener_AdminChatDemoCheckUsesSlowPathForGIF(t *testing.T) {
 	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "gif spam")
 }
 
-func TestTelegramListener_AdminChatDemoCheckSkipsAnimationWithoutThumbnail(t *testing.T) {
-	slowSpy := &slowPathCheckerSpy{}
+func TestTelegramListener_AdminChatDemoCheckUsesOriginalAnimationWithoutThumbnail(t *testing.T) {
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("jpeg frame"))
+	}))
+	defer imgSrv.Close()
+
+	slowSpy := &slowPathCheckerSpy{check: func(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
+		assert.Equal(t, slowpath.EscalationImageContent, req.Reason)
+		assert.Equal(t, "image/jpeg", req.ImageMIME)
+		return &slowpath.SlowPathResult{Spam: false, Confidence: 12, Reason: "animation frame ok", Providers: []string{"vision"}}, nil
+	}}
 	mockAPI := &mocks.TbAPIMock{
 		GetFileDirectURLFunc: func(fileID string) (string, error) {
-			t.Fatalf("must not download original animation file %q", fileID)
-			return "", nil
+			assert.Equal(t, "gif-file", fileID)
+			return imgSrv.URL, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{MessageID: 101}, nil },
 	}
@@ -808,7 +818,7 @@ func TestTelegramListener_AdminChatDemoCheckSkipsAnimationWithoutThumbnail(t *te
 	}})
 
 	require.NoError(t, err)
-	assert.Empty(t, slowSpy.calls)
+	require.Len(t, slowSpy.calls, 1)
 	require.Len(t, mockAPI.SendCalls(), 1)
 	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "сообщение пройдет")
 }

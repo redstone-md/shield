@@ -293,8 +293,8 @@ func mediaSlowPathFile(ctx context.Context, cfg mediaSlowPathConfig, msg *bot.Me
 		if msg.Animation.ThumbFileID != "" {
 			return msg.Animation.ThumbFileID, slowpath.EscalationImageContent
 		}
-		observability.Logf(ctx, "[DEBUG] animation slowpath skipped: no thumbnail available")
-		return "", ""
+		observability.Logf(ctx, "[DEBUG] animation slowpath using original file for first-frame extraction: mime=%s", msg.Animation.MimeType)
+		return msg.Animation.FileID, slowpath.EscalationImageContent
 	}
 	if msg.WithSticker && msg.Sticker != nil {
 		return stickerDownloadFileID(msg.Sticker), slowpath.EscalationImageContent
