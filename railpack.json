@@ -12,6 +12,9 @@
     }
   },
   "deploy": {
+    "aptPackages": [
+      "ffmpeg"
+    ],
     "inputs": [
       "...",
       {
