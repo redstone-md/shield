@@ -596,3 +596,94 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		assert.Empty(t, mockAPI.SendCalls())
 	})
 }
+
+func TestAdmin_WarningNotSpamCallback(t *testing.T) {
+	t.Run("ask confirmation", func(t *testing.T) {
+		mockAPI := &mocks.TbAPIMock{
+			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{}, nil },
+		}
+		adm := admin{tbAPI: mockAPI, adminChatID: 456}
+
+		query := &tbapi.CallbackQuery{
+			Data: "W?7187750383:777",
+			Message: &tbapi.Message{
+				MessageID: 100,
+				Chat:      tbapi.Chat{ID: 456},
+				Text:      "<b>⚠️ WARNING 1/3</b> Dorothy (7187750383)\n\nfalse positive\n\n",
+			},
+		}
+
+		err := adm.InlineCallbackHandler(context.Background(), query)
+		require.NoError(t, err)
+		require.Len(t, mockAPI.SendCalls(), 1)
+		edit := mockAPI.SendCalls()[0].C.(tbapi.EditMessageReplyMarkupConfig)
+		buttons := edit.ReplyMarkup.InlineKeyboard[0]
+		require.Len(t, buttons, 2)
+		assert.Equal(t, "Да, ham", buttons[0].Text)
+		require.NotNil(t, buttons[0].CallbackData)
+		assert.Equal(t, "W+7187750383:777", *buttons[0].CallbackData)
+		assert.Equal(t, "Отмена", buttons[1].Text)
+	})
+
+	t.Run("confirm updates ham", func(t *testing.T) {
+		mockAPI := &mocks.TbAPIMock{
+			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+				return &tbapi.APIResponse{Ok: true}, nil
+			},
+			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{}, nil },
+		}
+		botMock := &mocks.BotMock{UpdateHamFunc: func(msg string) error { return nil }}
+		autoLearner := &autoLearnerSpy{}
+		detectedSpy := &detectedSpamCounterSpy{count: 2, deleteResult: true}
+		adm := admin{tbAPI: mockAPI, bot: botMock, adminChatID: 456, autoLearner: autoLearner, detectedSpam: detectedSpy}
+
+		query := &tbapi.CallbackQuery{
+			ID:   "callback-id",
+			Data: "W+7187750383:777",
+			From: &tbapi.User{ID: 111, UserName: "admin"},
+			Message: &tbapi.Message{
+				MessageID: 100,
+				Date:      int(time.Now().Unix()),
+				Chat:      tbapi.Chat{ID: 456},
+				Text: `<b>⚠️ WARNING 1/3</b> Dorothy (7187750383)
+
+Проводим инвайтинг в чаты, рассылку по группам
+
+Причина: classifier`,
+			},
+		}
+
+		err := adm.InlineCallbackHandler(context.Background(), query)
+		require.NoError(t, err)
+		require.Len(t, botMock.UpdateHamCalls(), 1)
+		assert.Equal(t, "Проводим инвайтинг в чаты, рассылку по группам", botMock.UpdateHamCalls()[0].Msg)
+		require.Len(t, autoLearner.hamCalls, 1)
+		assert.Equal(t, "Проводим инвайтинг в чаты, рассылку по группам", autoLearner.hamCalls[0].text)
+		assert.Equal(t, "admin", autoLearner.hamCalls[0].labeledBy)
+		require.Len(t, detectedSpy.deleteByIDCalls, 2)
+		assert.Equal(t, int64(7187750383), detectedSpy.deleteByIDCalls[0].userID)
+		require.Len(t, detectedSpy.deleteLatestByIDCalls, 2)
+		assert.Equal(t, int64(7187750383), detectedSpy.deleteLatestByIDCalls[0])
+		require.Len(t, mockAPI.SendCalls(), 1)
+		edit := mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig)
+		assert.Contains(t, edit.Text, "ham подтвержден администратором [admin](tg://user?id=111)")
+		require.NotNil(t, edit.ReplyMarkup)
+		assert.Empty(t, edit.ReplyMarkup.InlineKeyboard)
+	})
+}
+
+type autoLearnerSpy struct {
+	hamCalls []struct {
+		text      string
+		labeledBy string
+	}
+}
+
+func (s *autoLearnerSpy) LearnSpam(context.Context, string, string) {}
+
+func (s *autoLearnerSpy) LearnHam(_ context.Context, text, labeledBy string) {
+	s.hamCalls = append(s.hamCalls, struct {
+		text      string
+		labeledBy string
+	}{text: text, labeledBy: labeledBy})
+}

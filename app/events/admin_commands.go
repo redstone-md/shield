@@ -185,7 +185,7 @@ func (a *admin) DirectUnwarnReport(update tbapi.Update) error {
 		return fmt.Errorf("direct unwarn report failed: can't identify warning subject")
 	}
 
-	remaining, deleted, err := a.deleteManualWarn(ctx, subjectID, userName)
+	remaining, deleted, err := a.deleteLatestWarn(ctx, subjectID, userName)
 	if err != nil {
 		return fmt.Errorf("direct unwarn report failed: %w", err)
 	}
@@ -197,13 +197,64 @@ func (a *admin) DirectUnwarnReport(update tbapi.Update) error {
 	return nil
 }
 
-func (a *admin) deleteManualWarn(ctx context.Context, subjectID int64, userName string) (remaining int, deleted bool, err error) {
+func (a *admin) deleteAllWarns(ctx context.Context, subjectID int64, userName string) (remaining int, deleted bool, err error) {
+	if subjectID != 0 {
+		manualCount, countErr := a.detectedSpam.CountByUserIDAndSignalSource(ctx, subjectID, manualWarnSignalSource)
+		if countErr != nil {
+			return 0, false, countErr
+		}
+		for range manualCount {
+			deletedOne, deleteErr := a.detectedSpam.DeleteLatestByUserIDAndSignalSource(ctx, subjectID, manualWarnSignalSource)
+			if deleteErr != nil {
+				return 0, deleted, deleteErr
+			}
+			deleted = deleted || deletedOne
+		}
+
+		remaining, err = a.detectedSpam.CountByUserID(ctx, subjectID)
+		if err != nil {
+			return 0, false, err
+		}
+		for range remaining {
+			deletedOne, deleteErr := a.detectedSpam.DeleteLatestByUserID(ctx, subjectID)
+			if deleteErr != nil {
+				return 0, deleted, deleteErr
+			}
+			deleted = deleted || deletedOne
+		}
+		return 0, deleted, nil
+	}
+	manualCount, countErr := a.detectedSpam.CountByUserNameAndSignalSource(ctx, userName, manualWarnSignalSource)
+	if countErr != nil {
+		return 0, false, countErr
+	}
+	for range manualCount {
+		deletedOne, deleteErr := a.detectedSpam.DeleteLatestByUserNameAndSignalSource(ctx, userName, manualWarnSignalSource)
+		if deleteErr != nil {
+			return 0, deleted, deleteErr
+		}
+		deleted = deleted || deletedOne
+	}
+	remaining, err = a.detectedSpam.CountByUserNameAndSignalSource(ctx, userName, manualWarnSignalSource)
+	if err != nil {
+		return 0, false, err
+	}
+	return remaining, deleted, err
+}
+
+func (a *admin) deleteLatestWarn(ctx context.Context, subjectID int64, userName string) (remaining int, deleted bool, err error) {
 	if subjectID != 0 {
 		deleted, err = a.detectedSpam.DeleteLatestByUserIDAndSignalSource(ctx, subjectID, manualWarnSignalSource)
 		if err != nil {
 			return 0, false, err
 		}
-		remaining, err = a.detectedSpam.CountByUserIDAndSignalSource(ctx, subjectID, manualWarnSignalSource)
+		if !deleted {
+			deleted, err = a.detectedSpam.DeleteLatestByUserID(ctx, subjectID)
+			if err != nil {
+				return 0, false, err
+			}
+		}
+		remaining, err = a.detectedSpam.CountByUserID(ctx, subjectID)
 		return remaining, deleted, err
 	}
 	deleted, err = a.detectedSpam.DeleteLatestByUserNameAndSignalSource(ctx, userName, manualWarnSignalSource)

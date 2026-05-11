@@ -181,6 +181,36 @@ func TestAdmin_reportWarnIncludesSlowpathReason(t *testing.T) {
 	assert.Contains(t, sentText, "Причина: vision spam reason")
 }
 
+func TestAdmin_reportWarnAddsNotSpamButton(t *testing.T) {
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			return tbapi.Message{}, nil
+		},
+	}
+
+	adm := admin{
+		tbAPI:       mockAPI,
+		adminChatID: 123,
+	}
+	msg := &bot.Message{
+		ID:   777,
+		From: bot.User{ID: 7187750383, Username: "dorothy", FirstName: "Dorothy"},
+		Text: "Проводим инвайтинг в чаты",
+	}
+
+	adm.ReportWarn("dorothy", msg, 1, 3)
+
+	require.Len(t, mockAPI.SendCalls(), 1)
+	msgConfig := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
+	markup := msgConfig.ReplyMarkup.(tbapi.InlineKeyboardMarkup)
+	require.Len(t, markup.InlineKeyboard, 1)
+	require.Len(t, markup.InlineKeyboard[0], 1)
+	button := markup.InlineKeyboard[0][0]
+	assert.Equal(t, "Не спам", button.Text)
+	require.NotNil(t, button.CallbackData)
+	assert.Equal(t, "W?7187750383:777", *button.CallbackData)
+}
+
 func TestAdmin_getCleanMessage(t *testing.T) {
 	a := &admin{}
 
@@ -239,6 +269,19 @@ func TestAdmin_getCleanMessage(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAdmin_getCleanWarningMessage(t *testing.T) {
+	a := &admin{}
+	msg := `<b>⚠️ WARNING 1/3</b> <a href="https://t.me/dorothy">Dorothy</a> (7187750383)
+
+Проводим инвайтинг в чаты, рассылку по группам
+
+Причина: slowpath spam reason`
+
+	result, err := a.getCleanWarningMessage(msg)
+	require.NoError(t, err)
+	assert.Equal(t, "Проводим инвайтинг в чаты, рассылку по группам", result)
 }
 
 func TestAdmin_getCleanMessage2(t *testing.T) {

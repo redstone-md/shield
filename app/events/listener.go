@@ -271,6 +271,11 @@ func (l *TelegramListener) eventLoop(ctx context.Context) error {
 func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update) error {
 	if update.Message != nil && l.isAdminChat(update.Message.Chat.ID, update.Message.From.UserName, update.Message.From.ID) {
 		l.incMetric("admin_messages")
+		if update.Message.ReplyToMessage != nil && l.SuperUsers.IsSuper(update.Message.From.UserName, update.Message.From.ID) {
+			if l.procSuperReply(ctx, update) {
+				return nil
+			}
+		}
 		if err := l.adminHandler.MsgHandler(ctx, update); err != nil {
 			l.incMetric("admin_errors")
 			log.Printf("[WARN] failed to process admin chat message: %v", err)

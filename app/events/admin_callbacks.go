@@ -46,12 +46,102 @@ func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.Callback
 		return nil
 	}
 
+	if strings.HasPrefix(callbackData, warnHamAskPrefix) {
+		if err := a.callbackAskWarningHamConfirmation(query); err != nil {
+			return fmt.Errorf("failed to make warning ham confirmation dialog: %w", err)
+		}
+		log.Printf("[DEBUG] warning ham confirmation request sent, chatID: %d, data: %s, orig: %q",
+			chatID, callbackData, query.Message.Text)
+		return nil
+	}
+
+	if strings.HasPrefix(callbackData, warnHamPrefix) {
+		if err := a.callbackWarningHamConfirmed(ctx, query); err != nil {
+			return fmt.Errorf("failed to confirm warning ham: %w", err)
+		}
+		log.Printf("[DEBUG] warning ham confirmed, chatID: %d, data: %s, orig: %q", chatID, callbackData, query.Message.Text)
+		return nil
+	}
+
+	if strings.HasPrefix(callbackData, warnHamCancel) {
+		if err := a.callbackWarningHamCancel(query); err != nil {
+			return fmt.Errorf("failed to cancel warning ham: %w", err)
+		}
+		return nil
+	}
+
 	log.Printf("[DEBUG] unban action activated, chatID: %d, userID: %s, orig: %q", chatID, callbackData, query.Message.Text)
 	if err := a.callbackUnbanConfirmed(ctx, query); err != nil {
 		return fmt.Errorf("failed to unban user: %w", err)
 	}
 	log.Printf("[INFO] user unbanned, chatID: %d, userID: %s, orig: %q", chatID, callbackData, query.Message.Text)
 
+	return nil
+}
+
+func (a *admin) callbackAskWarningHamConfirmation(query *tbapi.CallbackQuery) error {
+	confirmationKeyboard := tbapi.NewInlineKeyboardMarkup(
+		tbapi.NewInlineKeyboardRow(
+			tbapi.NewInlineKeyboardButtonData("Да, ham", warnHamPrefix+strings.TrimPrefix(query.Data, warnHamAskPrefix)),
+			tbapi.NewInlineKeyboardButtonData("Отмена", warnHamCancel+strings.TrimPrefix(query.Data, warnHamAskPrefix)),
+		),
+	)
+	editMsg := tbapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, confirmationKeyboard)
+	if err := send(editMsg, a.tbAPI); err != nil {
+		return fmt.Errorf("failed to make warning ham confirmation, chatID:%d, msgID:%d, %w",
+			query.Message.Chat.ID, query.Message.MessageID, err)
+	}
+	return nil
+}
+
+func (a *admin) callbackWarningHamConfirmed(ctx context.Context, query *tbapi.CallbackQuery) error {
+	callbackResponse := tbapi.NewCallback(query.ID, "принято")
+	if _, err := a.tbAPI.Request(callbackResponse); err != nil {
+		return fmt.Errorf("failed to send callback response: %w", err)
+	}
+	userID, _, err := parseCallbackData(query.Data)
+	if err != nil {
+		return fmt.Errorf("failed to parse warning ham callback %q: %w", query.Data, err)
+	}
+
+	cleanMsg, err := a.getCleanWarningMessage(query.Message.Text)
+	if err != nil {
+		return fmt.Errorf("failed to get warning message: %w", err)
+	}
+	if err := a.bot.UpdateHam(cleanMsg); err != nil {
+		return fmt.Errorf("failed to update ham for %q: %w", cleanMsg, err)
+	}
+	if a.autoLearner != nil {
+		a.autoLearner.LearnHam(ctx, cleanMsg, query.From.UserName)
+	}
+	if a.detectedSpam != nil {
+		if _, _, err := a.deleteAllWarns(ctx, userID, ""); err != nil {
+			return fmt.Errorf("failed to remove warning strikes for %d: %w", userID, err)
+		}
+	}
+
+	updText := query.Message.Text + fmt.Sprintf("\n\nham подтвержден администратором %s за %v",
+		markdownUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
+	editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, updText)
+	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
+	if err := send(editMsg, a.tbAPI); err != nil {
+		return fmt.Errorf("failed to edit warning ham message, chatID:%d, msgID:%d, %w",
+			query.Message.Chat.ID, query.Message.MessageID, err)
+	}
+	return nil
+}
+
+func (a *admin) callbackWarningHamCancel(query *tbapi.CallbackQuery) error {
+	markup := tbapi.NewInlineKeyboardMarkup(
+		tbapi.NewInlineKeyboardRow(
+			tbapi.NewInlineKeyboardButtonData("Не спам", warnHamAskPrefix+strings.TrimPrefix(query.Data, warnHamCancel)),
+		),
+	)
+	editMsg := tbapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, markup)
+	if err := send(editMsg, a.tbAPI); err != nil {
+		return fmt.Errorf("failed to cancel warning ham confirmation, chatID:%d, msgID:%d, %w",
+			query.Message.Chat.ID, query.Message.MessageID, err)
+	}
 	return nil
 }
 
@@ -343,6 +433,28 @@ func (a *admin) getCleanMessage(msg string) (string, error) {
 
 	cleanMsg := strings.Join(msgLines[2:spamInfoLine], "\n")
 	return strings.TrimSpace(cleanMsg), nil
+}
+
+func (a *admin) getCleanWarningMessage(msg string) (string, error) {
+	msgLines := strings.Split(msg, "\n")
+	if len(msgLines) < 3 {
+		return "", fmt.Errorf("unexpected warning callback message: %q", msg)
+	}
+
+	endLine := len(msgLines)
+	for i, line := range msgLines[2:] {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Причина:") || strings.HasPrefix(trimmed, "ham подтвержден") {
+			endLine = i + 2
+			break
+		}
+	}
+
+	cleanMsg := strings.TrimSpace(strings.Join(msgLines[2:endLine], "\n"))
+	if cleanMsg == "" {
+		return "", fmt.Errorf("no original warning message found in callback message: %q", msg)
+	}
+	return cleanMsg, nil
 }
 
 func (a *admin) sendWithUnbanMarkup(text, action string, user bot.User, msgID int, chatID int64) error {

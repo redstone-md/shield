@@ -41,6 +41,9 @@ const (
 	confirmationPrefix = "?"
 	banPrefix          = "+"
 	infoPrefix         = "!"
+	warnHamAskPrefix   = "W?"
+	warnHamPrefix      = "W+"
+	warnHamCancel      = "WX"
 )
 
 func (a *admin) ReportBan(banUserStr string, msg *bot.Message, duration time.Duration, restrict bool, reasons ...string) {
@@ -139,6 +142,11 @@ func (a *admin) ReportWarn(warnUserStr string, msg *bot.Message, warnNum, warnTo
 	msgConfig := tbapi.NewMessage(a.adminChatID, forwardMsg)
 	msgConfig.ParseMode = tbapi.ModeHTML
 	msgConfig.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
+	msgConfig.ReplyMarkup = tbapi.NewInlineKeyboardMarkup(
+		tbapi.NewInlineKeyboardRow(
+			tbapi.NewInlineKeyboardButtonData("Не спам", fmt.Sprintf("%s%d:%d", warnHamAskPrefix, userID, msg.ID)),
+		),
+	)
 	if _, err := a.tbAPI.Send(msgConfig); err != nil {
 		log.Printf("[WARN] failed to send admin warn message, %v", err)
 	}

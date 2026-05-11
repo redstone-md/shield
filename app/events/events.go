@@ -63,6 +63,7 @@ type DetectedSpamCounter interface {
 	CountByUserID(ctx context.Context, userID int64) (int, error)
 	CountByUserIDAndSignalSource(ctx context.Context, userID int64, signalSource string) (int, error)
 	CountByUserNameAndSignalSource(ctx context.Context, userName, signalSource string) (int, error)
+	DeleteLatestByUserID(ctx context.Context, userID int64) (bool, error)
 	DeleteLatestByUserIDAndSignalSource(ctx context.Context, userID int64, signalSource string) (bool, error)
 	DeleteLatestByUserNameAndSignalSource(ctx context.Context, userName, signalSource string) (bool, error)
 	Write(ctx context.Context, entry storage.DetectedSpamInfo, checks []spamcheck.Response) error
@@ -548,7 +549,7 @@ func mediaInfoDetails(info *bot.MediaInfo) string {
 }
 
 // parseCallbackData parses callback data format: [prefix]userID:msgID
-// prefix can be: ?, +, !, or two-char report prefixes (R+, R-, R?, R!, RX)
+// prefix can be: ?, +, !, two-char warning prefixes (W?, W+, WX), or two-char report prefixes (R+, R-, R?, R!, RX)
 func parseCallbackData(data string) (userID int64, msgID int, err error) {
 	if len(data) < 3 {
 		return 0, 0, fmt.Errorf("unexpected callback data, too short %q", data)
@@ -556,7 +557,7 @@ func parseCallbackData(data string) (userID int64, msgID int, err error) {
 
 	// remove prefix if present from the parsed data
 	// check for two-char report prefixes first (R+, R-, R?, R!, RX)
-	if len(data) >= 3 && data[:1] == "R" {
+	if len(data) >= 3 && (data[:1] == "R" || data[:1] == "W") {
 		// two-char report prefix
 		data = data[2:]
 	} else if data[:1] == "?" || data[:1] == "+" || data[:1] == "!" {

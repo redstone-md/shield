@@ -302,6 +302,25 @@ func (ds *DetectedSpam) CountByUserID(ctx context.Context, userID int64) (int, e
 	return count, nil
 }
 
+// DeleteLatestByUserID removes the newest detected spam entry for a user.
+func (ds *DetectedSpam) DeleteLatestByUserID(ctx context.Context, userID int64) (bool, error) {
+	ds.Lock()
+	defer ds.Unlock()
+
+	query := ds.Adopt(`DELETE FROM detected_spam WHERE id = (
+		SELECT id FROM detected_spam WHERE user_id = ? AND tenant_id = ? ORDER BY timestamp DESC, id DESC LIMIT 1
+	)`)
+	res, err := ds.ExecContext(ctx, query, userID, ds.TenantID())
+	if err != nil {
+		return false, fmt.Errorf("failed to delete latest detected spam entry for user_id %d: %w", userID, err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("failed to read deleted detected spam row count: %w", err)
+	}
+	return rows > 0, nil
+}
+
 // CountByUserIDAndSignalSource returns the number of detected spam entries for the given user and signal source.
 func (ds *DetectedSpam) CountByUserIDAndSignalSource(ctx context.Context, userID int64, signalSource string) (int, error) {
 	ds.RLock()
