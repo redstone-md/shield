@@ -188,6 +188,8 @@ func (s *StorageTestSuite) TestSampleUpdater() {
 				samples, err := NewSamples(context.Background(), db)
 				s.Require().NoError(err)
 
+				s.Require().NoError(samples.Add(context.Background(), SampleTypeSpam, SampleOriginUser, "test message"))
+
 				updater := NewSampleUpdater(samples, SampleTypeSpam, time.Nanosecond)
 				time.Sleep(time.Microsecond)
 				err = updater.Remove("test message")

@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,11 +14,10 @@ import (
 )
 
 func TestRestoreService_RestoreTenant(t *testing.T) {
-	dbFile := filepath.Join(os.TempDir(), "test_restore.db")
+	dbFile := filepath.Join(t.TempDir(), "test_restore.db")
 	db, err := engine.NewSqlite(dbFile, "gr1")
 	require.NoError(t, err)
 	defer db.Close()
-	defer os.Remove(dbFile)
 
 	tenants, err := NewTenants(context.Background(), db)
 	require.NoError(t, err)

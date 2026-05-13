@@ -4,6 +4,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -11,6 +12,9 @@ import (
 )
 
 func TestBackupDB(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("backup filenames embed colons, which are reserved on NTFS")
+	}
 
 	fileSize := func(t *testing.T, path string) int64 {
 		t.Helper()

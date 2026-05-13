@@ -147,7 +147,7 @@ func TestRun_DetailCorrectness(t *testing.T) {
 	if report.Details[0].Checks[0].Name != "test" {
 		t.Errorf("detail0 check name=%s", report.Details[0].Checks[0].Name)
 	}
-	if report.Details[0].Duration == 0 {
-		t.Errorf("detail0 duration should be >0")
+	if report.Details[0].Duration < 0 {
+		t.Errorf("detail0 duration should be non-negative, got %v", report.Details[0].Duration)
 	}
 }

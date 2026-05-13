@@ -52,7 +52,7 @@ func TestIncomingEventsRecord(t *testing.T) {
 	assert.Equal(t, event.MessageID, record.MessageID)
 	assert.Equal(t, event.EditedMessageID, record.EditedMessageID)
 	assert.Equal(t, event.IdempotencyKey, record.IdempotencyKey)
-	assert.Equal(t, event.ReceivedAt, record.ReceivedAt)
+	assert.True(t, event.ReceivedAt.Equal(record.ReceivedAt), "received_at mismatch: want %v, got %v", event.ReceivedAt, record.ReceivedAt)
 }
 
 func TestIncomingEventsReserveAndComplete(t *testing.T) {

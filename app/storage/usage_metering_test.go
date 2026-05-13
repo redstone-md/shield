@@ -168,7 +168,7 @@ func (s *StorageTestSuite) TestUsageMetering_ResetTenant() {
 				}
 			}
 			s.Assert().Len(found, 1)
-			s.Assert().Equal(newStart, found[0].WindowStart)
+			s.Assert().True(newStart.Equal(found[0].WindowStart), "window_start mismatch: want %v, got %v", newStart, found[0].WindowStart)
 		})
 	}
 }
