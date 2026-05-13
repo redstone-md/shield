@@ -1,17 +1,73 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
+# Dependabot configuration. See
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
+#
+# Security-only updates are governed by the repository setting
+# "Dependabot security updates" (PUT /repos/{owner}/{repo}/automated-security-fixes)
+# and ignore open-pull-requests-limit.
 version: 2
 updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 0
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      aws:
+        patterns: ["github.com/aws/*"]
+      otel:
+        patterns:
+          - "go.opentelemetry.io/*"
+          - "github.com/grpc-ecosystem/*"
+      grpc-protobuf:
+        patterns:
+          - "google.golang.org/grpc*"
+          - "google.golang.org/protobuf*"
+          - "google.golang.org/genproto*"
+      moby:
+        patterns:
+          - "github.com/moby/*"
+          - "github.com/containerd/*"
+          - "github.com/docker/*"
+      golang-x:
+        patterns: ["golang.org/x/*"]
+      modernc:
+        patterns: ["modernc.org/*"]
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
   - package-ecosystem: "gomod"
     directory: "/_examples/simplechat"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "chore(ci)"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore(docker)"
