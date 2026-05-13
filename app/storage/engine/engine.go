@@ -65,7 +65,7 @@ func New(ctx context.Context, connURL, gid string) (*SQL, error) {
 
 // NewSqlite creates a new sqlite database
 func NewSqlite(file, gid string) (*SQL, error) {
-	db, err := sqlx.Connect("sqlite", file)
+	db, err := sqlx.Connect("sqlite", sqliteDSN(file))
 	if err != nil {
 		return &SQL{}, fmt.Errorf("failed to connect to sqlite: %w", err)
 	}
@@ -201,6 +201,24 @@ func (e *SQL) Adopt(q string) string {
 	}
 
 	return result.String()
+}
+
+// sqliteDSN wraps a sqlite path or URI with _time_format=sqlite so DATETIME
+// columns round-trip through time.Time scanners regardless of the host's
+// timezone abbreviation (Go's t.String() can emit single-letter zones like
+// "R" on Windows, which modernc's legacy parser rejects).
+func sqliteDSN(path string) string {
+	if strings.HasPrefix(path, "file:") {
+		if strings.Contains(path, "_time_format=") {
+			return path
+		}
+		sep := "?"
+		if strings.Contains(path, "?") {
+			sep = "&"
+		}
+		return path + sep + "_time_format=sqlite"
+	}
+	return "file:" + path + "?_time_format=sqlite"
 }
 
 func setSqlitePragma(db *sqlx.DB) error {

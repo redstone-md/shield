@@ -47,7 +47,7 @@ func (c *memoryCache) Get(ctx context.Context, tenantID, workspaceID string) (ru
 		return rules.RuleSet{}, false
 	}
 
-	if invalidatedAt, ok := c.invalidated[key]; ok && invalidatedAt.After(entry.cachedAt) {
+	if invalidatedAt, ok := c.invalidated[key]; ok && !invalidatedAt.Before(entry.cachedAt) {
 		return rules.RuleSet{}, false
 	}
 
