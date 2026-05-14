@@ -331,7 +331,6 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 	}
 
 	if spamDetected {
-		d.addToLLMHistory(req)
 		d.spamHistory.Push(req)
 		return true, cr
 	}
