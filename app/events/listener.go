@@ -172,6 +172,12 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 		log.Printf("[INFO] soft ban mode, no bans but restrictions")
 	}
 
+	if l.DeleteGuestBots {
+		log.Printf("[INFO] delete-guest-bots enabled, whitelist=%v", l.BotWhitelist)
+	} else {
+		log.Printf("[DEBUG] delete-guest-bots disabled")
+	}
+
 	var getChatErr error
 	if l.chatID, getChatErr = l.getChatID(l.Group); getChatErr != nil {
 		return fmt.Errorf("failed to get chat ID for group %q: %w", l.Group, getChatErr)

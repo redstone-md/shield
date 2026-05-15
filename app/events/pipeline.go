@@ -75,8 +75,10 @@ func (l *TelegramListener) procEventsWithContext(ctx context.Context, update tba
 		return nil
 	}
 
-	if l.DeleteGuestBots && update.Message.From != nil && update.Message.From.IsBot && update.Message.SenderChat == nil {
-		if !l.isAllowedBot(update.Message.From) {
+	if update.Message.From != nil && update.Message.From.IsBot && update.Message.SenderChat == nil {
+		log.Printf("[DEBUG] bot-msg received: from=%q (%d) IsBot=true delete-guest-bots=%t",
+			update.Message.From.UserName, update.Message.From.ID, l.DeleteGuestBots)
+		if l.DeleteGuestBots && !l.isAllowedBot(update.Message.From) {
 			l.deleteGuestBotMessage(ctx, update.Message)
 			return nil
 		}
