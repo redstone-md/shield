@@ -7,6 +7,11 @@ type LLMProvider interface {
 	Check(ctx context.Context, req ProviderRequest) (*ProviderResult, error)
 }
 
+type ChatProvider interface {
+	Name() string
+	Reply(ctx context.Context, req ChatRequest) (*ChatResult, error)
+}
+
 type VisionProvider interface {
 	Name() string
 	AnalyzeImage(ctx context.Context, imageData []byte, mime string, prompt string) (*ProviderResult, error)

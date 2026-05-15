@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +37,12 @@ type MetricsRecorder interface {
 type SlowPathChecker interface {
 	Check(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error)
 }
+
+type SlowPathChatChecker interface {
+	Reply(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error)
+}
+
+var chatThoughtRe = regexp.MustCompile(`(?is)<thought>.*?</thought>`)
 
 // TelegramListener listens to tg update, forward to bots and send back responses
 // Not thread safe
@@ -78,6 +85,7 @@ type TelegramListener struct {
 	MetricsRecorder         MetricsRecorder
 	SlowPathEnabled         bool
 	SlowPathEngine          SlowPathChecker
+	SlowPathChatEngine      SlowPathChatChecker
 	CandidateGenerator      CandidateGenerator
 	AutoLearner             AutoLearner
 
@@ -94,6 +102,7 @@ type TelegramListener struct {
 		once sync.Once
 		ch   chan bot.Response
 	}
+	chatLimiter *chatRateLimiter
 }
 
 // GetDMUsers returns the list of recent DM senders
@@ -356,10 +365,8 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 		return nil
 	}
 
-	if update.Message.ReplyToMessage != nil {
-		if l.procUserReply(ctx, update) {
-			return nil
-		}
+	if l.procUserReply(ctx, update) {
+		return nil
 	}
 
 	if err := l.procEventsWithContext(ctx, update); err != nil {
@@ -501,8 +508,44 @@ func (l *TelegramListener) isBotMention(text string) bool {
 	return false
 }
 
+const (
+	chatReplyLimitPerMinute = 5
+	chatLimitWindow         = time.Minute
+	chatLimitWarningText    = "бот может отвечать вам только 5 раз в минуту"
+)
+
+type chatRateLimiter struct {
+	mu      sync.Mutex
+	entries map[int64][]time.Time
+}
+
+func (r *chatRateLimiter) allow(userID int64, now time.Time) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.entries == nil {
+		r.entries = make(map[int64][]time.Time)
+	}
+	cutoff := now.Add(-chatLimitWindow)
+	entries := r.entries[userID][:0]
+	for _, ts := range r.entries[userID] {
+		if ts.After(cutoff) {
+			entries = append(entries, ts)
+		}
+	}
+	if len(entries) >= chatReplyLimitPerMinute {
+		r.entries[userID] = entries
+		return false
+	}
+	r.entries[userID] = append(entries, now)
+	return true
+}
+
 // procUserReply processes regular user commands (reply) /report.
 func (l *TelegramListener) procUserReply(ctx context.Context, update tbapi.Update) (handled bool) {
+	if update.Message == nil {
+		return false
+	}
 	switch {
 	case l.isReportCommand(update.Message.Text):
 		if !l.ReportConfig.Enabled {
@@ -516,16 +559,102 @@ func (l *TelegramListener) procUserReply(ctx context.Context, update tbapi.Updat
 		}
 		return true
 	case l.isBotMention(update.Message.Text):
-		if !l.ReportConfig.Enabled {
-			log.Printf("[DEBUG] user bot-mention reporting disabled, ignoring mention from %s (%d)",
-				update.Message.From.UserName, update.Message.From.ID)
-			return true
-		}
-		log.Printf("[DEBUG] user %s (%d) requested LLM review by bot mention", update.Message.From.UserName, update.Message.From.ID)
-		if err := l.reportsHandler.DirectUserReport(ctx, update); err != nil {
-			log.Printf("[WARN] failed to process user bot-mention report: %v", err)
+		return l.handleChatReply(ctx, update)
+	case l.isChatReplyTrigger(update):
+		return l.handleChatReply(ctx, update)
+	}
+	return false
+}
+
+func (l *TelegramListener) isChatReplyTrigger(update tbapi.Update) bool {
+	if update.Message == nil {
+		return false
+	}
+	if update.Message.ReplyToMessage != nil && l.isReplyToBot(update.Message.ReplyToMessage) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(update.Message.Text), "железяка")
+}
+
+func (l *TelegramListener) isReplyToBot(msg *tbapi.Message) bool {
+	if msg == nil || msg.From == nil {
+		return false
+	}
+	if l.BotUsername != "" && strings.EqualFold(msg.From.UserName, l.BotUsername) {
+		return true
+	}
+	return msg.From.IsBot
+}
+
+func (l *TelegramListener) handleChatReply(ctx context.Context, update tbapi.Update) bool {
+	if update.Message == nil || update.Message.From == nil {
+		return false
+	}
+	if l.SlowPathChatEngine == nil {
+		return false
+	}
+	if l.SuperUsers.IsSuper(update.Message.From.UserName, update.Message.From.ID) {
+		l.sendChatReply(ctx, update)
+		return true
+	}
+	if l.chatLimiter == nil {
+		l.chatLimiter = &chatRateLimiter{}
+	}
+	if !l.chatLimiter.allow(update.Message.From.ID, time.Now().UTC()) {
+		msg := tbapi.NewMessage(update.Message.Chat.ID, chatLimitWarningText)
+		if sent, err := l.TbAPI.Send(msg); err == nil {
+			_, _ = l.TbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
+				ChatConfig: tbapi.ChatConfig{ChatID: update.Message.Chat.ID},
+				MessageID:  sent.MessageID,
+			}})
+		} else {
+			log.Printf("[WARN] failed to send rate-limit warning: %v", err)
 		}
 		return true
 	}
-	return false
+	l.sendChatReply(ctx, update)
+	return true
+}
+
+func (l *TelegramListener) sendChatReply(ctx context.Context, update tbapi.Update) {
+	msg := update.Message
+	if msg == nil {
+		return
+	}
+	if l.SlowPathChatEngine == nil {
+		log.Printf("[WARN] chat reply requested but slowpath chat engine is not configured")
+		return
+	}
+	req := slowpath.ChatRequest{
+		EventID:       fmt.Sprintf("chat-%d-%d", msg.Chat.ID, msg.MessageID),
+		CorrelationID: fmt.Sprintf("chat-%d", msg.MessageID),
+		TenantID:      l.TenantID,
+		Message:       msg.Text,
+	}
+	if msg.ReplyToMessage != nil {
+		req.History = []slowpath.HistoryMessage{{
+			UserName: msg.ReplyToMessage.From.UserName,
+			Text:     msg.ReplyToMessage.Text,
+		}}
+	}
+	result, err := replyChatWithRetry(ctx, l.SlowPathChatEngine, req, time.Sleep)
+	if err != nil {
+		log.Printf("[WARN] failed to generate chat reply: %v", err)
+		return
+	}
+	if result == nil {
+		return
+	}
+	text := strings.TrimSpace(stripChatThoughtTags(result.Text))
+	if text == "" {
+		return
+	}
+	resp := bot.Response{Send: true, Text: text, ReplyTo: msg.MessageID}
+	if err := l.sendBotResponse(resp, msg.Chat.ID, NotificationDefault); err != nil {
+		log.Printf("[WARN] failed to send chat reply: %v", err)
+	}
+}
+
+func stripChatThoughtTags(text string) string {
+	return chatThoughtRe.ReplaceAllString(text, "")
 }

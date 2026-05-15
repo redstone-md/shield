@@ -2,11 +2,15 @@ package events
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	tbapi "github.com/OvyFlash/telegram-bot-api"
+	openai "github.com/sashabaranov/go-openai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/events/mocks"
+	"github.com/umputun/tg-spam/app/slowpath"
 	"testing"
 	"time"
 )
@@ -456,6 +460,234 @@ func TestTelegramListener_isBotMention(t *testing.T) {
 			assert.Equal(t, tt.want, l.isBotMention(tt.text))
 		})
 	}
+}
+
+func TestTelegramListener_isChatReplyTrigger(t *testing.T) {
+	botMsg := &tbapi.Message{From: &tbapi.User{UserName: "mybot", IsBot: true}, MessageID: 10}
+	tests := []struct {
+		name string
+		upd  tbapi.Update
+		want bool
+	}{
+		{name: "reply to bot", upd: tbapi.Update{Message: &tbapi.Message{ReplyToMessage: botMsg}}, want: true},
+		{name: "reply to non bot", upd: tbapi.Update{Message: &tbapi.Message{ReplyToMessage: &tbapi.Message{From: &tbapi.User{UserName: "user"}}}}, want: false},
+		{name: "keyword", upd: tbapi.Update{Message: &tbapi.Message{Text: "эй железяка, ответь"}}, want: true},
+		{name: "no trigger", upd: tbapi.Update{Message: &tbapi.Message{Text: "привет"}}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := &TelegramListener{BotUsername: "mybot"}
+			assert.Equal(t, tt.want, l.isChatReplyTrigger(tt.upd))
+		})
+	}
+}
+
+func TestTelegramListener_handleChatReplyUsesSlowPathEngine(t *testing.T) {
+	var deleted int
+	var sent []tbapi.Chattable
+	chatEngine := &slowPathChatEngineStub{replyFunc: func(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error) {
+		assert.Equal(t, "tg-spam", req.TenantID)
+		assert.Equal(t, "hello bot", req.Message)
+		assert.Equal(t, "alice", req.History[0].UserName)
+		assert.Equal(t, "previous", req.History[0].Text)
+		return &slowpath.ChatResult{Text: "answer"}, nil
+	}}
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			sent = append(sent, c)
+			if msg, ok := c.(tbapi.MessageConfig); ok {
+				return tbapi.Message{MessageID: 99, Text: msg.Text}, nil
+			}
+			return tbapi.Message{}, nil
+		},
+		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+			if _, ok := c.(tbapi.DeleteMessageConfig); ok {
+				deleted++
+			}
+			return &tbapi.APIResponse{Ok: true}, nil
+		},
+	}
+	l := TelegramListener{
+		TbAPI:              mockAPI,
+		SlowPathChatEngine: chatEngine,
+		TenantID:           "tg-spam",
+		SuperUsers:         SuperUsers{"super"},
+	}
+
+	l.handleChatReply(context.Background(), tbapi.Update{Message: &tbapi.Message{
+		MessageID: 17,
+		Chat:      tbapi.Chat{ID: 123},
+		Text:      "hello bot",
+		From:      &tbapi.User{UserName: "alice", ID: 1},
+		Date:      int(time.Now().Unix()),
+		ReplyToMessage: &tbapi.Message{
+			MessageID: 16,
+			Text:      "previous",
+			From:      &tbapi.User{UserName: "alice"},
+		},
+	}})
+
+	require.Len(t, sent, 1)
+	require.Len(t, chatEngine.calls, 1)
+	assert.Equal(t, "answer", sent[0].(tbapi.MessageConfig).Text)
+	assert.Zero(t, deleted)
+}
+
+func TestTelegramListener_handleChatReplyStripsThoughtTags(t *testing.T) {
+	var sent []tbapi.Chattable
+	chatEngine := &slowPathChatEngineStub{replyFunc: func(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error) {
+		return &slowpath.ChatResult{Text: "<thought>private\nreasoning</thought> visible answer"}, nil
+	}}
+	mockAPI := &mocks.TbAPIMock{SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+		sent = append(sent, c)
+		return tbapi.Message{MessageID: 99}, nil
+	}}
+	l := TelegramListener{TbAPI: mockAPI, SlowPathChatEngine: chatEngine, TenantID: "tg-spam", SuperUsers: SuperUsers{"super"}}
+
+	l.handleChatReply(context.Background(), tbapi.Update{Message: &tbapi.Message{
+		MessageID: 17,
+		Chat:      tbapi.Chat{ID: 123},
+		Text:      "hello bot",
+		From:      &tbapi.User{UserName: "alice", ID: 1},
+		Date:      int(time.Now().Unix()),
+	}})
+
+	require.Len(t, sent, 1)
+	assert.Equal(t, "visible answer", sent[0].(tbapi.MessageConfig).Text)
+}
+
+func TestTelegramListener_handleChatReplyRateLimits(t *testing.T) {
+	var sent []string
+	var deleted int
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			if msg, ok := c.(tbapi.MessageConfig); ok {
+				sent = append(sent, msg.Text)
+				return tbapi.Message{MessageID: 77, Text: msg.Text}, nil
+			}
+			return tbapi.Message{}, nil
+		},
+		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+			if _, ok := c.(tbapi.DeleteMessageConfig); ok {
+				deleted++
+			}
+			return &tbapi.APIResponse{Ok: true}, nil
+		},
+	}
+	l := TelegramListener{
+		TbAPI: mockAPI,
+		SlowPathChatEngine: &slowPathChatEngineStub{replyFunc: func(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error) {
+			return &slowpath.ChatResult{Text: "answer"}, nil
+		}},
+		TenantID:   "tg-spam",
+		SuperUsers: SuperUsers{"super"},
+		chatLimiter: &chatRateLimiter{entries: map[int64][]time.Time{42: {
+			time.Now().UTC().Add(-10 * time.Second),
+			time.Now().UTC().Add(-20 * time.Second),
+			time.Now().UTC().Add(-30 * time.Second),
+			time.Now().UTC().Add(-40 * time.Second),
+			time.Now().UTC().Add(-50 * time.Second),
+		}}},
+	}
+
+	l.handleChatReply(context.Background(), tbapi.Update{Message: &tbapi.Message{
+		MessageID: 18,
+		Chat:      tbapi.Chat{ID: 123},
+		Text:      "hello bot",
+		From:      &tbapi.User{UserName: "alice", ID: 42},
+		Date:      int(time.Now().Unix()),
+	}})
+
+	assert.Equal(t, []string{chatLimitWarningText}, sent)
+	assert.Equal(t, 1, deleted)
+}
+
+func TestTelegramListener_handleChatReplySuperuserBypassesLimit(t *testing.T) {
+	var calls int
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			if msg, ok := c.(tbapi.MessageConfig); ok {
+				return tbapi.Message{MessageID: 55, Text: msg.Text}, nil
+			}
+			return tbapi.Message{}, nil
+		},
+	}
+	l := TelegramListener{
+		TbAPI:      mockAPI,
+		TenantID:   "tg-spam",
+		SuperUsers: SuperUsers{"super"},
+		SlowPathChatEngine: &slowPathChatEngineStub{replyFunc: func(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error) {
+			calls++
+			return &slowpath.ChatResult{Text: fmt.Sprintf("reply-%d", calls)}, nil
+		}},
+		chatLimiter: &chatRateLimiter{entries: map[int64][]time.Time{42: {
+			time.Now().UTC().Add(-10 * time.Second),
+			time.Now().UTC().Add(-20 * time.Second),
+			time.Now().UTC().Add(-30 * time.Second),
+			time.Now().UTC().Add(-40 * time.Second),
+			time.Now().UTC().Add(-50 * time.Second),
+		}}},
+	}
+
+	l.handleChatReply(context.Background(), tbapi.Update{Message: &tbapi.Message{
+		MessageID: 19,
+		Chat:      tbapi.Chat{ID: 123},
+		Text:      "hello bot",
+		From:      &tbapi.User{UserName: "super", ID: 42},
+		Date:      int(time.Now().Unix()),
+	}})
+
+	assert.Equal(t, 1, calls)
+}
+
+func TestReplyChatWithRetryRetriesTransientErrors(t *testing.T) {
+	var attempts int
+	var sleeps []time.Duration
+	chatEngine := &slowPathChatEngineStub{replyFunc: func(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error) {
+		attempts++
+		if attempts < 3 {
+			return nil, fmt.Errorf("openai chat reply: %w", &openai.APIError{HTTPStatusCode: 502, HTTPStatus: "502 Bad Gateway"})
+		}
+		return &slowpath.ChatResult{Text: "answer"}, nil
+	}}
+
+	result, err := replyChatWithRetry(context.Background(), chatEngine, slowpath.ChatRequest{Message: "hello"}, func(d time.Duration) {
+		sleeps = append(sleeps, d)
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "answer", result.Text)
+	assert.Equal(t, 3, attempts)
+	assert.Equal(t, []time.Duration{3 * time.Second, 3 * time.Second}, sleeps)
+}
+
+func TestReplyChatWithRetryDoesNotRetryPermanentErrors(t *testing.T) {
+	var attempts int
+	wantErr := errors.New("bad request")
+	chatEngine := &slowPathChatEngineStub{replyFunc: func(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error) {
+		attempts++
+		return nil, fmt.Errorf("openai chat reply: %w", &openai.APIError{HTTPStatusCode: 400, HTTPStatus: "400 Bad Request", Message: wantErr.Error()})
+	}}
+
+	result, err := replyChatWithRetry(context.Background(), chatEngine, slowpath.ChatRequest{Message: "hello"}, func(d time.Duration) {
+		t.Fatal("sleep should not be called for permanent errors")
+	})
+
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Equal(t, 1, attempts)
+}
+
+type slowPathChatEngineStub struct {
+	replyFunc func(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error)
+	calls     []slowpath.ChatRequest
+}
+
+func (s *slowPathChatEngineStub) Reply(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error) {
+	s.calls = append(s.calls, req)
+	return s.replyFunc(ctx, req)
 }
 
 func TestTelegramListener_IsLinkedChannel(t *testing.T) {

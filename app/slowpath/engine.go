@@ -14,6 +14,7 @@ type EngineConfig struct {
 
 type Engine struct {
 	providers map[string]LLMProvider
+	chat      map[string]ChatProvider
 	vision    map[string]VisionProvider
 	breakers  map[string]*ProviderBreaker
 	budget    BudgetTracker
@@ -24,6 +25,7 @@ type Engine struct {
 func NewEngine(cfg EngineConfig) *Engine {
 	return &Engine{
 		providers: make(map[string]LLMProvider),
+		chat:      make(map[string]ChatProvider),
 		vision:    make(map[string]VisionProvider),
 		breakers:  make(map[string]*ProviderBreaker),
 		config:    cfg,
@@ -34,6 +36,14 @@ func (e *Engine) RegisterProvider(p LLMProvider, breakerCfg BreakerConfig) {
 	name := p.Name()
 	e.providers[name] = p
 	e.breakers[name] = NewProviderBreaker(name, breakerCfg)
+}
+
+func (e *Engine) RegisterChat(p ChatProvider, breakerCfg BreakerConfig) {
+	name := p.Name()
+	e.chat[name] = p
+	if _, exists := e.breakers[name]; !exists {
+		e.breakers[name] = NewProviderBreaker(name, breakerCfg)
+	}
 }
 
 func (e *Engine) RegisterVision(p VisionProvider, breakerCfg BreakerConfig) {
@@ -52,6 +62,33 @@ func (e *Engine) Check(ctx context.Context, req SlowPathRequest) (*SlowPathResul
 		return e.checkVision(ctx, req)
 	}
 	return e.checkText(ctx, req)
+}
+
+func (e *Engine) Reply(ctx context.Context, req ChatRequest) (*ChatResult, error) {
+	if len(e.chat) == 0 {
+		return nil, fmt.Errorf("chat replies disabled")
+	}
+	provider := e.resolveChatProvider()
+	cp, ok := e.chat[provider]
+	if !ok {
+		return nil, fmt.Errorf("no chat provider: %s", provider)
+	}
+
+	systemPrompt, customPrompts, promptVersion, err := e.resolvePrompt(provider, req.PromptVersion)
+	if err != nil {
+		log.Printf("[WARN] slowpath prompt resolve: %v", err)
+	}
+	chatReq := ChatRequest{
+		EventID:       req.EventID,
+		CorrelationID: req.CorrelationID,
+		TenantID:      req.TenantID,
+		Message:       req.Message,
+		History:       req.History,
+		SystemPrompt:  systemPrompt,
+		CustomPrompts: customPrompts,
+		PromptVersion: promptVersion,
+	}
+	return e.callChatWithBreaker(ctx, provider, chatReq, cp)
 }
 
 func (e *Engine) checkText(ctx context.Context, req SlowPathRequest) (*SlowPathResult, error) {
@@ -165,6 +202,23 @@ func (e *Engine) callWithBreaker(ctx context.Context, provider string, req Provi
 	})
 }
 
+func (e *Engine) callChatWithBreaker(ctx context.Context, provider string, req ChatRequest, p ChatProvider) (*ChatResult, error) {
+	brk, ok := e.breakers[provider]
+	if !ok {
+		return p.Reply(ctx, req)
+	}
+	var result *ChatResult
+	_, err := brk.Execute(ctx, func(ctx context.Context) (*ProviderResult, error) {
+		res, err := p.Reply(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		result = res
+		return &ProviderResult{}, nil
+	})
+	return result, err
+}
+
 func (e *Engine) callVisionWithBreaker(ctx context.Context, provider string, imgData []byte, mime string, prompt string, v VisionProvider) (*ProviderResult, error) {
 	brk, ok := e.breakers[provider]
 	if !ok {
@@ -183,6 +237,13 @@ func (e *Engine) resolveProvider(req SlowPathRequest) string {
 		return name
 	}
 	for name := range e.vision {
+		return name
+	}
+	return ""
+}
+
+func (e *Engine) resolveChatProvider() string {
+	for name := range e.chat {
 		return name
 	}
 	return ""

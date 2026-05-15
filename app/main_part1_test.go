@@ -16,6 +16,7 @@ import (
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/approved"
 	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/umputun/tg-spam/lib/tgspam"
 	"io"
 	"os"
 	"path"
@@ -266,7 +267,16 @@ func Test_makeDetector(t *testing.T) {
 		assert.Equal(t, 4, res.OpenAIHistorySize)
 		assert.True(t, res.GeminiVeto)
 		assert.Equal(t, 5, res.GeminiHistorySize)
+		assert.Empty(t, res.LLMMode)
 	})
+}
+
+func TestBuildDetectorConfigSetsLLMMode(t *testing.T) {
+	var opts options
+	opts.LLM.Mode = "always"
+	cfg := buildDetectorConfig(opts, rules.RuleSet{})
+
+	assert.Equal(t, tgspam.LLMModeAlways, cfg.LLMMode)
 }
 
 func TestReadPromptOverride(t *testing.T) {
@@ -290,6 +300,33 @@ func TestResolveSlowPathPrompt(t *testing.T) {
 	assert.Equal(t, "provider prompt", resolveSlowPathPrompt("provider prompt", "file prompt"))
 	assert.Equal(t, "file prompt", resolveSlowPathPrompt(" ", "file prompt"))
 	assert.Empty(t, resolveSlowPathPrompt("", ""))
+}
+
+func TestMakeSlowPathChatEngine(t *testing.T) {
+	t.Run("disabled without token", func(t *testing.T) {
+		var opts options
+		assert.Nil(t, makeSlowPathChatEngine(opts))
+	})
+
+	t.Run("disabled without chat model", func(t *testing.T) {
+		var opts options
+		opts.OpenAI.Token = "token"
+		assert.Nil(t, makeSlowPathChatEngine(opts))
+	})
+
+	t.Run("enabled with token and chat model", func(t *testing.T) {
+		var opts options
+		opts.OpenAI.Token = "token"
+		opts.ChatModel = "gemma-4-31b"
+		require.NotNil(t, makeSlowPathChatEngine(opts))
+	})
+
+	t.Run("enabled with api base and chat model", func(t *testing.T) {
+		var opts options
+		opts.OpenAI.APIBase = "https://example.invalid/v1"
+		opts.ChatModel = "root/auto:fast"
+		require.NotNil(t, makeSlowPathChatEngine(opts))
+	})
 }
 
 func Test_makeSpamBot(t *testing.T) {

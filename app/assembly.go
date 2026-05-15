@@ -336,6 +336,7 @@ func buildDetectorConfig(opts options, ruleSet rules.RuleSet) tgspam.Config {
 		OpenAIHistorySize:   ruleSet.OpenAI.HistorySize,
 		GeminiVeto:          ruleSet.Gemini.Veto,
 		GeminiHistorySize:   ruleSet.Gemini.HistorySize,
+		LLMMode:             tgspam.LLMMode(opts.LLM.Mode),
 		LLMConsensus:        tgspam.LLMConsensusMode(opts.LLM.Consensus),
 		LLMRequestTimeout:   opts.LLM.RequestTimeout,
 		MultiLangWords:      opts.MultiLangWords,
@@ -514,6 +515,26 @@ func makeSlowPathEngine(opts options) *slowpath.Engine {
 		}
 	}
 
+	return eng
+}
+
+func makeSlowPathChatEngine(opts options) *slowpath.Engine {
+	if opts.ChatModel == "" {
+		return nil
+	}
+	if opts.OpenAI.Token == "" && opts.OpenAI.APIBase == "" {
+		return nil
+	}
+
+	config := openai.DefaultConfig(opts.OpenAI.Token)
+	if opts.OpenAI.APIBase != "" {
+		config.BaseURL = opts.OpenAI.APIBase
+	}
+
+	eng := slowpath.NewEngine(slowpath.EngineConfig{})
+	chatAdapter := slowpath.NewOpenAIAdapter(openai.NewClientWithConfig(config), opts.ChatModel, opts.OpenAI.MaxTokensResponse, opts.OpenAI.MaxSymbolsRequest)
+	eng.RegisterChat(chatAdapter, slowpath.DefaultBreakerConfig())
+	log.Printf("[INFO] slowpath openai chat registered (%s)", opts.ChatModel)
 	return eng
 }
 

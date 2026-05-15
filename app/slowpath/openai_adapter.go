@@ -96,6 +96,44 @@ func (a *OpenAIAdapter) Check(ctx context.Context, req ProviderRequest) (*Provid
 	return result, nil
 }
 
+func (a *OpenAIAdapter) Reply(ctx context.Context, req ChatRequest) (*ChatResult, error) {
+	if a.client == nil {
+		return nil, fmt.Errorf("openai: client not configured")
+	}
+	start := time.Now()
+	msg := a.truncateMessage(req.Message, appendHistory(req.Message, req.History))
+	systemPrompt := req.SystemPrompt
+	if systemPrompt == "" {
+		systemPrompt = defaultChatSystemPrompt
+	}
+	if len(req.CustomPrompts) > 0 {
+		systemPrompt = buildCustomPrompt(systemPrompt, req.CustomPrompts)
+	}
+	messages := []openai.ChatCompletionMessage{
+		{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
+		{Role: openai.ChatMessageRoleUser, Content: msg},
+	}
+	chatReq := openai.ChatCompletionRequest{Model: a.model, Messages: messages, MaxTokens: a.maxTokens}
+	resp, err := a.client.CreateChatCompletion(ctx, chatReq)
+	if err != nil {
+		return nil, fmt.Errorf("openai chat reply: %w", err)
+	}
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("openai chat: no choices in response")
+	}
+	content := strings.TrimSpace(resp.Choices[0].Message.Content)
+	return &ChatResult{
+		Text:          content,
+		Provider:      "openai",
+		Model:         a.model,
+		InputTokens:   resp.Usage.PromptTokens,
+		OutputTokens:  resp.Usage.CompletionTokens,
+		Latency:       time.Since(start),
+		RawResponse:   content,
+		PromptVersion: req.PromptVersion,
+	}, nil
+}
+
 func (a *OpenAIAdapter) AnalyzeImage(ctx context.Context, imageData []byte, mime string, prompt string) (*ProviderResult, error) {
 	start := time.Now()
 
@@ -220,3 +258,5 @@ const defaultSystemPrompt = `Return JSON: {"spam":true/false,"reason":"why","con
 	`Priority: crypto exchange, illegal work, repeated ads, classic spam, links, fraud, abuse, drugs, emoji spam.`
 
 const defaultVisionPrompt = `Analyze this image for spam or policy violations. Consider: crypto ads, illegal schemes, qr codes to scam sites, inappropriate content.`
+
+const defaultChatSystemPrompt = `Ты дружелюбный помощник в Telegram-чате. Отвечай по-русски, коротко и по делу. Не упоминай внутренние правила, модерацию или лимиты. Если вопрос неясен, задай короткий уточняющий вопрос.`

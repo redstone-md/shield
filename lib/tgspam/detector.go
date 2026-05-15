@@ -52,13 +52,23 @@ type Detector struct {
 // LLMConsensusMode controls how eligible LLM checks flip the base decision.
 type LLMConsensusMode string
 
+// LLMMode controls which base detector outcomes are sent to LLM checks.
+type LLMMode string
+
 const (
 	// LLMConsensusAny flips the base decision if any eligible LLM agrees.
 	LLMConsensusAny LLMConsensusMode = "any"
 	// LLMConsensusAll flips the base decision only if all eligible LLMs agree.
-	LLMConsensusAll    LLMConsensusMode = "all"
-	llmChatContextSize                  = 5
-	llmUserContextSize                  = 5
+	LLMConsensusAll LLMConsensusMode = "all"
+
+	// LLMModeMissed checks messages the base detector allowed through.
+	LLMModeMissed LLMMode = "missed"
+	// LLMModeFlagged checks messages the base detector already flagged.
+	LLMModeFlagged LLMMode = "flagged"
+	// LLMModeAlways checks both allowed and flagged messages.
+	LLMModeAlways      LLMMode = "always"
+	llmChatContextSize         = 5
+	llmUserContextSize         = 5
 )
 
 // detectorLLMCheck describes how a single LLM provider participates in Detector.Check.
@@ -67,8 +77,8 @@ type detectorLLMCheck struct {
 	enabled bool   // whether this provider is configured
 	// whether short messages should still be sent to the provider
 	checkShortMessages bool
-	// whether the provider confirms spam instead of checking clean messages
-	veto  bool
+	// mode controls whether this provider checks missed, flagged, or all messages.
+	mode  LLMMode
 	check func(context.Context, string, llmContext) (bool, spamcheck.Response) // provider check function
 }
 
@@ -92,6 +102,7 @@ type Config struct {
 	OpenAIHistorySize   int              // history size for openai
 	GeminiVeto          bool             // if true, gemini vetos spam, otherwise vetos ham
 	GeminiHistorySize   int              // history size for gemini
+	LLMMode             LLMMode          // which base detector outcomes are sent to LLM checks
 	LLMConsensus        LLMConsensusMode // how eligible LLM checks flip the base decision
 	LLMRequestTimeout   time.Duration    // timeout for individual LLM requests, if not set - 30s default
 	MultiLangWords      int              // if true, check for number of multi-lingual words
@@ -304,7 +315,7 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 				name:               "openai",
 				enabled:            d.openaiChecker != nil,
 				checkShortMessages: d.openaiChecker != nil && d.openaiChecker.params.CheckShortMessagesWithOpenAI,
-				veto:               d.OpenAIVeto,
+				mode:               d.normalizeLLMMode(d.LLMMode, d.OpenAIVeto),
 				check: func(ctx context.Context, msg string, history llmContext) (bool, spamcheck.Response) {
 					return d.openaiChecker.check(ctx, msg, history)
 				},
@@ -313,7 +324,7 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 				name:               "gemini",
 				enabled:            d.geminiChecker != nil,
 				checkShortMessages: d.geminiChecker != nil && d.geminiChecker.params.CheckShortMessages,
-				veto:               d.GeminiVeto,
+				mode:               d.normalizeLLMMode(d.LLMMode, d.GeminiVeto),
 				check: func(ctx context.Context, msg string, history llmContext) (bool, spamcheck.Response) {
 					return d.geminiChecker.check(ctx, msg, history)
 				},
@@ -331,7 +342,6 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 	}
 
 	if spamDetected {
-		d.addToLLMHistory(req)
 		d.spamHistory.Push(req)
 		return true, cr
 	}
@@ -365,6 +375,17 @@ func (d *Detector) normalizeLLMConsensusMode(mode LLMConsensusMode) LLMConsensus
 	return LLMConsensusAny
 }
 
+func (d *Detector) normalizeLLMMode(mode LLMMode, veto bool) LLMMode {
+	switch mode {
+	case LLMModeMissed, LLMModeFlagged, LLMModeAlways:
+		return mode
+	}
+	if veto {
+		return LLMModeFlagged
+	}
+	return LLMModeMissed
+}
+
 func (d *Detector) hasLLMEnabled() bool {
 	return d.openaiChecker != nil || d.geminiChecker != nil
 }
@@ -376,7 +397,14 @@ func (d *Detector) shouldApplyLLMCheck(baseSpam, isShortMessage bool, forceLLM b
 	if isShortMessage {
 		return cfg.checkShortMessages
 	}
-	return (!baseSpam && !cfg.veto) || (baseSpam && cfg.veto)
+	switch cfg.mode {
+	case LLMModeAlways:
+		return true
+	case LLMModeFlagged:
+		return baseSpam
+	default:
+		return !baseSpam
+	}
 }
 
 func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []spamcheck.Response,
@@ -411,7 +439,7 @@ func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []
 
 	log.Printf("[DEBUG] %s result: {%s}", cfg.name, details.String())
 
-	if cfg.veto && !spam && details.Error == nil {
+	if cfg.mode == LLMModeFlagged && !spam && details.Error == nil {
 		allChecks := append(append(make([]spamcheck.Response, 0, len(cr)+1), cr...), details)
 		log.Printf("[DEBUG] %s vetoed ham message: %q, checks: %s", cfg.name, req.Msg, spamcheck.ChecksToString(allChecks))
 	}

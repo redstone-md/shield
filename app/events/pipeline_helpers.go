@@ -12,6 +12,7 @@ import (
 	"time"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
+	openai "github.com/sashabaranov/go-openai"
 
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
@@ -345,6 +346,14 @@ func retryableSlowPathError(err error) bool {
 	if err == nil {
 		return false
 	}
+	var apiErr *openai.APIError
+	if errors.As(err, &apiErr) {
+		return retryableStatus(apiErr.HTTPStatusCode)
+	}
+	var reqErr *openai.RequestError
+	if errors.As(err, &reqErr) {
+		return retryableStatus(reqErr.HTTPStatusCode)
+	}
 	text := strings.ToLower(err.Error())
 	retryableMarkers := []string{"retryable", "bad gateway", "502", "503", "504", "429", "rate limit", "timeout", "temporarily unavailable"}
 	for _, marker := range retryableMarkers {
@@ -353,6 +362,34 @@ func retryableSlowPathError(err error) bool {
 		}
 	}
 	return false
+}
+
+func retryableStatus(statusCode int) bool {
+	switch statusCode {
+	case 429, 500, 502, 503, 504:
+		return true
+	default:
+		return false
+	}
+}
+
+func replyChatWithRetry(ctx context.Context, engine SlowPathChatChecker,
+	req slowpath.ChatRequest, sleep func(time.Duration),
+) (*slowpath.ChatResult, error) {
+	var lastErr error
+	for attempt := 0; attempt < 10; attempt++ {
+		result, err := engine.Reply(ctx, req)
+		if err == nil || !retryableSlowPathError(err) || attempt == 9 {
+			return result, err
+		}
+		lastErr = err
+		delay := 3 * time.Second
+		observability.Logf(ctx, "[WARN] chat reply failed, retrying in %s: %v", delay, err)
+		if !sleepContext(ctx, sleep, delay) {
+			return nil, errors.Join(ctx.Err(), lastErr)
+		}
+	}
+	return nil, lastErr
 }
 
 func sleepContext(ctx context.Context, sleep func(time.Duration), delay time.Duration) bool {
