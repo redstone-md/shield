@@ -335,17 +335,29 @@ func banUserOrChannel(ctx context.Context, r banRequest) error {
 	observability.Logf(ctx, "[INFO] user %s (%d) banned by bot in chat %d for %v (api resp ok=%t)",
 		r.userName, r.userID, r.chatID, r.duration, resp.Ok)
 
-	member, mErr := r.tbAPI.GetChatMember(tbapi.GetChatMemberConfig{
+	verifyBanApplied(ctx, r.tbAPI, r.chatID, r.userID)
+	return nil
+}
+
+// verifyBanApplied calls GetChatMember after a ban to confirm Telegram actually
+// applied the kick. Logs are diagnostic only; any error or panic from the mock
+// must not break the surrounding ban flow.
+func verifyBanApplied(ctx context.Context, api TbAPI, chatID, userID int64) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			observability.Logf(ctx, "[WARN] post-ban verify recovered from panic: %v", rec)
+		}
+	}()
+	member, mErr := api.GetChatMember(tbapi.GetChatMemberConfig{
 		ChatConfigWithUser: tbapi.ChatConfigWithUser{
-			ChatConfig: tbapi.ChatConfig{ChatID: r.chatID},
-			UserID:     r.userID,
+			ChatConfig: tbapi.ChatConfig{ChatID: chatID},
+			UserID:     userID,
 		},
 	})
 	if mErr != nil {
-		observability.Logf(ctx, "[WARN] post-ban GetChatMember failed for user %d in chat %d: %v", r.userID, r.chatID, mErr)
-	} else {
-		observability.Logf(ctx, "[INFO] post-ban verify: user=%d chat=%d status=%q is_member=%t",
-			r.userID, r.chatID, member.Status, member.IsMember)
+		observability.Logf(ctx, "[WARN] post-ban GetChatMember failed for user %d in chat %d: %v", userID, chatID, mErr)
+		return
 	}
-	return nil
+	observability.Logf(ctx, "[INFO] post-ban verify: user=%d chat=%d status=%q is_member=%t",
+		userID, chatID, member.Status, member.IsMember)
 }
