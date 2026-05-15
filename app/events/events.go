@@ -29,6 +29,7 @@ type TbAPI interface {
 	Request(c tbapi.Chattable) (*tbapi.APIResponse, error)
 	GetChat(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error)
 	GetChatAdministrators(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error)
+	GetChatMember(config tbapi.GetChatMemberConfig) (tbapi.ChatMember, error)
 	GetFileDirectURL(fileID string) (string, error)
 	GetCustomEmojiStickers(config tbapi.GetCustomEmojiStickersConfig) ([]tbapi.Sticker, error)
 }

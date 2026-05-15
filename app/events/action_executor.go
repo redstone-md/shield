@@ -332,6 +332,20 @@ func banUserOrChannel(ctx context.Context, r banRequest) error {
 		return fmt.Errorf("response is not Ok: %v", string(resp.Result))
 	}
 
-	observability.Logf(ctx, "[INFO] user %s banned by bot for %v", r.userName, r.duration)
+	observability.Logf(ctx, "[INFO] user %s (%d) banned by bot in chat %d for %v (api resp ok=%t)",
+		r.userName, r.userID, r.chatID, r.duration, resp.Ok)
+
+	member, mErr := r.tbAPI.GetChatMember(tbapi.GetChatMemberConfig{
+		ChatConfigWithUser: tbapi.ChatConfigWithUser{
+			ChatConfig: tbapi.ChatConfig{ChatID: r.chatID},
+			UserID:     r.userID,
+		},
+	})
+	if mErr != nil {
+		observability.Logf(ctx, "[WARN] post-ban GetChatMember failed for user %d in chat %d: %v", r.userID, r.chatID, mErr)
+	} else {
+		observability.Logf(ctx, "[INFO] post-ban verify: user=%d chat=%d status=%q is_member=%t",
+			r.userID, r.chatID, member.Status, member.IsMember)
+	}
 	return nil
 }

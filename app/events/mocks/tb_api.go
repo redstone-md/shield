@@ -4,9 +4,8 @@
 package mocks
 
 import (
-	"sync"
-
 	tbapi "github.com/OvyFlash/telegram-bot-api"
+	"sync"
 )
 
 // TbAPIMock is a mock implementation of events.TbAPI.
@@ -21,11 +20,14 @@ import (
 //			GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
 //				panic("mock out the GetChatAdministrators method")
 //			},
-//			GetFileDirectURLFunc: func(fileID string) (string, error) {
-//				panic("mock out the GetFileDirectURL method")
+//			GetChatMemberFunc: func(config tbapi.GetChatMemberConfig) (tbapi.ChatMember, error) {
+//				panic("mock out the GetChatMember method")
 //			},
 //			GetCustomEmojiStickersFunc: func(config tbapi.GetCustomEmojiStickersConfig) ([]tbapi.Sticker, error) {
 //				panic("mock out the GetCustomEmojiStickers method")
+//			},
+//			GetFileDirectURLFunc: func(fileID string) (string, error) {
+//				panic("mock out the GetFileDirectURL method")
 //			},
 //			GetUpdatesChanFunc: func(config tbapi.UpdateConfig) tbapi.UpdatesChannel {
 //				panic("mock out the GetUpdatesChan method")
@@ -49,11 +51,14 @@ type TbAPIMock struct {
 	// GetChatAdministratorsFunc mocks the GetChatAdministrators method.
 	GetChatAdministratorsFunc func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error)
 
-	// GetFileDirectURLFunc mocks the GetFileDirectURL method.
-	GetFileDirectURLFunc func(fileID string) (string, error)
+	// GetChatMemberFunc mocks the GetChatMember method.
+	GetChatMemberFunc func(config tbapi.GetChatMemberConfig) (tbapi.ChatMember, error)
 
 	// GetCustomEmojiStickersFunc mocks the GetCustomEmojiStickers method.
 	GetCustomEmojiStickersFunc func(config tbapi.GetCustomEmojiStickersConfig) ([]tbapi.Sticker, error)
+
+	// GetFileDirectURLFunc mocks the GetFileDirectURL method.
+	GetFileDirectURLFunc func(fileID string) (string, error)
 
 	// GetUpdatesChanFunc mocks the GetUpdatesChan method.
 	GetUpdatesChanFunc func(config tbapi.UpdateConfig) tbapi.UpdatesChannel
@@ -76,15 +81,20 @@ type TbAPIMock struct {
 			// Config is the config argument value.
 			Config tbapi.ChatAdministratorsConfig
 		}
-		// GetFileDirectURL holds details about calls to the GetFileDirectURL method.
-		GetFileDirectURL []struct {
-			// FileID is the fileID argument value.
-			FileID string
+		// GetChatMember holds details about calls to the GetChatMember method.
+		GetChatMember []struct {
+			// Config is the config argument value.
+			Config tbapi.GetChatMemberConfig
 		}
 		// GetCustomEmojiStickers holds details about calls to the GetCustomEmojiStickers method.
 		GetCustomEmojiStickers []struct {
 			// Config is the config argument value.
 			Config tbapi.GetCustomEmojiStickersConfig
+		}
+		// GetFileDirectURL holds details about calls to the GetFileDirectURL method.
+		GetFileDirectURL []struct {
+			// FileID is the fileID argument value.
+			FileID string
 		}
 		// GetUpdatesChan holds details about calls to the GetUpdatesChan method.
 		GetUpdatesChan []struct {
@@ -104,8 +114,9 @@ type TbAPIMock struct {
 	}
 	lockGetChat                sync.RWMutex
 	lockGetChatAdministrators  sync.RWMutex
-	lockGetFileDirectURL       sync.RWMutex
+	lockGetChatMember          sync.RWMutex
 	lockGetCustomEmojiStickers sync.RWMutex
+	lockGetFileDirectURL       sync.RWMutex
 	lockGetUpdatesChan         sync.RWMutex
 	lockRequest                sync.RWMutex
 	lockSend                   sync.RWMutex
@@ -189,43 +200,43 @@ func (mock *TbAPIMock) ResetGetChatAdministratorsCalls() {
 	mock.lockGetChatAdministrators.Unlock()
 }
 
-// GetFileDirectURL calls GetFileDirectURLFunc.
-func (mock *TbAPIMock) GetFileDirectURL(fileID string) (string, error) {
-	if mock.GetFileDirectURLFunc == nil {
-		panic("TbAPIMock.GetFileDirectURLFunc: method is nil but TbAPI.GetFileDirectURL was just called")
+// GetChatMember calls GetChatMemberFunc.
+func (mock *TbAPIMock) GetChatMember(config tbapi.GetChatMemberConfig) (tbapi.ChatMember, error) {
+	if mock.GetChatMemberFunc == nil {
+		panic("TbAPIMock.GetChatMemberFunc: method is nil but TbAPI.GetChatMember was just called")
 	}
 	callInfo := struct {
-		FileID string
+		Config tbapi.GetChatMemberConfig
 	}{
-		FileID: fileID,
+		Config: config,
 	}
-	mock.lockGetFileDirectURL.Lock()
-	mock.calls.GetFileDirectURL = append(mock.calls.GetFileDirectURL, callInfo)
-	mock.lockGetFileDirectURL.Unlock()
-	return mock.GetFileDirectURLFunc(fileID)
+	mock.lockGetChatMember.Lock()
+	mock.calls.GetChatMember = append(mock.calls.GetChatMember, callInfo)
+	mock.lockGetChatMember.Unlock()
+	return mock.GetChatMemberFunc(config)
 }
 
-// GetFileDirectURLCalls gets all the calls that were made to GetFileDirectURL.
+// GetChatMemberCalls gets all the calls that were made to GetChatMember.
 // Check the length with:
 //
-//	len(mockedTbAPI.GetFileDirectURLCalls())
-func (mock *TbAPIMock) GetFileDirectURLCalls() []struct {
-	FileID string
+//	len(mockedTbAPI.GetChatMemberCalls())
+func (mock *TbAPIMock) GetChatMemberCalls() []struct {
+	Config tbapi.GetChatMemberConfig
 } {
 	var calls []struct {
-		FileID string
+		Config tbapi.GetChatMemberConfig
 	}
-	mock.lockGetFileDirectURL.RLock()
-	calls = mock.calls.GetFileDirectURL
-	mock.lockGetFileDirectURL.RUnlock()
+	mock.lockGetChatMember.RLock()
+	calls = mock.calls.GetChatMember
+	mock.lockGetChatMember.RUnlock()
 	return calls
 }
 
-// ResetGetFileDirectURLCalls reset all the calls that were made to GetFileDirectURL.
-func (mock *TbAPIMock) ResetGetFileDirectURLCalls() {
-	mock.lockGetFileDirectURL.Lock()
-	mock.calls.GetFileDirectURL = nil
-	mock.lockGetFileDirectURL.Unlock()
+// ResetGetChatMemberCalls reset all the calls that were made to GetChatMember.
+func (mock *TbAPIMock) ResetGetChatMemberCalls() {
+	mock.lockGetChatMember.Lock()
+	mock.calls.GetChatMember = nil
+	mock.lockGetChatMember.Unlock()
 }
 
 // GetCustomEmojiStickers calls GetCustomEmojiStickersFunc.
@@ -265,6 +276,45 @@ func (mock *TbAPIMock) ResetGetCustomEmojiStickersCalls() {
 	mock.lockGetCustomEmojiStickers.Lock()
 	mock.calls.GetCustomEmojiStickers = nil
 	mock.lockGetCustomEmojiStickers.Unlock()
+}
+
+// GetFileDirectURL calls GetFileDirectURLFunc.
+func (mock *TbAPIMock) GetFileDirectURL(fileID string) (string, error) {
+	if mock.GetFileDirectURLFunc == nil {
+		panic("TbAPIMock.GetFileDirectURLFunc: method is nil but TbAPI.GetFileDirectURL was just called")
+	}
+	callInfo := struct {
+		FileID string
+	}{
+		FileID: fileID,
+	}
+	mock.lockGetFileDirectURL.Lock()
+	mock.calls.GetFileDirectURL = append(mock.calls.GetFileDirectURL, callInfo)
+	mock.lockGetFileDirectURL.Unlock()
+	return mock.GetFileDirectURLFunc(fileID)
+}
+
+// GetFileDirectURLCalls gets all the calls that were made to GetFileDirectURL.
+// Check the length with:
+//
+//	len(mockedTbAPI.GetFileDirectURLCalls())
+func (mock *TbAPIMock) GetFileDirectURLCalls() []struct {
+	FileID string
+} {
+	var calls []struct {
+		FileID string
+	}
+	mock.lockGetFileDirectURL.RLock()
+	calls = mock.calls.GetFileDirectURL
+	mock.lockGetFileDirectURL.RUnlock()
+	return calls
+}
+
+// ResetGetFileDirectURLCalls reset all the calls that were made to GetFileDirectURL.
+func (mock *TbAPIMock) ResetGetFileDirectURLCalls() {
+	mock.lockGetFileDirectURL.Lock()
+	mock.calls.GetFileDirectURL = nil
+	mock.lockGetFileDirectURL.Unlock()
 }
 
 // GetUpdatesChan calls GetUpdatesChanFunc.
@@ -394,13 +444,17 @@ func (mock *TbAPIMock) ResetCalls() {
 	mock.calls.GetChatAdministrators = nil
 	mock.lockGetChatAdministrators.Unlock()
 
-	mock.lockGetFileDirectURL.Lock()
-	mock.calls.GetFileDirectURL = nil
-	mock.lockGetFileDirectURL.Unlock()
+	mock.lockGetChatMember.Lock()
+	mock.calls.GetChatMember = nil
+	mock.lockGetChatMember.Unlock()
 
 	mock.lockGetCustomEmojiStickers.Lock()
 	mock.calls.GetCustomEmojiStickers = nil
 	mock.lockGetCustomEmojiStickers.Unlock()
+
+	mock.lockGetFileDirectURL.Lock()
+	mock.calls.GetFileDirectURL = nil
+	mock.lockGetFileDirectURL.Unlock()
 
 	mock.lockGetUpdatesChan.Lock()
 	mock.calls.GetUpdatesChan = nil

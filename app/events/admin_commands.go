@@ -462,6 +462,11 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 
 	origMsg := update.Message.ReplyToMessage
 
+	if from := origMsg.From; from != nil {
+		log.Printf("[DEBUG] reply src: chat=%d From.ID=%d From.UserName=%q From.IsBot=%t SenderChat=%+v ViaBot=%+v",
+			origMsg.Chat.ID, from.ID, from.UserName, from.IsBot, origMsg.SenderChat, origMsg.ViaBot)
+	}
+
 	msgTxt := origMsg.Text
 	if msgTxt == "" {
 		m := transform(origMsg)
