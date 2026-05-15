@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 )
 
 type BotService interface {
@@ -31,7 +30,9 @@ func (s *AppealService) SetFeedbackLabeler(labeler FeedbackLabeler) {
 	s.labeler = labeler
 }
 
-func (s *AppealService) Submit(ctx context.Context, incidentID int64, appellantUserID int64, appellantName, appealText string) (Appeal, error) {
+func (s *AppealService) Submit(
+	ctx context.Context, incidentID, appellantUserID int64, appellantName, appealText string,
+) (Appeal, error) {
 	_, err := s.incidents.Get(ctx, incidentID)
 	if err != nil {
 		return Appeal{}, fmt.Errorf("incident %d not found: %w", incidentID, err)
@@ -191,7 +192,7 @@ func (s *AppealService) GetForIncident(ctx context.Context, incidentID int64) (A
 	return s.appeals.GetByIncident(ctx, incidentID)
 }
 
-func (s *AppealService) autoLabel(ctx context.Context, inc Incident, label, resolverID string) {
+func (s *AppealService) autoLabel(ctx context.Context, inc Incident, label, _ string) {
 	if s.labeler == nil {
 		return
 	}
@@ -200,7 +201,7 @@ func (s *AppealService) autoLabel(ctx context.Context, inc Incident, label, reso
 	}
 }
 
-func (s *AppealService) autoLabelAppeal(ctx context.Context, ap Appeal, action, resolverID string) {
+func (s *AppealService) autoLabelAppeal(ctx context.Context, ap Appeal, action, _ string) {
 	if s.labeler == nil {
 		return
 	}
@@ -216,5 +217,3 @@ func (s *AppealService) autoLabelAppeal(ctx context.Context, ap Appeal, action, 
 		log.Printf("[WARN] auto-label incident %d as %s failed: %v", inc.ID, label, err)
 	}
 }
-
-func noopTime() time.Time { return time.Time{} }

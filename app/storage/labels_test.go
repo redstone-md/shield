@@ -28,14 +28,14 @@ func (s *StorageTestSuite) TestLabels_CreateAndGet() {
 
 			created, err := store.Create(ctx, entry)
 			s.Require().NoError(err)
-			s.Assert().True(created.ID > 0)
-			s.Assert().Equal(feedback.LabelConfirmedSpam, created.Label)
-			s.Assert().Equal("admin", created.LabeledBy)
+			s.Positive(created.ID)
+			s.Equal(feedback.LabelConfirmedSpam, created.Label)
+			s.Equal("admin", created.LabeledBy)
 
 			got, err := store.GetByID(ctx, created.ID)
 			s.Require().NoError(err)
-			s.Assert().Equal(created.ID, got.ID)
-			s.Assert().Equal(feedback.LabelConfirmedSpam, got.Label)
+			s.Equal(created.ID, got.ID)
+			s.Equal(feedback.LabelConfirmedSpam, got.Label)
 		})
 	}
 }
@@ -66,7 +66,7 @@ func (s *StorageTestSuite) TestLabels_GetByDetectedSpamID() {
 
 			labels, err := store.GetByDetectedSpamID(ctx, spamID)
 			s.Require().NoError(err)
-			s.Assert().Len(labels, 2)
+			s.Len(labels, 2)
 		})
 	}
 }
@@ -90,8 +90,8 @@ func (s *StorageTestSuite) TestLabels_GetByIncidentID() {
 
 			labels, err := store.GetByIncidentID(ctx, incID)
 			s.Require().NoError(err)
-			s.Assert().Len(labels, 1)
-			s.Assert().Equal(feedback.LabelPolicyOverride, labels[0].Label)
+			s.Len(labels, 1)
+			s.Equal(feedback.LabelPolicyOverride, labels[0].Label)
 		})
 	}
 }
@@ -114,12 +114,12 @@ func (s *StorageTestSuite) TestLabels_ListWithFilter() {
 
 			spamOnly, err := store.List(ctx, feedback.LabelFilter{Label: feedback.LabelConfirmedSpam, LabeledBy: fmt.Sprintf("a-%d", ts), Limit: 10})
 			s.Require().NoError(err)
-			s.Assert().Len(spamOnly, 1)
+			s.Len(spamOnly, 1)
 
 			byUser, err := store.List(ctx, feedback.LabelFilter{LabeledBy: fmt.Sprintf("b-%d", ts), Limit: 10})
 			s.Require().NoError(err)
-			s.Assert().Len(byUser, 1)
-			s.Assert().Equal(feedback.LabelFalsePositive, byUser[0].Label)
+			s.Len(byUser, 1)
+			s.Equal(feedback.LabelFalsePositive, byUser[0].Label)
 		})
 	}
 }
@@ -146,8 +146,8 @@ func (s *StorageTestSuite) TestLabels_Stats() {
 
 			stats, err = store.Stats(ctx)
 			s.Require().NoError(err)
-			s.Assert().Equal(beforeSpam+2, stats[feedback.LabelConfirmedSpam])
-			s.Assert().Equal(beforeFP+1, stats[feedback.LabelFalsePositive])
+			s.Equal(beforeSpam+2, stats[feedback.LabelConfirmedSpam])
+			s.Equal(beforeFP+1, stats[feedback.LabelFalsePositive])
 		})
 	}
 }

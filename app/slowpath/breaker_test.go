@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProviderBreakerSuccess(t *testing.T) {
@@ -19,7 +20,7 @@ func TestProviderBreakerSuccess(t *testing.T) {
 	result, err := b.Execute(context.Background(), func(ctx context.Context) (*ProviderResult, error) {
 		return &ProviderResult{Spam: false, Provider: "test"}, nil
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, "test", result.Provider)
 }
@@ -40,7 +41,7 @@ func TestProviderBreakerOpensOnFailures(t *testing.T) {
 	_, _ = b.Execute(context.Background(), failFn)
 
 	_, err := b.Execute(context.Background(), failFn)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "circuit breaker")
 }
 
@@ -49,7 +50,7 @@ func TestProviderBreakerDefaultConfig(t *testing.T) {
 	result, err := b.Execute(context.Background(), func(ctx context.Context) (*ProviderResult, error) {
 		return &ProviderResult{Spam: true, Provider: "x"}, nil
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result.Spam)
 }
 
@@ -71,6 +72,6 @@ func TestProviderBreakerRecoversAfterTimeout(t *testing.T) {
 	result, err := b.Execute(context.Background(), func(ctx context.Context) (*ProviderResult, error) {
 		return &ProviderResult{Spam: false, Provider: "recovered"}, nil
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 }

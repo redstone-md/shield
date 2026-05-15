@@ -228,7 +228,7 @@ func send(tbMsg tbapi.Chattable, tbAPI TbAPI) error {
 	return nil
 }
 
-func spamPenalty(strikes int, keepRestricted bool, cfg ModerationConfig) (duration time.Duration, restrict bool, warn bool) {
+func spamPenalty(strikes int, keepRestricted bool, cfg ModerationConfig) (duration time.Duration, restrict, warn bool) {
 	if cfg.WarnStrikes > 0 {
 		if strikes < cfg.WarnStrikes {
 			return 0, false, true
@@ -516,7 +516,8 @@ func logAnimationTransformDetails(msg *tbapi.Message, animation *bot.MediaInfo) 
 		return
 	}
 	log.Printf("[DEBUG] animation transform: animation=%s premium_animation=%s document=%s result=%s",
-		telegramAnimationDetails(msg.Animation), telegramAnimationDetails(msg.PremiumAnimation), telegramDocumentDetails(msg.Document), mediaInfoDetails(animation))
+		telegramAnimationDetails(msg.Animation), telegramAnimationDetails(msg.PremiumAnimation),
+		telegramDocumentDetails(msg.Document), mediaInfoDetails(animation))
 }
 
 func telegramAnimationDetails(animation *tbapi.Animation) string {

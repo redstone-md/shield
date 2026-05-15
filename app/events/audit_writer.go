@@ -33,7 +33,17 @@ type enrichedAuditLogger interface {
 }
 
 type IncidentCreator interface {
-	CreateIncident(ctx context.Context, idempotencyKey string, chatID int64, ruleSetVersion int, spamUserID int64, spamUserName string, messageText string, checks []spamcheck.Response, slowPath *slowpath.SlowPathInvocation) error
+	CreateIncident(
+		ctx context.Context,
+		idempotencyKey string,
+		chatID int64,
+		ruleSetVersion int,
+		spamUserID int64,
+		spamUserName string,
+		messageText string,
+		checks []spamcheck.Response,
+		slowPath *slowpath.SlowPathInvocation,
+	) error
 }
 
 type defaultAuditWriter struct {

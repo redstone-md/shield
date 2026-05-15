@@ -50,7 +50,9 @@ func (a dictionaryFallbackAdapter) Read(ctx context.Context, _ string, t storage
 	return a.inner.Read(ctx, t)
 }
 
-func (a dictionaryFallbackAdapter) ReadWithIDs(ctx context.Context, _ string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+func (a dictionaryFallbackAdapter) ReadWithIDs(
+	ctx context.Context, _ string, t storage.DictionaryType,
+) ([]storage.DictionaryEntry, error) {
 	return a.inner.ReadWithIDs(ctx, t)
 }
 

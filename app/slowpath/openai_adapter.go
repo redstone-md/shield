@@ -134,7 +134,7 @@ func (a *OpenAIAdapter) Reply(ctx context.Context, req ChatRequest) (*ChatResult
 	}, nil
 }
 
-func (a *OpenAIAdapter) AnalyzeImage(ctx context.Context, imageData []byte, mime string, prompt string) (*ProviderResult, error) {
+func (a *OpenAIAdapter) AnalyzeImage(ctx context.Context, imageData []byte, mime, prompt string) (*ProviderResult, error) {
 	start := time.Now()
 
 	if prompt == "" {
@@ -193,17 +193,22 @@ func (a *OpenAIAdapter) AnalyzeImage(ctx context.Context, imageData []byte, mime
 	}, nil
 }
 
-func logVisionPayloadDebug(model string, mime string, imageData []byte, dataURL string, prompt string, req openai.ChatCompletionRequest) {
+func logVisionPayloadDebug(
+	model, mime string, imageData []byte, dataURL, prompt string, req openai.ChatCompletionRequest,
+) {
 	headLen := min(len(imageData), 64)
 	urlPreviewLen := min(len(dataURL), 160)
 	sum := sha256.Sum256(imageData)
 	log.Printf(
-		"[DEBUG] openai vision payload: model=%q max_tokens=%d response_format=%q messages=%d prompt_len=%d mime=%q image_bytes=%d image_sha256=%x image_head_hex=%x data_url_len=%d data_url_prefix=%q",
-		model, req.MaxTokens, req.ResponseFormat.Type, len(req.Messages), len(prompt), mime, len(imageData), sum, imageData[:headLen], len(dataURL), dataURL[:urlPreviewLen],
+		"[DEBUG] openai vision payload: model=%q max_tokens=%d response_format=%q messages=%d "+
+			"prompt_len=%d mime=%q image_bytes=%d image_sha256=%x image_head_hex=%x "+
+			"data_url_len=%d data_url_prefix=%q",
+		model, req.MaxTokens, req.ResponseFormat.Type, len(req.Messages), len(prompt), mime,
+		len(imageData), sum, imageData[:headLen], len(dataURL), dataURL[:urlPreviewLen],
 	)
 }
 
-func (a *OpenAIAdapter) truncateMessage(msg string, fullMsg string) string {
+func (a *OpenAIAdapter) truncateMessage(_, fullMsg string) string {
 	encoder, err := tokenizer.NewEncoder()
 	if err != nil {
 		return a.truncateBySymbols(fullMsg)

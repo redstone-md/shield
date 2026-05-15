@@ -53,7 +53,7 @@ func TestAuditTenantIDInQueries(t *testing.T) {
 						continue
 					}
 
-					assert.True(t, strings.Contains(trimmed, "tenant_id"),
+					assert.Contains(t, trimmed, "tenant_id",
 						"%s cmd=%d %s: WHERE clause missing tenant_id\nquery: %s", tc.name, cmd, dbType, trimmed)
 				}
 			})

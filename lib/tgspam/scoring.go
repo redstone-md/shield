@@ -8,11 +8,13 @@ import (
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
+// ScoringEngine aggregates weighted spam signals against a threshold and renders the verdict.
 type ScoringEngine struct {
 	threshold float64
 	signals   []spamcheck.Response
 }
 
+// NewScoringEngine returns a ScoringEngine that flags spam when total weighted score reaches threshold (default 1.0).
 func NewScoringEngine(threshold float64) *ScoringEngine {
 	if threshold <= 0 {
 		threshold = 1.0
@@ -20,10 +22,12 @@ func NewScoringEngine(threshold float64) *ScoringEngine {
 	return &ScoringEngine{threshold: threshold}
 }
 
+// AddSignal records a check response that the engine will weigh in Score.
 func (e *ScoringEngine) AddSignal(r spamcheck.Response) {
 	e.signals = append(e.signals, r)
 }
 
+// Score computes the aggregate RiskScore, falling back to boolean OR when no signal carries a weight.
 func (e *ScoringEngine) Score() spamcheck.RiskScore {
 	if e.hasWeightedSignals() {
 		return e.weightedScore()
@@ -85,7 +89,7 @@ func (e *ScoringEngine) booleanFallback() spamcheck.RiskScore {
 	decision := len(contributing) > 0
 	reason := "boolean-or"
 	if decision {
-		var names []string
+		names := make([]string, 0, len(contributing))
 		for _, s := range contributing {
 			names = append(names, s.Name)
 		}
@@ -112,19 +116,20 @@ func (d *Detector) scoreSignals(cr []spamcheck.Response, boolOR func([]spamcheck
 }
 
 // withScoring populates scoring fields on a Response. Deterministic checks get Score=1.0, Weight=1.0.
-// Probabilistic checks pass their own score. NormalizedText is truncated to 64 runes.
-func withScoring(r spamcheck.Response, score float64, normText string) spamcheck.Response {
+// NormalizedText is truncated to 64 runes.
+func withScoring(r spamcheck.Response, normText string) spamcheck.Response {
 	r.RuleID = r.Name
-	r.Score = score
+	r.Score = 1.0
 	if r.Weight == 0 && r.Spam {
 		r.Weight = 1.0
 	}
-	r.NormalizedText = truncateRunes(normText, 64)
+	r.NormalizedText = truncateRunes(normText)
 	return r
 }
 
-// truncateRunes truncates text to maxRunes runes.
-func truncateRunes(text string, maxRunes int) string {
+// truncateRunes truncates text to 64 runes.
+func truncateRunes(text string) string {
+	const maxRunes = 64
 	runes := []rune(text)
 	if len(runes) <= maxRunes {
 		return text

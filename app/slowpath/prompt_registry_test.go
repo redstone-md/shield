@@ -68,7 +68,7 @@ func TestFilePromptRegistryGetNotFound(t *testing.T) {
 	reg := NewFilePromptRegistry(dir)
 
 	_, err := reg.Get("openai", "v99")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Error(t, err)
 }
 
@@ -90,7 +90,7 @@ func TestFilePromptRegistryLoadFromDir(t *testing.T) {
 	}
 	data, err := json.MarshalIndent(entries, "", "  ")
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompts-openai.json"), data, 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompts-openai.json"), data, 0o644))
 
 	reg := NewFilePromptRegistry(dir)
 	require.NoError(t, reg.Load())
@@ -127,7 +127,7 @@ func TestInMemoryPromptRegistry(t *testing.T) {
 func TestInMemoryPromptRegistryNotFound(t *testing.T) {
 	reg := NewInMemoryPromptRegistry()
 	_, err := reg.Active("missing")
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = reg.Get("missing", "v1")
 	assert.Error(t, err)

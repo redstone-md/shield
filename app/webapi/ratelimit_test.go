@@ -16,8 +16,8 @@ func TestTenantRateLimiter_AllowsWithinBurst(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	for i := 0; i < 5; i++ {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+	for i := range 5 {
+		req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 		req.Header.Set("X-Tenant-ID", "tenant-a")
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
@@ -31,15 +31,15 @@ func TestTenantRateLimiter_BlocksOverBurst(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	for i := 0; i < 2; i++ {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+	for range 2 {
+		req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 		req.Header.Set("X-Tenant-ID", "tenant-a")
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	req.Header.Set("X-Tenant-ID", "tenant-a")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -52,19 +52,19 @@ func TestTenantRateLimiter_Isolation(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	reqA := httptest.NewRequest(http.MethodGet, "/", nil)
+	reqA := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	reqA.Header.Set("X-Tenant-ID", "tenant-a")
 	recA := httptest.NewRecorder()
 	handler.ServeHTTP(recA, reqA)
 	assert.Equal(t, http.StatusOK, recA.Code)
 
-	reqA2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	reqA2 := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	reqA2.Header.Set("X-Tenant-ID", "tenant-a")
 	recA2 := httptest.NewRecorder()
 	handler.ServeHTTP(recA2, reqA2)
 	assert.Equal(t, http.StatusTooManyRequests, recA2.Code, "tenant-a should be rate limited")
 
-	reqB := httptest.NewRequest(http.MethodGet, "/", nil)
+	reqB := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	reqB.Header.Set("X-Tenant-ID", "tenant-b")
 	recB := httptest.NewRecorder()
 	handler.ServeHTTP(recB, reqB)
@@ -77,7 +77,7 @@ func TestTenantRateLimiter_DefaultTenant(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -92,6 +92,6 @@ func TestTenantRateLimiter_NilMiddleware(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", http.NoBody))
 	assert.Equal(t, http.StatusOK, rec.Code)
 }

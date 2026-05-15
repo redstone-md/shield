@@ -66,14 +66,14 @@ func TestDictionaryService_Delete(t *testing.T) {
 
 	entries, err := svc.Read(context.Background(), "t1", storage.DictionaryTypeStopPhrase)
 	require.NoError(t, err)
-	assert.Len(t, entries, 0)
+	assert.Empty(t, entries)
 }
 
 func TestDictionaryService_Validation(t *testing.T) {
 	svc := NewDictionaryService(nil, nil)
 
 	err := svc.Add(context.Background(), "t1", storage.DictionaryTypeStopPhrase, "")
-	assert.EqualError(t, err, "data cannot be empty")
+	require.EqualError(t, err, "data cannot be empty")
 
 	err = svc.Add(context.Background(), "t1", storage.DictionaryType("invalid"), "data")
 	assert.Error(t, err)
@@ -134,10 +134,10 @@ func TestDictionaryService_NilStore(t *testing.T) {
 	svc := NewDictionaryService(nil, nil)
 
 	_, err := svc.Read(context.Background(), "t1", storage.DictionaryTypeStopPhrase)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = svc.ReadWithIDs(context.Background(), "t1", storage.DictionaryTypeStopPhrase)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = svc.Stats(context.Background(), "t1")
 	assert.Error(t, err)

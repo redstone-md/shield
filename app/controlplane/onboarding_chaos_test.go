@@ -105,11 +105,9 @@ func TestOnboardingChaos_ConcurrentOffboard(t *testing.T) {
 	results := make(chan error, workers)
 
 	for range workers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			results <- svc.Offboard(context.Background(), "offboard-chaos")
-		}()
+		})
 	}
 	wg.Wait()
 	close(results)

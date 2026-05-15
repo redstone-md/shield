@@ -7,6 +7,7 @@ import (
 
 	"github.com/sashabaranov/go-openai"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOpenAIAdapterName(t *testing.T) {
@@ -35,7 +36,7 @@ func TestOpenAIAdapterCheckSpam(t *testing.T) {
 	}
 	a := NewOpenAIAdapter(mock, "gpt-4o-mini", 1024, 8192)
 	result, err := a.Check(context.Background(), ProviderRequest{Message: "buy USDT now"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result.Spam)
 	assert.Equal(t, 95, result.Confidence)
 	assert.Contains(t, result.Reason, "crypto spam")
@@ -57,7 +58,7 @@ func TestOpenAIAdapterCheckHam(t *testing.T) {
 	}
 	a := NewOpenAIAdapter(mock, "gpt-4o-mini", 1024, 8192)
 	result, err := a.Check(context.Background(), ProviderRequest{Message: "hello world"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, result.Spam)
 	assert.Equal(t, 10, result.Confidence)
 }
@@ -80,7 +81,7 @@ func TestOpenAIAdapterCustomPrompts(t *testing.T) {
 		Message:       "hello",
 		CustomPrompts: []string{"custom rule"},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, result.Spam)
 }
 
@@ -113,7 +114,7 @@ func TestOpenAIAdapterNoChoices(t *testing.T) {
 	}
 	a := NewOpenAIAdapter(mock, "gpt-4o", 1024, 8192)
 	_, err := a.Check(context.Background(), ProviderRequest{Message: "test"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no choices")
 }
 
@@ -130,7 +131,7 @@ func TestOpenAIAdapterBrokenJSON(t *testing.T) {
 	}
 	a := NewOpenAIAdapter(mock, "gpt-4o", 1024, 8192)
 	result, err := a.Check(context.Background(), ProviderRequest{Message: "test"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result.Spam)
 }
 
@@ -149,7 +150,7 @@ func TestOpenAIAdapterAnalyzeImageSendsMultimodalContent(t *testing.T) {
 	mock := &mockOpenAIClient{
 		fn: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
 			payload, err := json.Marshal(req.Messages[1])
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Contains(t, string(payload), `"content":[`)
 			assert.NotContains(t, string(payload), `"content":null`)
 			return openai.ChatCompletionResponse{
@@ -162,7 +163,7 @@ func TestOpenAIAdapterAnalyzeImageSendsMultimodalContent(t *testing.T) {
 	}
 	a := NewOpenAIAdapter(mock, "gpt-4o", 1024, 8192)
 	result, err := a.AnalyzeImage(context.Background(), []byte("fake-image"), "image/jpeg", "check image")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, result.Spam)
 }
 

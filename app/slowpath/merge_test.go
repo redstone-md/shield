@@ -16,7 +16,7 @@ func TestMergeFastOnly(t *testing.T) {
 	}
 	merged := MergeResults(fast, nil)
 	assert.True(t, merged.Spam)
-	assert.Equal(t, 0.8, merged.Score)
+	assert.InDelta(t, 0.8, merged.Score, 1e-9)
 	assert.Len(t, merged.Signals, 1)
 }
 

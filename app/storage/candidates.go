@@ -178,7 +178,9 @@ func (s *CandidateStorage) List(ctx context.Context, filter feedback.CandidateFi
 	return entries, nil
 }
 
-func (s *CandidateStorage) UpdateStatus(ctx context.Context, id int64, status feedback.CandidateStatus, reviewedBy, comment string) error {
+func (s *CandidateStorage) UpdateStatus(
+	ctx context.Context, id int64, status feedback.CandidateStatus, reviewedBy, comment string,
+) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -188,7 +190,7 @@ func (s *CandidateStorage) UpdateStatus(ctx context.Context, id int64, status fe
 	}
 	query = s.Adopt(query)
 
-	var reviewedAt interface{}
+	var reviewedAt any
 	if status != feedback.CandidatePending {
 		reviewedAt = time.Now()
 	}
@@ -203,7 +205,9 @@ func (s *CandidateStorage) UpdateStatus(ctx context.Context, id int64, status fe
 	return nil
 }
 
-func (s *CandidateStorage) FindByValue(ctx context.Context, candidateType feedback.CandidateType, value string) ([]feedback.CandidateEntry, error) {
+func (s *CandidateStorage) FindByValue(
+	ctx context.Context, candidateType feedback.CandidateType, value string,
+) ([]feedback.CandidateEntry, error) {
 	s.RLock()
 	defer s.RUnlock()
 

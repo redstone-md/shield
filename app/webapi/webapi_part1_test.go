@@ -64,7 +64,7 @@ func TestServer_RequestMetadataMiddlewarePropagatesToDetectedSpam(t *testing.T) 
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/check/42", nil)
+	req := httptest.NewRequest(http.MethodGet, "/check/42", http.NoBody)
 	req.SetPathValue("user_id", "42")
 	req.Header.Set("X-Request-ID", "req-123")
 	rr := httptest.NewRecorder()

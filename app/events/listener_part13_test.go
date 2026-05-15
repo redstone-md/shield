@@ -308,8 +308,8 @@ func TestTelegramListener_ApplyRuleSet_propagatesToSubHandlers(t *testing.T) {
 
 	assert.True(t, l.adminHandler.softBan)
 	assert.True(t, l.adminHandler.dry)
-	assert.False(t, l.reportsHandler.ReportConfig.Enabled)
-	assert.Equal(t, 7, l.reportsHandler.ReportConfig.Threshold)
+	assert.False(t, l.reportsHandler.Enabled)
+	assert.Equal(t, 7, l.reportsHandler.Threshold)
 	assert.Equal(t, 1*time.Minute, l.reportsHandler.moderation.FirstStrike)
 	assert.True(t, l.reportsHandler.softBanMode)
 	assert.True(t, l.reportsHandler.dry)

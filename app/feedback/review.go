@@ -21,7 +21,9 @@ func NewReviewService(store CandidateStore, dict DictionaryAdder, svc *Service) 
 	return &ReviewService{store: store, dict: dict, svc: svc}
 }
 
-func (r *ReviewService) GenerateFromIncident(ctx context.Context, incidentID int64, messageText string) ([]CandidateEntry, error) {
+func (r *ReviewService) GenerateFromIncident(
+	ctx context.Context, incidentID int64, messageText string,
+) ([]CandidateEntry, error) {
 	if messageText == "" {
 		return nil, nil
 	}

@@ -50,9 +50,11 @@ var tenantLimitsQueries = engine.NewQueryMap().
 	`).
 	AddSame(CmdGetTenantLimit, `SELECT limit_value, current_usage, window_start
 		FROM tenant_limits WHERE tenant_id = ? AND limit_type = ?`).
-	AddSame(CmdSetTenantLimit, `INSERT INTO tenant_limits (gid, tenant_id, limit_type, limit_value, current_usage, window_start, updated_at)
+	AddSame(CmdSetTenantLimit, `INSERT INTO tenant_limits
+		(gid, tenant_id, limit_type, limit_value, current_usage, window_start, updated_at)
 		VALUES (?, ?, ?, ?, 0, ?, ?)
-		ON CONFLICT(tenant_id, limit_type) DO UPDATE SET limit_value = excluded.limit_value, updated_at = excluded.updated_at`).
+		ON CONFLICT(tenant_id, limit_type) DO UPDATE
+		SET limit_value = excluded.limit_value, updated_at = excluded.updated_at`).
 	AddSame(CmdIncrementTenantLimit, `UPDATE tenant_limits SET current_usage = current_usage + 1, updated_at = ?
 		WHERE tenant_id = ? AND limit_type = ?`).
 	AddSame(CmdResetTenantLimit, `UPDATE tenant_limits SET current_usage = 0, window_start = ?, updated_at = ?

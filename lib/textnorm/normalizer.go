@@ -7,8 +7,10 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
+// ScriptFoldFunc maps a string to a script-folded form (for example, mapping look-alike scripts to Latin).
 type ScriptFoldFunc func(string) string
 
+// Options configures which normalization steps a Normalizer applies and in which order.
 type Options struct {
 	LowerCase           bool
 	Trim                bool
@@ -19,14 +21,17 @@ type Options struct {
 	ScriptFold          ScriptFoldFunc
 }
 
+// Normalizer applies the configured text normalization pipeline to input strings.
 type Normalizer struct {
 	opts Options
 }
 
+// New builds a Normalizer that runs the steps enabled by opts.
 func New(opts Options) Normalizer {
 	return Normalizer{opts: opts}
 }
 
+// Default returns a Normalizer preconfigured for case-insensitive whitespace-canonical lookup.
 func Default() Normalizer {
 	return New(Options{
 		LowerCase:           true,
@@ -36,6 +41,7 @@ func Default() Normalizer {
 	})
 }
 
+// Normalize applies the configured normalization steps to text and returns the result.
 func (n Normalizer) Normalize(text string) string {
 	if n.opts.StripInvisible {
 		text = stripInvisible(text)

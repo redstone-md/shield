@@ -298,9 +298,7 @@ func execute(ctx context.Context, opts options) error {
 	}
 
 	runtimeProbe := newRuntimeProbe(opts.InstanceID, revision)
-	if probeErr := activateRuntimeProbe(ctx, opts.Server.ProbeListenAddr, runtimeProbe); probeErr != nil {
-		return fmt.Errorf("can't activate runtime probe server, %w", probeErr)
-	}
+	activateRuntimeProbe(ctx, opts.Server.ProbeListenAddr, runtimeProbe)
 	defer runtimeProbe.SetReady(false)
 
 	assembly, err := assembleRuntime(ctx, opts)

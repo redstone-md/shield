@@ -187,7 +187,9 @@ func (s *Server) reloadDynamicSamplesHandler(w http.ResponseWriter, r *http.Requ
 	rest.RenderJSON(w, rest.JSON{"reloaded": true})
 }
 
-func (s *Server) updateApprovedUsersHandler(updFn func(ctx context.Context, tenantID string, ui approved.UserInfo) error) func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) updateApprovedUsersHandler(
+	updFn func(ctx context.Context, tenantID string, ui approved.UserInfo) error,
+) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		req := approved.UserInfo{}
 		isHtmxRequest := r.Header.Get("HX-Request") == "true"
@@ -271,7 +273,7 @@ func (a detectorApprovedUsersAdapter) Add(_ context.Context, _ string, user appr
 	return a.detector.AddApprovedUser(user)
 }
 
-func (a detectorApprovedUsersAdapter) Remove(_ context.Context, _ string, id string) error {
+func (a detectorApprovedUsersAdapter) Remove(_ context.Context, _, id string) error {
 	return a.detector.RemoveApprovedUser(id)
 }
 
@@ -301,7 +303,8 @@ func (a dictionaryStoreAdapter) Read(ctx context.Context, _ string, t storage.Di
 	return a.store.Read(ctx, "", t)
 }
 
-func (a dictionaryStoreAdapter) ReadWithIDs(ctx context.Context, _ string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+func (a dictionaryStoreAdapter) ReadWithIDs(ctx context.Context, _ string,
+	t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
 	return a.store.ReadWithIDs(ctx, "", t)
 }
 

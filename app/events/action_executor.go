@@ -238,10 +238,10 @@ type banRequest struct {
 }
 
 type warnRequest struct {
-	chatID     int64
-	subjectID int64
-	messageID int
-	text      string
+	chatID      int64
+	subjectID   int64
+	messageID   int
+	text        string
 	warnDelTime time.Duration // time to delete the warning message, 0 to keep
 }
 

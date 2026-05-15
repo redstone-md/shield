@@ -70,16 +70,17 @@ func (m *mockIncidentStore) List(_ context.Context, filter IncidentFilter) ([]In
 
 func (m *mockIncidentStore) UpdateStatus(_ context.Context, id int64, status IncidentStatus, resolvedBy string) error {
 	for i := range m.incidents {
-		if m.incidents[i].ID == id {
-			m.incidents[i].Status = status
-			m.incidents[i].ResolvedBy = resolvedBy
-			m.incidents[i].UpdatedAt = time.Now()
-			if status == IncidentStatusResolved || status == IncidentStatusClosed {
-				now := time.Now()
-				m.incidents[i].ResolvedAt = &now
-			}
-			return nil
+		if m.incidents[i].ID != id {
+			continue
 		}
+		m.incidents[i].Status = status
+		m.incidents[i].ResolvedBy = resolvedBy
+		m.incidents[i].UpdatedAt = time.Now()
+		if status == IncidentStatusResolved || status == IncidentStatusClosed {
+			now := time.Now()
+			m.incidents[i].ResolvedAt = &now
+		}
+		return nil
 	}
 	return ErrNotFound
 }
@@ -157,17 +158,18 @@ func (m *mockAppealStore) List(_ context.Context, filter AppealFilter) ([]Appeal
 
 func (m *mockAppealStore) UpdateStatus(_ context.Context, id int64, status AppealStatus, resolvedBy, resolutionText string) error {
 	for i := range m.appeals {
-		if m.appeals[i].ID == id {
-			m.appeals[i].Status = status
-			m.appeals[i].ResolvedBy = resolvedBy
-			m.appeals[i].ResolutionText = resolutionText
-			m.appeals[i].UpdatedAt = time.Now()
-			if status == AppealAccepted || status == AppealRejected {
-				now := time.Now()
-				m.appeals[i].ResolvedAt = &now
-			}
-			return nil
+		if m.appeals[i].ID != id {
+			continue
 		}
+		m.appeals[i].Status = status
+		m.appeals[i].ResolvedBy = resolvedBy
+		m.appeals[i].ResolutionText = resolutionText
+		m.appeals[i].UpdatedAt = time.Now()
+		if status == AppealAccepted || status == AppealRejected {
+			now := time.Now()
+			m.appeals[i].ResolvedAt = &now
+		}
+		return nil
 	}
 	return ErrNotFound
 }

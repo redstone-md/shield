@@ -8,17 +8,17 @@ import (
 )
 
 func TestEscalationReasonValues(t *testing.T) {
-	assert.Equal(t, EscalationReason("ambiguous_fast"), EscalationAmbiguousFast)
-	assert.Equal(t, EscalationReason("image_content"), EscalationImageContent)
-	assert.Equal(t, EscalationReason("user_report"), EscalationUserReport)
-	assert.Equal(t, EscalationReason("high_risk_policy"), EscalationHighRiskPolicy)
-	assert.Equal(t, EscalationReason("force_llm"), EscalationForceLLM)
+	assert.Equal(t, EscalationAmbiguousFast, EscalationReason("ambiguous_fast"))
+	assert.Equal(t, EscalationImageContent, EscalationReason("image_content"))
+	assert.Equal(t, EscalationUserReport, EscalationReason("user_report"))
+	assert.Equal(t, EscalationHighRiskPolicy, EscalationReason("high_risk_policy"))
+	assert.Equal(t, EscalationForceLLM, EscalationReason("force_llm"))
 }
 
 func TestBudgetClassValues(t *testing.T) {
-	assert.Equal(t, BudgetClass("standard"), BudgetClassStandard)
-	assert.Equal(t, BudgetClass("high"), BudgetClassHigh)
-	assert.Equal(t, BudgetClass("premium"), BudgetClassPremium)
+	assert.Equal(t, BudgetClassStandard, BudgetClass("standard"))
+	assert.Equal(t, BudgetClassHigh, BudgetClass("high"))
+	assert.Equal(t, BudgetClassPremium, BudgetClass("premium"))
 }
 
 func TestProviderResultDefaults(t *testing.T) {
@@ -79,7 +79,7 @@ func (m *mockLLMProvider) Check(_ context.Context, _ ProviderRequest) (*Provider
 type mockVisionProvider struct{}
 
 func (m *mockVisionProvider) Name() string { return "mock-vision" }
-func (m *mockVisionProvider) AnalyzeImage(_ context.Context, _ []byte, _ string, _ string) (*ProviderResult, error) {
+func (m *mockVisionProvider) AnalyzeImage(_ context.Context, _ []byte, _, _ string) (*ProviderResult, error) {
 	return &ProviderResult{Spam: false, Provider: "mock-vision"}, nil
 }
 

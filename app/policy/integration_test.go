@@ -56,9 +56,9 @@ func TestIntegration_EscalationProgression(t *testing.T) {
 }
 
 func TestIntegration_ShadowMode(t *testing.T) {
-	real := NewEngine(PermissiveProfile())
+	actual := NewEngine(PermissiveProfile())
 	shadow := StrictProfile()
-	engine := NewEngineWithShadow(real.Profile, shadow)
+	engine := NewEngineWithShadow(actual.Profile, shadow)
 
 	sig := []spamcheck.Response{{Name: "stop-word", Spam: true, RuleID: "stop-word"}}
 	result := engine.Decide(PolicyInput{Signals: sig})
@@ -70,7 +70,7 @@ func TestIntegration_ShadowMode(t *testing.T) {
 		t.Errorf("shadow profile should be strict, got %s", result.Shadow.Explanation.ProfileName)
 	}
 	if result.Explanation.ProfileName != "permissive" {
-		t.Errorf("real profile should be permissive, got %s", result.Explanation.ProfileName)
+		t.Errorf("actual profile should be permissive, got %s", result.Explanation.ProfileName)
 	}
 	if result.Shadow.Action != result.Action {
 		if result.Shadow.Action != moderation.ActionBan {
@@ -78,7 +78,7 @@ func TestIntegration_ShadowMode(t *testing.T) {
 		}
 	}
 
-	t.Logf("real:   %s (%s)", result.Action, result.Explanation.ProfileName)
+	t.Logf("actual: %s (%s)", result.Action, result.Explanation.ProfileName)
 	t.Logf("shadow: %s (%s)", result.Shadow.Action, result.Shadow.Explanation.ProfileName)
 }
 

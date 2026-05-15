@@ -72,7 +72,7 @@ func (s *WorkspaceService) EnsureDefaultWorkspace(ctx context.Context, req Works
 		rec.ID = id
 	}
 
-	if err = s.EnsureMember(ctx, rec.ID, req.OwnerID, RoleOwner); err != nil {
+	if err := s.EnsureMember(ctx, rec.ID, req.OwnerID, RoleOwner); err != nil {
 		return storage.WorkspaceRecord{}, err
 	}
 	return rec, nil

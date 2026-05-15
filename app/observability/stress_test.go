@@ -16,15 +16,13 @@ func TestMetrics_StressCounters(t *testing.T) {
 	const opsPer = 200
 
 	var wg sync.WaitGroup
-	for i := 0; i < goroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < opsPer; j++ {
+	for range goroutines {
+		wg.Go(func() {
+			for range opsPer {
 				m.Inc("requests")
 				m.Add("bytes", 1)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -39,11 +37,11 @@ func TestMetrics_StressHistograms(t *testing.T) {
 	const opsPer = 100
 
 	var wg sync.WaitGroup
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			for j := 0; j < opsPer; j++ {
+			for j := range opsPer {
 				d := time.Duration(id+j%10+1) * time.Millisecond
 				m.Observe("latency", d)
 			}
@@ -55,8 +53,8 @@ func TestMetrics_StressHistograms(t *testing.T) {
 	h := snap.Histograms["latency"]
 	expected := int64(goroutines * opsPer)
 	assert.Equal(t, expected, h.Count)
-	assert.True(t, h.SumMs > 0)
-	assert.True(t, h.AvgMs > 0)
+	assert.Positive(t, h.SumMs)
+	assert.Positive(t, h.AvgMs)
 }
 
 func TestMetrics_StressMixedOps(t *testing.T) {
@@ -65,17 +63,17 @@ func TestMetrics_StressMixedOps(t *testing.T) {
 	const opsPer = 50
 	var wg sync.WaitGroup
 
-	for i := 0; i < workers; i++ {
+	for range workers {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			for j := 0; j < opsPer; j++ {
+			for range opsPer {
 				m.Inc("counter_a")
 			}
 		}()
 		go func() {
 			defer wg.Done()
-			for j := 0; j < opsPer; j++ {
+			for j := range opsPer {
 				m.Observe("hist_x", time.Duration(j+1)*time.Millisecond)
 			}
 		}()
@@ -94,10 +92,10 @@ func TestMetrics_StressSnapshotConsistency(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(writers)
-	for i := 0; i < writers; i++ {
+	for i := range writers {
 		go func(id int) {
 			defer wg.Done()
-			for j := 0; j < opsPer; j++ {
+			for range opsPer {
 				m.Inc("snap_ctr")
 				m.Inc("snap_bytes")
 			}
@@ -116,12 +114,12 @@ func TestMetrics_StressManyNames(t *testing.T) {
 	const opsPerName = 50
 
 	var wg sync.WaitGroup
-	for i := 0; i < nameCount; i++ {
+	for i := range nameCount {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
 			name := fmt.Sprintf("metric_%d", idx)
-			for j := 0; j < opsPerName; j++ {
+			for range opsPerName {
 				m.Inc(name)
 			}
 		}(i)
@@ -130,7 +128,7 @@ func TestMetrics_StressManyNames(t *testing.T) {
 
 	snap := m.Snapshot().(MetricsSnapshot)
 	assert.Len(t, snap.Counters, nameCount)
-	for i := 0; i < nameCount; i++ {
+	for i := range nameCount {
 		name := fmt.Sprintf("metric_%d", i)
 		assert.Equal(t, int64(opsPerName), snap.Counters[name], "counter %s mismatch", name)
 	}
@@ -142,12 +140,10 @@ func TestMetrics_StressObserveAccuracy(t *testing.T) {
 	dur := 25 * time.Millisecond
 
 	var wg sync.WaitGroup
-	for i := 0; i < count; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range count {
+		wg.Go(func() {
 			m.Observe("test_lat", dur)
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -183,7 +179,7 @@ func BenchmarkMetrics_Observe(b *testing.B) {
 
 func BenchmarkMetrics_Snapshot(b *testing.B) {
 	m := NewMetrics()
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		m.Inc(fmt.Sprintf("counter_%d", i))
 		m.Observe(fmt.Sprintf("hist_%d", i), time.Duration(i+1)*time.Millisecond)
 	}

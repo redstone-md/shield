@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEngineCheckText(t *testing.T) {
@@ -20,7 +21,7 @@ func TestEngineCheckText(t *testing.T) {
 		EventID: "evt-1",
 		Content: Content{Text: "spam"},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result.Spam)
 	assert.Equal(t, "evt-1", result.EventID)
 	assert.True(t, result.Final)
@@ -34,7 +35,7 @@ func TestEngineCheckNoProvider(t *testing.T) {
 		EventID: "evt-1",
 		Content: Content{Text: "test"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no LLM provider")
 }
 
@@ -68,7 +69,7 @@ func TestEngineCheckBudgetDenied(t *testing.T) {
 		BudgetClass: BudgetClassStandard,
 		Content:     Content{Text: "test"},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result.Skipped)
 }
 
@@ -88,7 +89,7 @@ func TestEngineCheckBudgetNoConfig(t *testing.T) {
 		TenantID: "tenant-unknown",
 		Content:  Content{Text: "test"},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result.Spam)
 }
 
@@ -105,7 +106,7 @@ func TestEngineVision(t *testing.T) {
 		ImageData: []byte("fake"),
 		ImageMIME: "image/jpeg",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result.Spam)
 	assert.Equal(t, "evt-img", result.EventID)
 }
@@ -124,7 +125,7 @@ func TestEngineVisionFallbackToTextProvider(t *testing.T) {
 		ImageMIME: "image/jpeg",
 		Content:   Content{Text: "check this"},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result.Spam)
 }
 
@@ -149,7 +150,7 @@ func TestEngineWithPromptRegistry(t *testing.T) {
 		EventID: "evt-1",
 		Content: Content{Text: "test"},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, result.Spam)
 	assert.Equal(t, "custom prompt", provider.req.SystemPrompt)
 	assert.Equal(t, "v2", provider.req.PromptVersion)
@@ -178,7 +179,7 @@ func TestEngineInvocationFromResult(t *testing.T) {
 	assert.Equal(t, "evt-1", inv.EventID)
 	assert.Equal(t, "openai", inv.Provider)
 	assert.Equal(t, 150, inv.InputTokens+inv.OutputTokens)
-	assert.Equal(t, 0.15, inv.CostEstimate)
+	assert.InDelta(t, 0.15, inv.CostEstimate, 1e-9)
 	assert.True(t, inv.Spam)
 }
 
@@ -199,7 +200,7 @@ func TestEngineDefaultProvider(t *testing.T) {
 		EventID: "evt-1",
 		Content: Content{Text: "test"},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, result.Spam)
 	assert.Equal(t, []string{"gemini"}, result.Providers)
 }
@@ -224,6 +225,6 @@ type stubVisionProvider struct {
 }
 
 func (s *stubVisionProvider) Name() string { return s.name }
-func (s *stubVisionProvider) AnalyzeImage(_ context.Context, _ []byte, _ string, _ string) (*ProviderResult, error) {
+func (s *stubVisionProvider) AnalyzeImage(_ context.Context, _ []byte, _, _ string) (*ProviderResult, error) {
 	return s.result, s.err
 }

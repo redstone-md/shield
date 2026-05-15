@@ -110,7 +110,7 @@ func TestService_Label_ConfirmedSpam(t *testing.T) {
 		LabeledBy:      "admin",
 	})
 	require.NoError(t, err)
-	assert.True(t, created.ID > 0)
+	assert.Positive(t, created.ID)
 	assert.Equal(t, LabelConfirmedSpam, created.Label)
 	assert.Equal(t, []string{"buy viagra now"}, samples.spamTexts)
 	assert.Empty(t, samples.hamTexts)

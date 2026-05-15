@@ -124,25 +124,6 @@ var incidentsQueries = engine.NewQueryMap().
 	}).
 	AddSame(CmdListIncidentComments, `SELECT * FROM incident_comments WHERE incident_id = ? ORDER BY created_at ASC`)
 
-var incidentsListQuery = engine.NewQueryMap().
-	Add(CmdListIncidents, engine.Query{
-		Sqlite:   buildIncidentListQuery("?"),
-		Postgres: buildIncidentListQuery("$"),
-	})
-
-func buildIncidentListQuery(placeholder string) string {
-	conditions := []string{"tenant_id = " + placeholder}
-	n := 2
-	addIf := func(field string, status string) {
-		if status != "" {
-			conditions = append(conditions, fmt.Sprintf("%s = %s%d", field, placeholder, n))
-			n++
-		}
-	}
-	_ = addIf
-	return "PLACEHOLDER_QUERY"
-}
-
 type IncidentStorage struct {
 	*engine.SQL
 	engine.RWLocker
@@ -238,7 +219,7 @@ func (s *IncidentStorage) getNoLock(ctx context.Context, id int64) (audit.Incide
 	return rec.toIncident(), nil
 }
 
-func (s *IncidentStorage) GetByIdempotencyKey(ctx context.Context, tenantID, key string) (audit.Incident, error) {
+func (s *IncidentStorage) GetByIdempotencyKey(ctx context.Context, _, key string) (audit.Incident, error) {
 	s.RLock()
 	defer s.RUnlock()
 	return s.getByIdempotencyKeyNoLock(ctx, key)
@@ -320,7 +301,10 @@ func (s *IncidentStorage) UpdateStatus(ctx context.Context, id int64, status aud
 		resolvedAt = now
 	}
 
-	query := s.Adopt("UPDATE incidents SET status = ?, resolved_by = ?, updated_at = ?, resolved_at = ? WHERE tenant_id = ? AND id = ?")
+	query := s.Adopt(
+		"UPDATE incidents SET status = ?, resolved_by = ?, updated_at = ?, resolved_at = ? " +
+			"WHERE tenant_id = ? AND id = ?",
+	)
 	_, err := s.ExecContext(ctx, query, string(status), resolvedBy, time.Now().UTC(), resolvedAt, s.TenantID(), id)
 	if err != nil {
 		return fmt.Errorf("failed to update incident status: %w", err)
@@ -350,7 +334,9 @@ func (s *IncidentStorage) AddComment(ctx context.Context, comment audit.Incident
 	}
 	query = s.Adopt(query)
 
-	result, err := s.ExecContext(ctx, query, comment.IncidentID, comment.AuthorType, comment.AuthorID, comment.Action, comment.Payload)
+	result, err := s.ExecContext(
+		ctx, query, comment.IncidentID, comment.AuthorType, comment.AuthorID, comment.Action, comment.Payload,
+	)
 	if err != nil {
 		return audit.IncidentComment{}, fmt.Errorf("failed to insert incident comment: %w", err)
 	}

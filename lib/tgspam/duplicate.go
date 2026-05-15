@@ -94,7 +94,7 @@ func (d *duplicateDetector) check(req spamcheck.Request) spamcheck.Response {
 			RuleID:         "duplicate",
 			Score:          1.0,
 			Weight:         1.0,
-			NormalizedText: truncateRunes(req.Msg, 64),
+			NormalizedText: truncateRunes(req.Msg),
 		}
 	}
 

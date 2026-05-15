@@ -32,13 +32,13 @@ func newImageDownloader(api TbAPI) *imageDownloader {
 	}
 }
 
-func (d *imageDownloader) download(ctx context.Context, fileID string) ([]byte, string, error) {
+func (d *imageDownloader) download(ctx context.Context, fileID string) (data []byte, mime string, err error) {
 	url, err := d.api.GetFileDirectURL(fileID)
 	if err != nil {
 		return nil, "", fmt.Errorf("get file url: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, "", fmt.Errorf("create request: %w", err)
 	}
@@ -58,7 +58,7 @@ func (d *imageDownloader) download(ctx context.Context, fileID string) ([]byte, 
 	}
 
 	limited := io.LimitReader(resp.Body, d.maxSize+1)
-	data, err := io.ReadAll(limited)
+	data, err = io.ReadAll(limited)
 	if err != nil {
 		return nil, "", fmt.Errorf("read body: %w", err)
 	}
@@ -69,13 +69,13 @@ func (d *imageDownloader) download(ctx context.Context, fileID string) ([]byte, 
 
 	detectedMime := http.DetectContentType(data)
 	if isKnownNonImageMedia(detectedMime) {
-		data, mime, err := d.extract(ctx, data, detectedMime, d.maxSize)
-		if err != nil {
-			return nil, "", err
+		subData, subMime, subErr := d.extract(ctx, data, detectedMime, d.maxSize)
+		if subErr != nil {
+			return nil, "", subErr
 		}
-		return data, mime, nil
+		return subData, subMime, nil
 	}
-	mime := detectedMime
+	mime = detectedMime
 	if !strings.HasPrefix(mime, "image/") {
 		mime = resp.Header.Get("Content-Type")
 	}
@@ -105,8 +105,11 @@ func isKnownNonImageMedia(mime string) bool {
 	return strings.HasPrefix(mime, "video/") || strings.HasPrefix(mime, "audio/")
 }
 
-func ffmpegExtractFirstFrameJPEG(ctx context.Context, data []byte, mime string, maxSize int64) ([]byte, string, error) {
-	cmd := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-frames:v", "1", "-f", "image2", "-vcodec", "mjpeg", "pipe:1")
+func ffmpegExtractFirstFrameJPEG(
+	ctx context.Context, data []byte, mime string, maxSize int64,
+) (frameData []byte, frameMime string, err error) {
+	cmd := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error",
+		"-i", "pipe:0", "-frames:v", "1", "-f", "image2", "-vcodec", "mjpeg", "pipe:1")
 	cmd.Stdin = bytes.NewReader(data)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -124,7 +127,7 @@ func ffmpegExtractFirstFrameJPEG(ctx context.Context, data []byte, mime string, 
 	return frame, "image/jpeg", nil
 }
 
-func convertWebPToJPEG(data []byte) ([]byte, string, error) {
+func convertWebPToJPEG(data []byte) (jpegData []byte, jpegMime string, err error) {
 	img, err := webp.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, "", fmt.Errorf("convert webp: decode: %w", err)
@@ -137,7 +140,7 @@ func convertWebPToJPEG(data []byte) ([]byte, string, error) {
 	return buf.Bytes(), "image/jpeg", nil
 }
 
-func normalizeJPEG(data []byte) ([]byte, string, error) {
+func normalizeJPEG(data []byte) (jpegData []byte, jpegMime string, err error) {
 	img, err := jpeg.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, "", fmt.Errorf("normalize jpeg: decode: %w", err)

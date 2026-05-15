@@ -105,8 +105,10 @@ var reportsQueries = engine.NewQueryMap().
 			":reported_user_name, :msg_text, :report_time, :notification_sent, :admin_msg_id) " +
 			"ON CONFLICT (tenant_id, msg_id, chat_id, reporter_user_id) DO NOTHING",
 	}).
-	AddSame(CmdGetReportsByMessage, "SELECT * FROM reports WHERE tenant_id = ? AND msg_id = ? AND chat_id = ? ORDER BY report_time ASC").
-	AddSame(CmdGetReporterCountSince, "SELECT COUNT(*) FROM reports WHERE tenant_id = ? AND reporter_user_id = ? AND report_time > ?").
+	AddSame(CmdGetReportsByMessage,
+		"SELECT * FROM reports WHERE tenant_id = ? AND msg_id = ? AND chat_id = ? ORDER BY report_time ASC").
+	AddSame(CmdGetReporterCountSince,
+		"SELECT COUNT(*) FROM reports WHERE tenant_id = ? AND reporter_user_id = ? AND report_time > ?").
 	AddSame(CmdUpdateReportsAdminMsgID,
 		"UPDATE reports SET notification_sent = true, admin_msg_id = ? WHERE tenant_id = ? AND msg_id = ? AND chat_id = ?").
 	AddSame(CmdDeleteReporter, "DELETE FROM reports WHERE tenant_id = ? AND reporter_user_id = ? AND msg_id = ? AND chat_id = ?").

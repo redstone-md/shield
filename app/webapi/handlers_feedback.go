@@ -7,36 +7,9 @@ import (
 	"strconv"
 
 	"github.com/go-pkgz/rest"
-	"github.com/go-pkgz/routegroup"
 
 	"github.com/umputun/tg-spam/app/feedback"
 )
-
-func (s *Server) feedbackRoutes(mux *routegroup.Bundle) {
-	if s.FeedbackService == nil {
-		return
-	}
-
-	mux.Mount("/api/feedback").Route(func(r *routegroup.Bundle) {
-		r.HandleFunc("POST /labels", s.createLabelHandler)
-		r.HandleFunc("GET /labels", s.listLabelsHandler)
-		r.HandleFunc("GET /labels/stats", s.labelStatsHandler)
-
-		if s.ReviewService != nil {
-			r.HandleFunc("GET /candidates", s.listCandidatesHandler)
-			r.HandleFunc("POST /candidates/{id}/approve", s.approveCandidateHandler)
-			r.HandleFunc("POST /candidates/{id}/reject", s.rejectCandidateHandler)
-			r.HandleFunc("POST /candidates/generate", s.generateCandidatesHandler)
-		}
-
-		if s.KnowledgeService != nil {
-			r.HandleFunc("POST /knowledge/snapshots", s.createKnowledgeSnapshotHandler)
-			r.HandleFunc("GET /knowledge/snapshots", s.listKnowledgeSnapshotsHandler)
-			r.HandleFunc("GET /knowledge/snapshots/{id}", s.getKnowledgeSnapshotHandler)
-			r.HandleFunc("POST /knowledge/snapshots/{id}/rollback", s.rollbackKnowledgeHandler)
-		}
-	})
-}
 
 func (s *Server) createLabelHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {

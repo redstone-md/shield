@@ -29,7 +29,7 @@ func TestTenantStatusMiddleware_Active(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", http.NoBody))
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
@@ -44,7 +44,7 @@ func TestTenantStatusMiddleware_Suspended(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", http.NoBody))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
@@ -59,7 +59,7 @@ func TestTenantStatusMiddleware_Deleted(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", http.NoBody))
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
@@ -71,7 +71,7 @@ func TestTenantStatusMiddleware_NilChecker(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", http.NoBody))
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
@@ -85,6 +85,6 @@ func TestTenantAuthzMiddleware_NilProvider(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", http.NoBody))
 	assert.Equal(t, http.StatusOK, rec.Code)
 }

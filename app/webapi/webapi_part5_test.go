@@ -360,7 +360,7 @@ func TestServer_renderSamples(t *testing.T) {
 
 		server := NewServer(Config{SpamFilter: mockSpamFilter})
 		w := httptest.NewRecorder()
-		server.renderSamples(w, httptest.NewRequest("GET", "/", nil), "samples_list")
+		server.renderSamples(w, httptest.NewRequest("GET", "/", http.NoBody), "samples_list")
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, "text/html; charset=utf-8", w.Header().Get("Content-Type"))
 		t.Log(w.Body.String())
@@ -381,7 +381,7 @@ func TestServer_renderSamples(t *testing.T) {
 
 		server := NewServer(Config{SpamFilter: mockSpamFilter})
 		w := httptest.NewRecorder()
-		server.renderSamples(w, httptest.NewRequest("GET", "/", nil), "samples_list")
+		server.renderSamples(w, httptest.NewRequest("GET", "/", http.NoBody), "samples_list")
 		assert.Equal(t, http.StatusOK, w.Code)
 		body := w.Body.String()
 		assert.Contains(t, body, "Spam Samples (0)")
@@ -397,7 +397,7 @@ func TestServer_renderSamples(t *testing.T) {
 
 		server := NewServer(Config{SpamFilter: mockSpamFilter})
 		w := httptest.NewRecorder()
-		server.renderSamples(w, httptest.NewRequest("GET", "/", nil), "samples_list")
+		server.renderSamples(w, httptest.NewRequest("GET", "/", http.NoBody), "samples_list")
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
 
@@ -425,7 +425,7 @@ func TestServer_renderSamples(t *testing.T) {
 
 		server := NewServer(Config{SpamFilter: mockSpamFilter})
 		w := httptest.NewRecorder()
-		server.renderSamples(w, httptest.NewRequest("GET", "/", nil), "samples_list")
+		server.renderSamples(w, httptest.NewRequest("GET", "/", http.NoBody), "samples_list")
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
 

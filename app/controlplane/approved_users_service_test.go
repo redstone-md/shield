@@ -78,14 +78,14 @@ func TestApprovedUsersService_Remove(t *testing.T) {
 
 	users, err := svc.List(context.Background(), "t1")
 	require.NoError(t, err)
-	assert.Len(t, users, 0)
+	assert.Empty(t, users)
 }
 
 func TestApprovedUsersService_Validation(t *testing.T) {
 	svc := NewApprovedUsersService(nil, nil)
 
 	err := svc.Add(context.Background(), "t1", approved.UserInfo{UserID: ""})
-	assert.EqualError(t, err, "user id is required")
+	require.EqualError(t, err, "user id is required")
 
 	err = svc.Remove(context.Background(), "t1", "")
 	assert.EqualError(t, err, "user id is required")

@@ -31,9 +31,8 @@ const (
 // Type allows distinguishing between different database engines.
 type SQL struct {
 	sqlx.DB
-	gid      string // group id, to allow per-group storage in the same database
-	tenantID string // tenant id, for multi-tenant isolation
-	dbType   Type   // type of the database engine
+	gid    string // group id, to allow per-group storage in the same database
+	dbType Type   // type of the database engine
 }
 
 // New creates a new database engine with a connection URL and group id.

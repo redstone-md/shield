@@ -43,7 +43,7 @@ func (s *QuotaService) Check(ctx context.Context, tenantID, limitType string) (b
 	return true, nil
 }
 
-func (s *QuotaService) Increment(ctx context.Context, tenantID, limitType string) error {
+func (s *QuotaService) Increment(ctx context.Context, _, limitType string) error {
 	if s.limits == nil {
 		return nil
 	}

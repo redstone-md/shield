@@ -192,7 +192,9 @@ func (e *Engine) checkVision(ctx context.Context, req SlowPathRequest) (*SlowPat
 	}, nil
 }
 
-func (e *Engine) callWithBreaker(ctx context.Context, provider string, req ProviderRequest, p LLMProvider) (*ProviderResult, error) {
+func (e *Engine) callWithBreaker(
+	ctx context.Context, provider string, req ProviderRequest, p LLMProvider,
+) (*ProviderResult, error) {
 	brk, ok := e.breakers[provider]
 	if !ok {
 		return p.Check(ctx, req)
@@ -219,7 +221,9 @@ func (e *Engine) callChatWithBreaker(ctx context.Context, provider string, req C
 	return result, err
 }
 
-func (e *Engine) callVisionWithBreaker(ctx context.Context, provider string, imgData []byte, mime string, prompt string, v VisionProvider) (*ProviderResult, error) {
+func (e *Engine) callVisionWithBreaker(
+	ctx context.Context, provider string, imgData []byte, mime, prompt string, v VisionProvider,
+) (*ProviderResult, error) {
 	brk, ok := e.breakers[provider]
 	if !ok {
 		return v.AnalyzeImage(ctx, imgData, mime, prompt)
@@ -229,7 +233,7 @@ func (e *Engine) callVisionWithBreaker(ctx context.Context, provider string, img
 	})
 }
 
-func (e *Engine) resolveProvider(req SlowPathRequest) string {
+func (e *Engine) resolveProvider(_ SlowPathRequest) string {
 	if e.config.DefaultProvider != "" {
 		return e.config.DefaultProvider
 	}
@@ -281,10 +285,7 @@ func (e *Engine) recordUsage(tenantID string, class BudgetClass, result *Provide
 	e.budget.Record(tenantID, class, tokens, cost)
 }
 
-func (e *Engine) extractHistory(req SlowPathRequest) []HistoryMessage {
-	if len(req.FastResult.Signals) == 0 {
-		return nil
-	}
+func (e *Engine) extractHistory(_ SlowPathRequest) []HistoryMessage {
 	return nil
 }
 

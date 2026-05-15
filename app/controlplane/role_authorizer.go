@@ -21,7 +21,7 @@ func NewRoleAuthorizer(store WorkspaceStore) *RoleAuthorizer {
 	return &RoleAuthorizer{store: store}
 }
 
-func (a *RoleAuthorizer) Authorize(ctx context.Context, workspaceID string, userID string, access string) error {
+func (a *RoleAuthorizer) Authorize(ctx context.Context, workspaceID, userID, access string) error {
 	if a.store == nil {
 		return fmt.Errorf("workspace store is nil")
 	}

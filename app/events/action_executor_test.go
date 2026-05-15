@@ -80,8 +80,8 @@ func TestTelegramActionExecutor_SkipCompletedReplay(t *testing.T) {
 	ctx := observability.WithModerationMetadata(context.Background(), "evt-1", "corr-1", "key-1")
 	err := exec.DeleteMessage(ctx, 123, 77)
 	require.NoError(t, err)
-	require.Len(t, mockAPI.RequestCalls(), 0)
-	require.Len(t, journal.calls, 0)
+	require.Empty(t, mockAPI.RequestCalls())
+	require.Empty(t, journal.calls)
 }
 
 func TestTelegramActionExecutor_RetryFailedActionWithNextAttempt(t *testing.T) {

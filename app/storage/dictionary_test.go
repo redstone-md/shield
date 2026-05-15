@@ -103,15 +103,15 @@ func (s *StorageTestSuite) TestDictionary_DeleteByType() {
 			s.Require().NoError(d.Add(ctx, DictionaryTypeIgnoredWord, "ignored1"))
 
 			affected, err := d.DeleteByType(ctx, DictionaryTypeStopPhrase)
-			s.NoError(err)
+			s.Require().NoError(err)
 			s.Equal(int64(2), affected)
 
 			phrases, err := d.Read(ctx, DictionaryTypeStopPhrase)
-			s.NoError(err)
+			s.Require().NoError(err)
 			s.Empty(phrases)
 
 			ignored, err := d.Read(ctx, DictionaryTypeIgnoredWord)
-			s.NoError(err)
+			s.Require().NoError(err)
 			s.Len(ignored, 1)
 
 			s.Run("invalid type", func() {

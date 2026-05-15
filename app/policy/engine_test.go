@@ -134,11 +134,11 @@ func TestActionLevelToAction_Defaults(t *testing.T) {
 }
 
 func TestEngine_Decide_ShadowMode(t *testing.T) {
-	real := BalancedProfile()
+	actual := BalancedProfile()
 	shadow := StrictProfile()
 	shadow.Version = 2
 
-	e := NewEngine(real)
+	e := NewEngine(actual)
 	e.ShadowProfile = &shadow
 
 	sig := []spamcheck.Response{{Name: "stop-word", Spam: true, RuleID: "stop-word"}}
@@ -150,8 +150,8 @@ func TestEngine_Decide_ShadowMode(t *testing.T) {
 	if result.Shadow.Action != moderation.ActionBan {
 		t.Errorf("shadow strict should ban, got %s", result.Shadow.Action)
 	}
-	if result.Action == result.Shadow.Action && real.Matrix[RiskSpam] == shadow.Matrix[RiskSpam] {
-		t.Error("shadow and real should differ with different profiles")
+	if result.Action == result.Shadow.Action && actual.Matrix[RiskSpam] == shadow.Matrix[RiskSpam] {
+		t.Error("shadow and actual should differ with different profiles")
 	}
 	if result.Shadow.Explanation.ProfileName != "strict" {
 		t.Errorf("shadow should use strict profile, got %s", result.Shadow.Explanation.ProfileName)

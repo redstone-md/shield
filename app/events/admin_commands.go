@@ -279,7 +279,7 @@ func unwarnResultText(subjectID int64, userName string, remaining int, deleted b
 	return fmt.Sprintf("Предупреждение снято: %s, осталось %d", subject, remaining)
 }
 
-func unwarnSubject(msg *tbapi.Message) (int64, string) {
+func unwarnSubject(msg *tbapi.Message) (subjectID int64, userName string) {
 	if msg == nil {
 		return 0, ""
 	}
@@ -295,7 +295,7 @@ func unwarnSubject(msg *tbapi.Message) (int64, string) {
 	return 0, ""
 }
 
-func unwarnSubjectFromText(text string) (int64, string, bool) {
+func unwarnSubjectFromText(text string) (subjectID int64, userName string, ok bool) {
 	for _, expr := range []string{`tg://user\?id=(-?\d+)`, `\((-?\d+)\)`, `user (-?\d+)`} {
 		re := regexp.MustCompile(expr)
 		if match := re.FindStringSubmatch(text); len(match) > 1 {
@@ -365,7 +365,11 @@ func (a *admin) recordManualWarn(ctx context.Context, msg *bot.Message, subjectI
 	if a.detectedSpam == nil || msg == nil || subjectID == 0 {
 		return
 	}
-	checks := []spamcheck.Response{{Name: manualWarnSignalSource, Spam: true, Details: fmt.Sprintf("ручное предупреждение %d/%d", warnNum, a.moderation.WarnStrikes)}}
+	checks := []spamcheck.Response{{
+		Name:    manualWarnSignalSource,
+		Spam:    true,
+		Details: fmt.Sprintf("ручное предупреждение %d/%d", warnNum, a.moderation.WarnStrikes),
+	}}
 	userName := msg.From.Username
 	if msg.SenderChat.UserName != "" {
 		userName = msg.SenderChat.UserName
@@ -429,18 +433,6 @@ func (a *admin) sendWarnMessage(ctx context.Context, origMsg *tbapi.Message, war
 	return nil
 }
 
-func (a *admin) warnTarget(origMsg *tbapi.Message) string {
-	warnTarget := "@" + origMsg.From.UserName
-	if origMsg.SenderChat != nil && origMsg.SenderChat.ID != 0 && origMsg.SenderChat.ID != a.primChatID {
-		chName := a.channelDisplayName(origMsg.SenderChat)
-		if origMsg.SenderChat.UserName != "" {
-			return "@" + chName
-		}
-		return chName
-	}
-	return warnTarget
-}
-
 func (a *admin) warnContext(update tbapi.Update, origMsg *tbapi.Message) context.Context {
 	eventID := fmt.Sprintf("warn-%d-%d", a.primChatID, origMsg.MessageID)
 	correlationID := fmt.Sprintf("corr-warn-%d", origMsg.MessageID)
@@ -478,7 +470,8 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 	if origMsg.Quote != nil && origMsg.Quote.Text != "" {
 		msgTxt = msgTxt + "\n" + origMsg.Quote.Text
 	}
-	log.Printf("[DEBUG] reported spam message from superuser %q (%d): %q", update.Message.From.UserName, update.Message.From.ID, msgTxt)
+	log.Printf("[DEBUG] reported spam message from superuser %q (%d): %q",
+		update.Message.From.UserName, update.Message.From.ID, msgTxt)
 
 	if origMsg.From.UserName != "" && a.superUsers.IsSuper(origMsg.From.UserName, origMsg.From.ID) {
 		return fmt.Errorf("banned message is from super-user %s (%d), ignored", origMsg.From.UserName, origMsg.From.ID)

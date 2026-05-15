@@ -26,8 +26,8 @@ func (s *StorageTestSuite) TestUsageMetering_IncrementAutoCreate() {
 
 			counter, err := m.Get(ctx, meterType, wStart)
 			s.Require().NoError(err)
-			s.Assert().Equal(1, counter.Count)
-			s.Assert().Equal(meterType, counter.MeterType)
+			s.Equal(1, counter.Count)
+			s.Equal(meterType, counter.MeterType)
 		})
 	}
 }
@@ -54,7 +54,7 @@ func (s *StorageTestSuite) TestUsageMetering_IncrementExisting() {
 
 			counter, err := m.Get(ctx, meterType, wStart)
 			s.Require().NoError(err)
-			s.Assert().Equal(3, counter.Count)
+			s.Equal(3, counter.Count)
 		})
 	}
 }
@@ -69,7 +69,7 @@ func (s *StorageTestSuite) TestUsageMetering_GetMissing() {
 
 			wStart := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
 			_, err = m.Get(ctx, "nonexistent_meter", wStart)
-			s.Assert().Error(err)
+			s.Error(err)
 		})
 	}
 }
@@ -94,10 +94,10 @@ func (s *StorageTestSuite) TestUsageMetering_GetPresent() {
 
 			counter, err := m.Get(ctx, meterType, wStart)
 			s.Require().NoError(err)
-			s.Assert().Equal(meterType, counter.MeterType)
-			s.Assert().Equal(1, counter.Count)
-			s.Assert().True(counter.WindowStart.Equal(wStart))
-			s.Assert().True(counter.WindowEnd.Equal(wEnd))
+			s.Equal(meterType, counter.MeterType)
+			s.Equal(1, counter.Count)
+			s.True(counter.WindowStart.Equal(wStart))
+			s.True(counter.WindowEnd.Equal(wEnd))
 		})
 	}
 }
@@ -128,7 +128,7 @@ func (s *StorageTestSuite) TestUsageMetering_ListByWindow() {
 
 			counters, err := m.ListByWindow(ctx, wStart1, wEnd2)
 			s.Require().NoError(err)
-			s.Assert().Len(counters, 3)
+			s.Len(counters, 3)
 		})
 	}
 }
@@ -167,8 +167,8 @@ func (s *StorageTestSuite) TestUsageMetering_ResetTenant() {
 					found = append(found, c)
 				}
 			}
-			s.Assert().Len(found, 1)
-			s.Assert().True(newStart.Equal(found[0].WindowStart), "window_start mismatch: want %v, got %v", newStart, found[0].WindowStart)
+			s.Len(found, 1)
+			s.True(newStart.Equal(found[0].WindowStart), "window_start mismatch: want %v, got %v", newStart, found[0].WindowStart)
 		})
 	}
 }

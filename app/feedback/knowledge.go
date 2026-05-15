@@ -57,7 +57,9 @@ type KnowledgeService struct {
 	restorer StopPhraseRestorer
 }
 
-func NewKnowledgeService(store KnowledgeStore, dict DictionaryReader, sample SampleCounter, restorer StopPhraseRestorer) *KnowledgeService {
+func NewKnowledgeService(
+	store KnowledgeStore, dict DictionaryReader, sample SampleCounter, restorer StopPhraseRestorer,
+) *KnowledgeService {
 	return &KnowledgeService{store: store, dict: dict, sample: sample, restorer: restorer}
 }
 

@@ -34,7 +34,12 @@ type OnboardResult struct {
 	RuleSetVer  int
 }
 
-func NewOnboardingService(tenants TenantStore, workspaces WorkspaceStore, ruleSets RuleSetBootstrapper, cache RuleSetCache) *OnboardingService {
+func NewOnboardingService(
+	tenants TenantStore,
+	workspaces WorkspaceStore,
+	ruleSets RuleSetBootstrapper,
+	cache RuleSetCache,
+) *OnboardingService {
 	return &OnboardingService{
 		tenants:    tenants,
 		workspaces: workspaces,
@@ -53,14 +58,14 @@ func (s *OnboardingService) Onboard(ctx context.Context, req OnboardRequest) (*O
 		return nil, fmt.Errorf("tenant %s already exists", req.TenantID)
 	}
 
-	if err := s.tenants.Add(ctx, storage.TenantRecord{
+	if addErr := s.tenants.Add(ctx, storage.TenantRecord{
 		ID:      req.TenantID,
 		GID:     req.GID,
 		Name:    req.Name,
 		Status:  "active",
 		OwnerID: req.OwnerID,
-	}); err != nil {
-		return nil, fmt.Errorf("failed to create tenant: %w", err)
+	}); addErr != nil {
+		return nil, fmt.Errorf("failed to create tenant: %w", addErr)
 	}
 	log.Printf("[INFO] tenant onboarded: id=%s name=%s", req.TenantID, req.Name)
 
@@ -73,8 +78,8 @@ func (s *OnboardingService) Onboard(ctx context.Context, req OnboardRequest) (*O
 		return nil, fmt.Errorf("failed to create workspace: %w", err)
 	}
 
-	if err := s.workspaces.AddMember(ctx, wsID, req.OwnerID, string(RoleOwner)); err != nil {
-		return nil, fmt.Errorf("failed to add owner to workspace: %w", err)
+	if addErr := s.workspaces.AddMember(ctx, wsID, req.OwnerID, string(RoleOwner)); addErr != nil {
+		return nil, fmt.Errorf("failed to add owner to workspace: %w", addErr)
 	}
 	log.Printf("[INFO] workspace created: id=%d tenant=%s", wsID, req.TenantID)
 
@@ -85,16 +90,13 @@ func (s *OnboardingService) Onboard(ctx context.Context, req OnboardRequest) (*O
 	if err != nil {
 		return nil, fmt.Errorf("failed to bootstrap rule set: %w", err)
 	}
-	ver := 0
-	if created {
-		ver = 1
-	}
+	_ = created
 
 	rs, err := s.ruleSets.Active(ctx, wsIDStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load active rule set: %w", err)
 	}
-	ver = rs.Version
+	ver := rs.Version
 
 	if s.cache != nil {
 		s.cache.Set(ctx, req.TenantID, wsIDStr, rs)

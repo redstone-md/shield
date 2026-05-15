@@ -45,7 +45,9 @@ func NewProviderBreaker(name string, cfg BreakerConfig) *ProviderBreaker {
 	return &ProviderBreaker{name: name, breaker: cb}
 }
 
-func (b *ProviderBreaker) Execute(ctx context.Context, fn func(ctx context.Context) (*ProviderResult, error)) (*ProviderResult, error) {
+func (b *ProviderBreaker) Execute(
+	ctx context.Context, fn func(ctx context.Context) (*ProviderResult, error),
+) (*ProviderResult, error) {
 	result, err := b.breaker.Execute(func() (*ProviderResult, error) {
 		return fn(ctx)
 	})

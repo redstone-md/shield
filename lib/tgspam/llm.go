@@ -28,7 +28,7 @@ var (
 	trailingCommaRegex = regexp.MustCompile(`,\s*([}\]])`)
 	spamFieldRegex     = regexp.MustCompile(`(?is)"?spam"?\s*:\s*("?(?:true|false|1|0)"?)`)
 	reasonFieldRegex   = regexp.MustCompile(`(?is)"?reason"?\s*:\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')`)
-	confFieldRegex     = regexp.MustCompile(`(?is)"?confidence"?\s*:\s*"?([0-9]{1,3})"?`)
+	confFieldRegex     = regexp.MustCompile(`(?is)"?confidence"?\s*:\s*"?(\d{1,3})"?`)
 )
 
 type llmCheckParams struct {
@@ -41,13 +41,8 @@ type llmCheckParams struct {
 }
 
 func runLLMProviderCheck(ctx context.Context, p llmCheckParams) (spam bool, cr spamcheck.Response) {
-	retryCount := p.RetryCount
-	if retryCount < 1 {
-		retryCount = 1
-	}
-	if retryCount > maxLLMProviderRetries {
-		retryCount = maxLLMProviderRetries
-	}
+	retryCount := max(p.RetryCount, 1)
+	retryCount = min(retryCount, maxLLMProviderRetries)
 
 	msg := appendHistoryToLLMMessage(p.Msg, p.History)
 
@@ -218,7 +213,7 @@ func parseLLMResponseFallback(content string) (llmResponse, bool) {
 	return llmResponse{IsSpam: isSpam, Reason: reason, Confidence: confidence}, true
 }
 
-func parseFallbackBool(raw string) (bool, bool) {
+func parseFallbackBool(raw string) (value, ok bool) {
 	val := strings.Trim(strings.ToLower(raw), `" `)
 	switch val {
 	case "true", "1":

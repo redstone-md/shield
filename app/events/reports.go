@@ -113,12 +113,12 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 		msgTxt = msgTxt + "\n" + origMsg.Quote.Text
 	}
 
-	if handled, err := r.tryLLMReportModeration(ctx, update, origMsg, msgTxt); handled {
-		if err == nil {
+	if handled, llmErr := r.tryLLMReportModeration(ctx, update, origMsg, msgTxt); handled {
+		if llmErr == nil {
 			duration, restrict := r.reportPenalty(ctx, origMsg.From.ID)
 			r.notifyPrimaryChat(reportOutcomeBanned, duration, restrict)
 		}
-		return err
+		return llmErr
 	}
 
 	if r.Storage == nil {
@@ -135,8 +135,8 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 		MsgText:          msgTxt,
 	}
 
-	if err := r.Storage.Add(ctx, report); err != nil {
-		return fmt.Errorf("failed to add report: %w", err)
+	if addErr := r.Storage.Add(ctx, report); addErr != nil {
+		return fmt.Errorf("failed to add report: %w", addErr)
 	}
 
 	outcome, err := r.checkReportThreshold(ctx, origMsg.MessageID, r.primChatID)
@@ -171,7 +171,8 @@ func (r *userReports) notifyPrimaryChat(outcome reportOutcome, duration time.Dur
 	}
 }
 
-func (r *userReports) tryLLMReportModeration(ctx context.Context, update tbapi.Update, origMsg *tbapi.Message, msgTxt string) (bool, error) {
+func (r *userReports) tryLLMReportModeration(ctx context.Context, update tbapi.Update,
+	origMsg *tbapi.Message, msgTxt string) (bool, error) {
 	reviewMsg := transform(origMsg)
 	reviewMsg.ForceLLM = true
 	reviewMsg.LLMContext = reportLLMContext
@@ -186,7 +187,8 @@ func (r *userReports) tryLLMReportModeration(ctx context.Context, update tbapi.U
 	return true, r.applyImmediateReportModeration(ctx, update, origMsg, msgTxt, resp)
 }
 
-func (r *userReports) applyImmediateReportModeration(ctx context.Context, update tbapi.Update, origMsg *tbapi.Message, msgTxt string, resp bot.Response) error {
+func (r *userReports) applyImmediateReportModeration(ctx context.Context, update tbapi.Update,
+	origMsg *tbapi.Message, msgTxt string, resp bot.Response) error {
 	duration, restrict := r.reportPenalty(ctx, origMsg.From.ID)
 	ctx = r.reportActionContext(ctx, "llm_auto", origMsg.MessageID, origMsg.From.ID)
 
@@ -254,7 +256,8 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 		}
 
 		notificationText := fmt.Sprintf(
-			"**LLM auto-moderated reported message**\n\n[%s](tg://user?id=%d)\n\n%s\n\n**Reporter:** [%s](tg://user?id=%d)\n**Reason:** %s",
+			"**LLM auto-moderated reported message**\n\n[%s](tg://user?id=%d)\n\n%s\n\n"+
+				"**Reporter:** [%s](tg://user?id=%d)\n**Reason:** %s",
 			escapeMarkDownV1Text(origMsg.From.UserName),
 			origMsg.From.ID,
 			truncateString(strings.ReplaceAll(escapeMarkDownV1Text(msgTxt), "\n", " "), 300, "..."),

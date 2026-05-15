@@ -101,7 +101,7 @@ func TestOpenAIChecker_Check(t *testing.T) {
 		assert.True(t, spam)
 		assert.Equal(t, "openai", details.Name)
 		assert.Equal(t, "recovered, confidence: 88%", details.Details)
-		assert.NoError(t, details.Error)
+		require.NoError(t, details.Error)
 		assert.Equal(t, 2, callCount)
 	})
 

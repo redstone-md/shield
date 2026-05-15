@@ -492,7 +492,7 @@ func TestTelegramListener_DuplicateRetryRecoversAfterTelegramActionFailure(t *te
 	assert.True(t, record.ActionApplied.Bool)
 }
 
-func assertContextMetadata(t *testing.T, ctx context.Context, eventID, correlationID string) {
+func assertContextMetadata(t *testing.T, ctx context.Context, eventID, correlationID string) { //nolint:revive // t *testing.T must come first in test helpers
 	t.Helper()
 	meta, ok := observability.MetadataFromContext(ctx)
 	require.True(t, ok)

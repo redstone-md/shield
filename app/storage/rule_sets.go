@@ -181,7 +181,10 @@ func (rs *RuleSets) EnsureBootstrap(ctx context.Context, ruleSet rules.RuleSet) 
 
 	insertVersion := rs.Adopt(`INSERT INTO rule_set_versions (workspace_id, gid, tenant_id, version, source, payload, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`)
-	if _, err = tx.ExecContext(ctx, insertVersion, ruleSet.WorkspaceID, rs.GID(), rs.TenantID(), 1, ruleSet.Source, string(payload), time.Now()); err != nil {
+	if _, err = tx.ExecContext(
+		ctx, insertVersion,
+		ruleSet.WorkspaceID, rs.GID(), rs.TenantID(), 1, ruleSet.Source, string(payload), time.Now(),
+	); err != nil {
 		return false, fmt.Errorf("failed to insert bootstrap rule set version: %w", err)
 	}
 
@@ -256,7 +259,10 @@ func (rs *RuleSets) Update(ctx context.Context, ruleSet rules.RuleSet) (int, err
 
 	insertVersion := rs.Adopt(`INSERT INTO rule_set_versions (workspace_id, gid, tenant_id, version, source, payload, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`)
-	if _, err = tx.ExecContext(ctx, insertVersion, ruleSet.WorkspaceID, rs.GID(), rs.TenantID(), newVersion, ruleSet.Source, string(payload), time.Now()); err != nil {
+	if _, err = tx.ExecContext(
+		ctx, insertVersion,
+		ruleSet.WorkspaceID, rs.GID(), rs.TenantID(), newVersion, ruleSet.Source, string(payload), time.Now(),
+	); err != nil {
 		return 0, fmt.Errorf("failed to insert rule set version %d: %w", newVersion, err)
 	}
 
@@ -296,14 +302,14 @@ func (rs *RuleSets) History(ctx context.Context, workspaceID string, limit int) 
 
 	result := make([]rules.RuleSet, 0, len(rows))
 	for _, row := range rows {
-		var rs_ rules.RuleSet
-		if err := json.Unmarshal([]byte(row.Payload), &rs_); err != nil {
+		var ruleRow rules.RuleSet
+		if err := json.Unmarshal([]byte(row.Payload), &ruleRow); err != nil {
 			return nil, fmt.Errorf("failed to decode rule set version %d: %w", row.Version, err)
 		}
-		rs_.Version = row.Version
-		rs_.Source = row.Source
-		rs_.CreatedAt = row.CreatedAt
-		result = append(result, rs_)
+		ruleRow.Version = row.Version
+		ruleRow.Source = row.Source
+		ruleRow.CreatedAt = row.CreatedAt
+		result = append(result, ruleRow)
 	}
 	return result, nil
 }
@@ -313,7 +319,8 @@ func upsertRuleSetQuery(dbType engine.Type) string {
 		return `INSERT INTO rule_sets (workspace_id, gid, tenant_id, active_version, updated_at)
 			VALUES ($1, $2, $3, $4, $5)
 			ON CONFLICT (workspace_id) DO UPDATE
-			SET gid = EXCLUDED.gid, tenant_id = EXCLUDED.tenant_id, active_version = EXCLUDED.active_version, updated_at = EXCLUDED.updated_at`
+			SET gid = EXCLUDED.gid, tenant_id = EXCLUDED.tenant_id,
+			    active_version = EXCLUDED.active_version, updated_at = EXCLUDED.updated_at`
 	}
 	return `INSERT OR REPLACE INTO rule_sets (workspace_id, gid, tenant_id, active_version, updated_at)
 		VALUES (?, ?, ?, ?, ?)`

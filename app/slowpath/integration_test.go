@@ -132,13 +132,13 @@ func TestIntegration_CircuitBreakerTrips(t *testing.T) {
 
 	req := SlowPathRequest{EventID: "evt-1", Content: Content{Text: "test"}}
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, _ = eng.Check(context.Background(), req)
 	}
 	assert.Equal(t, 3, callCount)
 
 	_, err := eng.Check(context.Background(), req)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "circuit breaker")
 }
 
@@ -219,7 +219,7 @@ func TestIntegration_SlowPathSkippedOnBudget(t *testing.T) {
 
 	merged := MergeResults(fast, slow)
 	assert.False(t, merged.Spam)
-	assert.Equal(t, 0.48, merged.Score)
+	assert.InDelta(t, 0.48, merged.Score, 1e-9)
 	assert.Len(t, merged.Signals, 1)
 }
 

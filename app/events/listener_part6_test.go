@@ -333,9 +333,9 @@ func TestTelegramListener_DoWithProcLeftChatMemberMessage(t *testing.T) {
 		mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updChan }
 
 		err := l.Do(ctx)
-		assert.EqualError(t, err, "telegram update chan closed")
-		assert.Equal(t, 0, len(mockAPI.SendCalls()))
-		require.Equal(t, 0, len(mockAPI.RequestCalls()))
+		require.EqualError(t, err, "telegram update chan closed")
+		assert.Empty(t, mockAPI.SendCalls())
+		require.Empty(t, mockAPI.RequestCalls())
 	})
 
 	t.Run("user has left the chat by admin, we don't have a message about joining", func(t *testing.T) {
@@ -355,9 +355,9 @@ func TestTelegramListener_DoWithProcLeftChatMemberMessage(t *testing.T) {
 		mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updChan }
 
 		err := l.Do(ctx)
-		assert.EqualError(t, err, "telegram update chan closed")
-		assert.Equal(t, 0, len(mockAPI.SendCalls()))
-		require.Equal(t, 0, len(mockAPI.RequestCalls()))
+		require.EqualError(t, err, "telegram update chan closed")
+		assert.Empty(t, mockAPI.SendCalls())
+		require.Empty(t, mockAPI.RequestCalls())
 	})
 
 	t.Run("user has left the chat by admin, we have a message about joining", func(t *testing.T) {
@@ -380,9 +380,9 @@ func TestTelegramListener_DoWithProcLeftChatMemberMessage(t *testing.T) {
 		mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updChan }
 
 		err = l.Do(ctx)
-		assert.EqualError(t, err, "telegram update chan closed")
-		assert.Equal(t, 0, len(mockAPI.SendCalls()))
-		require.Equal(t, 1, len(mockAPI.RequestCalls()))
+		require.EqualError(t, err, "telegram update chan closed")
+		assert.Empty(t, mockAPI.SendCalls())
+		require.Len(t, mockAPI.RequestCalls(), 1)
 		assert.Equal(t, int64(123), mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).ChatID)
 		assert.Equal(t, 21, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
 	})
@@ -413,9 +413,9 @@ func TestTelegramListener_DoWithProcLeftChatMemberMessage(t *testing.T) {
 		mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updChan }
 
 		err = l.Do(ctx)
-		assert.EqualError(t, err, "telegram update chan closed")
-		assert.Equal(t, 0, len(mockAPI.SendCalls()))
-		require.Equal(t, 0, len(mockAPI.RequestCalls()))
+		require.EqualError(t, err, "telegram update chan closed")
+		assert.Empty(t, mockAPI.SendCalls())
+		require.Empty(t, mockAPI.RequestCalls())
 	})
 
 	t.Run("error from procLeftChatMemberMessage", func(t *testing.T) {
@@ -446,9 +446,9 @@ func TestTelegramListener_DoWithProcLeftChatMemberMessage(t *testing.T) {
 		}()
 
 		err = l.Do(ctx)
-		assert.EqualError(t, err, "telegram update chan closed")
-		assert.Equal(t, 0, len(mockAPI.SendCalls()))
-		require.Equal(t, 1, len(mockAPI.RequestCalls()))
+		require.EqualError(t, err, "telegram update chan closed")
+		assert.Empty(t, mockAPI.SendCalls())
+		require.Len(t, mockAPI.RequestCalls(), 1)
 		assert.Equal(t, int64(123), mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).ChatID)
 		assert.Equal(t, 21, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
 	})

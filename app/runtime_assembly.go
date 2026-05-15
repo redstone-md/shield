@@ -377,7 +377,9 @@ func bootstrapRuleSet(opts options) rules.RuleSet {
 	}
 }
 
-func makeApprovedUsersStore(ctx context.Context, dataDB *engine.SQL, detector *tgspam.Detector) (int, *storage.ApprovedUsers, error) {
+func makeApprovedUsersStore(
+	ctx context.Context, dataDB *engine.SQL, detector *tgspam.Detector,
+) (int, *storage.ApprovedUsers, error) {
 	approvedUsersStore, err := storage.NewApprovedUsers(ctx, dataDB)
 	if err != nil {
 		return 0, nil, fmt.Errorf("can't make approved users store, %w", err)

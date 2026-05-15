@@ -137,14 +137,14 @@ func (s *StorageTestSuite) TestIncidents_ListWithFilters() {
 			prefix := fmt.Sprintf("filter-%d-", time.Now().UnixNano())
 			sources := []audit.IncidentSource{audit.SourceAutoMod, audit.SourceUserReport, audit.SourceAdminAction}
 			for i, src := range sources {
-				_, err := store.Create(ctx, audit.Incident{
+				_, errCreate := store.Create(ctx, audit.Incident{
 					Source:         src,
 					Status:         audit.IncidentStatusOpen,
 					Severity:       audit.SeverityMedium,
 					IdempotencyKey: fmt.Sprintf("%s%d", prefix, i),
 					ReasonCode:     audit.ReasonRegexMatch,
 				})
-				s.Require().NoError(err)
+				s.Require().NoError(errCreate)
 			}
 
 			autoOnly, err := store.List(ctx, audit.IncidentFilter{Source: audit.SourceAutoMod, Limit: 10})
@@ -170,14 +170,14 @@ func (s *StorageTestSuite) TestIncidents_Pagination() {
 
 			prefix := fmt.Sprintf("page-%d-", time.Now().UnixNano())
 			for i := range 5 {
-				_, err := store.Create(ctx, audit.Incident{
+				_, errCreate := store.Create(ctx, audit.Incident{
 					Source:         audit.SourceAutoMod,
 					Status:         audit.IncidentStatusOpen,
 					Severity:       audit.SeverityLow,
 					IdempotencyKey: fmt.Sprintf("%s%d", prefix, i),
 					ReasonCode:     audit.ReasonRegexMatch,
 				})
-				s.Require().NoError(err)
+				s.Require().NoError(errCreate)
 			}
 
 			page1, err := store.List(ctx, audit.IncidentFilter{Limit: 2, Offset: 0})

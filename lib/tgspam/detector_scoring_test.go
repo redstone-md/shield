@@ -48,8 +48,8 @@ func TestDetector_ScoringEndToEnd(t *testing.T) {
 		}
 		require.NotNil(t, stopwordResp)
 		assert.Equal(t, "stopword", stopwordResp.RuleID)
-		assert.Equal(t, 1.0, stopwordResp.Score)
-		assert.Equal(t, 1.0, stopwordResp.Weight)
+		assert.InDelta(t, 1.0, stopwordResp.Score, 1e-9)
+		assert.InDelta(t, 1.0, stopwordResp.Weight, 1e-9)
 		assert.NotEmpty(t, stopwordResp.NormalizedText)
 	})
 
@@ -66,8 +66,8 @@ func TestDetector_ScoringEndToEnd(t *testing.T) {
 		}
 		require.NotNil(t, emojiResp)
 		assert.Equal(t, "emoji", emojiResp.RuleID)
-		assert.Equal(t, 1.0, emojiResp.Score)
-		assert.Equal(t, 1.0, emojiResp.Weight)
+		assert.InDelta(t, 1.0, emojiResp.Score, 1e-9)
+		assert.InDelta(t, 1.0, emojiResp.Weight, 1e-9)
 	})
 
 	t.Run("ham with scoring engine returns not spam", func(t *testing.T) {
@@ -90,8 +90,8 @@ func TestDetector_ScoringEndToEnd(t *testing.T) {
 			if r.Spam {
 				assert.NotEmpty(t, r.Name, "spam result must have Name")
 				assert.Equal(t, r.Name, r.RuleID, "RuleID must match Name")
-				assert.Equal(t, 1.0, r.Score, "deterministic check score=1.0")
-				assert.Equal(t, 1.0, r.Weight, "default weight=1.0")
+				assert.InDelta(t, 1.0, r.Score, 1e-9, "deterministic check score=1.0")
+				assert.InDelta(t, 1.0, r.Weight, 1e-9, "default weight=1.0")
 			}
 		}
 	})
