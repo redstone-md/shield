@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     cd app && go build -o /build/tg-spam -ldflags "-X main.revision=${version} -s -w"
 
 
-FROM alpine:3.22
+FROM alpine:3.23
 # enables automatic changelog generation by tools like Dependabot
 LABEL org.opencontainers.image.source="https://github.com/umputun/tg-spam"
 ENV TGSPAM_IN_DOCKER=1
