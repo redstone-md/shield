@@ -435,6 +435,8 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 		Dry:                     a.ActiveRuleSet.Moderation.DryRun,
 		AggressiveCleanup:       opts.AggressiveCleanup,
 		AggressiveCleanupLimit:  opts.AggressiveCleanupLimit,
+		DeleteGuestBots:         opts.DeleteGuestBots,
+		BotWhitelist:            opts.BotWhitelist,
 	}
 	if a.AuditService != nil {
 		listener.AuditWriter = events.NewDefaultAuditWriter(a.SpamLogger, a.Locator, events.NewIncidentAdapter(a.AuditService))

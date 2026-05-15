@@ -75,6 +75,13 @@ func (l *TelegramListener) procEventsWithContext(ctx context.Context, update tba
 		return nil
 	}
 
+	if l.DeleteGuestBots && update.Message.From != nil && update.Message.From.IsBot && update.Message.SenderChat == nil {
+		if !l.isAllowedBot(update.Message.From) {
+			l.deleteGuestBotMessage(ctx, update.Message)
+			return nil
+		}
+	}
+
 	msg := transform(update.Message)
 	if strings.TrimSpace(msg.Text) == "" && msg.Image == nil && !msg.WithVideoNote && !msg.WithVideo && !msg.WithForward &&
 		!msg.WithSticker && msg.Animation == nil && msg.CustomEmojiID == "" {

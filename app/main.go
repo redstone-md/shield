@@ -166,6 +166,9 @@ type options struct {
 	AggressiveCleanup      bool `long:"aggressive-cleanup" env:"AGGRESSIVE_CLEANUP" description:"delete all messages from user when banned via /spam command"`
 	AggressiveCleanupLimit int  `long:"aggressive-cleanup-limit" env:"AGGRESSIVE_CLEANUP_LIMIT" default:"100" description:"max messages to delete in aggressive cleanup mode"`
 
+	DeleteGuestBots bool     `long:"delete-guest-bots" env:"DELETE_GUEST_BOTS" description:"auto-delete messages from non-whitelisted bot accounts in the primary chat"`
+	BotWhitelist    []string `long:"bot-whitelist" env:"BOT_WHITELIST" env-delim:"," description:"comma-separated list of allowed bot usernames or numeric user IDs"`
+
 	Message struct {
 		Startup string `long:"startup" env:"STARTUP" default:"" description:"startup message"`
 		Spam    string `long:"spam" env:"SPAM" default:"this is spam" description:"spam message"`

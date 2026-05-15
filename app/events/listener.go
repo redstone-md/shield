@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -76,6 +77,8 @@ type TelegramListener struct {
 	Dry                     bool         // dry run, do not ban or send messages
 	AggressiveCleanup       bool         // delete all messages from user when banned via /spam command
 	AggressiveCleanupLimit  int          // max messages to delete in aggressive cleanup mode
+	DeleteGuestBots         bool         // auto-delete messages from non-admin, non-whitelisted bot accounts
+	BotWhitelist            []string     // allowed bot usernames or numeric user IDs (raw strings from config)
 	Queue                   moderation.Queue
 	ActionExecutor          ActionExecutor
 	PolicyEngine            PolicyEngine
@@ -576,6 +579,66 @@ func (l *TelegramListener) isChatReplyTrigger(update tbapi.Update) bool {
 		return true
 	}
 	return strings.Contains(strings.ToLower(update.Message.Text), "железяка")
+}
+
+// isAllowedBot returns true if a bot user is permitted to post in the primary chat:
+// it is our own bot, a chat administrator, or explicitly whitelisted by id/username.
+// Used by the guest-bot auto-delete path; unknown bot accounts return false.
+func (l *TelegramListener) isAllowedBot(user *tbapi.User) bool {
+	if user == nil {
+		return true
+	}
+	if l.BotUsername != "" && strings.EqualFold(user.UserName, l.BotUsername) {
+		return true
+	}
+	if user.ID == 136817688 { // @Channel_Bot — proxy for channel/anonymous-admin posts, handled elsewhere
+		return true
+	}
+	for _, entry := range l.BotWhitelist {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if strings.EqualFold(strings.TrimPrefix(entry, "@"), user.UserName) {
+			return true
+		}
+		if id, err := strconv.ParseInt(entry, 10, 64); err == nil && id == user.ID {
+			return true
+		}
+	}
+	// admin status check via Telegram API. errors treat the bot as not allowed so that we delete on the safe side.
+	member, err := l.TbAPI.GetChatMember(tbapi.GetChatMemberConfig{
+		ChatConfigWithUser: tbapi.ChatConfigWithUser{
+			ChatConfig: tbapi.ChatConfig{ChatID: l.chatID},
+			UserID:     user.ID,
+		},
+	})
+	if err != nil {
+		log.Printf("[WARN] guest-bot check: GetChatMember failed for %d: %v", user.ID, err)
+		return false
+	}
+	return member.Status == "administrator" || member.Status == "creator"
+}
+
+// deleteGuestBotMessage removes a single message from a non-admin bot in the primary chat and logs the outcome.
+func (l *TelegramListener) deleteGuestBotMessage(ctx context.Context, msg *tbapi.Message) {
+	if l.Dry {
+		log.Printf("[INFO] dry run: would delete guest bot message %d from %q (%d)",
+			msg.MessageID, msg.From.UserName, msg.From.ID)
+		return
+	}
+	_, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
+		MessageID:  msg.MessageID,
+		ChatConfig: tbapi.ChatConfig{ChatID: msg.Chat.ID},
+	}})
+	if err != nil {
+		log.Printf("[WARN] failed to delete guest bot message %d from %q (%d): %v",
+			msg.MessageID, msg.From.UserName, msg.From.ID, err)
+		return
+	}
+	log.Printf("[INFO] deleted guest bot message %d from %q (%d) chat=%d",
+		msg.MessageID, msg.From.UserName, msg.From.ID, msg.Chat.ID)
+	_ = ctx
 }
 
 func (l *TelegramListener) isReplyToBot(msg *tbapi.Message) bool {
