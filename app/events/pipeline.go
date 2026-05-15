@@ -1,13 +1,13 @@
 package events
 
 import (
-	"sync/atomic"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"

@@ -295,4 +295,3 @@ func (s *Server) resolveAppealHandler(w http.ResponseWriter, r *http.Request) {
 
 	rest.RenderJSON(w, rest.JSON{"status": "resolved", "action": body.Action})
 }
-
