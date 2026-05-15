@@ -41,7 +41,6 @@ type sampleConfig struct {
 	RequestTimeout  time.Duration
 	OptionalBackend *sampleBackend
 	Nested          sampleNestedConfig
-	hidden          string
 }
 
 type sampleNestedConfig struct {

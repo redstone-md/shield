@@ -77,7 +77,9 @@ func NewKnowledgeSnapshotStorage(ctx context.Context, db *engine.SQL) (*Knowledg
 	return res, nil
 }
 
-func (s *KnowledgeSnapshotStorage) Create(ctx context.Context, snap feedback.KnowledgeSnapshot) (feedback.KnowledgeSnapshot, error) {
+func (s *KnowledgeSnapshotStorage) Create(
+	ctx context.Context, snap feedback.KnowledgeSnapshot,
+) (feedback.KnowledgeSnapshot, error) {
 	s.Lock()
 	defer s.Unlock()
 

@@ -38,7 +38,9 @@ func (r *userReports) sendAutoBanNotification(reports []storage.Report) error {
 		actionType = "ограничен"
 	}
 
-	notificationText := fmt.Sprintf("**Пользователь автоматически %s после %d репортов**\n\n[%s](tg://user?id=%d)\n\n%s\n\n**Кто пожаловался:**\n%s",
+	notificationText := fmt.Sprintf(
+		"**Пользователь автоматически %s после %d репортов**\n\n[%s](tg://user?id=%d)\n\n"+
+			"%s\n\n**Кто пожаловался:**\n%s",
 		actionType,
 		len(reports),
 		escapeMarkDownV1Text(reportedUserName),

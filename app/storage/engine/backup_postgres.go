@@ -133,7 +133,9 @@ GROUP BY table_name
 	return nil
 }
 
-func (e *SQL) getPostgresTableInfo(ctx context.Context, tx *sqlx.Tx, table string) (hasTenantID bool, coumns []string, err error) {
+func (e *SQL) getPostgresTableInfo(
+	ctx context.Context, tx *sqlx.Tx, table string,
+) (hasTenantID bool, coumns []string, err error) {
 	query := `
 SELECT EXISTS (
 SELECT 1

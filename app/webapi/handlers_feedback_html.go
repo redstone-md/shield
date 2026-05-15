@@ -13,9 +13,9 @@ func (s *Server) htmlFeedbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tmplData := struct {
-		Labels     interface{}
-		Candidates interface{}
-		Snapshots  interface{}
+		Labels     any
+		Candidates any
+		Snapshots  any
 	}{}
 
 	if s.KnowledgeService != nil {

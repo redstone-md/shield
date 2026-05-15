@@ -214,7 +214,8 @@ func (d *Detector) UpdateConfig(cfg Config) {
 	d.MinSpamProbability = cfg.MinSpamProbability
 	d.MultiLangWords = cfg.MultiLangWords
 	d.AbnormalSpacing = cfg.AbnormalSpacing
-	if cfg.DuplicateDetection.Threshold != d.DuplicateDetection.Threshold || cfg.DuplicateDetection.Window != d.DuplicateDetection.Window {
+	if cfg.DuplicateDetection.Threshold != d.DuplicateDetection.Threshold ||
+		cfg.DuplicateDetection.Window != d.DuplicateDetection.Window {
 		d.duplicateDetector = newDuplicateDetector(cfg.DuplicateDetection.Threshold, cfg.DuplicateDetection.Window)
 		d.DuplicateDetection = cfg.DuplicateDetection
 	}

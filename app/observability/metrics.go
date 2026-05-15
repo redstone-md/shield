@@ -17,7 +17,6 @@ type counter struct {
 }
 
 type timingHistogram struct {
-	mu      sync.Mutex
 	buckets []bucket
 	count   atomic.Int64
 	sum     atomic.Int64

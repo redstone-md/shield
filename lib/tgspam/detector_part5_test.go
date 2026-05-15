@@ -116,7 +116,7 @@ func TestDetector_CheckMultiLang(t *testing.T) {
 		spam  bool
 	}{
 		{"No MultiLang", "Hello, world!\n 12345-980! _", 0, false},
-		{"One MultiLang", "Hi therе", 1, false},
+		{"One MultiLang", "Hi thereе", 1, false},
 		{"Two MultiLang", "Gооd moфning", 2, true},
 		{"WithCyrillic no MultiLang", "Привет  мир", 0, false},
 		{"WithCyrillic two MultiLang", "Привеt  мip", 2, true},

@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
@@ -30,7 +31,7 @@ type listenerPipeline struct {
 	worker   sync.WaitGroup
 	pending  map[string]pendingIncomingEvent
 	mu       sync.Mutex
-	eventID  uint64
+	eventID  atomic.Uint64
 	running  bool
 	ownQueue bool
 }
@@ -434,7 +435,8 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 	return l.cleanupAfterAction(ctx, pc, errs)
 }
 
-func (l *TelegramListener) applyBanAction(ctx context.Context, pc pipelineContext, actionResult *moderation.ModerationActionResult, errs *multierror.Error) {
+func (l *TelegramListener) applyBanAction(ctx context.Context, pc pipelineContext,
+	actionResult *moderation.ModerationActionResult, errs *multierror.Error) {
 	banReq := banRequest{
 		duration:  pc.outcome.Duration,
 		userID:    pc.resp.User.ID,
@@ -451,7 +453,7 @@ func (l *TelegramListener) applyBanAction(ctx context.Context, pc pipelineContex
 		l.incMetric("ban_errors")
 		actionResult.Applied = false
 		actionResult.Error = err.Error()
-		errs = multierror.Append(errs, fmt.Errorf("failed to apply %s for %s: %w",
+		multierror.Append(errs, fmt.Errorf("failed to apply %s for %s: %w",
 			pc.outcome.Decision.Action, pc.banUserStr, err))
 	} else if l.adminChatID != 0 && pc.msg.From.ID != 0 {
 		actionResult.Applied = true
@@ -462,7 +464,8 @@ func (l *TelegramListener) applyBanAction(ctx context.Context, pc pipelineContex
 	}
 }
 
-func (l *TelegramListener) applyDeleteAction(ctx context.Context, pc pipelineContext, actionResult *moderation.ModerationActionResult, errs *multierror.Error) {
+func (l *TelegramListener) applyDeleteAction(ctx context.Context, pc pipelineContext,
+	actionResult *moderation.ModerationActionResult, errs *multierror.Error) {
 	if l.Dry {
 		observability.Logf(ctx, "[INFO] dry run: delete message %d", pc.msg.ID)
 		actionResult.Applied = true
@@ -479,7 +482,7 @@ func (l *TelegramListener) applyDeleteAction(ctx context.Context, pc pipelineCon
 	if err := l.ActionExecutor.DeleteMessage(ctx, pc.fromChat, pc.msg.ID); err != nil {
 		actionResult.Applied = false
 		actionResult.Error = err.Error()
-		errs = multierror.Append(errs, fmt.Errorf("failed to delete message %d: %w", pc.msg.ID, err))
+		multierror.Append(errs, fmt.Errorf("failed to delete message %d: %w", pc.msg.ID, err))
 		return
 	}
 	actionResult.Applied = true
@@ -489,7 +492,8 @@ func (l *TelegramListener) applyDeleteAction(ctx context.Context, pc pipelineCon
 }
 
 func (l *TelegramListener) cleanupAfterAction(ctx context.Context, pc pipelineContext, errs *multierror.Error) error {
-	if err := l.ActionExecutor.DeleteExtraMessages(ctx, pc.resp.CheckResults, pc.msg.From.ID, pc.msg.From.Username, pc.fromChat); err != nil {
+	if err := l.ActionExecutor.DeleteExtraMessages(ctx, pc.resp.CheckResults,
+		pc.msg.From.ID, pc.msg.From.Username, pc.fromChat); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 
@@ -507,7 +511,8 @@ func (l *TelegramListener) cleanupAfterAction(ctx context.Context, pc pipelineCo
 	return nil
 }
 
-func (l *TelegramListener) makeActionResult(event moderation.IncomingEvent, action moderation.Action, applied bool) moderation.ModerationActionResult {
+func (l *TelegramListener) makeActionResult(event moderation.IncomingEvent,
+	action moderation.Action, applied bool) moderation.ModerationActionResult {
 	return moderation.ModerationActionResult{
 		EventID:       event.EventID,
 		CorrelationID: event.CorrelationID,

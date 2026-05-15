@@ -43,7 +43,7 @@ func (s *ApprovedUsersService) List(ctx context.Context, _ string) ([]approved.U
 	return users, nil
 }
 
-func (s *ApprovedUsersService) Add(ctx context.Context, _ string, user approved.UserInfo) error {
+func (s *ApprovedUsersService) Add(_ context.Context, _ string, user approved.UserInfo) error {
 	if user.UserID == "" {
 		return fmt.Errorf("user id is required")
 	}
@@ -55,7 +55,7 @@ func (s *ApprovedUsersService) Add(ctx context.Context, _ string, user approved.
 	return nil
 }
 
-func (s *ApprovedUsersService) Remove(ctx context.Context, _ string, id string) error {
+func (s *ApprovedUsersService) Remove(_ context.Context, _, id string) error {
 	if id == "" {
 		return fmt.Errorf("user id is required")
 	}

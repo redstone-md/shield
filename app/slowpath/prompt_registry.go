@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -53,7 +54,7 @@ func (r *FilePromptRegistry) Active(provider string) (*PromptEntry, error) {
 	return r.defaultEntry(provider), nil
 }
 
-func (r *FilePromptRegistry) Get(provider string, version string) (*PromptEntry, error) {
+func (r *FilePromptRegistry) Get(provider, version string) (*PromptEntry, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -119,6 +120,7 @@ func (r *FilePromptRegistry) loadFromDir() (map[string][]PromptEntry, error) {
 	}
 
 	for _, path := range matches {
+		// #nosec G304 -- path validated by registry inputs
 		data, err := os.ReadFile(path)
 		if err != nil {
 			continue
@@ -142,7 +144,7 @@ func (r *FilePromptRegistry) saveToDir() error {
 		return nil
 	}
 
-	if err := os.MkdirAll(r.dir, 0o755); err != nil {
+	if err := os.MkdirAll(r.dir, 0o750); err != nil {
 		return fmt.Errorf("mkdir prompts: %w", err)
 	}
 
@@ -153,7 +155,7 @@ func (r *FilePromptRegistry) saveToDir() error {
 		}
 
 		path := filepath.Join(r.dir, "prompts-"+provider+".json")
-		if err := os.WriteFile(path, data, 0o644); err != nil {
+		if err := os.WriteFile(path, data, 0o600); err != nil {
 			return fmt.Errorf("write prompts: %w", err)
 		}
 	}
@@ -180,15 +182,15 @@ func (r *InMemoryPromptRegistry) Active(provider string) (*PromptEntry, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	entries := r.entries[provider]
-	for i := len(entries) - 1; i >= 0; i-- {
-		if entries[i].Active {
-			return &entries[i], nil
+	for _, v := range slices.Backward(entries) {
+		if v.Active {
+			return &v, nil
 		}
 	}
 	return nil, fmt.Errorf("no active prompt for %s", provider)
 }
 
-func (r *InMemoryPromptRegistry) Get(provider string, version string) (*PromptEntry, error) {
+func (r *InMemoryPromptRegistry) Get(provider, version string) (*PromptEntry, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	for _, e := range r.entries[provider] {

@@ -28,12 +28,12 @@ func (s *StorageTestSuite) TestCandidates_CreateAndGet() {
 
 			created, err := store.Create(ctx, entry)
 			s.Require().NoError(err)
-			s.Assert().True(created.ID > 0)
-			s.Assert().Equal(feedback.CandidatePending, created.Status)
+			s.Positive(created.ID)
+			s.Equal(feedback.CandidatePending, created.Status)
 
 			got, err := store.GetByID(ctx, created.ID)
 			s.Require().NoError(err)
-			s.Assert().Equal(created.Value, got.Value)
+			s.Equal(created.Value, got.Value)
 		})
 	}
 }
@@ -54,11 +54,11 @@ func (s *StorageTestSuite) TestCandidates_ListWithFilter() {
 
 			pending, err := store.List(ctx, feedback.CandidateFilter{Status: feedback.CandidatePending, Limit: 10})
 			s.Require().NoError(err)
-			s.Assert().True(len(pending) >= 2)
+			s.GreaterOrEqual(len(pending), 2)
 
 			phrases, err := store.List(ctx, feedback.CandidateFilter{Type: feedback.CandidateStopPhrase, Limit: 10})
 			s.Require().NoError(err)
-			s.Assert().True(len(phrases) >= 1)
+			s.GreaterOrEqual(len(phrases), 1)
 		})
 	}
 }
@@ -83,8 +83,8 @@ func (s *StorageTestSuite) TestCandidates_UpdateStatus() {
 
 			got, err := store.GetByID(ctx, created.ID)
 			s.Require().NoError(err)
-			s.Assert().Equal(feedback.CandidateApproved, got.Status)
-			s.Assert().Equal("admin", got.ReviewedBy)
+			s.Equal(feedback.CandidateApproved, got.Status)
+			s.Equal("admin", got.ReviewedBy)
 		})
 	}
 }

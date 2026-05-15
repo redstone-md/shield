@@ -409,22 +409,6 @@ func (s *Server) htmlAppealsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) htmlAppealDetailHandler(w http.ResponseWriter, r *http.Request) {
-	if s.AppealService == nil {
-		http.Error(w, "appeals not configured", http.StatusNotImplemented)
-		return
-	}
-	tmplData := struct {
-		AppealID string
-	}{
-		AppealID: r.PathValue("id"),
-	}
-	if err := tmpl.ExecuteTemplate(w, "appeal_detail.html", tmplData); err != nil {
-		observability.Logf(r.Context(), "[WARN] can't execute template: %v", err)
-		http.Error(w, "Error executing template", http.StatusInternalServerError)
-	}
-}
-
 func formatDuration(d time.Duration) string {
 	days := int(d.Hours() / 24)
 	hours := int(d.Hours()) % 24

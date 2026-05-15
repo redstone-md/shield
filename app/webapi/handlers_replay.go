@@ -195,8 +195,8 @@ func (s *Server) addIncidentCommentHandler(w http.ResponseWriter, r *http.Reques
 		Action     string `json:"action"`
 		Payload    string `json:"payload"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "invalid body", "details": err.Error()})
+	if decodeErr := json.NewDecoder(r.Body).Decode(&body); decodeErr != nil {
+		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "invalid body", "details": decodeErr.Error()})
 		return
 	}
 
@@ -281,7 +281,10 @@ func (s *Server) resolveAppealHandler(w http.ResponseWriter, r *http.Request) {
 	case "triage":
 		resolveErr = s.AppealService.Triage(r.Context(), id, body.ResolverID)
 	default:
-		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "invalid action", "details": "must be accept, reject, escalate, or triage"})
+		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{
+			"error":   "invalid action",
+			"details": "must be accept, reject, escalate, or triage",
+		})
 		return
 	}
 
@@ -291,75 +294,4 @@ func (s *Server) resolveAppealHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rest.RenderJSON(w, rest.JSON{"status": "resolved", "action": body.Action})
-}
-
-func (s *Server) getAppealHandler(w http.ResponseWriter, r *http.Request) {
-	if s.AppealService == nil {
-		_ = rest.EncodeJSON(w, http.StatusNotImplemented, rest.JSON{"error": "appeals not configured"})
-		return
-	}
-	idStr := r.PathValue("id")
-	if idStr == "" {
-		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "appeal id required"})
-		return
-	}
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "invalid appeal id", "details": err.Error()})
-		return
-	}
-
-	ap, err := s.AppealService.GetForIncident(r.Context(), id)
-	if err != nil {
-		_ = rest.EncodeJSON(w, http.StatusNotFound, rest.JSON{"error": "appeal not found", "details": err.Error()})
-		return
-	}
-	rest.RenderJSON(w, ap)
-}
-
-func (s *Server) createAppealHandler(w http.ResponseWriter, r *http.Request) {
-	if s.AppealService == nil {
-		_ = rest.EncodeJSON(w, http.StatusNotImplemented, rest.JSON{"error": "appeals not configured"})
-		return
-	}
-	var body struct {
-		IncidentID    int64  `json:"incident_id"`
-		AppellantID   int64  `json:"appellant_user_id"`
-		AppellantName string `json:"appellant_name"`
-		AppealText    string `json:"appeal_text"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "invalid body", "details": err.Error()})
-		return
-	}
-
-	ap, err := s.AppealService.Submit(r.Context(), body.IncidentID, body.AppellantID, body.AppellantName, body.AppealText)
-	if err != nil {
-		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "submit appeal failed", "details": err.Error()})
-		return
-	}
-	rest.RenderJSON(w, ap)
-}
-
-func (s *Server) escalateAppealHandler(w http.ResponseWriter, r *http.Request) {
-	if s.AppealService == nil {
-		_ = rest.EncodeJSON(w, http.StatusNotImplemented, rest.JSON{"error": "appeals not configured"})
-		return
-	}
-	idStr := r.PathValue("id")
-	if idStr == "" {
-		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "appeal id required"})
-		return
-	}
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		_ = rest.EncodeJSON(w, http.StatusBadRequest, rest.JSON{"error": "invalid appeal id", "details": err.Error()})
-		return
-	}
-
-	if err := s.AppealService.Escalate(r.Context(), id); err != nil {
-		_ = rest.EncodeJSON(w, http.StatusInternalServerError, rest.JSON{"error": "escalate failed", "details": err.Error()})
-		return
-	}
-	rest.RenderJSON(w, rest.JSON{"status": "escalated"})
 }

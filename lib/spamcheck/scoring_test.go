@@ -147,8 +147,8 @@ func TestRiskScore_JSONRoundtrip(t *testing.T) {
 }
 
 func contains(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(sub) == 0 ||
-		(len(s) > 0 && len(sub) > 0 && jsonContains(s, sub)))
+	return len(s) >= len(sub) && (s == sub || sub == "" ||
+		(s != "" && sub != "" && jsonContains(s, sub)))
 }
 
 func jsonContains(s, sub string) bool {

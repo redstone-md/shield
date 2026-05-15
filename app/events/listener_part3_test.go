@@ -156,13 +156,13 @@ func TestTelegramListener_DoWithBotBan(t *testing.T) {
 		mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updChan }
 
 		err := l.Do(ctx)
-		assert.EqualError(t, err, "telegram update chan closed")
-		require.Equal(t, 1, len(mockLogger.SaveCalls()))
+		require.EqualError(t, err, "telegram update chan closed")
+		require.Len(t, mockLogger.SaveCalls(), 1)
 		assert.Equal(t, "text 543", mockLogger.SaveCalls()[0].Msg.Text)
 		assert.Equal(t, "admin", mockLogger.SaveCalls()[0].Msg.From.Username)
 		assert.Equal(t, "bot's answer for admin", mockLogger.SaveCalls()[0].Response.Text)
 		assert.Empty(t, mockAPI.SendCalls())
-		require.Equal(t, 0, len(mockAPI.RequestCalls()))
+		require.Empty(t, mockAPI.RequestCalls())
 
 		require.Len(t, botMock.OnMessageCalls(), 1)
 		assert.Equal(t, "text 543", botMock.OnMessageCalls()[0].Msg.Text)

@@ -51,7 +51,7 @@ func (s *RuleSetService) Get(ctx context.Context, workspaceID string) (rules.Rul
 	return rs, nil
 }
 
-func (s *RuleSetService) Update(ctx context.Context, workspaceID string, source string, rs rules.RuleSet) (rules.RuleSet, error) {
+func (s *RuleSetService) Update(ctx context.Context, workspaceID, source string, rs rules.RuleSet) (rules.RuleSet, error) {
 	rs.WorkspaceID = workspaceID
 	rs.Source = source
 

@@ -43,7 +43,7 @@ var tmpl = template.Must(template.ParseFS(templateFS, "assets/*.html", "assets/c
 
 // startTime tracks when the server started
 var startTime = time.Now()
-var requestSeq uint64
+var requestSeq atomic.Uint64
 
 const (
 	requestHeaderEventID       = "X-Event-ID"
@@ -321,7 +321,7 @@ func (s *Server) requestMetadataMiddleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) requestMetadata(r *http.Request) (eventID, correlationID string) {
-	seq := atomic.AddUint64(&requestSeq, 1)
+	seq := requestSeq.Add(1)
 	instanceID := strings.TrimSpace(s.Settings.TenantID)
 	if instanceID == "" {
 		instanceID = "tg-spam"

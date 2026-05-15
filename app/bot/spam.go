@@ -102,15 +102,18 @@ func NewSpamFilter(detector MessageChecker, params SpamConfig) *SpamFilter {
 	if updater, ok := detector.(SampleUpdater); ok {
 		res.updater = updater
 	}
-	if approved, ok := detector.(ApprovedUsers); ok {
-		res.approved = approved
+	if approvedUsers, ok := detector.(ApprovedUsers); ok {
+		res.approved = approvedUsers
 	}
 	return res
 }
 
 // NewSpamFilterWithRoles creates a spam filter from role-specific detector dependencies.
-func NewSpamFilterWithRoles(checker MessageChecker, loader SampleLoader, updater SampleUpdater, approved ApprovedUsers, params SpamConfig) *SpamFilter {
-	return &SpamFilter{checker: checker, loader: loader, updater: updater, approved: approved, params: params}
+func NewSpamFilterWithRoles(
+	checker MessageChecker, loader SampleLoader, updater SampleUpdater,
+	approvedUsers ApprovedUsers, params SpamConfig,
+) *SpamFilter {
+	return &SpamFilter{checker: checker, loader: loader, updater: updater, approved: approvedUsers, params: params}
 }
 
 // OnMessage checks if user already approved and if not checks if user is a spammer

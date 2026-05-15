@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/genai"
 )
 
@@ -41,7 +42,7 @@ func TestGeminiAdapterCheckSpam(t *testing.T) {
 	}
 	a := NewGeminiAdapter(mock, "gemma-4-31b-it", GeminiAdapterConfig{})
 	result, err := a.Check(context.Background(), ProviderRequest{Message: "buy USDT"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result.Spam)
 	assert.Equal(t, 92, result.Confidence)
 	assert.Equal(t, "gemini", result.Provider)
@@ -55,7 +56,7 @@ func TestGeminiAdapterCheckHam(t *testing.T) {
 	}
 	a := NewGeminiAdapter(mock, "gemma-4-31b-it", GeminiAdapterConfig{})
 	result, err := a.Check(context.Background(), ProviderRequest{Message: "hello"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, result.Spam)
 }
 
@@ -67,7 +68,7 @@ func TestGeminiAdapterNoCandidates(t *testing.T) {
 	}
 	a := NewGeminiAdapter(mock, "gemma-4-31b-it", GeminiAdapterConfig{})
 	_, err := a.Check(context.Background(), ProviderRequest{Message: "test"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no candidates")
 }
 
@@ -90,7 +91,7 @@ func TestGeminiAdapterAnalyzeImage(t *testing.T) {
 	}
 	a := NewGeminiAdapter(mock, "gemma-4-31b-it", GeminiAdapterConfig{})
 	result, err := a.AnalyzeImage(context.Background(), []byte("fake-image"), "image/jpeg", "check for scams")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result.Spam)
 	assert.Equal(t, "gemini", result.Provider)
 }

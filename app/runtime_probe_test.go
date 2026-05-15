@@ -19,7 +19,7 @@ func TestRuntimeProbeHandler(t *testing.T) {
 	handler := probe.Handler(ctx)
 
 	t.Run("health is live before ready", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+		req := httptest.NewRequest(http.MethodGet, "/healthz", http.NoBody)
 		rr := httptest.NewRecorder()
 
 		handler.ServeHTTP(rr, req)
@@ -33,7 +33,7 @@ func TestRuntimeProbeHandler(t *testing.T) {
 	})
 
 	t.Run("readiness is false until flipped", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+		req := httptest.NewRequest(http.MethodGet, "/readyz", http.NoBody)
 		rr := httptest.NewRecorder()
 
 		handler.ServeHTTP(rr, req)
@@ -46,7 +46,7 @@ func TestRuntimeProbeHandler(t *testing.T) {
 
 	t.Run("readiness becomes true", func(t *testing.T) {
 		probe.SetReady(true)
-		req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+		req := httptest.NewRequest(http.MethodGet, "/readyz", http.NoBody)
 		rr := httptest.NewRecorder()
 
 		handler.ServeHTTP(rr, req)
@@ -60,12 +60,12 @@ func TestRuntimeProbeHandler(t *testing.T) {
 	t.Run("shutdown drops liveness and readiness", func(t *testing.T) {
 		cancel()
 
-		healthReq := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+		healthReq := httptest.NewRequest(http.MethodGet, "/healthz", http.NoBody)
 		healthRR := httptest.NewRecorder()
 		handler.ServeHTTP(healthRR, healthReq)
 		require.Equal(t, http.StatusServiceUnavailable, healthRR.Code)
 
-		readyReq := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+		readyReq := httptest.NewRequest(http.MethodGet, "/readyz", http.NoBody)
 		readyRR := httptest.NewRecorder()
 		handler.ServeHTTP(readyRR, readyReq)
 		require.Equal(t, http.StatusServiceUnavailable, readyRR.Code)

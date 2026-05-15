@@ -31,7 +31,7 @@ func (s approvedUsersProviderSpy) List(ctx context.Context, tenantID string) ([]
 func (s approvedUsersProviderSpy) Add(ctx context.Context, tenantID string, user approved.UserInfo) error {
 	return s.add(ctx, tenantID, user)
 }
-func (s approvedUsersProviderSpy) Remove(ctx context.Context, tenantID string, id string) error {
+func (s approvedUsersProviderSpy) Remove(ctx context.Context, tenantID, id string) error {
 	return s.remove(ctx, tenantID, id)
 }
 

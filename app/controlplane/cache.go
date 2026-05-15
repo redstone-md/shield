@@ -33,7 +33,7 @@ func cacheKey(tenantID, workspaceID string) string {
 	return tenantID + ":" + workspaceID
 }
 
-func (c *memoryCache) Get(ctx context.Context, tenantID, workspaceID string) (rules.RuleSet, bool) {
+func (c *memoryCache) Get(_ context.Context, tenantID, workspaceID string) (rules.RuleSet, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -54,7 +54,7 @@ func (c *memoryCache) Get(ctx context.Context, tenantID, workspaceID string) (ru
 	return entry.ruleSet, true
 }
 
-func (c *memoryCache) Set(ctx context.Context, tenantID, workspaceID string, ruleSet rules.RuleSet) {
+func (c *memoryCache) Set(_ context.Context, tenantID, workspaceID string, ruleSet rules.RuleSet) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -65,7 +65,7 @@ func (c *memoryCache) Set(ctx context.Context, tenantID, workspaceID string, rul
 	}
 }
 
-func (c *memoryCache) Invalidate(ctx context.Context, tenantID, workspaceID string) {
+func (c *memoryCache) Invalidate(_ context.Context, tenantID, workspaceID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -73,7 +73,7 @@ func (c *memoryCache) Invalidate(ctx context.Context, tenantID, workspaceID stri
 	c.invalidated[key] = time.Now()
 }
 
-func (c *memoryCache) InvalidateAll(ctx context.Context, tenantID string) {
+func (c *memoryCache) InvalidateAll(_ context.Context, tenantID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

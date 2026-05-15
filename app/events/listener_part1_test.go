@@ -101,7 +101,7 @@ func (s *detectedSpamCounterSpy) DeleteLatestByUserID(_ context.Context, userID 
 	return s.deleteResult, nil
 }
 
-func (s *detectedSpamCounterSpy) CountByUserNameAndSignalSource(_ context.Context, _ string, _ string) (int, error) {
+func (s *detectedSpamCounterSpy) CountByUserNameAndSignalSource(_ context.Context, _, _ string) (int, error) {
 	return s.nameCount, nil
 }
 

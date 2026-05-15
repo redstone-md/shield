@@ -60,15 +60,20 @@ const (
 	LLMConsensusAny LLMConsensusMode = "any"
 	// LLMConsensusAll flips the base decision only if all eligible LLMs agree.
 	LLMConsensusAll LLMConsensusMode = "all"
+)
 
+const (
 	// LLMModeMissed checks messages the base detector allowed through.
 	LLMModeMissed LLMMode = "missed"
 	// LLMModeFlagged checks messages the base detector already flagged.
 	LLMModeFlagged LLMMode = "flagged"
 	// LLMModeAlways checks both allowed and flagged messages.
-	LLMModeAlways      LLMMode = "always"
-	llmChatContextSize         = 5
-	llmUserContextSize         = 5
+	LLMModeAlways LLMMode = "always"
+)
+
+const (
+	llmChatContextSize = 5
+	llmUserContextSize = 5
 )
 
 // detectorLLMCheck describes how a single LLM provider participates in Detector.Check.
@@ -390,7 +395,7 @@ func (d *Detector) hasLLMEnabled() bool {
 	return d.openaiChecker != nil || d.geminiChecker != nil
 }
 
-func (d *Detector) shouldApplyLLMCheck(baseSpam, isShortMessage bool, forceLLM bool, cfg detectorLLMCheck) bool {
+func (d *Detector) shouldApplyLLMCheck(baseSpam, isShortMessage, forceLLM bool, cfg detectorLLMCheck) bool {
 	if forceLLM {
 		return true
 	}

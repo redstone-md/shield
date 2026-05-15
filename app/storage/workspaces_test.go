@@ -25,7 +25,7 @@ func TestWorkspacesAddAndGet(t *testing.T) {
 		Status:  "active",
 	})
 	require.NoError(t, err)
-	assert.Greater(t, id, int64(0))
+	assert.Positive(t, id)
 
 	rec, err := store.Get(context.Background(), "test-workspace")
 	require.NoError(t, err)

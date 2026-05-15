@@ -24,7 +24,7 @@ func TestRuleSetService_Get(t *testing.T) {
 	svc := NewRuleSetService(store, "gr1")
 
 	_, err = svc.Get(context.Background(), "gr1")
-	assert.Error(t, err, "no rule set yet")
+	require.Error(t, err, "no rule set yet")
 
 	_, err = store.EnsureBootstrap(context.Background(), rules.RuleSet{
 		WorkspaceID: "gr1",

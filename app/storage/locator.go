@@ -182,7 +182,8 @@ func (l *Locator) migrate(ctx context.Context, tx *sqlx.Tx, gid string) error {
 			return fmt.Errorf("failed to get add messages GID query: %w", pickErr)
 		}
 
-		if _, execErr := tx.ExecContext(ctx, addGIDMessagesQuery); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
+		if _, execErr := tx.ExecContext(ctx, addGIDMessagesQuery); execErr != nil &&
+			!strings.Contains(execErr.Error(), "duplicate column") {
 			return fmt.Errorf("failed to add gid column to messages: %w", execErr)
 		}
 
@@ -191,7 +192,8 @@ func (l *Locator) migrate(ctx context.Context, tx *sqlx.Tx, gid string) error {
 			return fmt.Errorf("failed to get add spam GID query: %w", pickErr)
 		}
 
-		if _, execErr := tx.ExecContext(ctx, addGIDSpamQuery); execErr != nil && !strings.Contains(execErr.Error(), "duplicate column") {
+		if _, execErr := tx.ExecContext(ctx, addGIDSpamQuery); execErr != nil &&
+			!strings.Contains(execErr.Error(), "duplicate column") {
 			return fmt.Errorf("failed to add gid column to spam: %w", execErr)
 		}
 

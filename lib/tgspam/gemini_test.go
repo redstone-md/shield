@@ -100,7 +100,7 @@ func TestGeminiChecker_Check(t *testing.T) {
 		assert.False(t, spam)
 		assert.Equal(t, "gemini", details.Name)
 		assert.Equal(t, "recovered, confidence: 73%", details.Details)
-		assert.NoError(t, details.Error)
+		require.NoError(t, details.Error)
 		assert.Equal(t, 2, callCount)
 	})
 

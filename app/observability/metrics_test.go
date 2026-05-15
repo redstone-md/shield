@@ -69,7 +69,7 @@ func TestMetrics_Concurrent(t *testing.T) {
 	m := NewMetrics()
 	done := make(chan struct{})
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		go func() {
 			m.Inc("concurrent_counter")
 			m.Observe("concurrent_latency", time.Millisecond)
@@ -77,7 +77,7 @@ func TestMetrics_Concurrent(t *testing.T) {
 		}()
 	}
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		<-done
 	}
 

@@ -28,11 +28,11 @@ func (s ruleSetProviderSpy) Get(ctx context.Context, workspaceID string) (rules.
 	return s.get(ctx, workspaceID)
 }
 
-func (s ruleSetProviderSpy) Update(ctx context.Context, workspaceID string, source string, rs rules.RuleSet) (rules.RuleSet, error) {
+func (s ruleSetProviderSpy) Update(ctx context.Context, workspaceID, source string, rs rules.RuleSet) (rules.RuleSet, error) {
 	return s.update(ctx, workspaceID, source, rs)
 }
 
-func (s controlPlaneAuthorizerSpy) Authorize(ctx context.Context, workspaceID string, userID string, access string) error {
+func (s controlPlaneAuthorizerSpy) Authorize(ctx context.Context, workspaceID, userID, access string) error {
 	return s.authorize(ctx, workspaceID, userID, access)
 }
 

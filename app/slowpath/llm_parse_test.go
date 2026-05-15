@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseLLMOutputValid(t *testing.T) {
 	resp, err := parseLLMOutput(`{"spam":true,"reason":"crypto","confidence":95}`)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, resp.IsSpam)
 	assert.Equal(t, "crypto", resp.Reason)
 	assert.Equal(t, 95, resp.Confidence)
@@ -16,27 +17,27 @@ func TestParseLLMOutputValid(t *testing.T) {
 
 func TestParseLLMOutputHam(t *testing.T) {
 	resp, err := parseLLMOutput(`{"spam":false,"reason":"clean","confidence":10}`)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, resp.IsSpam)
 }
 
 func TestParseLLMOutputTrailingComma(t *testing.T) {
 	resp, err := parseLLMOutput(`{"spam":true,"reason":"spam","confidence":90,}`)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, resp.IsSpam)
 }
 
 func TestParseLLMOutputWithThoughtTags(t *testing.T) {
 	input := `<think let me analyze this</think {"spam":false,"reason":"ok","confidence":20}`
 	resp, err := parseLLMOutput(input)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, resp.IsSpam)
 }
 
 func TestParseLLMOutputFallbackRegex(t *testing.T) {
 	input := `The message is spam: true, reason: "crypto ad", confidence: 85`
 	resp, err := parseLLMOutput(input)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, resp.IsSpam)
 	assert.Equal(t, 85, resp.Confidence)
 }
@@ -54,7 +55,7 @@ func TestParseLLMOutputGarbage(t *testing.T) {
 func TestExtractFirstJSON(t *testing.T) {
 	input := `Some text {"spam":true,"reason":"test","confidence":50} more text`
 	result := extractFirstJSON(input)
-	assert.Equal(t, `{"spam":true,"reason":"test","confidence":50}`, result)
+	assert.JSONEq(t, `{"spam":true,"reason":"test","confidence":50}`, result)
 }
 
 func TestExtractFirstJSONNested(t *testing.T) {

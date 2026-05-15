@@ -24,7 +24,7 @@ func newMockLimitStore() *mockLimitStore {
 	}
 }
 
-func (m *mockLimitStore) Get(_ context.Context, limitType string) (int, int, error) {
+func (m *mockLimitStore) Get(_ context.Context, limitType string) (limit, usage int, err error) {
 	rec, ok := m.limits[limitType]
 	if !ok {
 		return 0, 0, nil
@@ -87,7 +87,7 @@ func TestQuotaService_UnderLimitAllows(t *testing.T) {
 func TestQuotaService_AtLimitBlocks(t *testing.T) {
 	store := newMockLimitStore()
 	require.NoError(t, store.Set(context.Background(), "throughput", 3))
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		require.NoError(t, store.Increment(context.Background(), "throughput"))
 	}
 	svc := NewQuotaService(store)
@@ -100,7 +100,7 @@ func TestQuotaService_IncrementTracksUsage(t *testing.T) {
 	store := newMockLimitStore()
 	require.NoError(t, store.Set(context.Background(), "throughput", 10))
 	svc := NewQuotaService(store)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		require.NoError(t, svc.Increment(context.Background(), "tenant-1", "throughput"))
 	}
 	limit, usage, err := store.Get(context.Background(), "throughput")

@@ -37,11 +37,11 @@ func TestStress_ConcurrentWrites(t *testing.T) {
 			for j := range opsPerWorker {
 				name := fmt.Sprintf("worker_%d_op_%d", id, j)
 				lock.Lock()
-				_, err := db.Exec("INSERT INTO stress_test (gid, name, value) VALUES (?, ?, ?)", "gr1", name, id*j)
+				_, errExec := db.Exec("INSERT INTO stress_test (gid, name, value) VALUES (?, ?, ?)", "gr1", name, id*j)
 				lock.Unlock()
-				if err != nil {
+				if errExec != nil {
 					select {
-					case errCh <- fmt.Errorf("worker %d insert %d: %w", id, j, err):
+					case errCh <- fmt.Errorf("worker %d insert %d: %w", id, j, errExec):
 					default:
 					}
 					return

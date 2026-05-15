@@ -324,7 +324,7 @@ func TestDetector_UpdateConfig(t *testing.T) {
 	})
 
 	assert.Equal(t, 50, d.MinMsgLen)
-	assert.Equal(t, 0.5, d.SimilarityThreshold)
+	assert.InDelta(t, 0.5, d.SimilarityThreshold, 1e-9)
 	assert.NotNil(t, d.duplicateDetector)
 
 	d.UpdateConfig(Config{
@@ -340,8 +340,8 @@ func TestDetector_UpdateConfig(t *testing.T) {
 	})
 
 	assert.Equal(t, 100, d.MinMsgLen)
-	assert.Equal(t, 0.8, d.SimilarityThreshold)
-	assert.Equal(t, float64(60), d.MinSpamProbability)
+	assert.InDelta(t, 0.8, d.SimilarityThreshold, 1e-9)
+	assert.InDelta(t, float64(60), d.MinSpamProbability, 1e-9)
 	assert.NotNil(t, d.duplicateDetector)
 
 	_, cr := d.Check(spamcheck.Request{Msg: "test", UserID: "123"})

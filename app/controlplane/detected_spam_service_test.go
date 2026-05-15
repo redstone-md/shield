@@ -46,7 +46,7 @@ func TestDetectedSpamService_NilStore(t *testing.T) {
 	svc := NewDetectedSpamService(nil)
 
 	_, err := svc.Read(context.Background(), "t1")
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = svc.FindByUserID(context.Background(), "t1", 1)
 	assert.Error(t, err)

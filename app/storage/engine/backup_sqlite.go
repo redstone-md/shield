@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"slices"
 	"strings"
 	"time"
 
@@ -132,15 +133,15 @@ func (e *SQL) sqliteHasTenantID(ctx context.Context, tx *sqlx.Tx, table string) 
 	if err != nil {
 		return false, err
 	}
-	for _, col := range columns {
-		if col == "tenant_id" {
-			return true, nil
-		}
+	if slices.Contains(columns, "tenant_id") {
+		return true, nil
 	}
 	return false, nil
 }
 
-func (e *SQL) writeSqliteTableData(ctx context.Context, tx *sqlx.Tx, w io.Writer, table string, columns []string, hasTenantID bool) error {
+func (e *SQL) writeSqliteTableData(
+	ctx context.Context, tx *sqlx.Tx, w io.Writer, table string, columns []string, hasTenantID bool,
+) error {
 	var query string
 	var err error
 	var rows *sqlx.Rows

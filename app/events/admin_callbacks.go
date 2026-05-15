@@ -262,7 +262,8 @@ func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.Callbac
 	updText := query.Message.Text + fmt.Sprintf("\n\nразбанено администратором %s за %v",
 		markdownUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
 
-	if !strings.Contains(query.Message.Text, "диагностика") && !strings.Contains(query.Message.Text, "spam detection results") && userID != 0 {
+	if !strings.Contains(query.Message.Text, "диагностика") &&
+		!strings.Contains(query.Message.Text, "spam detection results") && userID != 0 {
 		spamInfoText := []string{"\n\n**исходная диагностика**\n"}
 
 		info, found := a.locator.Spam(ctx, userID)

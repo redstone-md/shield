@@ -149,13 +149,13 @@ func TestBackupSqlite_Roundtrip(t *testing.T) {
 	)`)
 	require.NoError(t, err)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_, err = db1.Exec(`INSERT INTO roundtrip_test (tenant_id, name, value) VALUES (?, ?, ?)`,
 			"gr1", fmt.Sprintf("name_gr1_%d", i), fmt.Sprintf("val_%d", i))
 		require.NoError(t, err)
 	}
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		_, err = db1.Exec(`INSERT INTO roundtrip_test (tenant_id, name, value) VALUES (?, ?, ?)`,
 			"other", fmt.Sprintf("name_other_%d", i), fmt.Sprintf("other_val_%d", i))
 		require.NoError(t, err)

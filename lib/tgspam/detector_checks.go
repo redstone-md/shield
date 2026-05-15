@@ -37,7 +37,7 @@ func (d *Detector) isSpamSimilarityHigh(msg string) spamcheck.Response {
 				RuleID:         "similarity",
 				Score:          maxSimilarity,
 				Weight:         1.0,
-				NormalizedText: truncateRunes(msg, 64),
+				NormalizedText: truncateRunes(msg),
 			}
 		}
 	}
@@ -176,7 +176,7 @@ func (d *Detector) isSpamClassified(msg string) spamcheck.Response {
 
 	return spamcheck.Response{Name: "classifier", Spam: isSpam,
 		Details: fmt.Sprintf("probability of %s: %s%%", class, probStr),
-		RuleID:  "classifier", Score: prob, Weight: 1.0, NormalizedText: truncateRunes(msg, 64)}
+		RuleID:  "classifier", Score: prob, Weight: 1.0, NormalizedText: truncateRunes(msg)}
 }
 
 // isStopWord checks if a given message or username contains any of the stop words.
@@ -187,7 +187,7 @@ func (d *Detector) isStopWord(msg string, req spamcheck.Request) spamcheck.Respo
 	cleanMsg := normalizeLookupText(cleanEmoji(msg))
 	for _, word := range d.stopWords {
 		if matchStopWord(cleanMsg, word) {
-			return withScoring(spamcheck.Response{Name: "stopword", Spam: true, Details: strings.TrimPrefix(word, "=")}, 1.0, cleanMsg)
+			return withScoring(spamcheck.Response{Name: "stopword", Spam: true, Details: strings.TrimPrefix(word, "=")}, cleanMsg)
 		}
 	}
 
@@ -202,7 +202,7 @@ func (d *Detector) isStopWord(msg string, req spamcheck.Request) spamcheck.Respo
 		normalizedName := normalizeLookupText(name)
 		for _, word := range d.stopWords {
 			if matchStopWord(normalizedName, word) {
-				return withScoring(spamcheck.Response{Name: "stopword", Spam: true, Details: strings.TrimPrefix(word, "=")}, 1.0, normalizedName)
+				return withScoring(spamcheck.Response{Name: "stopword", Spam: true, Details: strings.TrimPrefix(word, "=")}, normalizedName)
 			}
 		}
 	}
@@ -231,7 +231,7 @@ func matchStopWord(text, word string) bool {
 func (d *Detector) isManyEmojis(msg string) spamcheck.Response {
 	count := countEmoji(msg)
 	return withScoring(spamcheck.Response{Name: "emoji", Spam: count > d.MaxAllowedEmoji,
-		Details: fmt.Sprintf("%d/%d", count, d.MaxAllowedEmoji)}, 1.0, msg)
+		Details: fmt.Sprintf("%d/%d", count, d.MaxAllowedEmoji)}, msg)
 }
 
 // isMultiLang checks if a given message contains more than MultiLangWords multi-lingual words.
@@ -289,7 +289,10 @@ func (d *Detector) isMultiLang(msg string) spamcheck.Response {
 		}
 	}
 	if count >= d.MultiLangWords {
-		return withScoring(spamcheck.Response{Name: "multi-lingual", Spam: true, Details: fmt.Sprintf("%d/%d", count, d.MultiLangWords)}, 1.0, msg)
+		return withScoring(spamcheck.Response{
+			Name: "multi-lingual", Spam: true,
+			Details: fmt.Sprintf("%d/%d", count, d.MultiLangWords),
+		}, msg)
 	}
 	return spamcheck.Response{Name: "multi-lingual", Spam: false, Details: fmt.Sprintf("%d/%d", count, d.MultiLangWords)}
 }
@@ -356,7 +359,7 @@ func (d *Detector) isAbnormalSpacing(msg string) spamcheck.Response {
 			Name:    "word-spacing",
 			Spam:    true,
 			Details: fmt.Sprintf("abnormal (ratio: %.2f, short: %.0f%%)", spaceRatio, shortWordRatio*100),
-		}, 1.0, msg)
+		}, msg)
 	}
 
 	return spamcheck.Response{
@@ -377,11 +380,6 @@ func cleanEmoji(s string) string {
 
 func countEmoji(s string) int {
 	return len(gomoji.CollectAll(s))
-}
-
-// normalizeSpaces collapses multiple consecutive spaces into a single space
-func normalizeSpaces(s string) string {
-	return textnorm.New(textnorm.Options{Trim: true, CanonicalWhitespace: true}).Normalize(s)
 }
 
 func normalizeLookupText(text string) string {

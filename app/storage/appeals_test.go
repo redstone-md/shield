@@ -171,8 +171,8 @@ func (s *StorageTestSuite) TestAppeals_UpdateReplayResult() {
 			s.NotEmpty(got.ReplayResult)
 
 			var parsed audit.ReplayResult
-			s.NoError(json.Unmarshal([]byte(got.ReplayResult), &parsed))
-			s.Equal(false, parsed.DetectionSpam)
+			s.Require().NoError(json.Unmarshal([]byte(got.ReplayResult), &parsed))
+			s.False(parsed.DetectionSpam)
 			s.Equal("allow", parsed.PolicyAction)
 		})
 	}

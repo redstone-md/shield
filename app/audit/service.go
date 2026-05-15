@@ -101,7 +101,7 @@ func (s *Service) CreateIncident(ctx context.Context, data AuditEventData) error
 			AuthorType: "system",
 			AuthorID:   "slow_path",
 			Action:     "slow_path_invoked",
-			Payload:    fmt.Sprintf(`{"provider":"%s","prompt_version":"%s"}`, data.SlowProvider, data.SlowPromptVer),
+			Payload:    fmt.Sprintf(`{"provider":%q,"prompt_version":%q}`, data.SlowProvider, data.SlowPromptVer),
 		})
 	}
 
@@ -186,7 +186,7 @@ func (s *Service) CreateFromAdminAction(ctx context.Context, p AdminActionParams
 		AuthorType: "admin",
 		AuthorID:   p.AdminUserName,
 		Action:     p.Action,
-		Payload:    fmt.Sprintf(`{"admin":"%s","user_id":%d,"action":"%s"}`, p.AdminUserName, p.UserID, p.Action),
+		Payload:    fmt.Sprintf(`{"admin":%q,"user_id":%d,"action":%q}`, p.AdminUserName, p.UserID, p.Action),
 	})
 
 	return nil
@@ -238,7 +238,7 @@ func (s *Service) ListComments(ctx context.Context, incidentID int64) ([]Inciden
 	return s.store.ListComments(ctx, incidentID)
 }
 
-func (s *Service) ResolveFromChecks(ctx context.Context, tenantID, idempotencyKey string, checkNames []string) {
+func (s *Service) ResolveFromChecks(ctx context.Context, tenantID, idempotencyKey string, _ []string) {
 	if s.store == nil {
 		return
 	}
@@ -253,9 +253,9 @@ func (s *Service) ResolveFromChecks(ctx context.Context, tenantID, idempotencyKe
 	_ = s.store.UpdateStatus(ctx, incident.ID, IncidentStatusResolved, "system")
 }
 
-func truncateMsg(s string, max int) string {
-	if len(s) <= max {
+func truncateMsg(s string, maxOf int) string {
+	if len(s) <= maxOf {
 		return s
 	}
-	return s[:max]
+	return s[:maxOf]
 }

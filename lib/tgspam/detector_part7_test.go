@@ -242,7 +242,7 @@ func TestDetector_LLMContextIncludesLastFiveChatMessages(t *testing.T) {
 	}
 	d.WithOpenAIChecker(openAIMock, OpenAIConfig{Model: "gpt4"})
 
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		userID := "other"
 		userName := "other"
 		if i%2 == 0 {

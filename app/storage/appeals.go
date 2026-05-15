@@ -208,7 +208,9 @@ func (s *AppealStorage) List(ctx context.Context, filter audit.AppealFilter) ([]
 	return result, nil
 }
 
-func (s *AppealStorage) UpdateStatus(ctx context.Context, id int64, status audit.AppealStatus, resolvedBy, resolutionText string) error {
+func (s *AppealStorage) UpdateStatus(
+	ctx context.Context, id int64, status audit.AppealStatus, resolvedBy, resolutionText string,
+) error {
 	s.Lock()
 	defer s.Unlock()
 

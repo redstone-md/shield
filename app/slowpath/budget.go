@@ -37,7 +37,7 @@ func (t *InMemoryBudgetTracker) SetConfig(tenantID string, cfg BudgetConfig) {
 	t.configs[tenantID] = cfg
 }
 
-func (t *InMemoryBudgetTracker) Allow(tenantID string, class BudgetClass, estimatedTokens int) bool {
+func (t *InMemoryBudgetTracker) Allow(tenantID string, _ BudgetClass, estimatedTokens int) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -67,7 +67,7 @@ func (t *InMemoryBudgetTracker) Allow(tenantID string, class BudgetClass, estima
 	return true
 }
 
-func (t *InMemoryBudgetTracker) Record(tenantID string, class BudgetClass, tokensUsed int, cost float64) {
+func (t *InMemoryBudgetTracker) Record(tenantID string, _ BudgetClass, tokensUsed int, cost float64) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -77,7 +77,7 @@ func (t *InMemoryBudgetTracker) Record(tenantID string, class BudgetClass, token
 	counter.cost += cost
 }
 
-func (t *InMemoryBudgetTracker) Usage(tenantID string) (requests int, tokens int, cost float64) {
+func (t *InMemoryBudgetTracker) Usage(tenantID string) (requests, tokens int, cost float64) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 

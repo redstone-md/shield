@@ -35,7 +35,7 @@ func (m *mockKnowledgeStore) GetByID(_ context.Context, id int64) (KnowledgeSnap
 }
 
 func (m *mockKnowledgeStore) List(_ context.Context, limit, offset int) ([]KnowledgeSnapshot, error) {
-	var res []KnowledgeSnapshot
+	res := make([]KnowledgeSnapshot, 0, len(m.snapshots))
 	for _, s := range m.snapshots {
 		res = append(res, s)
 	}
@@ -123,7 +123,7 @@ func TestKnowledgeService_Rollback_NoRestorer(t *testing.T) {
 	svc := NewKnowledgeService(store, nil, nil, nil)
 
 	_, err := svc.Rollback(context.Background(), 1, "admin")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no restorer configured")
 }
 
@@ -133,6 +133,6 @@ func TestKnowledgeService_Rollback_SnapshotNotFound(t *testing.T) {
 	svc := NewKnowledgeService(store, nil, nil, restorer)
 
 	_, err := svc.Rollback(context.Background(), 999, "admin")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get snapshot for rollback")
 }

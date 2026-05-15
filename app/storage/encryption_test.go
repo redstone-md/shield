@@ -28,11 +28,11 @@ func TestEncryptor_EmptyString(t *testing.T) {
 
 	result, err := EncryptField(enc, "")
 	require.NoError(t, err)
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 
 	result, err = DecryptField(enc, "")
 	require.NoError(t, err)
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 func TestEncryptor_EncryptField_NonEmpty(t *testing.T) {
@@ -80,7 +80,7 @@ func TestEncryptor_DecryptInvalidInput(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = enc.Decrypt("not-hex-at-all!!!")
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = enc.Decrypt("enc:abcd")
 	assert.Error(t, err)

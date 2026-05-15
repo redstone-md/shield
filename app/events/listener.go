@@ -417,7 +417,9 @@ func (l *TelegramListener) procSuperCommand(ctx context.Context, update tbapi.Up
 // procSuperReply processes superuser reply commands: /spam, /ban, /warn, /unwarn.
 func (l *TelegramListener) procSuperReply(ctx context.Context, update tbapi.Update) (handled bool) {
 	switch {
-	case strings.EqualFold(update.Message.Text, "/spam") || strings.EqualFold(update.Message.Text, "spam") || l.isReportCommand(update.Message.Text):
+	case strings.EqualFold(update.Message.Text, "/spam") ||
+		strings.EqualFold(update.Message.Text, "spam") ||
+		l.isReportCommand(update.Message.Text):
 		log.Printf("[DEBUG] superuser %s reported spam", update.Message.From.UserName)
 		if err := l.adminHandler.DirectSpamReport(ctx, update); err != nil {
 			log.Printf("[WARN] failed to process direct spam report: %v", err)
@@ -499,7 +501,7 @@ func (l *TelegramListener) isBotMention(text string) bool {
 		return false
 	}
 	needle := "@" + strings.ToLower(l.BotUsername)
-	for _, field := range strings.Fields(text) {
+	for field := range strings.FieldsSeq(text) {
 		trimmed := strings.Trim(field, ".,:;!?()[]{}<>\"'")
 		if trimmed == needle {
 			return true

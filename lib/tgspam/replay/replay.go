@@ -10,6 +10,7 @@ import (
 	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
+// Case describes a single replay fixture: an input message and the expected spam verdict.
 type Case struct {
 	Msg          string             `json:"msg"`
 	UserID       string             `json:"user_id"`
@@ -18,6 +19,7 @@ type Case struct {
 	Meta         spamcheck.MetaData `json:"meta"`
 }
 
+// Result holds the outcome of replaying one Case through the spam check function.
 type Result struct {
 	Case       Case                 `json:"case"`
 	ActualSpam bool                 `json:"actual_spam"`
@@ -26,6 +28,7 @@ type Result struct {
 	Duration   time.Duration        `json:"duration"`
 }
 
+// Report aggregates classification metrics across a replay run.
 type Report struct {
 	Total     int      `json:"total"`
 	TP        int      `json:"tp"`
@@ -38,8 +41,10 @@ type Report struct {
 	Details   []Result `json:"details"`
 }
 
+// CheckFunc is the spam check entry point invoked by Run for each replay Case.
 type CheckFunc func(req spamcheck.Request) (bool, []spamcheck.Response)
 
+// Run executes fn against the provided cases and returns a Report with per-case results and aggregate metrics.
 func Run(fn CheckFunc, cases []Case) Report {
 	report := Report{Details: make([]Result, 0, len(cases))}
 
@@ -84,6 +89,7 @@ func Run(fn CheckFunc, cases []Case) Report {
 	return report
 }
 
+// LoadCases decodes a stream of newline-delimited JSON Case objects from r.
 func LoadCases(r io.Reader) ([]Case, error) {
 	dec := json.NewDecoder(r)
 	var cases []Case
@@ -100,7 +106,9 @@ func LoadCases(r io.Reader) ([]Case, error) {
 	return cases, nil
 }
 
+// LoadCasesFile opens the fixture file at path and delegates decoding to LoadCases.
 func LoadCasesFile(path string) ([]Case, error) {
+	// #nosec G304 -- replay loads operator-provided fixture path
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)

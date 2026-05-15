@@ -63,7 +63,9 @@ func (s *DictionaryService) Read(ctx context.Context, _ string, t storage.Dictio
 	return s.store.Read(ctx, t)
 }
 
-func (s *DictionaryService) ReadWithIDs(ctx context.Context, _ string, t storage.DictionaryType) ([]storage.DictionaryEntry, error) {
+func (s *DictionaryService) ReadWithIDs(
+	ctx context.Context, _ string, t storage.DictionaryType,
+) ([]storage.DictionaryEntry, error) {
 	if s.store == nil {
 		return nil, fmt.Errorf("dictionary store is nil")
 	}

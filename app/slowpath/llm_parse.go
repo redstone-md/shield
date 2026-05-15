@@ -18,7 +18,7 @@ var (
 	trailingCommaRe = regexp.MustCompile(`,\s*([}\]])`)
 	spamFieldRe     = regexp.MustCompile(`(?is)"?spam"?\s*:\s*("?(?:true|false|1|0)"?)`)
 	reasonFieldRe   = regexp.MustCompile(`(?is)"?reason"?\s*:\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')`)
-	confFieldRe     = regexp.MustCompile(`(?is)"?confidence"?\s*:\s*"?([0-9]{1,3})"?`)
+	confFieldRe     = regexp.MustCompile(`(?is)"?confidence"?\s*:\s*"?(\d{1,3})"?`)
 	thoughtRe       = regexp.MustCompile(`<thought>(?s).*?</thought>`)
 )
 
@@ -133,7 +133,7 @@ func parseFallback(content string) (llmResponse, bool) {
 	return llmResponse{IsSpam: isSpam, Reason: reason, Confidence: conf}, true
 }
 
-func parseBool(raw string) (bool, bool) {
+func parseBool(raw string) (val, ok bool) {
 	v := strings.Trim(strings.ToLower(raw), `" `)
 	switch v {
 	case "true", "1":

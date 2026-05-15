@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -639,7 +638,7 @@ func TestTelegramListener_AdminChatPlainMessageDemoCheck(t *testing.T) {
 	require.Len(t, mockAPI.SendCalls(), 1)
 	sent := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
 	assert.Equal(t, int64(456), sent.ChatID)
-	assert.True(t, strings.Contains(sent.Text, "сообщение НЕ пройдет"), sent.Text)
+	assert.Contains(t, sent.Text, "сообщение НЕ пройдет", sent.Text)
 }
 
 func TestTelegramListener_AdminChatPlainMessageDemoCheckIgnoresForwardDisable(t *testing.T) {

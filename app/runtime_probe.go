@@ -57,9 +57,9 @@ func (p *runtimeProbe) Handler(ctx context.Context) http.Handler {
 	return mux
 }
 
-func activateRuntimeProbe(ctx context.Context, listenAddr string, probe *runtimeProbe) error {
+func activateRuntimeProbe(ctx context.Context, listenAddr string, probe *runtimeProbe) {
 	if probe == nil || strings.TrimSpace(listenAddr) == "" {
-		return nil
+		return
 	}
 
 	srv := &http.Server{
@@ -86,8 +86,6 @@ func activateRuntimeProbe(ctx context.Context, listenAddr string, probe *runtime
 			log.Printf("[ERROR] runtime probe server failed, %v", err)
 		}
 	}()
-
-	return nil
 }
 
 func writeProbeResponse(w http.ResponseWriter, status int, resp probeResponse) {

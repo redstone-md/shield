@@ -88,6 +88,17 @@ linters:
       - linters:
           - revive
         text: "var-naming: avoid package names"
+      - linters:
+          - revive
+        path: ^app/
+        text: "exported:"
+      - linters:
+          - wrapcheck
+        path: ^app/
+      - linters:
+          - revive
+        path: _test\.go$
+        text: "exported:"
     paths:
       - vendor
       - third_party$

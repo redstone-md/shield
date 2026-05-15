@@ -58,7 +58,7 @@ func (s *StorageTestSuite) TestTenantIsolation() {
 			s.Equal("evt2", rec2.EventID)
 
 			_, err = ie1.ByIdempotencyKey(ctx, "key2")
-			s.Error(err)
+			s.Require().Error(err)
 
 			_, err = ie2.ByIdempotencyKey(ctx, "key1")
 			s.Error(err)
@@ -131,7 +131,7 @@ func (s *StorageTestSuite) TestTenantIsolation() {
 
 			cross, err := r1.GetByMessage(ctx, 2, 200)
 			s.Require().NoError(err)
-			s.Len(cross, 0)
+			s.Empty(cross)
 		})
 
 		s.Run("rule sets", func() {
@@ -199,7 +199,7 @@ func (s *StorageTestSuite) TestTenantIsolation() {
 			s.Equal("Tenant B", rec2.Name)
 
 			_, err = t1.Get(ctx, "tenant-b")
-			s.Error(err)
+			s.Require().Error(err)
 
 			_, err = t2.Get(ctx, "tenant-a")
 			s.Error(err)
@@ -311,7 +311,7 @@ func (s *StorageTestSuite) TestTenantIsolation() {
 
 			cross, err := r1.GetByMessage(ctx, 102, 1002)
 			s.Require().NoError(err)
-			s.Len(cross, 0)
+			s.Empty(cross)
 		})
 
 		s.Run("rule sets", func() {

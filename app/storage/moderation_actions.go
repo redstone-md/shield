@@ -64,8 +64,10 @@ var moderationActionsQueries = engine.NewQueryMap().
 		CREATE INDEX IF NOT EXISTS idx_moderation_actions_tenant_id ON moderation_actions(tenant_id);
 	`).
 	AddSame(CmdAddModerationAction, `INSERT INTO moderation_actions
-		(gid, tenant_id, event_id, correlation_id, idempotency_key, command, status, chat_id, subject_id, message_id, attempt, last_error, created_at)
-		VALUES (:gid, :tenant_id, :event_id, :correlation_id, :idempotency_key, :command, :status, :chat_id, :subject_id, :message_id, :attempt, :last_error, :created_at)`).
+		(gid, tenant_id, event_id, correlation_id, idempotency_key, command, status,
+		 chat_id, subject_id, message_id, attempt, last_error, created_at)
+		VALUES (:gid, :tenant_id, :event_id, :correlation_id, :idempotency_key, :command, :status,
+		        :chat_id, :subject_id, :message_id, :attempt, :last_error, :created_at)`).
 	AddSame(CmdGetLatestModerationAction, `SELECT
 	id, gid, event_id, correlation_id, idempotency_key, command, status,
 	chat_id, subject_id, message_id, attempt, last_error, created_at

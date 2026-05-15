@@ -1,5 +1,7 @@
 package controlplane
 
+import "slices"
+
 import "context"
 
 type Plan string
@@ -60,8 +62,11 @@ var planCatalog = map[Plan]PlanDefinition{
 		},
 	},
 	PlanEnterprise: {
-		Name:     PlanEnterprise,
-		Features: []Feature{FeatureSlowPath, FeatureVision, FeatureCustomRules, FeatureMultiWorkspace, FeaturePriorityQueue, FeatureExport, FeatureAppeals},
+		Name: PlanEnterprise,
+		Features: []Feature{
+			FeatureSlowPath, FeatureVision, FeatureCustomRules, FeatureMultiWorkspace,
+			FeaturePriorityQueue, FeatureExport, FeatureAppeals,
+		},
 		Limits: PlanLimits{
 			SpamChecksPerHour:   0,
 			SlowPathPerHour:     0,
@@ -102,10 +107,8 @@ func (s *PlanService) HasFeature(ctx context.Context, tenantID string, feature F
 	if err != nil {
 		return false, err
 	}
-	for _, f := range def.Features {
-		if f == feature {
-			return true, nil
-		}
+	if slices.Contains(def.Features, feature) {
+		return true, nil
 	}
 	return false, nil
 }

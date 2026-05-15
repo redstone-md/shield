@@ -103,7 +103,9 @@ func checkVolumeMount(opts options) (ok bool) {
 	return false
 }
 
-func activateServer(ctx context.Context, opts options, web webRuntimeAssembly, dmUsersProvider webapi.DMUsersProvider) (err error) {
+func activateServer(
+	ctx context.Context, opts options, web webRuntimeAssembly, dmUsersProvider webapi.DMUsersProvider,
+) (err error) {
 	authPassswd := opts.Server.AuthPasswd
 	if opts.Server.AuthPasswd == "auto" {
 		authPassswd, err = webapi.GenerateRandomPassword(20)
@@ -404,7 +406,9 @@ func buildMetaChecks(ruleSet rules.RuleSet, minMsgLen int) []tgspam.MetaCheck {
 	return mc
 }
 
-func makeSpamBot(ctx context.Context, opts options, ruleSet rules.RuleSet, dataDB *engine.SQL, detector *tgspam.Detector) (*bot.SpamFilter, error) {
+func makeSpamBot(
+	ctx context.Context, opts options, ruleSet rules.RuleSet, dataDB *engine.SQL, detector *tgspam.Detector,
+) (*bot.SpamFilter, error) {
 	if dataDB == nil || detector == nil {
 		return nil, errors.New("nil datadb or detector")
 	}
@@ -484,7 +488,8 @@ func makeSlowPathEngine(opts options) *slowpath.Engine {
 			config.BaseURL = opts.OpenAI.APIBase
 		}
 		oaClient := openai.NewClientWithConfig(config)
-		textAdapter := slowpath.NewOpenAIAdapter(oaClient, opts.OpenAI.Model, opts.OpenAI.MaxTokensResponse, opts.OpenAI.MaxSymbolsRequest)
+		textAdapter := slowpath.NewOpenAIAdapter(oaClient, opts.OpenAI.Model,
+			opts.OpenAI.MaxTokensResponse, opts.OpenAI.MaxSymbolsRequest)
 		eng.RegisterProvider(textAdapter, brk)
 
 		if vm := opts.OpenAI.VisionModel; vm != "" {
@@ -532,7 +537,8 @@ func makeSlowPathChatEngine(opts options) *slowpath.Engine {
 	}
 
 	eng := slowpath.NewEngine(slowpath.EngineConfig{})
-	chatAdapter := slowpath.NewOpenAIAdapter(openai.NewClientWithConfig(config), opts.ChatModel, opts.OpenAI.MaxTokensResponse, opts.OpenAI.MaxSymbolsRequest)
+	chatAdapter := slowpath.NewOpenAIAdapter(openai.NewClientWithConfig(config), opts.ChatModel,
+		opts.OpenAI.MaxTokensResponse, opts.OpenAI.MaxSymbolsRequest)
 	eng.RegisterChat(chatAdapter, slowpath.DefaultBreakerConfig())
 	log.Printf("[INFO] slowpath openai chat registered (%s)", opts.ChatModel)
 	return eng
@@ -567,7 +573,7 @@ func readPromptOverride(dynamicPath string) (string, error) {
 	}
 
 	path := filepath.Join(dynamicPath, promptOverrideFile)
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path supplied by operator config
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return "", nil

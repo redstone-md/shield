@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
@@ -65,7 +64,7 @@ func telegramIdempotencyKey(updateID int, chatID int64, messageID, editedMessage
 }
 
 func (l *TelegramListener) nextEventID() string {
-	seq := atomic.AddUint64(&l.pipeline.eventID, 1)
+	seq := l.pipeline.eventID.Add(1)
 	return fmt.Sprintf("evt-%s-%d", strings.TrimSpace(l.TenantID), seq)
 }
 
@@ -294,7 +293,8 @@ func mediaSlowPathFile(ctx context.Context, cfg mediaSlowPathConfig, msg *bot.Me
 		if msg.Animation.ThumbFileID != "" {
 			return msg.Animation.ThumbFileID, slowpath.EscalationImageContent
 		}
-		observability.Logf(ctx, "[DEBUG] animation slowpath using original file for first-frame extraction: mime=%s", msg.Animation.MimeType)
+		observability.Logf(ctx, "[DEBUG] animation slowpath using original file for first-frame extraction: mime=%s",
+			msg.Animation.MimeType)
 		return msg.Animation.FileID, slowpath.EscalationImageContent
 	}
 	if msg.WithSticker && msg.Sticker != nil {
@@ -325,9 +325,10 @@ func customEmojiDownloadFileID(ctx context.Context, api TbAPI, customEmojiID str
 	return stickerDownloadFileID(info)
 }
 
-func checkSlowPathWithRetry(ctx context.Context, cfg mediaSlowPathConfig, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
+func checkSlowPathWithRetry(ctx context.Context, cfg mediaSlowPathConfig,
+	req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
 	var lastErr error
-	for attempt := 0; attempt < 10; attempt++ {
+	for attempt := range 10 {
 		result, err := cfg.engine.Check(ctx, req)
 		if err == nil || !retryableSlowPathError(err) || attempt == 9 {
 			return result, err
@@ -355,7 +356,10 @@ func retryableSlowPathError(err error) bool {
 		return retryableStatus(reqErr.HTTPStatusCode)
 	}
 	text := strings.ToLower(err.Error())
-	retryableMarkers := []string{"retryable", "bad gateway", "502", "503", "504", "429", "rate limit", "timeout", "temporarily unavailable"}
+	retryableMarkers := []string{
+		"retryable", "bad gateway", "502", "503", "504",
+		"429", "rate limit", "timeout", "temporarily unavailable",
+	}
 	for _, marker := range retryableMarkers {
 		if strings.Contains(text, marker) {
 			return true
@@ -377,7 +381,7 @@ func replyChatWithRetry(ctx context.Context, engine SlowPathChatChecker,
 	req slowpath.ChatRequest, sleep func(time.Duration),
 ) (*slowpath.ChatResult, error) {
 	var lastErr error
-	for attempt := 0; attempt < 10; attempt++ {
+	for attempt := range 10 {
 		result, err := engine.Reply(ctx, req)
 		if err == nil || !retryableSlowPathError(err) || attempt == 9 {
 			return result, err

@@ -36,7 +36,7 @@ type knowledgeSamplesAdapter struct {
 	samples *storage.Samples
 }
 
-func (a *knowledgeSamplesAdapter) CountSamples(ctx context.Context) (int, int, error) {
+func (a *knowledgeSamplesAdapter) CountSamples(ctx context.Context) (spamCount, hamCount int, err error) {
 	stats, err := a.samples.Stats(ctx)
 	if err != nil {
 		return 0, 0, err
@@ -86,26 +86,6 @@ type restoreProviderAdapter struct {
 
 func (a *restoreProviderAdapter) RestoreTenant(ctx context.Context, tenantID string, r io.Reader) error {
 	return a.svc.RestoreTenant(ctx, tenantID, r)
-}
-
-type quotaLimitAdapter struct {
-	inner *storage.TenantLimits
-}
-
-func (a *quotaLimitAdapter) Get(ctx context.Context, limitType string) (int, int, error) {
-	rec, err := a.inner.Get(ctx, limitType)
-	if err != nil {
-		return 0, 0, err
-	}
-	return rec.LimitValue, rec.CurrentUsage, nil
-}
-
-func (a *quotaLimitAdapter) Increment(ctx context.Context, limitType string) error {
-	return a.inner.Increment(ctx, limitType)
-}
-
-func (a *quotaLimitAdapter) Set(ctx context.Context, limitType string, limitValue int) error {
-	return a.inner.Set(ctx, limitType, limitValue)
 }
 
 type sampleAdderAdapter struct {
@@ -169,7 +149,7 @@ type autoLearnerAdapter struct {
 	reviewSvc candidateGenerator
 }
 
-func (a *autoLearnerAdapter) LearnSpam(ctx context.Context, text, labeledBy string) {
+func (a *autoLearnerAdapter) LearnSpam(ctx context.Context, text, _ string) {
 	if text == "" {
 		return
 	}
@@ -185,7 +165,7 @@ func (a *autoLearnerAdapter) LearnSpam(ctx context.Context, text, labeledBy stri
 	}
 }
 
-func (a *autoLearnerAdapter) LearnHam(ctx context.Context, text, labeledBy string) {
+func (a *autoLearnerAdapter) LearnHam(ctx context.Context, text, _ string) {
 	if text == "" {
 		return
 	}
