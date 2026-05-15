@@ -16,6 +16,7 @@ import (
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/approved"
 	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/umputun/tg-spam/lib/tgspam"
 	"io"
 	"os"
 	"path"
@@ -266,7 +267,16 @@ func Test_makeDetector(t *testing.T) {
 		assert.Equal(t, 4, res.OpenAIHistorySize)
 		assert.True(t, res.GeminiVeto)
 		assert.Equal(t, 5, res.GeminiHistorySize)
+		assert.Empty(t, res.LLMMode)
 	})
+}
+
+func TestBuildDetectorConfigSetsLLMMode(t *testing.T) {
+	var opts options
+	opts.LLM.Mode = "always"
+	cfg := buildDetectorConfig(opts, rules.RuleSet{})
+
+	assert.Equal(t, tgspam.LLMModeAlways, cfg.LLMMode)
 }
 
 func TestReadPromptOverride(t *testing.T) {

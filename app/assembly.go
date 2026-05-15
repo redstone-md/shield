@@ -336,6 +336,7 @@ func buildDetectorConfig(opts options, ruleSet rules.RuleSet) tgspam.Config {
 		OpenAIHistorySize:   ruleSet.OpenAI.HistorySize,
 		GeminiVeto:          ruleSet.Gemini.Veto,
 		GeminiHistorySize:   ruleSet.Gemini.HistorySize,
+		LLMMode:             tgspam.LLMMode(opts.LLM.Mode),
 		LLMConsensus:        tgspam.LLMConsensusMode(opts.LLM.Consensus),
 		LLMRequestTimeout:   opts.LLM.RequestTimeout,
 		MultiLangWords:      opts.MultiLangWords,

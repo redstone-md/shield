@@ -164,6 +164,50 @@ func TestNewDetector_DefaultLLMConsensus(t *testing.T) {
 	assert.Equal(t, LLMConsensusAny, d.LLMConsensus)
 }
 
+func TestDetector_LLMModeAlwaysChecksHamAndSpamBase(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseSpam bool
+		wantSpam bool
+	}{
+		{name: "checks ham base", wantSpam: true},
+		{name: "checks spam base", baseSpam: true, wantSpam: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			d := NewDetector(Config{MaxAllowedEmoji: -1, FirstMessageOnly: true, LLMMode: LLMModeAlways})
+			req := spamcheck.Request{Msg: "normal looking message"}
+			llmSpam := true
+			if tc.baseSpam {
+				_, err := d.LoadStopWords(strings.NewReader("spamword"))
+				require.NoError(t, err)
+				req.Msg = "spamword message"
+				llmSpam = false
+			}
+
+			openAIMock := &mocks.OpenAIClientMock{
+				CreateChatCompletionFunc: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+					return openai.ChatCompletionResponse{
+						Choices: []openai.ChatCompletionChoice{{
+							Message: openai.ChatCompletionMessage{
+								Content: fmt.Sprintf(`{"spam": %t, "reason":"always", "confidence":95}`, llmSpam),
+							},
+						}},
+					}, nil
+				},
+			}
+			d.WithOpenAIChecker(openAIMock, OpenAIConfig{Model: "gpt4"})
+
+			spam, cr := d.Check(req)
+
+			assert.Equal(t, tc.wantSpam, spam)
+			assert.Len(t, openAIMock.CreateChatCompletionCalls(), 1)
+			assert.NotNil(t, findResponseByName(cr, "openai"))
+		})
+	}
+}
+
 func TestDetector_CheckWithLLMInParanoidMode(t *testing.T) {
 	d := NewDetector(Config{MaxAllowedEmoji: -1, MinMsgLen: 5})
 	openAIMock := &mocks.OpenAIClientMock{
