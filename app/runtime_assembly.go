@@ -55,6 +55,7 @@ type runtimeAssembly struct {
 	RetentionSvc           *storage.RetentionService
 	Metrics                *observability.Metrics
 	SlowPathEngine         *slowpath.Engine
+	SlowPathChatEngine     *slowpath.Engine
 	AutoLearner            events.AutoLearner
 	Web                    webRuntimeAssembly
 }
@@ -112,6 +113,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 
 	detector := makeDetectorWithRuleSet(opts, activeRuleSet)
 	slowPathEngine := makeSlowPathEngine(opts)
+	slowPathChatEngine := makeSlowPathChatEngine(opts)
 	spamBot, err := makeSpamBot(ctx, opts, activeRuleSet, dataDB, detector)
 	if err != nil {
 		return nil, fmt.Errorf("can't make spam bot, %w", err)
@@ -283,10 +285,11 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 			UsageCountersTTL:     opts.Retention.UsageCountersTTL,
 			Interval:             opts.Retention.Interval,
 		}),
-		Metrics:        metrics,
-		SlowPathEngine: slowPathEngine,
-		OnboardingSvc:  onboardingSvc,
-		RestoreSvc:     restoreSvc,
+		Metrics:            metrics,
+		SlowPathEngine:     slowPathEngine,
+		SlowPathChatEngine: slowPathChatEngine,
+		OnboardingSvc:      onboardingSvc,
+		RestoreSvc:         restoreSvc,
 		Web: webRuntimeAssembly{
 			Detector:             detector,
 			SpamFilter:           spamBot,
@@ -443,6 +446,9 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 	if a.SlowPathEngine != nil {
 		listener.SlowPathEngine = a.SlowPathEngine
 		listener.SlowPathEnabled = true
+	}
+	if a.SlowPathChatEngine != nil {
+		listener.SlowPathChatEngine = a.SlowPathChatEngine
 	}
 	if a.ReviewService != nil {
 		listener.CandidateGenerator = &candidateGeneratorAdapter{svc: a.ReviewService}

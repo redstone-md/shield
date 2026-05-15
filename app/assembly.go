@@ -518,6 +518,26 @@ func makeSlowPathEngine(opts options) *slowpath.Engine {
 	return eng
 }
 
+func makeSlowPathChatEngine(opts options) *slowpath.Engine {
+	if opts.ChatModel == "" {
+		return nil
+	}
+	if opts.OpenAI.Token == "" && opts.OpenAI.APIBase == "" {
+		return nil
+	}
+
+	config := openai.DefaultConfig(opts.OpenAI.Token)
+	if opts.OpenAI.APIBase != "" {
+		config.BaseURL = opts.OpenAI.APIBase
+	}
+
+	eng := slowpath.NewEngine(slowpath.EngineConfig{})
+	chatAdapter := slowpath.NewOpenAIAdapter(openai.NewClientWithConfig(config), opts.ChatModel, opts.OpenAI.MaxTokensResponse, opts.OpenAI.MaxSymbolsRequest)
+	eng.RegisterChat(chatAdapter, slowpath.DefaultBreakerConfig())
+	log.Printf("[INFO] slowpath openai chat registered (%s)", opts.ChatModel)
+	return eng
+}
+
 func configureSlowPathPrompts(eng *slowpath.Engine, opts options) {
 	registry := slowpath.NewInMemoryPromptRegistry()
 	configured := false

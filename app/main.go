@@ -91,6 +91,8 @@ type options struct {
 		CheckShortMessages bool     `long:"check-short-messages" env:"CHECK_SHORT_MESSAGES" description:"check messages shorter than min-msg-len with OpenAI"`
 	} `group:"openai" namespace:"openai" env-namespace:"OPENAI"`
 
+	ChatModel string `long:"chat-model" env:"CHAT_MODEL" default:"gemma-4-31b" description:"chat model for replies"`
+
 	Gemini struct {
 		Token              string   `long:"token" env:"TOKEN" description:"gemini token, disabled if not set"`
 		Veto               bool     `long:"veto" env:"VETO" description:"veto mode, confirm detected spam"`

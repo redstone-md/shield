@@ -33,6 +33,17 @@ type SlowPathRequest struct {
 	ImageMIME     string
 }
 
+type ChatRequest struct {
+	EventID       string
+	CorrelationID string
+	TenantID      string
+	Message       string
+	History       []HistoryMessage
+	SystemPrompt  string
+	CustomPrompts []string
+	PromptVersion string
+}
+
 type DetectionResult struct {
 	Spam    bool
 	Score   float64
@@ -70,6 +81,17 @@ type ProviderResult struct {
 	Spam          bool
 	Confidence    int
 	Reason        string
+	Provider      string
+	Model         string
+	InputTokens   int
+	OutputTokens  int
+	Latency       time.Duration
+	RawResponse   string
+	PromptVersion string
+}
+
+type ChatResult struct {
+	Text          string
 	Provider      string
 	Model         string
 	InputTokens   int

@@ -302,6 +302,33 @@ func TestResolveSlowPathPrompt(t *testing.T) {
 	assert.Empty(t, resolveSlowPathPrompt("", ""))
 }
 
+func TestMakeSlowPathChatEngine(t *testing.T) {
+	t.Run("disabled without token", func(t *testing.T) {
+		var opts options
+		assert.Nil(t, makeSlowPathChatEngine(opts))
+	})
+
+	t.Run("disabled without chat model", func(t *testing.T) {
+		var opts options
+		opts.OpenAI.Token = "token"
+		assert.Nil(t, makeSlowPathChatEngine(opts))
+	})
+
+	t.Run("enabled with token and chat model", func(t *testing.T) {
+		var opts options
+		opts.OpenAI.Token = "token"
+		opts.ChatModel = "gemma-4-31b"
+		require.NotNil(t, makeSlowPathChatEngine(opts))
+	})
+
+	t.Run("enabled with api base and chat model", func(t *testing.T) {
+		var opts options
+		opts.OpenAI.APIBase = "https://example.invalid/v1"
+		opts.ChatModel = "root/auto:fast"
+		require.NotNil(t, makeSlowPathChatEngine(opts))
+	})
+}
+
 func Test_makeSpamBot(t *testing.T) {
 	ctx := t.Context()
 
