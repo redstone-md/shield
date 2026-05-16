@@ -195,6 +195,48 @@ func applyExplicitDetectionOverrides(rs *rules.RuleSet, opts options) {
 	}
 }
 
+// envPinnedKey maps a RuleSet JSON path to its CLI flag and env var.
+type envPinnedKey struct {
+	flag string
+	env  string
+}
+
+var envPinnedRegistry = map[string]envPinnedKey{
+	"detection.max_emoji":            {"max-emoji", "MAX_EMOJI"},
+	"detection.min_msg_len":          {"min-msg-len", "MIN_MSG_LEN"},
+	"detection.similarity_threshold": {"similarity-threshold", "SIMILARITY_THRESHOLD"},
+	"detection.min_spam_probability": {"min-probability", "MIN_PROBABILITY"},
+	"detection.multi_lang_words":     {"multi-lang", "MULTI_LANG"},
+	"detection.first_messages_count": {"first-messages-count", "FIRST_MESSAGES_COUNT"},
+	"detection.paranoid_mode":        {"paranoid", "PARANOID"},
+	"detection.history_size":         {"history-min-size", "HISTORY_MIN_SIZE"},
+	"detection.cas_enabled":          {"cas.api", "CAS_API"},
+	"llm.mode":                       {"llm.mode", "LLM_MODE"},
+	"llm.consensus":                  {"llm.consensus", "LLM_CONSENSUS"},
+	"openai.veto":                    {"openai.veto", "OPENAI_VETO"},
+	"openai.model":                   {"openai.model", "OPENAI_MODEL"},
+	"openai.history_size":            {"openai.history-size", "OPENAI_HISTORY_SIZE"},
+	"openai.check_short_messages":    {"openai.check-short-messages", "OPENAI_CHECK_SHORT_MESSAGES"},
+	"openai.prompt":                  {"openai.prompt", "OPENAI_PROMPT"},
+	"gemini.veto":                    {"gemini.veto", "GEMINI_VETO"},
+	"gemini.model":                   {"gemini.model", "GEMINI_MODEL"},
+	"gemini.history_size":            {"gemini.history-size", "GEMINI_HISTORY_SIZE"},
+	"gemini.check_short_messages":    {"gemini.check-short-messages", "GEMINI_CHECK_SHORT_MESSAGES"},
+	"gemini.prompt":                  {"gemini.prompt", "GEMINI_PROMPT"},
+}
+
+// envPinnedKeys returns RuleSet JSON paths whose value is explicitly set via env/CLI
+// and therefore overrides the stored ruleset on the next restart.
+func envPinnedKeys() map[string]bool {
+	pinned := make(map[string]bool, len(envPinnedRegistry))
+	for path, k := range envPinnedRegistry {
+		if configured(k.flag, k.env) {
+			pinned[path] = true
+		}
+	}
+	return pinned
+}
+
 func configured(flagName, envName string) bool {
 	if v, ok := os.LookupEnv(envName); ok && v != "" {
 		return true

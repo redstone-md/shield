@@ -45,3 +45,14 @@ func TestApplyExplicitOverrides_DetectionFieldsUntouchedWithoutEnv(t *testing.T)
 
 	assert.Equal(t, 2, rs.Detection.MaxEmoji, "no env set: ruleset value must be kept")
 }
+
+func TestEnvPinnedKeys(t *testing.T) {
+	t.Setenv("MAX_EMOJI", "5")
+	t.Setenv("OPENAI_VETO", "true")
+
+	pinned := envPinnedKeys()
+
+	assert.True(t, pinned["detection.max_emoji"], "MAX_EMOJI must be reported as pinned")
+	assert.True(t, pinned["openai.veto"], "OPENAI_VETO must be reported as pinned")
+	assert.False(t, pinned["detection.min_msg_len"], "unset MIN_MSG_LEN must not be pinned")
+}
