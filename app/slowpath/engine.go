@@ -18,7 +18,6 @@ type Engine struct {
 	vision        map[string]VisionProvider
 	breakers      map[string]*ProviderBreaker
 	budget        BudgetTracker
-	registry      PromptRegistry
 	systemPrompts map[string]string
 	visionPrompt  string
 	config        EngineConfig
@@ -57,8 +56,10 @@ func (e *Engine) RegisterVision(p VisionProvider, breakerCfg BreakerConfig) {
 	}
 }
 
-func (e *Engine) SetBudgetTracker(bt BudgetTracker)   { e.budget = bt }
-func (e *Engine) SetPromptRegistry(pr PromptRegistry) { e.registry = pr }
+func (e *Engine) SetBudgetTracker(bt BudgetTracker) { e.budget = bt }
+
+// SetSystemPrompt sets the system prompt used for text checks of the given provider.
+func (e *Engine) SetSystemPrompt(provider, prompt string) { e.systemPrompts[provider] = prompt }
 
 // SetVisionPrompt sets the system prompt used for vision (image) checks.
 func (e *Engine) SetVisionPrompt(prompt string) { e.visionPrompt = prompt }
@@ -268,19 +269,7 @@ func (e *Engine) resolveChatProvider() string {
 }
 
 func (e *Engine) resolvePrompt(provider, version string) (system string, customs []string, ver string, err error) {
-	if e.registry == nil {
-		return "", nil, version, nil
-	}
-	var entry *PromptEntry
-	if version != "" {
-		entry, err = e.registry.Get(provider, version)
-	} else {
-		entry, err = e.registry.Active(provider)
-	}
-	if err != nil || entry == nil {
-		return "", nil, version, err
-	}
-	return entry.SystemPrompt, entry.CustomPrompts, entry.Version, nil
+	return e.systemPrompts[provider], nil, version, nil
 }
 
 func (e *Engine) checkBudget(tenantID string, class BudgetClass, estimatedTokens int) bool {

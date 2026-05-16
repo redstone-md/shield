@@ -129,31 +129,23 @@ func TestEngineVisionFallbackToTextProvider(t *testing.T) {
 	assert.True(t, result.Spam)
 }
 
-func TestEngineWithPromptRegistry(t *testing.T) {
-	provider := &stubLLMProvider{
-		name:   "test",
-		result: &ProviderResult{Spam: false, Confidence: 10, Provider: "test"},
-	}
-	reg := NewInMemoryPromptRegistry()
-	reg.Set(PromptEntry{
-		Version:      "v2",
-		Provider:     "test",
-		SystemPrompt: "custom prompt",
-		Active:       true,
-	})
+func TestEngine_SetSystemPrompt(t *testing.T) {
+	e := NewEngine(EngineConfig{})
 
-	eng := NewEngine(EngineConfig{})
-	eng.RegisterProvider(provider, DefaultBreakerConfig())
-	eng.SetPromptRegistry(reg)
+	e.SetSystemPrompt("openai", "openai system prompt")
+	system, customs, ver, err := e.resolvePrompt("openai", "v1")
 
-	result, err := eng.Check(context.Background(), SlowPathRequest{
-		EventID: "evt-1",
-		Content: Content{Text: "test"},
-	})
 	require.NoError(t, err)
-	assert.False(t, result.Spam)
-	assert.Equal(t, "custom prompt", provider.req.SystemPrompt)
-	assert.Equal(t, "v2", provider.req.PromptVersion)
+	assert.Equal(t, "openai system prompt", system)
+	assert.Nil(t, customs)
+	assert.Equal(t, "v1", ver)
+}
+
+func TestEngine_ResolvePromptUnknownProvider(t *testing.T) {
+	e := NewEngine(EngineConfig{})
+	system, _, _, err := e.resolvePrompt("missing", "")
+	require.NoError(t, err)
+	assert.Equal(t, "", system)
 }
 
 func TestEngineInvocationFromResult(t *testing.T) {
