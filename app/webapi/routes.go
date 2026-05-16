@@ -148,6 +148,7 @@ func (s *Server) setupWebUIRoutes(router *routegroup.Bundle) {
 
 		staticFiles := newStaticFS(templateFS,
 			staticFileMapping{urlPath: "styles.css", filesysPath: "assets/styles.css"},
+			staticFileMapping{urlPath: "app.js", filesysPath: "assets/app.js"},
 			staticFileMapping{urlPath: "logo.png", filesysPath: "assets/logo.png"},
 			staticFileMapping{urlPath: "spinner.svg", filesysPath: "assets/spinner.svg"},
 		)

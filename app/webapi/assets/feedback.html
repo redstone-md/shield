@@ -1,43 +1,38 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Feedback - TG-Spam</title>
+    <title>Feedback - Shield</title>
     {{template "heads.html"}}
 </head>
-<body>
-{{template "navbar.html"}}
+<body x-data="{ navOpen: false }">
+{{template "sidebar.html"}}
+<div class="scrim" x-show="navOpen" @click="navOpen=false" x-cloak></div>
+<main class="main">
+    <header class="topbar">
+        <button class="topbar__burger" @click="navOpen=!navOpen" aria-label="Toggle navigation"><i class="bi bi-list"></i></button>
+        <h2 class="page-title">Feedback</h2>
+    </header>
+    <div class="content" x-data="{ tab: 'labels' }">
+        <div class="tabs">
+            <button class="tab" :class="{ 'is-active': tab === 'labels' }" @click="tab='labels'">Labels</button>
+            <button class="tab" :class="{ 'is-active': tab === 'candidates' }" @click="tab='candidates'">Candidates</button>
+            <button class="tab" :class="{ 'is-active': tab === 'knowledge' }" @click="tab='knowledge'">Knowledge</button>
+        </div>
 
-<div class="container mt-4">
-    <h2 class="text-center mb-4">Feedback</h2>
-
-    <ul class="nav nav-tabs mb-3" id="feedback-tabs">
-        <li class="nav-item">
-            <a class="nav-link active" data-bs-toggle="tab" href="#labels">Labels</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="tab" href="#candidates">Candidates</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="tab" href="#knowledge">Knowledge</a>
-        </li>
-    </ul>
-
-    <div class="tab-content">
-        <div class="tab-pane fade show active" id="labels">
-            <div class="row mb-3">
-                <div class="col-md-3">
-                    <select class="form-select form-select-sm" id="label-filter"
-                            hx-get="/api/feedback/labels" hx-target="#labels-content" hx-trigger="change"
-                            name="label">
+        <div x-show="tab === 'labels'">
+            <div class="filter-bar">
+                <div class="field" style="margin-bottom:0">
+                    <label>Label</label>
+                    <select class="select" id="label-filter" hx-get="/api/feedback/labels" hx-target="#labels-content" hx-trigger="change" name="label">
                         <option value="">All</option>
                         <option value="confirmed_spam">Confirmed Spam</option>
                         <option value="false_positive">False Positive</option>
                         <option value="uncertain">Uncertain</option>
                     </select>
                 </div>
-                <div class="col-md-2">
-                    <select class="form-select form-select-sm" name="limit"
-                            hx-get="/api/feedback/labels" hx-target="#labels-content" hx-trigger="change">
+                <div class="field" style="margin-bottom:0">
+                    <label>Limit</label>
+                    <select class="select" name="limit" hx-get="/api/feedback/labels" hx-target="#labels-content" hx-trigger="change">
                         <option value="25">25</option>
                         <option value="50" selected>50</option>
                         <option value="100">100</option>
@@ -49,12 +44,11 @@
             </div>
         </div>
 
-        <div class="tab-pane fade" id="candidates">
-            <div class="row mb-3">
-                <div class="col-md-3">
-                    <select class="form-select form-select-sm" id="candidate-status-filter"
-                            hx-get="/api/feedback/candidates" hx-target="#candidates-content" hx-trigger="change"
-                            name="status">
+        <div x-show="tab === 'candidates'" x-cloak>
+            <div class="filter-bar">
+                <div class="field" style="margin-bottom:0">
+                    <label>Status</label>
+                    <select class="select" id="candidate-status-filter" hx-get="/api/feedback/candidates" hx-target="#candidates-content" hx-trigger="change" name="status">
                         <option value="pending" selected>Pending</option>
                         <option value="">All</option>
                         <option value="approved">Approved</option>
@@ -67,31 +61,25 @@
             </div>
         </div>
 
-        <div class="tab-pane fade" id="knowledge">
-            <div class="row mb-3">
-                <div class="col-md-3">
-                    <button class="btn btn-primary btn-sm"
-                            hx-post="/api/feedback/knowledge/snapshots"
-                            hx-target="#knowledge-content"
-                            hx-swap="innerHTML">
-                        <i class="bi bi-camera me-1"></i>Create Snapshot
-                    </button>
-                </div>
+        <div x-show="tab === 'knowledge'" x-cloak>
+            <div class="mb-3">
+                <button class="btn btn-accent btn-sm" hx-post="/api/feedback/knowledge/snapshots" hx-target="#knowledge-content" hx-swap="innerHTML">
+                    <i class="bi bi-camera"></i> Create Snapshot
+                </button>
             </div>
             <div id="knowledge-content">
                 {{template "knowledge_list" .Snapshots}}
             </div>
         </div>
     </div>
-</div>
-
+</main>
 </body>
 </html>
 
 {{define "labels_list"}}
-<div class="table-responsive">
-    <table class="table table-striped table-hover">
-        <thead class="custom-table-header">
+<div class="table-wrap">
+    <table class="table">
+        <thead>
             <tr>
                 <th>ID</th>
                 <th>Incident</th>
@@ -107,16 +95,16 @@
                 <td>{{.ID}}</td>
                 <td><a href="/incidents/{{.IncidentID}}">#{{.IncidentID}}</a></td>
                 <td>
-                    <span class="badge {{if eq .Label "confirmed_spam"}}bg-danger{{else if eq .Label "false_positive"}}bg-success{{else}}bg-warning{{end}}">
+                    <span class="badge {{if eq .Label "confirmed_spam"}}badge-spam{{else if eq .Label "false_positive"}}badge-ham{{else}}badge-warn{{end}}">
                         {{.Label}}
                     </span>
                 </td>
-                <td><span class="badge bg-secondary">{{.Source}}</span></td>
+                <td><span class="badge badge-muted">{{.Source}}</span></td>
                 <td>{{.LabeledBy}}</td>
                 <td>{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
             </tr>
             {{else}}
-            <tr><td colspan="6" class="text-center text-muted">No labels found</td></tr>
+            <tr><td colspan="6" class="center-text muted">No labels found</td></tr>
             {{end}}
         </tbody>
     </table>
@@ -124,9 +112,9 @@
 {{end}}
 
 {{define "candidates_list"}}
-<div class="table-responsive">
-    <table class="table table-striped table-hover">
-        <thead class="custom-table-header">
+<div class="table-wrap">
+    <table class="table">
+        <thead>
             <tr>
                 <th>ID</th>
                 <th>Value</th>
@@ -142,9 +130,9 @@
             <tr id="candidate-{{.ID}}">
                 <td>{{.ID}}</td>
                 <td><code>{{.Value}}</code></td>
-                <td><span class="badge bg-info">{{.Type}}</span></td>
+                <td><span class="badge badge-info">{{.Type}}</span></td>
                 <td>
-                    <span class="badge {{if eq .Status "pending"}}bg-warning{{else if eq .Status "approved"}}bg-success{{else}}bg-secondary{{end}}">
+                    <span class="badge {{if eq .Status "pending"}}badge-warn{{else if eq .Status "approved"}}badge-ham{{else}}badge-muted{{end}}">
                         {{.Status}}
                     </span>
                 </td>
@@ -152,19 +140,17 @@
                 <td>{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
                 <td>
                     {{if eq .Status "pending"}}
-                    <button class="btn btn-sm btn-outline-success"
-                            hx-post="/api/feedback/candidates/{{.ID}}/approve" hx-target="#candidate-{{.ID}}" hx-swap="outerHTML">
+                    <button class="btn btn-sm btn-ghost" hx-post="/api/feedback/candidates/{{.ID}}/approve" hx-target="#candidate-{{.ID}}" hx-swap="outerHTML">
                         <i class="bi bi-check-lg"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-danger"
-                            hx-post="/api/feedback/candidates/{{.ID}}/reject" hx-target="#candidate-{{.ID}}" hx-swap="outerHTML">
+                    <button class="btn btn-sm btn-ghost" hx-post="/api/feedback/candidates/{{.ID}}/reject" hx-target="#candidate-{{.ID}}" hx-swap="outerHTML">
                         <i class="bi bi-x-lg"></i>
                     </button>
                     {{end}}
                 </td>
             </tr>
             {{else}}
-            <tr><td colspan="7" class="text-center text-muted">No candidates found</td></tr>
+            <tr><td colspan="7" class="center-text muted">No candidates found</td></tr>
             {{end}}
         </tbody>
     </table>
@@ -172,9 +158,9 @@
 {{end}}
 
 {{define "knowledge_list"}}
-<div class="table-responsive">
-    <table class="table table-striped table-hover">
-        <thead class="custom-table-header">
+<div class="table-wrap">
+    <table class="table">
+        <thead>
             <tr>
                 <th>ID</th>
                 <th>Stop Phrases</th>
@@ -195,16 +181,14 @@
                 <td>{{.Data.DictionaryVer}}</td>
                 <td>{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-warning"
-                            hx-post="/api/feedback/knowledge/snapshots/{{.ID}}/rollback"
-                            hx-target="#knowledge-content" hx-swap="innerHTML"
-                            hx-confirm="Rollback to this snapshot?">
+                    <button class="btn btn-sm btn-ghost" hx-post="/api/feedback/knowledge/snapshots/{{.ID}}/rollback"
+                            hx-target="#knowledge-content" hx-swap="innerHTML" hx-confirm="Rollback to this snapshot?">
                         <i class="bi bi-arrow-counterclockwise"></i>
                     </button>
                 </td>
             </tr>
             {{else}}
-            <tr><td colspan="7" class="text-center text-muted">No snapshots found</td></tr>
+            <tr><td colspan="7" class="center-text muted">No snapshots found</td></tr>
             {{end}}
         </tbody>
     </table>

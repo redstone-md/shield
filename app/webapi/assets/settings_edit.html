@@ -1,136 +1,137 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Edit Settings - TG-Spam</title>
+    <title>Edit Settings - Shield</title>
     {{template "heads.html"}}
 </head>
-<body>
-{{template "navbar.html"}}
+<body x-data="{ navOpen: false }">
+{{template "sidebar.html"}}
+<div class="scrim" x-show="navOpen" @click="navOpen=false" x-cloak></div>
+<main class="main">
+    <header class="topbar">
+        <button class="topbar__burger" @click="navOpen=!navOpen" aria-label="Toggle navigation"><i class="bi bi-list"></i></button>
+        <h2 class="page-title">Edit Settings</h2>
+    </header>
+    <div class="content">
+        <div id="settings-error"></div>
+        <div id="settings-status"></div>
 
-<div class="container mt-4">
-    <h2 class="text-center mb-4">Edit Settings</h2>
+        <form hx-post="/settings/save" hx-target="#settings-status" hx-swap="innerHTML">
+            {{$pinned := .EnvPinned}}
 
-    <div id="settings-error"></div>
-    <div id="settings-status"></div>
-
-    <form hx-post="/settings/save" hx-target="#settings-status" hx-swap="innerHTML">
-        {{$pinned := .EnvPinned}}
-
-        <div class="card mb-3">
-            <div class="card-header">Detection</div>
-            <div class="card-body">
-                {{template "settings_int" dict "Key" "detection.max_emoji" "Label" "Max emoji" "Val" .RuleSet.Detection.MaxEmoji "Pinned" $pinned}}
-                {{template "settings_int" dict "Key" "detection.min_msg_len" "Label" "Min message length" "Val" .RuleSet.Detection.MinMsgLen "Pinned" $pinned}}
-                {{template "settings_float" dict "Key" "detection.similarity_threshold" "Label" "Similarity threshold" "Val" .RuleSet.Detection.SimilarityThreshold "Pinned" $pinned}}
-                {{template "settings_float" dict "Key" "detection.min_spam_probability" "Label" "Min spam probability %" "Val" .RuleSet.Detection.MinSpamProbability "Pinned" $pinned}}
-                {{template "settings_int" dict "Key" "detection.multi_lang_words" "Label" "Multi-lang words" "Val" .RuleSet.Detection.MultiLangWords "Pinned" $pinned}}
-                {{template "settings_int" dict "Key" "detection.history_size" "Label" "History size" "Val" .RuleSet.Detection.HistorySize "Pinned" $pinned}}
-                {{template "settings_int" dict "Key" "detection.first_messages_count" "Label" "First messages count" "Val" .RuleSet.Detection.FirstMessagesCount "Pinned" $pinned}}
-                {{template "settings_bool" dict "Key" "detection.cas_enabled" "Label" "CAS enabled" "Val" .RuleSet.Detection.CasEnabled "Pinned" $pinned}}
-                {{template "settings_bool" dict "Key" "detection.paranoid_mode" "Label" "Paranoid mode" "Val" .RuleSet.Detection.ParanoidMode "Pinned" $pinned}}
+            <div class="card">
+                <div class="card-header">Detection</div>
+                <div class="card-body">
+                    {{template "settings_int" dict "Key" "detection.max_emoji" "Label" "Max emoji" "Val" .RuleSet.Detection.MaxEmoji "Pinned" $pinned}}
+                    {{template "settings_int" dict "Key" "detection.min_msg_len" "Label" "Min message length" "Val" .RuleSet.Detection.MinMsgLen "Pinned" $pinned}}
+                    {{template "settings_float" dict "Key" "detection.similarity_threshold" "Label" "Similarity threshold" "Val" .RuleSet.Detection.SimilarityThreshold "Pinned" $pinned}}
+                    {{template "settings_float" dict "Key" "detection.min_spam_probability" "Label" "Min spam probability %" "Val" .RuleSet.Detection.MinSpamProbability "Pinned" $pinned}}
+                    {{template "settings_int" dict "Key" "detection.multi_lang_words" "Label" "Multi-lang words" "Val" .RuleSet.Detection.MultiLangWords "Pinned" $pinned}}
+                    {{template "settings_int" dict "Key" "detection.history_size" "Label" "History size" "Val" .RuleSet.Detection.HistorySize "Pinned" $pinned}}
+                    {{template "settings_int" dict "Key" "detection.first_messages_count" "Label" "First messages count" "Val" .RuleSet.Detection.FirstMessagesCount "Pinned" $pinned}}
+                    {{template "settings_bool" dict "Key" "detection.cas_enabled" "Label" "CAS enabled" "Val" .RuleSet.Detection.CasEnabled "Pinned" $pinned}}
+                    {{template "settings_bool" dict "Key" "detection.paranoid_mode" "Label" "Paranoid mode" "Val" .RuleSet.Detection.ParanoidMode "Pinned" $pinned}}
+                </div>
             </div>
-        </div>
 
-        <div class="card mb-3">
-            <div class="card-header">LLM</div>
-            <div class="card-body">
-                {{template "settings_enum" dict "Key" "llm.mode" "Label" "LLM mode" "Val" .RuleSet.LLM.Mode "Options" .LLMModes "Pinned" $pinned}}
-                {{template "settings_enum" dict "Key" "llm.consensus" "Label" "LLM consensus" "Val" .RuleSet.LLM.Consensus "Options" .LLMConsensus "Pinned" $pinned}}
-                {{template "settings_text" dict "Key" "llm.vision_prompt" "Label" "Vision prompt" "Val" .RuleSet.LLM.VisionPrompt "Pinned" $pinned}}
+            <div class="card">
+                <div class="card-header">LLM</div>
+                <div class="card-body">
+                    {{template "settings_enum" dict "Key" "llm.mode" "Label" "LLM mode" "Val" .RuleSet.LLM.Mode "Options" .LLMModes "Pinned" $pinned}}
+                    {{template "settings_enum" dict "Key" "llm.consensus" "Label" "LLM consensus" "Val" .RuleSet.LLM.Consensus "Options" .LLMConsensus "Pinned" $pinned}}
+                    {{template "settings_text" dict "Key" "llm.vision_prompt" "Label" "Vision prompt" "Val" .RuleSet.LLM.VisionPrompt "Pinned" $pinned}}
+                </div>
             </div>
-        </div>
 
-        <div class="card mb-3">
-            <div class="card-header">OpenAI</div>
-            <div class="card-body">
-                {{template "settings_bool" dict "Key" "openai.veto" "Label" "Veto" "Val" .RuleSet.OpenAI.Veto "Pinned" $pinned}}
-                {{template "settings_bool" dict "Key" "openai.check_short_messages" "Label" "Check short messages" "Val" .RuleSet.OpenAI.CheckShortMessages "Pinned" $pinned}}
-                {{template "settings_str" dict "Key" "openai.model" "Label" "Model" "Val" .RuleSet.OpenAI.Model "Pinned" $pinned}}
-                {{template "settings_int" dict "Key" "openai.history_size" "Label" "History size" "Val" .RuleSet.OpenAI.HistorySize "Pinned" $pinned}}
-                {{template "settings_text" dict "Key" "openai.prompt" "Label" "System prompt" "Val" .RuleSet.OpenAI.Prompt "Pinned" $pinned}}
+            <div class="card">
+                <div class="card-header">OpenAI</div>
+                <div class="card-body">
+                    {{template "settings_bool" dict "Key" "openai.veto" "Label" "Veto" "Val" .RuleSet.OpenAI.Veto "Pinned" $pinned}}
+                    {{template "settings_bool" dict "Key" "openai.check_short_messages" "Label" "Check short messages" "Val" .RuleSet.OpenAI.CheckShortMessages "Pinned" $pinned}}
+                    {{template "settings_str" dict "Key" "openai.model" "Label" "Model" "Val" .RuleSet.OpenAI.Model "Pinned" $pinned}}
+                    {{template "settings_int" dict "Key" "openai.history_size" "Label" "History size" "Val" .RuleSet.OpenAI.HistorySize "Pinned" $pinned}}
+                    {{template "settings_text" dict "Key" "openai.prompt" "Label" "System prompt" "Val" .RuleSet.OpenAI.Prompt "Pinned" $pinned}}
+                </div>
             </div>
-        </div>
 
-        <div class="card mb-3">
-            <div class="card-header">Gemini</div>
-            <div class="card-body">
-                {{template "settings_bool" dict "Key" "gemini.veto" "Label" "Veto" "Val" .RuleSet.Gemini.Veto "Pinned" $pinned}}
-                {{template "settings_bool" dict "Key" "gemini.check_short_messages" "Label" "Check short messages" "Val" .RuleSet.Gemini.CheckShortMessages "Pinned" $pinned}}
-                {{template "settings_str" dict "Key" "gemini.model" "Label" "Model" "Val" .RuleSet.Gemini.Model "Pinned" $pinned}}
-                {{template "settings_int" dict "Key" "gemini.history_size" "Label" "History size" "Val" .RuleSet.Gemini.HistorySize "Pinned" $pinned}}
-                {{template "settings_text" dict "Key" "gemini.prompt" "Label" "System prompt" "Val" .RuleSet.Gemini.Prompt "Pinned" $pinned}}
+            <div class="card">
+                <div class="card-header">Gemini</div>
+                <div class="card-body">
+                    {{template "settings_bool" dict "Key" "gemini.veto" "Label" "Veto" "Val" .RuleSet.Gemini.Veto "Pinned" $pinned}}
+                    {{template "settings_bool" dict "Key" "gemini.check_short_messages" "Label" "Check short messages" "Val" .RuleSet.Gemini.CheckShortMessages "Pinned" $pinned}}
+                    {{template "settings_str" dict "Key" "gemini.model" "Label" "Model" "Val" .RuleSet.Gemini.Model "Pinned" $pinned}}
+                    {{template "settings_int" dict "Key" "gemini.history_size" "Label" "History size" "Val" .RuleSet.Gemini.HistorySize "Pinned" $pinned}}
+                    {{template "settings_text" dict "Key" "gemini.prompt" "Label" "System prompt" "Val" .RuleSet.Gemini.Prompt "Pinned" $pinned}}
+                </div>
             </div>
-        </div>
 
-        <div class="card mb-3">
-            <div class="card-body">
-                {{template "settings_bool" dict "Key" "slow_path_enabled" "Label" "Slow-path enabled" "Val" .RuleSet.SlowPathEnabled "Pinned" $pinned}}
+            <div class="card">
+                <div class="card-body">
+                    {{template "settings_bool" dict "Key" "slow_path_enabled" "Label" "Slow-path enabled" "Val" .RuleSet.SlowPathEnabled "Pinned" $pinned}}
+                </div>
             </div>
-        </div>
 
-        <button type="submit" class="btn btn-primary">Save</button>
-    </form>
-</div>
-
+            <button type="submit" class="btn btn-accent">Save</button>
+        </form>
+    </div>
+</main>
 </body>
 </html>
 
 {{define "settings_pinned_badge"}}
-{{if index .Pinned .Key}}<span class="badge bg-warning text-dark ms-2" title="Set by env var; this will be overwritten on restart. Remove it from env to manage it here.">env-pinned</span>{{end}}
+{{if index .Pinned .Key}}<span class="badge badge-warn" title="Set by env var; this will be overwritten on restart. Remove it from env to manage it here.">env-pinned</span>{{end}}
 {{end}}
 
 {{define "settings_int"}}
-<div class="mb-3 row">
-    <label class="col-sm-4 col-form-label">{{.Label}}{{template "settings_pinned_badge" .}}</label>
-    <div class="col-sm-8">
-        <input type="number" step="1" class="form-control" name="{{.Key}}" value="{{.Val}}">
+<div class="form-row">
+    <label>{{.Label}} {{template "settings_pinned_badge" .}}</label>
+    <div class="form-row__control">
+        <input type="number" step="1" class="input" name="{{.Key}}" value="{{.Val}}">
     </div>
 </div>
 {{end}}
 
 {{define "settings_float"}}
-<div class="mb-3 row">
-    <label class="col-sm-4 col-form-label">{{.Label}}{{template "settings_pinned_badge" .}}</label>
-    <div class="col-sm-8">
-        <input type="number" step="any" class="form-control" name="{{.Key}}" value="{{.Val}}">
+<div class="form-row">
+    <label>{{.Label}} {{template "settings_pinned_badge" .}}</label>
+    <div class="form-row__control">
+        <input type="number" step="any" class="input" name="{{.Key}}" value="{{.Val}}">
     </div>
 </div>
 {{end}}
 
 {{define "settings_str"}}
-<div class="mb-3 row">
-    <label class="col-sm-4 col-form-label">{{.Label}}{{template "settings_pinned_badge" .}}</label>
-    <div class="col-sm-8">
-        <input type="text" class="form-control" name="{{.Key}}" value="{{.Val}}">
+<div class="form-row">
+    <label>{{.Label}} {{template "settings_pinned_badge" .}}</label>
+    <div class="form-row__control">
+        <input type="text" class="input" name="{{.Key}}" value="{{.Val}}">
     </div>
 </div>
 {{end}}
 
 {{define "settings_text"}}
-<div class="mb-3 row">
-    <label class="col-sm-4 col-form-label">{{.Label}}{{template "settings_pinned_badge" .}}</label>
-    <div class="col-sm-8">
-        <textarea class="form-control" name="{{.Key}}" rows="3">{{.Val}}</textarea>
+<div class="form-row">
+    <label>{{.Label}} {{template "settings_pinned_badge" .}}</label>
+    <div class="form-row__control">
+        <textarea class="input" name="{{.Key}}" rows="3">{{.Val}}</textarea>
     </div>
 </div>
 {{end}}
 
 {{define "settings_bool"}}
-<div class="mb-3 row">
-    <label class="col-sm-4 col-form-label">{{.Label}}{{template "settings_pinned_badge" .}}</label>
-    <div class="col-sm-8">
-        <div class="form-check">
-            <input type="checkbox" class="form-check-input" name="{{.Key}}" {{if .Val}}checked{{end}}>
-        </div>
+<div class="form-row">
+    <label>{{.Label}} {{template "settings_pinned_badge" .}}</label>
+    <div class="form-row__control">
+        <input type="checkbox" class="checkbox" name="{{.Key}}" {{if .Val}}checked{{end}}>
     </div>
 </div>
 {{end}}
 
 {{define "settings_enum"}}
-<div class="mb-3 row">
-    <label class="col-sm-4 col-form-label">{{.Label}}{{template "settings_pinned_badge" .}}</label>
-    <div class="col-sm-8">
-        <select class="form-select" name="{{.Key}}">
+<div class="form-row">
+    <label>{{.Label}} {{template "settings_pinned_badge" .}}</label>
+    <div class="form-row__control">
+        <select class="select" name="{{.Key}}">
             {{$cur := .Val}}
             {{range .Options}}<option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{if eq . ""}}(default){{else}}{{.}}{{end}}</option>{{end}}
         </select>

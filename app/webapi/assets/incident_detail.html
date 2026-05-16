@@ -1,156 +1,155 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Incident Detail - TG-Spam</title>
+    <title>Incident Detail - Shield</title>
     {{template "heads.html"}}
 </head>
-<body>
-{{template "navbar.html"}}
+<body x-data="{ navOpen: false }">
+{{template "sidebar.html"}}
+<div class="scrim" x-show="navOpen" @click="navOpen=false" x-cloak></div>
+<main class="main">
+    <header class="topbar">
+        <button class="topbar__burger" @click="navOpen=!navOpen" aria-label="Toggle navigation"><i class="bi bi-list"></i></button>
+        <h2 class="page-title">Incident #{{.Incident.ID}}</h2>
+    </header>
+    <div class="content" id="incident-detail">
+        <div class="flex between center mb-3">
+            <span class="muted">Detection incident record</span>
+            <a href="/incidents" class="btn btn-ghost btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
+        </div>
 
-<div class="container mt-4" id="incident-detail">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>Incident #{{.Incident.ID}}</h2>
-        <a href="/incidents" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to List</a>
-    </div>
-
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card mb-3">
-                <div class="card-header">
-                    <strong>Details</strong>
-                    <span class="badge {{if eq .Incident.Status "open"}}bg-warning{{else if eq .Incident.Status "resolved"}}bg-success{{else if eq .Incident.Status "appealed"}}bg-info{{else if eq .Incident.Status "reviewing"}}bg-primary{{else}}bg-secondary{{end}} float-end">{{.Incident.Status}}</span>
-                </div>
-                <div class="card-body">
-                    <table class="table table-sm mb-0">
-                        <tr><th style="width:150px">Source</th><td><span class="badge bg-secondary">{{.Incident.Source}}</span></td></tr>
-                        <tr><th>Severity</th><td><span class="badge {{if eq .Incident.Severity "critical"}}bg-danger{{else if eq .Incident.Severity "high"}}bg-warning{{else if eq .Incident.Severity "medium"}}bg-info{{else}}bg-light text-dark{{end}}">{{.Incident.Severity}}</span></td></tr>
-                        <tr><th>Reason</th><td><code>{{.Incident.ReasonCode}}</code> — {{.Incident.ReasonText}}</td></tr>
-                        <tr><th>Spam User</th><td>{{.Incident.SpamUserName}} <span class="text-muted">(ID: {{.Incident.SpamUserID}})</span></td></tr>
-                        <tr><th>Chat ID</th><td>{{.Incident.ChatID}}</td></tr>
-                        <tr><th>Created</th><td>{{.Incident.CreatedAt.Format "2006-01-02 15:04:05"}}</td></tr>
-                        {{if .Incident.ResolvedAt}}<tr><th>Resolved</th><td>{{.Incident.ResolvedAt.Format "2006-01-02 15:04:05"}} by {{.Incident.ResolvedBy}}</td></tr>{{end}}
-                        <tr><th>Idempotency Key</th><td><code>{{.Incident.IdempotencyKey}}</code></td></tr>
-                    </table>
-                </div>
-            </div>
-
-            <div class="card mb-3">
-                <div class="card-header"><strong>Message</strong></div>
-                <div class="card-body">
-                    <pre class="mb-0" style="white-space:pre-wrap">{{.Incident.MessageText}}</pre>
-                    <div class="mt-2">
-                        <button class="btn btn-sm btn-outline-primary" hx-post="/incidents/{{.Incident.ID}}/replay" hx-target="#replay-result" hx-swap="innerHTML" hx-indicator="#replay-spinner">
-                            <i class="bi bi-arrow-repeat me-1"></i>Replay Detection
-                        </button>
-                        <img id="replay-spinner" class="htmx-indicator" src="/spinner.svg" alt="Loading" style="height:20px"/>
+        <div class="grid-2-1">
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <span>Details</span>
+                        <span class="badge {{if eq .Incident.Status "open"}}badge-warn{{else if eq .Incident.Status "resolved"}}badge-ham{{else if eq .Incident.Status "appealed"}}badge-info{{else if eq .Incident.Status "reviewing"}}badge-info{{else}}badge-muted{{end}}">{{.Incident.Status}}</span>
                     </div>
-                    <div id="replay-result" class="mt-2"></div>
+                    <div class="card-body">
+                        <table class="table">
+                            <tr><th style="width:150px">Source</th><td><span class="badge badge-muted">{{.Incident.Source}}</span></td></tr>
+                            <tr><th>Severity</th><td><span class="badge {{if eq .Incident.Severity "critical"}}badge-spam{{else if eq .Incident.Severity "high"}}badge-warn{{else if eq .Incident.Severity "medium"}}badge-info{{else}}badge-muted{{end}}">{{.Incident.Severity}}</span></td></tr>
+                            <tr><th>Reason</th><td><code>{{.Incident.ReasonCode}}</code> &mdash; {{.Incident.ReasonText}}</td></tr>
+                            <tr><th>Spam User</th><td>{{.Incident.SpamUserName}} <span class="muted">(ID: {{.Incident.SpamUserID}})</span></td></tr>
+                            <tr><th>Chat ID</th><td>{{.Incident.ChatID}}</td></tr>
+                            <tr><th>Created</th><td>{{.Incident.CreatedAt.Format "2006-01-02 15:04:05"}}</td></tr>
+                            {{if .Incident.ResolvedAt}}<tr><th>Resolved</th><td>{{.Incident.ResolvedAt.Format "2006-01-02 15:04:05"}} by {{.Incident.ResolvedBy}}</td></tr>{{end}}
+                            <tr><th>Idempotency Key</th><td><code>{{.Incident.IdempotencyKey}}</code></td></tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Message</div>
+                    <div class="card-body">
+                        <pre style="white-space:pre-wrap">{{.Incident.MessageText}}</pre>
+                        <div class="mt-2">
+                            <button class="btn btn-ghost btn-sm" hx-post="/incidents/{{.Incident.ID}}/replay" hx-target="#replay-result" hx-swap="innerHTML" hx-indicator="#replay-spinner">
+                                <i class="bi bi-arrow-repeat"></i> Replay Detection
+                            </button>
+                            <img id="replay-spinner" class="htmx-indicator" src="/spinner.svg" alt="Loading" style="height:20px"/>
+                        </div>
+                        <div id="replay-result" class="mt-2"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Timeline</div>
+                    <div class="card-body">
+                        <div class="table-wrap">
+                            <table class="table">
+                                <thead><tr><th>Time</th><th>Author</th><th>Action</th><th>Details</th></tr></thead>
+                                <tbody>
+                                {{range .Comments}}
+                                    <tr>
+                                        <td class="muted nowrap">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+                                        <td><span class="badge badge-muted">{{.AuthorType}}</span> {{.AuthorID}}</td>
+                                        <td>{{.Action}}</td>
+                                        <td class="truncate">{{.Payload}}</td>
+                                    </tr>
+                                {{else}}
+                                    <tr><td colspan="4" class="center-text muted">No comments yet</td></tr>
+                                {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Add Comment</div>
+                    <div class="card-body">
+                        <form hx-post="/incidents/{{.Incident.ID}}/comment" hx-target="#incident-detail" hx-swap="outerHTML" hx-error="#comment-error">
+                            <input type="hidden" name="author_type" value="admin">
+                            <input type="hidden" name="author_id" value="web-ui">
+                            <div class="field">
+                                <select class="select" name="action" style="max-width:200px">
+                                    <option value="comment">Comment</option>
+                                    <option value="note">Note</option>
+                                    <option value="reviewed">Reviewed</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <textarea class="input" name="payload" rows="2" placeholder="Comment text..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-accent btn-sm">Add Comment</button>
+                        </form>
+                        <div id="comment-error" class="alert alert-danger hidden mt-2"></div>
+                    </div>
                 </div>
             </div>
 
-            <div class="card mb-3">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <strong>Timeline</strong>
+            <div>
+                <div class="card">
+                    <div class="card-header">Actions</div>
+                    <div class="card-body">
+                        <form hx-post="/incidents/{{.Incident.ID}}/status" hx-target="#incident-detail" hx-swap="outerHTML" hx-error="#action-error">
+                            <input type="hidden" name="resolved_by" value="web-ui">
+                            <div class="flex flex-col gap-2">
+                                {{if or (eq .Incident.Status "open") (eq .Incident.Status "reviewing") (eq .Incident.Status "appealed")}}
+                                <button class="btn btn-ham btn-sm" name="status" value="resolved">Resolve</button>
+                                <button class="btn btn-ghost btn-sm" name="status" value="closed">Close</button>
+                                {{else}}
+                                <span class="muted">No actions available</span>
+                                {{end}}
+                            </div>
+                        </form>
+                        <div id="action-error" class="alert alert-danger hidden mt-2"></div>
+                    </div>
                 </div>
-                <div class="card-body p-0">
-                    <table class="table table-sm mb-0">
-                        <thead class="custom-table-header"><tr><th>Time</th><th>Author</th><th>Action</th><th>Details</th></tr></thead>
-                        <tbody>
-                        {{range .Comments}}
-                            <tr>
-                                <td class="text-muted" style="white-space:nowrap">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
-                                <td><span class="badge bg-light text-dark">{{.AuthorType}}</span> {{.AuthorID}}</td>
-                                <td>{{.Action}}</td>
-                                <td class="text-truncate" style="max-width:300px">{{.Payload}}</td>
-                            </tr>
-                        {{else}}
-                            <tr><td colspan="4" class="text-center text-muted">No comments yet</td></tr>
+
+                <div class="card">
+                    <div class="card-header">Appeal</div>
+                    <div class="card-body">
+                        {{if .Appeal}}
+                        <table class="table">
+                            <tr><th>Status</th><td><span class="badge badge-info">{{.Appeal.Status}}</span></td></tr>
+                            <tr><th>Appellant</th><td>{{.Appeal.AppellantName}}</td></tr>
+                            <tr><th>Text</th><td>{{.Appeal.AppealText}}</td></tr>
+                            {{if .Appeal.ResolvedAt}}<tr><th>Resolved</th><td>{{.Appeal.ResolvedAt.Format "2006-01-02 15:04:05"}}</td></tr>{{end}}
+                        </table>
+                        {{if or (eq .Appeal.Status "new") (eq .Appeal.Status "triaged")}}
+                        <div class="flex flex-col gap-2 mt-2">
+                            <form hx-post="/appeals/{{.Appeal.ID}}/resolve" hx-target="#incident-detail" hx-swap="outerHTML">
+                                <input type="hidden" name="action" value="accept">
+                                <input type="hidden" name="resolver_id" value="web-ui">
+                                <button class="btn btn-ham btn-sm w-full">Accept Appeal</button>
+                            </form>
+                            <form hx-post="/appeals/{{.Appeal.ID}}/resolve" hx-target="#incident-detail" hx-swap="outerHTML">
+                                <input type="hidden" name="action" value="reject">
+                                <input type="hidden" name="resolver_id" value="web-ui">
+                                <button class="btn btn-danger btn-sm w-full">Reject Appeal</button>
+                            </form>
+                        </div>
                         {{end}}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="card mb-3">
-                <div class="card-header"><strong>Add Comment</strong></div>
-                <div class="card-body">
-                    <form hx-post="/incidents/{{.Incident.ID}}/comment" hx-target="#incident-detail" hx-swap="outerHTML" hx-error="#comment-error">
-                        <input type="hidden" name="author_type" value="admin">
-                        <input type="hidden" name="author_id" value="web-ui">
-                        <div class="mb-2">
-                            <select class="form-select form-select-sm" name="action" style="max-width:200px">
-                                <option value="comment">Comment</option>
-                                <option value="note">Note</option>
-                                <option value="reviewed">Reviewed</option>
-                            </select>
-                        </div>
-                        <div class="mb-2">
-                            <textarea class="form-control form-control-sm" name="payload" rows="2" placeholder="Comment text..."></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-primary">Add Comment</button>
-                    </form>
-                    <div id="comment-error" class="alert alert-danger d-none mt-2"></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="card mb-3">
-                <div class="card-header"><strong>Actions</strong></div>
-                <div class="card-body">
-                    <form hx-post="/incidents/{{.Incident.ID}}/status" hx-target="#incident-detail" hx-swap="outerHTML" hx-error="#action-error">
-                        <input type="hidden" name="resolved_by" value="web-ui">
-                        <div class="d-grid gap-2">
-                            {{if eq .Incident.Status "open"}}
-                            <button class="btn btn-success btn-sm" name="status" value="resolved">Resolve</button>
-                            <button class="btn btn-secondary btn-sm" name="status" value="closed">Close</button>
-                            {{else if eq .Incident.Status "reviewing"}}
-                            <button class="btn btn-success btn-sm" name="status" value="resolved">Resolve</button>
-                            <button class="btn btn-secondary btn-sm" name="status" value="closed">Close</button>
-                            {{else if eq .Incident.Status "appealed"}}
-                            <button class="btn btn-success btn-sm" name="status" value="resolved">Resolve</button>
-                            <button class="btn btn-secondary btn-sm" name="status" value="closed">Close</button>
-                            {{else}}
-                            <span class="text-muted">No actions available</span>
-                            {{end}}
-                        </div>
-                    </form>
-                    <div id="action-error" class="alert alert-danger d-none mt-2"></div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header"><strong>Appeal</strong></div>
-                <div class="card-body">
-                    {{if .Appeal}}
-                    <table class="table table-sm mb-0">
-                        <tr><th>Status</th><td><span class="badge bg-info">{{.Appeal.Status}}</span></td></tr>
-                        <tr><th>Appellant</th><td>{{.Appeal.AppellantName}}</td></tr>
-                        <tr><th>Text</th><td>{{.Appeal.AppealText}}</td></tr>
-                        {{if .Appeal.ResolvedAt}}<tr><th>Resolved</th><td>{{.Appeal.ResolvedAt.Format "2006-01-02 15:04:05"}}</td></tr>{{end}}
-                    </table>
-                    {{if or (eq .Appeal.Status "new") (eq .Appeal.Status "triaged")}}
-                    <div class="mt-2 d-grid gap-1">
-                        <form hx-post="/appeals/{{.Appeal.ID}}/resolve" hx-target="#incident-detail" hx-swap="outerHTML">
-                            <input type="hidden" name="action" value="accept">
-                            <input type="hidden" name="resolver_id" value="web-ui">
-                            <button class="btn btn-success btn-sm w-100">Accept Appeal</button>
-                        </form>
-                        <form hx-post="/appeals/{{.Appeal.ID}}/resolve" hx-target="#incident-detail" hx-swap="outerHTML">
-                            <input type="hidden" name="action" value="reject">
-                            <input type="hidden" name="resolver_id" value="web-ui">
-                            <button class="btn btn-danger btn-sm w-100">Reject Appeal</button>
-                        </form>
+                        {{else}}
+                        <span class="muted">No appeal filed</span>
+                        {{end}}
                     </div>
-                    {{end}}
-                    {{else}}
-                    <span class="text-muted">No appeal filed</span>
-                    {{end}}
                 </div>
             </div>
         </div>
     </div>
-</div>
-
+</main>
 </body>
 </html>
