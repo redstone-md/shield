@@ -227,6 +227,7 @@ func activateServer(
 		Version:               revision,
 		Dbg:                   opts.Dbg,
 		Settings:              settings,
+		EnvPinnedKeys:         envPinnedKeys(),
 	}}
 
 	go func() {
