@@ -86,6 +86,9 @@ type Config struct {
 	MetricsCollector      MetricsProvider            // SLO/SLA metrics
 	Dbg                   bool                       // debug mode
 	Settings              Settings                   // application settings
+	// EnvPinnedKeys lists RuleSet JSON paths whose value is pinned by an env var
+	// and will override the stored ruleset on the next restart.
+	EnvPinnedKeys map[string]bool
 }
 
 type OnboardingService interface {
