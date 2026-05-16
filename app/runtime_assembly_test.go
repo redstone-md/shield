@@ -52,3 +52,39 @@ func TestBootstrapRuleSet_CasDisabledWhenNoAPI(t *testing.T) {
 	rs := bootstrapRuleSet(opts)
 	assert.False(t, rs.Detection.CasEnabled)
 }
+
+func TestBackfillRuleSetSchema_OldRuleSet(t *testing.T) {
+	var opts options
+	opts.InstanceID = "tg-spam"
+	opts.MaxEmoji = 4
+	opts.MinMsgLen = 50
+	opts.LLM.Mode = "flagged"
+
+	// a ruleset persisted before the new fields existed
+	old := rules.RuleSet{WorkspaceID: "tg-spam", Version: 1, SchemaVersion: 0}
+
+	got, changed := backfillRuleSetSchema(old, opts)
+
+	assert.True(t, changed, "an old ruleset must be reported as changed")
+	assert.Equal(t, rules.CurrentSchemaVersion, got.SchemaVersion)
+	assert.Equal(t, 4, got.Detection.MaxEmoji)
+	assert.Equal(t, 50, got.Detection.MinMsgLen)
+	assert.Equal(t, "flagged", got.LLM.Mode)
+	assert.Equal(t, 1, got.Version, "version and identity fields must be preserved")
+}
+
+func TestBackfillRuleSetSchema_CurrentRuleSetUnchanged(t *testing.T) {
+	var opts options
+	opts.InstanceID = "tg-spam"
+
+	current := rules.RuleSet{
+		WorkspaceID:   "tg-spam",
+		Version:       5,
+		SchemaVersion: rules.CurrentSchemaVersion,
+		Detection:     rules.DetectionRules{MaxEmoji: 2},
+	}
+	got, changed := backfillRuleSetSchema(current, opts)
+
+	assert.False(t, changed, "a current-schema ruleset must not be changed")
+	assert.Equal(t, current, got)
+}

@@ -109,6 +109,13 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	if err != nil {
 		return nil, fmt.Errorf("can't load active rule set, %w", err)
 	}
+	if backfilled, changed := backfillRuleSetSchema(activeRuleSet, opts); changed {
+		log.Printf("[INFO] backfilling rule set schema to version %d", rules.CurrentSchemaVersion)
+		if _, err = ruleSets.Update(ctx, backfilled); err != nil {
+			return nil, fmt.Errorf("can't backfill rule set schema, %w", err)
+		}
+		activeRuleSet = backfilled
+	}
 	applyExplicitRuleSetOverrides(&activeRuleSet, opts)
 
 	detector := makeDetectorWithRuleSet(opts, activeRuleSet)
@@ -395,6 +402,25 @@ func bootstrapRuleSet(opts options) rules.RuleSet {
 			CustomPrompts:      opts.Gemini.CustomPrompts,
 		},
 	}
+}
+
+// backfillRuleSetSchema seeds new fields into a ruleset persisted before the
+// current schema version. Identity and versioning fields are preserved; only the
+// detection/LLM/prompt fields are seeded from env-derived defaults. The second
+// return value reports whether the ruleset was modified.
+func backfillRuleSetSchema(rs rules.RuleSet, opts options) (rules.RuleSet, bool) {
+	if rs.SchemaVersion >= rules.CurrentSchemaVersion {
+		return rs, false
+	}
+	seed := bootstrapRuleSet(opts)
+	rs.SchemaVersion = rules.CurrentSchemaVersion
+	rs.Detection = seed.Detection
+	rs.LLM = seed.LLM
+	rs.OpenAI.Prompt = seed.OpenAI.Prompt
+	rs.OpenAI.VisionModel = seed.OpenAI.VisionModel
+	rs.Gemini.Prompt = seed.Gemini.Prompt
+	rs.Gemini.VisionModel = seed.Gemini.VisionModel
+	return rs, true
 }
 
 func makeApprovedUsersStore(
