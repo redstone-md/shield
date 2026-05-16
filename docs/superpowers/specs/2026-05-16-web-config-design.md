@@ -112,17 +112,24 @@ take effect. Workflow: "empty the tuning section of `.env`, manage from the UI."
 |---|---|---|
 | OpenAI/Gemini text system prompt | `opts.OpenAI.Prompt` / `opts.Gemini.Prompt` (env, builtin fallback) | → `LLMRules.Prompt` (Part 2a) |
 | OpenAI/Gemini custom prompts | `LLMRules.CustomPrompts` | already in `RuleSet` |
-| Vision prompt | `defaultVisionPrompt` const + `slowpath.PromptRegistry` (`Active`/`Set`) | keep `PromptRegistry`; UI reads/writes through it |
+| Vision prompt | hardcoded `defaultVisionPrompt` const in `checkVision` | → `RuleSet.LLM.VisionPrompt`; const stays as empty-value fallback |
 
-The vision prompt keeps its existing versioned `PromptRegistry` store rather than
-moving into `RuleSet` — duplicating it would break the wired slowpath subsystem.
-The settings UI aggregates two backends (`RuleSetService` + `PromptRegistry`); this
-is hidden from the user behind one page.
+Investigation finding (revises the earlier assumption): the slowpath `checkVision`
+hardcodes `defaultVisionPrompt` and ignores the `PromptRegistry` entirely. The
+`PromptRegistry` only carries the slowpath *text* system prompt, and it is an
+`InMemoryPromptRegistry` (ephemeral). It is not a viable persistence layer.
 
-**Implementation must verify** that a `FilePromptRegistry` is actually constructed
-and passed to the slowpath `Engine` (`SetPromptRegistry`). If it is not wired, vision
-always uses `defaultVisionPrompt` and prompt editing has no effect — wiring it is
-then part of the work. See Open items.
+Decision: consolidate all prompts into the DB `RuleSet` and remove `PromptRegistry`.
+- Slowpath text system prompt → sourced per-provider from `RuleSet.OpenAI.Prompt` /
+  `RuleSet.Gemini.Prompt`, pushed onto the engine via `Engine.SetSystemPrompt`.
+- Vision prompt → one shared `RuleSet.LLM.VisionPrompt` (`LLMCommonRules`), pushed via
+  `Engine.SetVisionPrompt`; empty value falls back to the `defaultVisionPrompt` const.
+- `PromptRegistry`, `FilePromptRegistry`, `InMemoryPromptRegistry`, `PromptEntry`, and
+  `configureSlowPathPrompts` are deleted.
+
+This is implemented by Plan 2 (`docs/superpowers/plans/2026-05-16-web-config-llm-prompts.md`).
+Plan 2 also adds prompt hot-reload: `wireLiveReload` rebuilds the OpenAI/Gemini text
+checkers and re-pushes the slowpath prompts on every ruleset change.
 
 ### Part 1 — editable web UI
 
