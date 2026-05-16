@@ -293,7 +293,7 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 		detector.WithGeminiChecker(client.Models, geminiConfig)
 	}
 
-	detector.WithMetaChecks(buildMetaChecks(ruleSet, opts.MinMsgLen)...)
+	detector.WithMetaChecks(buildMetaChecks(ruleSet, ruleSet.Detection.MinMsgLen)...)
 	debugLogFields("detector config", detectorConfig)
 
 	// initialize Lua plugins if enabled
@@ -324,31 +324,35 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 }
 
 func buildDetectorConfig(opts options, ruleSet rules.RuleSet) tgspam.Config {
+	casAPI := ""
+	if ruleSet.Detection.CasEnabled {
+		casAPI = opts.CAS.API
+	}
 	cfg := tgspam.Config{
-		MaxAllowedEmoji:     opts.MaxEmoji,
-		MinMsgLen:           opts.MinMsgLen,
-		SimilarityThreshold: opts.SimilarityThreshold,
-		MinSpamProbability:  opts.MinSpamProbability,
-		CasAPI:              opts.CAS.API,
+		MaxAllowedEmoji:     ruleSet.Detection.MaxEmoji,
+		MinMsgLen:           ruleSet.Detection.MinMsgLen,
+		SimilarityThreshold: ruleSet.Detection.SimilarityThreshold,
+		MinSpamProbability:  ruleSet.Detection.MinSpamProbability,
+		CasAPI:              casAPI,
 		CasUserAgent:        opts.CAS.UserAgent,
 		HTTPClient:          &http.Client{Timeout: opts.CAS.Timeout},
-		FirstMessageOnly:    !opts.ParanoidMode,
-		FirstMessagesCount:  opts.FirstMessagesCount,
+		FirstMessageOnly:    !ruleSet.Detection.ParanoidMode,
+		FirstMessagesCount:  ruleSet.Detection.FirstMessagesCount,
 		OpenAIVeto:          ruleSet.OpenAI.Veto,
 		OpenAIHistorySize:   ruleSet.OpenAI.HistorySize,
 		GeminiVeto:          ruleSet.Gemini.Veto,
 		GeminiHistorySize:   ruleSet.Gemini.HistorySize,
-		LLMMode:             tgspam.LLMMode(opts.LLM.Mode),
-		LLMConsensus:        tgspam.LLMConsensusMode(opts.LLM.Consensus),
+		LLMMode:             tgspam.LLMMode(ruleSet.LLM.Mode),
+		LLMConsensus:        tgspam.LLMConsensusMode(ruleSet.LLM.Consensus),
 		LLMRequestTimeout:   opts.LLM.RequestTimeout,
-		MultiLangWords:      opts.MultiLangWords,
-		HistorySize:         opts.HistorySize,
+		MultiLangWords:      ruleSet.Detection.MultiLangWords,
+		HistorySize:         ruleSet.Detection.HistorySize,
 	}
 
-	if opts.FirstMessagesCount > 0 {
+	if ruleSet.Detection.FirstMessagesCount > 0 {
 		cfg.FirstMessageOnly = true
 	}
-	if opts.ParanoidMode {
+	if ruleSet.Detection.ParanoidMode {
 		cfg.FirstMessageOnly = false
 		cfg.FirstMessagesCount = 0
 	}

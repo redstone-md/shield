@@ -512,7 +512,7 @@ func (a *runtimeAssembly) wireLiveReload(opts options) {
 		if a.Detector != nil {
 			cfg := buildDetectorConfig(opts, rs)
 			a.Detector.UpdateConfig(cfg)
-			a.Detector.ReplaceMetaChecks(buildMetaChecks(rs, opts.MinMsgLen)...)
+			a.Detector.ReplaceMetaChecks(buildMetaChecks(rs, rs.Detection.MinMsgLen)...)
 		}
 
 		a.SpamBot.ApplyRuleSet(rs)

@@ -273,8 +273,8 @@ func Test_makeDetector(t *testing.T) {
 
 func TestBuildDetectorConfigSetsLLMMode(t *testing.T) {
 	var opts options
-	opts.LLM.Mode = "always"
-	cfg := buildDetectorConfig(opts, rules.RuleSet{})
+	rs := rules.RuleSet{LLM: rules.LLMCommonRules{Mode: "always"}}
+	cfg := buildDetectorConfig(opts, rs)
 
 	assert.Equal(t, tgspam.LLMModeAlways, cfg.LLMMode)
 }
@@ -603,4 +603,53 @@ func TestCacheInvalidationOnControlPlaneChanges(t *testing.T) {
 
 	require.NoError(t, assembly.DetectedSpamService.SetAddedToSamplesFlag(ctx, opts.InstanceID, 999))
 	assert.Equal(t, 1, spamNotified)
+}
+
+func TestBuildDetectorConfig_ReadsDetectionFromRuleSet(t *testing.T) {
+	var opts options
+	// opts values must be ignored for these fields now
+	opts.MaxEmoji = 999
+	opts.MinMsgLen = 999
+	opts.SimilarityThreshold = 9.9
+	opts.MinSpamProbability = 99
+	opts.MultiLangWords = 99
+	opts.FirstMessagesCount = 99
+	opts.LLM.Mode = "always"
+	opts.LLM.Consensus = "all"
+	opts.CAS.API = "https://api.cas.chat"
+
+	rs := rules.RuleSet{
+		Detection: rules.DetectionRules{
+			MaxEmoji:            3,
+			MinMsgLen:           50,
+			SimilarityThreshold: 0.5,
+			MinSpamProbability:  50,
+			MultiLangWords:      2,
+			CasEnabled:          true,
+			FirstMessagesCount:  1,
+			ParanoidMode:        false,
+		},
+		LLM: rules.LLMCommonRules{Mode: "flagged", Consensus: "any"},
+	}
+
+	cfg := buildDetectorConfig(opts, rs)
+
+	assert.Equal(t, 3, cfg.MaxAllowedEmoji)
+	assert.Equal(t, 50, cfg.MinMsgLen)
+	assert.InEpsilon(t, 0.5, cfg.SimilarityThreshold, 0.0001)
+	assert.InEpsilon(t, 50.0, cfg.MinSpamProbability, 0.0001)
+	assert.Equal(t, 2, cfg.MultiLangWords)
+	assert.Equal(t, 1, cfg.FirstMessagesCount)
+	assert.Equal(t, tgspam.LLMMode("flagged"), cfg.LLMMode)
+	assert.Equal(t, tgspam.LLMConsensusMode("any"), cfg.LLMConsensus)
+	assert.Equal(t, "https://api.cas.chat", cfg.CasAPI)
+}
+
+func TestBuildDetectorConfig_CasDisabledClearsAPI(t *testing.T) {
+	var opts options
+	opts.CAS.API = "https://api.cas.chat"
+	rs := rules.RuleSet{Detection: rules.DetectionRules{CasEnabled: false}}
+
+	cfg := buildDetectorConfig(opts, rs)
+	assert.Empty(t, cfg.CasAPI, "CAS API must be cleared when CasEnabled is false")
 }
