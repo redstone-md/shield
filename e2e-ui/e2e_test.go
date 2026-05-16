@@ -259,10 +259,10 @@ func TestFeedback_PageLoads(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, title, "Feedback")
 
-	waitVisible(t, page.Locator("h2:has-text('Feedback & Knowledge')"))
-	waitVisible(t, page.Locator("button[data-bs-target='#labels-tab']"))
-	waitVisible(t, page.Locator("button[data-bs-target='#candidates-tab']"))
-	waitVisible(t, page.Locator("button[data-bs-target='#knowledge-tab']"))
+	waitVisible(t, page.Locator("h2:has-text('Feedback')"))
+	waitVisible(t, page.Locator("a[data-bs-toggle='tab'][href='#labels']"))
+	waitVisible(t, page.Locator("a[data-bs-toggle='tab'][href='#candidates']"))
+	waitVisible(t, page.Locator("a[data-bs-toggle='tab'][href='#knowledge']"))
 }
 
 // --- navigation tests ---
