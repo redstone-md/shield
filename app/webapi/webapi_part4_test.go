@@ -68,7 +68,7 @@ func TestServer_htmlSpamCheckHandler(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code, "handler should return status OK")
 		body := rr.Body.String()
-		assert.Contains(t, body, "<title>Checker - TG-Spam</title>", "template should contain the correct title")
+		assert.Contains(t, body, "<title>Checker - Shield</title>", "template should contain the correct title")
 		assert.Contains(t, body, "Version: 1.0", "template should contain the correct version")
 		assert.Contains(t, body, "<form", "template should contain a form")
 	})
