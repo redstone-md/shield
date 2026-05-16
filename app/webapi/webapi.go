@@ -49,7 +49,7 @@ func templateDict(pairs ...any) (map[string]any, error) {
 		return nil, fmt.Errorf("dict requires an even number of arguments, got %d", len(pairs))
 	}
 	m := make(map[string]any, len(pairs)/2)
-	for i := 0; i < len(pairs); i += 2 {
+	for i := 0; i+1 < len(pairs); i += 2 {
 		key, ok := pairs[i].(string)
 		if !ok {
 			return nil, fmt.Errorf("dict key %d is not a string", i)
