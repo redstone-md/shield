@@ -1,72 +1,61 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Manage Users - TG-Spam</title>
+    <title>Manage Users - Shield</title>
     {{template "heads.html"}}
 </head>
-<body>
-{{template "navbar.html"}}
+<body x-data="{ navOpen: false }">
+{{template "sidebar.html"}}
+<div class="scrim" x-show="navOpen" @click="navOpen=false" x-cloak></div>
+<main class="main">
+    <header class="topbar">
+        <button class="topbar__burger" @click="navOpen=!navOpen" aria-label="Toggle navigation"><i class="bi bi-list"></i></button>
+        <h2 class="page-title">Manage Approved Users</h2>
+    </header>
+    <div class="content">
+        <form class="flex wrap gap-2 center mb-4" hx-post="/users/add" hx-target="#users-list" hx-swap="outerHTML" hx-error="#error-message" hx-on::after-request="this.reset()">
+            <input type="text" name="user_id" class="input" style="width:auto" placeholder="User ID">
+            <input type="text" name="user_name" class="input" style="width:auto" placeholder="User Name">
+            <button type="submit" class="btn btn-accent"><i class="bi bi-plus-circle"></i> Add to Approved Users</button>
+        </form>
 
-<div class="container mt-4">
-    <h2>Manage Approved Users</h2>
-
-    <!-- Form for Adding a New Approved User -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <form hx-post="/users/add" hx-target="#users-list" hx-swap="outerHTML" hx-error="#error-message" hx-on::after-request="this.reset()">
-                <div class="input-group mb-3 flex-wrap">
-                    <input type="text" name="user_id" class="form-control me-2 mb-2 mb-md-0" placeholder="User ID">
-                    <input type="text" name="user_name" class="form-control me-3 mb-2 mb-md-0" placeholder="User Name">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-plus-circle"></i> Add to Approved Users
-                    </button>
-                </div>
-            </form>
-        </div>
+        {{template "users_list" .}}
     </div>
-
-
-    {{template "users_list" .}}
-</div>
-
+</main>
 </body>
 </html>
 
-
-<!-- list of users -->
 {{define "users_list"}}
-<div class="row" id="users-list">
-    <div class="col-md-12">
-        <div id="error-message"></div> <!-- Error message container -->
-        <h4>Approved Users ({{.TotalApprovedUsers}})</h4>
-        <table class="table table-striped">
-            <thead class="custom-table-header">
+<div id="users-list">
+    <div id="error-message"></div>
+    <h4>Approved Users ({{.TotalApprovedUsers}})</h4>
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
             <tr>
                 <th>ID</th>
                 <th>Name</th>
                 <th>Timestamp</th>
-                <th></th> <!-- Header for the action column -->
+                <th></th>
             </tr>
             </thead>
             <tbody>
             {{range .ApprovedUsers}}
-                <tr>
-                    <td>{{.UserID}}</td>
-                    <td>{{.UserName}}</td>
-                    <td>{{.Timestamp.Format "2006-01-02 15:04:05"}}</td>
-                    <td class="text-end">
-                        <form method="POST" hx-post="/users/delete" hx-target="#users-list" hx-swap="outerHTML" class="d-inline">
-                            <input type="hidden" name="user_id" value="{{.UserID}}">
-                            <button type="submit" class="btn btn-danger btn-sm" title="Delete User">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </form>
-                    </td>
-                </tr>
+            <tr>
+                <td>{{.UserID}}</td>
+                <td>{{.UserName}}</td>
+                <td>{{.Timestamp.Format "2006-01-02 15:04:05"}}</td>
+                <td class="right-text">
+                    <form method="POST" hx-post="/users/delete" hx-target="#users-list" hx-swap="outerHTML">
+                        <input type="hidden" name="user_id" value="{{.UserID}}">
+                        <button type="submit" class="btn btn-danger btn-sm" title="Delete User"><i class="bi bi-trash"></i></button>
+                    </form>
+                </td>
+            </tr>
             {{else}}
-                <tr>
-                    <td colspan="4">No approved users found</td>
-                </tr>
+            <tr>
+                <td colspan="4">No approved users found</td>
+            </tr>
             {{end}}
             </tbody>
         </table>
