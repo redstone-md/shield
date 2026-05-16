@@ -4,7 +4,7 @@ import "time"
 
 // CurrentSchemaVersion is the RuleSet payload schema version. Bump it whenever new
 // fields are added so older persisted rulesets can be detected and backfilled.
-const CurrentSchemaVersion = 1
+const CurrentSchemaVersion = 2
 
 // RuleSet is the single-tenant moderation configuration snapshot.
 type RuleSet struct {
@@ -97,6 +97,7 @@ type DetectionRules struct {
 
 // LLMCommonRules holds LLM settings shared across providers.
 type LLMCommonRules struct {
-	Mode      string `json:"mode"`      // "" | missed | flagged | always
-	Consensus string `json:"consensus"` // any | all
+	Mode         string `json:"mode"`      // "" | missed | flagged | always
+	Consensus    string `json:"consensus"` // any | all
+	VisionPrompt string `json:"vision_prompt"`
 }
