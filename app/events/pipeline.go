@@ -418,6 +418,7 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 		l.adminHandler.ReportWarn(pc.banUserStr, pc.msg, warnNum, warnTotal, slowpathReason(pc.resp.CheckResults))
 	}
 
+	l.forwardImageToAdminBeforeDelete(ctx, pc)
 	if err := l.ActionExecutor.DeleteMessage(ctx, pc.fromChat, pc.msg.ID); err != nil {
 		observability.Logf(ctx, "[WARN] failed to delete spam message %d in warn mode: %v", pc.msg.ID, err)
 	}
@@ -488,6 +489,7 @@ func (l *TelegramListener) applyDeleteAction(ctx context.Context, pc pipelineCon
 		actionResult.Applied = true
 		return
 	}
+	l.forwardImageToAdminBeforeDelete(ctx, pc)
 	if err := l.ActionExecutor.DeleteMessage(ctx, pc.fromChat, pc.msg.ID); err != nil {
 		actionResult.Applied = false
 		actionResult.Error = err.Error()
@@ -497,6 +499,15 @@ func (l *TelegramListener) applyDeleteAction(ctx context.Context, pc pipelineCon
 	actionResult.Applied = true
 	if l.adminChatID != 0 && pc.msg.From.ID != 0 {
 		l.adminHandler.ReportBan(pc.banUserStr, pc.msg, 0, false, slowpathReason(pc.resp.CheckResults))
+	}
+}
+
+func (l *TelegramListener) forwardImageToAdminBeforeDelete(ctx context.Context, pc pipelineContext) {
+	if pc.msg.Image == nil || l.adminChatID == 0 || l.ActionExecutor == nil {
+		return
+	}
+	if err := l.ActionExecutor.ForwardMessage(ctx, pc.fromChat, l.adminChatID, pc.msg.ID); err != nil {
+		observability.Logf(ctx, "[WARN] failed to forward image message %d before deletion: %v", pc.msg.ID, err)
 	}
 }
 

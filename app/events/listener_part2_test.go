@@ -359,6 +359,52 @@ func TestTelegramListener_ProcessQueuedEventDeletesMessageForDeletePolicy(t *tes
 	assert.True(t, store.completeCalls[0].ActionResult.Applied)
 }
 
+func TestTelegramListener_ProcessQueuedEventForwardsImageBeforeDelete(t *testing.T) {
+	locator := &locatorContextSpy{}
+	botMock := &contextualBotSpy{
+		onMessage: func(ctx context.Context, msg bot.Message, checkOnly bool) bot.Response {
+			return bot.Response{
+				Send: true,
+				User: bot.User{ID: 42, Username: "user"},
+				CheckResults: []spamcheck.Response{
+					{Name: "slowpath", Spam: true, Details: "vision spam"},
+				},
+			}
+		},
+	}
+
+	actionSpy := &actionExecutorSpy{}
+	l := TelegramListener{
+		Bot:            botMock,
+		Locator:        locator,
+		NoSpamReply:    true,
+		PolicyEngine:   defaultPolicyEngine{},
+		ActionExecutor: actionSpy,
+		AuditWriter:    &auditWriterSpy{},
+		adminChatID:    999,
+	}
+
+	event := moderation.IncomingEvent{EventID: "evt-delete-image", CorrelationID: "corr-delete-image"}
+	update := tbapi.Update{
+		Message: &tbapi.Message{
+			MessageID: 226,
+			Chat:      tbapi.Chat{ID: 123},
+			Photo:     []tbapi.PhotoSize{{FileID: "image-file", Width: 100, Height: 100}},
+			From:      &tbapi.User{UserName: "user"},
+			Date:      int(time.Now().Unix()),
+		},
+	}
+
+	err := l.processQueuedEvent(context.Background(), event, update)
+	require.NoError(t, err)
+	require.Len(t, actionSpy.forwardMessageCalls, 1)
+	assert.Equal(t, int64(123), actionSpy.forwardMessageCalls[0].FromChatID)
+	assert.Equal(t, int64(999), actionSpy.forwardMessageCalls[0].ToChatID)
+	assert.Equal(t, 226, actionSpy.forwardMessageCalls[0].MsgID)
+	require.Len(t, actionSpy.deleteMessageCalls, 1)
+	assert.Equal(t, 226, actionSpy.deleteMessageCalls[0].MsgID)
+}
+
 func TestTelegramListener_DuplicateRetryDoesNotRepeatSuccessfulActionOrAudit(t *testing.T) {
 	locator, teardown := prepTestLocator(t)
 	defer teardown()

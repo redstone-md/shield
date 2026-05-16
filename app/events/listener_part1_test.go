@@ -49,6 +49,7 @@ func (s *policyEngineSpy) Decide(ctx context.Context, req PolicyRequest) (Policy
 type actionExecutorSpy struct {
 	applyBan           func(ctx context.Context, req banRequest) error
 	deleteMessage      func(ctx context.Context, chatID int64, msgID int) error
+	forwardMessage     func(ctx context.Context, fromChatID, toChatID int64, msgID int) error
 	deleteExtra        func(ctx context.Context, checkResults []spamcheck.Response, userID int64, username string, chatID int64) error
 	warnUser           func(ctx context.Context, req warnRequest) error
 	banCtxs            []context.Context
@@ -59,6 +60,12 @@ type actionExecutorSpy struct {
 		Context context.Context
 		ChatID  int64
 		MsgID   int
+	}
+	forwardMessageCalls []struct {
+		Context    context.Context
+		FromChatID int64
+		ToChatID   int64
+		MsgID      int
 	}
 	deleteExtraCalls []struct {
 		Context      context.Context
@@ -144,6 +151,19 @@ func (s *actionExecutorSpy) DeleteMessage(ctx context.Context, chatID int64, msg
 	}{Context: ctx, ChatID: chatID, MsgID: msgID})
 	if s.deleteMessage != nil {
 		return s.deleteMessage(ctx, chatID, msgID)
+	}
+	return nil
+}
+
+func (s *actionExecutorSpy) ForwardMessage(ctx context.Context, fromChatID, toChatID int64, msgID int) error {
+	s.forwardMessageCalls = append(s.forwardMessageCalls, struct {
+		Context    context.Context
+		FromChatID int64
+		ToChatID   int64
+		MsgID      int
+	}{Context: ctx, FromChatID: fromChatID, ToChatID: toChatID, MsgID: msgID})
+	if s.forwardMessage != nil {
+		return s.forwardMessage(ctx, fromChatID, toChatID, msgID)
 	}
 	return nil
 }

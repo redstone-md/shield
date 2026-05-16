@@ -15,6 +15,7 @@ import (
 type ActionExecutor interface {
 	ApplyBan(ctx context.Context, req banRequest) error
 	DeleteMessage(ctx context.Context, chatID int64, msgID int) error
+	ForwardMessage(ctx context.Context, fromChatID, toChatID int64, msgID int) error
 	DeleteExtraMessages(ctx context.Context, checkResults []spamcheck.Response, userID int64, username string, chatID int64) error
 	WarnUser(ctx context.Context, req warnRequest) error
 }
@@ -70,6 +71,16 @@ func (e telegramActionExecutor) DeleteMessage(ctx context.Context, chatID int64,
 	}
 	observability.Logf(ctx, "[DEBUG] deleted message %d", msgID)
 	e.recordAction(ctx, commandDeleteMessage, chatID, 0, msgID, attempt, nil)
+	return nil
+}
+
+func (e telegramActionExecutor) ForwardMessage(ctx context.Context, fromChatID, toChatID int64, msgID int) error {
+	_, err := e.tbAPI.Send(tbapi.NewForward(toChatID, fromChatID, msgID))
+	if err != nil {
+		observability.Logf(ctx, "[WARN] failed to forward message %d to admin chat %d: %v", msgID, toChatID, err)
+		return fmt.Errorf("forward message %d: %w", msgID, err)
+	}
+	observability.Logf(ctx, "[DEBUG] forwarded message %d to admin chat %d", msgID, toChatID)
 	return nil
 }
 
