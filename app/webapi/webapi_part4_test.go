@@ -137,8 +137,8 @@ func TestServer_htmlManageSamplesHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code, "handler should return status OK")
 	body := rr.Body.String()
-	assert.Contains(t, body, "<title>Manage Samples - TG-Spam</title>", "template should contain the correct title")
-	assert.Contains(t, body, `<div class="row" id="samples-list">`, "template should contain a samples list")
+	assert.Contains(t, body, "<title>Manage Samples - Shield</title>", "template should contain the correct title")
+	assert.Contains(t, body, `id="samples-list"`, "template should contain a samples list")
 }
 
 func TestServer_htmlManageUsersHandler(t *testing.T) {
@@ -162,7 +162,7 @@ func TestServer_htmlManageUsersHandler(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code, "handler should return status OK")
 		body := rr.Body.String()
-		assert.Contains(t, body, "<title>Manage Users - TG-Spam</title>", "template should contain the correct title")
+		assert.Contains(t, body, "<title>Manage Users - Shield</title>", "template should contain the correct title")
 		assert.Contains(t, body, "<h4>Approved Users (2)</h4>", "template should contain users list with correct count")
 		assert.Contains(t, body, "User One", "should contain first user's name")
 		assert.Contains(t, body, "User Two", "should contain second user's name")
@@ -311,7 +311,7 @@ func TestServer_htmlSettingsHandler(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code, "handler should return status OK")
 		body := rr.Body.String()
-		assert.Contains(t, body, "<title>Settings - TG-Spam</title>", "template should contain the correct title")
+		assert.Contains(t, body, "<title>Settings - Shield</title>", "template should contain the correct title")
 		assert.Contains(t, body, "Database")
 		assert.Contains(t, body, "Not connected", "Should show database is not connected")
 		assert.Contains(t, body, "Backup")
@@ -342,7 +342,7 @@ func TestServer_htmlSettingsHandler(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code, "handler should return status OK")
 		body := rr.Body.String()
-		assert.Contains(t, body, "<title>Settings - TG-Spam</title>", "template should contain the correct title")
+		assert.Contains(t, body, "<title>Settings - Shield</title>", "template should contain the correct title")
 		assert.Contains(t, body, "Connected", "Should show database is connected")
 		assert.Len(t, detectorMock.GetLuaPluginNamesCalls(), 1, "GetLuaPluginNames should be called")
 	})
