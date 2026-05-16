@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/umputun/tg-spam/app/rules"
+	"github.com/umputun/tg-spam/app/slowpath"
+	"github.com/umputun/tg-spam/lib/tgspam"
 )
 
 func TestBootstrapRuleSet_SeedsNewFields(t *testing.T) {
@@ -87,4 +89,19 @@ func TestBackfillRuleSetSchema_CurrentRuleSetUnchanged(t *testing.T) {
 
 	assert.False(t, changed, "a current-schema ruleset must not be changed")
 	assert.Equal(t, current, got)
+}
+
+func TestWireLiveReload_AppliesLLMAndSlowPathPrompts(t *testing.T) {
+	var opts options
+	opts.InstanceID = "tg-spam"
+
+	a := &runtimeAssembly{
+		Detector:       tgspam.NewDetector(tgspam.Config{}),
+		SlowPathEngine: slowpath.NewEngine(slowpath.EngineConfig{}),
+	}
+	rs := rules.RuleSet{LLM: rules.LLMCommonRules{VisionPrompt: "live vision prompt"}}
+
+	applyLiveReload(a, opts, rs)
+
+	assert.Equal(t, "live vision prompt", slowpath.ExportVisionPrompt(a.SlowPathEngine))
 }
