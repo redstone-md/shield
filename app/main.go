@@ -212,14 +212,13 @@ type options struct {
 
 // default file names
 const (
-	samplesSpamFile    = "spam-samples.txt"
-	samplesHamFile     = "ham-samples.txt"
-	excludeTokensFile  = "exclude-tokens.txt" //nolint:gosec // false positive
-	stopWordsFile      = "stop-words.txt"     //nolint:gosec // false positive
-	dynamicSpamFile    = "spam-dynamic.txt"
-	dynamicHamFile     = "ham-dynamic.txt"
-	promptOverrideFile = "prompt-override.md"
-	dataFile           = "tg-spam.db"
+	samplesSpamFile   = "spam-samples.txt"
+	samplesHamFile    = "ham-samples.txt"
+	excludeTokensFile = "exclude-tokens.txt" //nolint:gosec // false positive
+	stopWordsFile     = "stop-words.txt"     //nolint:gosec // false positive
+	dynamicSpamFile   = "spam-dynamic.txt"
+	dynamicHamFile    = "ham-dynamic.txt"
+	dataFile          = "tg-spam.db"
 )
 
 var revision = "local"

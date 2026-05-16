@@ -101,16 +101,6 @@ type ChatResult struct {
 	PromptVersion string
 }
 
-type PromptEntry struct {
-	ID            string
-	Version       string
-	Provider      string
-	SystemPrompt  string
-	CustomPrompts []string
-	CreatedAt     time.Time
-	Active        bool
-}
-
 type SlowPathInvocation struct {
 	EventID       string
 	CorrelationID string

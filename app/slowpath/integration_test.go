@@ -152,20 +152,15 @@ func (c *callableProvider) Check(ctx context.Context, req ProviderRequest) (*Pro
 	return c.fn(ctx, req)
 }
 
-func TestIntegration_PromptRegistryWithEngine(t *testing.T) {
+func TestIntegration_SystemPromptWithEngine(t *testing.T) {
 	provider := &stubLLMProvider{
 		name:   "openai",
 		result: &ProviderResult{Spam: false, Confidence: 10, Provider: "openai"},
 	}
 
-	reg := NewInMemoryPromptRegistry()
-	reg.Set(PromptEntry{
-		Version: "v2", Provider: "openai", SystemPrompt: "custom system prompt", Active: true,
-	})
-
 	eng := NewEngine(EngineConfig{DefaultProvider: "openai"})
 	eng.RegisterProvider(provider, DefaultBreakerConfig())
-	eng.SetPromptRegistry(reg)
+	eng.SetSystemPrompt("openai", "custom system prompt")
 
 	req := SlowPathRequest{
 		EventID: "evt-1", Content: Content{Text: "test"},
@@ -174,6 +169,7 @@ func TestIntegration_PromptRegistryWithEngine(t *testing.T) {
 	result, err := eng.Check(context.Background(), req)
 	require.NoError(t, err)
 	assert.False(t, result.Spam)
+	assert.Equal(t, "custom system prompt", provider.req.SystemPrompt)
 }
 
 func TestIntegration_FullFlowMergeWithPolicy(t *testing.T) {

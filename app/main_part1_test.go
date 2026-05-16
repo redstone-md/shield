@@ -12,6 +12,7 @@ import (
 	"github.com/umputun/tg-spam/app/events"
 	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/rules"
+	"github.com/umputun/tg-spam/app/slowpath"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/approved"
@@ -277,29 +278,6 @@ func TestBuildDetectorConfigSetsLLMMode(t *testing.T) {
 	cfg := buildDetectorConfig(opts, rs)
 
 	assert.Equal(t, tgspam.LLMModeAlways, cfg.LLMMode)
-}
-
-func TestReadPromptOverride(t *testing.T) {
-	t.Run("missing file", func(t *testing.T) {
-		prompt, err := readPromptOverride(t.TempDir())
-		require.NoError(t, err)
-		assert.Empty(t, prompt)
-	})
-
-	t.Run("trims markdown prompt", func(t *testing.T) {
-		dir := t.TempDir()
-		require.NoError(t, os.WriteFile(path.Join(dir, promptOverrideFile), []byte("\ncustom prompt\n"), 0o600))
-
-		prompt, err := readPromptOverride(dir)
-		require.NoError(t, err)
-		assert.Equal(t, "custom prompt", prompt)
-	})
-}
-
-func TestResolveSlowPathPrompt(t *testing.T) {
-	assert.Equal(t, "provider prompt", resolveSlowPathPrompt("provider prompt", "file prompt"))
-	assert.Equal(t, "file prompt", resolveSlowPathPrompt(" ", "file prompt"))
-	assert.Empty(t, resolveSlowPathPrompt("", ""))
 }
 
 func TestMakeSlowPathChatEngine(t *testing.T) {
@@ -652,4 +630,29 @@ func TestBuildDetectorConfig_CasDisabledClearsAPI(t *testing.T) {
 
 	cfg := buildDetectorConfig(opts, rs)
 	assert.Empty(t, cfg.CasAPI, "CAS API must be cleared when CasEnabled is false")
+}
+
+func TestApplyLLMCheckers_NoLLMConfigured(t *testing.T) {
+	// no tokens configured -> applyLLMCheckers must be a safe no-op
+	var opts options
+	detector := tgspam.NewDetector(tgspam.Config{})
+	rs := rules.RuleSet{}
+
+	assert.NotPanics(t, func() { applyLLMCheckers(detector, opts, rs) })
+}
+
+func TestApplySlowPathPrompts_FromRuleSet(t *testing.T) {
+	eng := slowpath.NewEngine(slowpath.EngineConfig{})
+	rs := rules.RuleSet{
+		OpenAI: rules.LLMRules{Prompt: "openai sys"},
+		Gemini: rules.LLMRules{Prompt: "gemini sys"},
+		LLM:    rules.LLMCommonRules{VisionPrompt: "vision sys"},
+	}
+
+	applySlowPathPrompts(eng, rs)
+
+	system, _, _, err := slowpath.ExportResolvePrompt(eng, "openai")
+	require.NoError(t, err)
+	assert.Equal(t, "openai sys", system)
+	assert.Equal(t, "vision sys", slowpath.ExportVisionPrompt(eng))
 }

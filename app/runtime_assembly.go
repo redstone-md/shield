@@ -119,7 +119,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	applyExplicitRuleSetOverrides(&activeRuleSet, opts)
 
 	detector := makeDetectorWithRuleSet(opts, activeRuleSet)
-	slowPathEngine := makeSlowPathEngine(opts)
+	slowPathEngine := makeSlowPathEngine(opts, activeRuleSet)
 	slowPathChatEngine := makeSlowPathChatEngine(opts)
 	spamBot, err := makeSpamBot(ctx, opts, activeRuleSet, dataDB, detector)
 	if err != nil {
@@ -526,25 +526,36 @@ func activateWebRuntime(ctx context.Context, opts options, web webRuntimeAssembl
 	return activateServer(ctx, opts, web, dmUsersProvider)
 }
 
+func applyLiveReload(a *runtimeAssembly, opts options, rs rules.RuleSet) {
+	log.Printf("[INFO] rule set changed: version=%d, applying live reload", rs.Version)
+	applyExplicitRuleSetOverrides(&rs, opts)
+
+	if a.TelegramListener != nil {
+		a.TelegramListener.ApplyRuleSet(rs)
+	}
+
+	if a.Detector != nil {
+		cfg := buildDetectorConfig(opts, rs)
+		a.Detector.UpdateConfig(cfg)
+		a.Detector.ReplaceMetaChecks(buildMetaChecks(rs, rs.Detection.MinMsgLen)...)
+		applyLLMCheckers(a.Detector, opts, rs)
+	}
+
+	if a.SlowPathEngine != nil {
+		applySlowPathPrompts(a.SlowPathEngine, rs)
+	}
+
+	if a.SpamBot != nil {
+		a.SpamBot.ApplyRuleSet(rs)
+	}
+	a.ActiveRuleSet = rs
+
+	log.Printf("[INFO] live reload applied: version=%d", rs.Version)
+}
+
 func (a *runtimeAssembly) wireLiveReload(opts options) {
 	a.RuleSetService.OnChange(func(rs rules.RuleSet) {
-		log.Printf("[INFO] rule set changed: version=%d, applying live reload", rs.Version)
-		applyExplicitRuleSetOverrides(&rs, opts)
-
-		if a.TelegramListener != nil {
-			a.TelegramListener.ApplyRuleSet(rs)
-		}
-
-		if a.Detector != nil {
-			cfg := buildDetectorConfig(opts, rs)
-			a.Detector.UpdateConfig(cfg)
-			a.Detector.ReplaceMetaChecks(buildMetaChecks(rs, rs.Detection.MinMsgLen)...)
-		}
-
-		a.SpamBot.ApplyRuleSet(rs)
-		a.ActiveRuleSet = rs
-
-		log.Printf("[INFO] live reload applied: version=%d", rs.Version)
+		applyLiveReload(a, opts, rs)
 	})
 
 	if a.ApprovedUsersService != nil {

@@ -22,8 +22,3 @@ type BudgetTracker interface {
 	Record(tenantID string, class BudgetClass, tokensUsed int, cost float64)
 	Usage(tenantID string) (requests int, tokens int, cost float64)
 }
-
-type PromptRegistry interface {
-	Active(provider string) (*PromptEntry, error)
-	Get(provider string, version string) (*PromptEntry, error)
-}

@@ -82,15 +82,3 @@ func (m *mockVisionProvider) Name() string { return "mock-vision" }
 func (m *mockVisionProvider) AnalyzeImage(_ context.Context, _ []byte, _, _ string) (*ProviderResult, error) {
 	return &ProviderResult{Spam: false, Provider: "mock-vision"}, nil
 }
-
-func TestPromptEntryFields(t *testing.T) {
-	pe := PromptEntry{
-		ID:           "openai-v1",
-		Version:      "v1",
-		Provider:     "openai",
-		SystemPrompt: "test prompt",
-		Active:       true,
-	}
-	assert.Equal(t, "openai-v1", pe.ID)
-	assert.True(t, pe.Active)
-}
