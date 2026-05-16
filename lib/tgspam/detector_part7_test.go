@@ -1,6 +1,7 @@
 package tgspam
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/sashabaranov/go-openai"
@@ -10,6 +11,7 @@ import (
 	"github.com/umputun/tg-spam/lib/tgspam/mocks"
 	"google.golang.org/genai"
 	"io"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -431,6 +433,75 @@ func TestDetector_CheckWithLLMConsensus(t *testing.T) {
 			assert.Contains(t, checkNames, "gemini")
 		})
 	}
+}
+
+func TestDetector_CASNonVetoable(t *testing.T) {
+	casResponder := func(body string) *mocks.HTTPClientMock {
+		return &mocks.HTTPClientMock{
+			DoFunc: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewBufferString(body)),
+				}, nil
+			},
+		}
+	}
+	hamOpenAI := func() *mocks.OpenAIClientMock {
+		return &mocks.OpenAIClientMock{
+			CreateChatCompletionFunc: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+				return openai.ChatCompletionResponse{
+					Choices: []openai.ChatCompletionChoice{{
+						Message: openai.ChatCompletionMessage{Content: `{"spam": false, "reason":"looks fine", "confidence":15}`},
+					}},
+				}, nil
+			},
+		}
+	}
+
+	t.Run("cas hit survives openai ham veto", func(t *testing.T) {
+		d := NewDetector(Config{
+			MaxAllowedEmoji:  -1,
+			FirstMessageOnly: true,
+			CasAPI:           "http://localhost",
+			HTTPClient:       casResponder(`{"ok": true, "description": "banned"}`),
+			OpenAIVeto:       true,
+		})
+		openAIMock := hamOpenAI()
+		d.WithOpenAIChecker(openAIMock, OpenAIConfig{Model: "gpt4"})
+
+		spam, cr := d.Check(spamcheck.Request{Msg: "hello there friends", UserID: "12345"})
+		assert.True(t, spam, "cas hit must not be vetoed by openai ham verdict")
+		assert.Len(t, openAIMock.CreateChatCompletionCalls(), 1, "openai still runs as veto")
+
+		var casSpam, openaiHam bool
+		for _, c := range cr {
+			switch c.Name {
+			case "cas":
+				casSpam = c.Spam
+			case "openai":
+				openaiHam = !c.Spam
+			}
+		}
+		assert.True(t, casSpam, "cas flagged spam")
+		assert.True(t, openaiHam, "openai returned ham")
+	})
+
+	t.Run("no cas hit still allows openai veto", func(t *testing.T) {
+		d := NewDetector(Config{
+			MaxAllowedEmoji:  -1,
+			FirstMessageOnly: true,
+			CasAPI:           "http://localhost",
+			HTTPClient:       casResponder(`{"ok": false, "description": "not found"}`),
+			OpenAIVeto:       true,
+		})
+		_, err := d.LoadStopWords(strings.NewReader("spamword"))
+		require.NoError(t, err)
+		openAIMock := hamOpenAI()
+		d.WithOpenAIChecker(openAIMock, OpenAIConfig{Model: "gpt4"})
+
+		spam, _ := d.Check(spamcheck.Request{Msg: "spamword message here", UserID: "999"})
+		assert.False(t, spam, "without cas hit openai veto still clears spam")
+	})
 }
 
 func TestDetector_CheckWithShortMessageRunsOnlyEligibleLLMs(t *testing.T) {

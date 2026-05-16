@@ -345,6 +345,11 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 		spamDetected = d.applyLLMConsensus(baseSpam, llmResults, d.LLMConsensus)
 	}
 
+	// CAS is a curated global ban list, so an LLM ham verdict must not veto a CAS hit
+	if !spamDetected && casFlaggedSpam(cr) {
+		spamDetected = true
+	}
+
 	if spamDetected {
 		d.spamHistory.Push(req)
 		return true, cr
@@ -458,6 +463,16 @@ func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []
 
 func shouldSkipTextLLM(msg string) bool {
 	return strings.TrimSpace(msg) == ""
+}
+
+// casFlaggedSpam reports whether the CAS check flagged the message as spam.
+func casFlaggedSpam(cr []spamcheck.Response) bool {
+	for _, r := range cr {
+		if r.Name == "cas" && r.Spam {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *Detector) llmContextForRequest(req spamcheck.Request) llmContext {
