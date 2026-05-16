@@ -159,7 +159,7 @@ func applyExplicitLLMOverrides(rs *rules.RuleSet, opts options) {
 }
 
 func configured(flagName, envName string) bool {
-	if _, ok := os.LookupEnv(envName); ok {
+	if v, ok := os.LookupEnv(envName); ok && v != "" {
 		return true
 	}
 	return cliFlagSet(flagName)
