@@ -218,7 +218,6 @@ const (
 	stopWordsFile      = "stop-words.txt"     //nolint:gosec // false positive
 	dynamicSpamFile    = "spam-dynamic.txt"
 	dynamicHamFile     = "ham-dynamic.txt"
-	promptOverrideFile = "prompt-override.md"
 	dataFile           = "tg-spam.db"
 )
 
