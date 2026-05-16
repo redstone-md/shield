@@ -9,10 +9,10 @@
         <li><a class="nav-link" :class="{ 'is-active': window.location.pathname === '/manage_users' }" href="/manage_users"><i class="bi bi-people"></i>Manage Users</a></li>
         <li><a class="nav-link" :class="{ 'is-active': window.location.pathname === '/manage_dictionary' }" href="/manage_dictionary"><i class="bi bi-book"></i>Manage Dictionary</a></li>
         <li><a class="nav-link" :class="{ 'is-active': window.location.pathname === '/detected_spam' }" href="/detected_spam"><i class="bi bi-exclamation-triangle"></i>Detected Spam</a></li>
-        <li><a class="nav-link" :class="{ 'is-active': window.location.pathname === '/incidents' }" href="/incidents"><i class="bi bi-clipboard-data"></i>Incidents</a></li>
+        <li><a class="nav-link" :class="{ 'is-active': window.location.pathname.startsWith('/incidents') }" href="/incidents"><i class="bi bi-clipboard-data"></i>Incidents</a></li>
         <li><a class="nav-link" :class="{ 'is-active': window.location.pathname === '/appeals' }" href="/appeals"><i class="bi bi-chat-left-text"></i>Appeals</a></li>
         <li><a class="nav-link" :class="{ 'is-active': window.location.pathname === '/feedback' }" href="/feedback"><i class="bi bi-lightbulb"></i>Feedback</a></li>
-        <li><a class="nav-link" :class="{ 'is-active': window.location.pathname === '/list_settings' }" href="/list_settings"><i class="bi bi-gear"></i>Settings</a></li>
+        <li><a class="nav-link" :class="{ 'is-active': window.location.pathname === '/list_settings' || window.location.pathname.startsWith('/settings') }" href="/list_settings"><i class="bi bi-gear"></i>Settings</a></li>
     </ul>
     <div class="sidebar__footer">
         <a class="nav-link" href="/download/backup" download><i class="bi bi-download"></i>Create Backup</a>
