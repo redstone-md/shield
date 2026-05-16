@@ -325,7 +325,7 @@ func TestChecker_CheckMessage(t *testing.T) {
 	// submit
 	require.NoError(t, page.Locator("button[type='submit']:has-text('Check')").Click())
 
-	// wait for result container with alert-light (outer container)
+	// wait for the result element (#result .alert)
 	result := page.Locator("#result .alert")
 	waitVisible(t, result)
 
