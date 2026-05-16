@@ -25,7 +25,7 @@ function copyUserID(userId, btn) {
 }
 
 // re-initialize Alpine components inside fragments swapped in by HTMX.
-document.body.addEventListener('htmx:afterSwap', function (evt) {
+document.body.addEventListener('htmx:afterSettle', function (evt) {
     if (window.Alpine && evt.detail && evt.detail.target) {
         window.Alpine.initTree(evt.detail.target);
     }
