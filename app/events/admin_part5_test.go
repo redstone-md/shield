@@ -971,3 +971,50 @@ func TestApplyMediaSlowPathReportsSlowPathError(t *testing.T) {
 	assert.False(t, resp.CheckResults[0].Spam)
 	assert.Contains(t, resp.CheckResults[0].Details, "openai vision: error, status code: 400")
 }
+
+func TestApplyMediaSlowPathEmojiArtGate(t *testing.T) {
+	t.Run("emoji over limit skips custom-emoji vision", func(t *testing.T) {
+		slowSpy := &slowPathCheckerSpy{}
+		mockAPI := &mocks.TbAPIMock{
+			GetCustomEmojiStickersFunc: func(config tbapi.GetCustomEmojiStickersConfig) ([]tbapi.Sticker, error) {
+				return []tbapi.Sticker{{FileID: "emoji-file"}}, nil
+			},
+		}
+		cfg := mediaSlowPathConfig{enabled: true, api: mockAPI, engine: slowSpy, tenantID: "tg-spam"}
+
+		resp := applyMediaSlowPath(context.Background(), cfg, moderation.IncomingEvent{EventID: "e1"},
+			&bot.Message{ID: 42, From: bot.User{ID: 1}, CustomEmojiID: "emoji-1"},
+			bot.Response{CheckResults: []spamcheck.Response{{Name: "emoji", Spam: true, Details: "42/10"}}})
+
+		assert.False(t, resp.Send)
+		assert.Empty(t, slowSpy.calls, "slowpath must not run for emoji-art over limit")
+		assert.Empty(t, mockAPI.GetCustomEmojiStickersCalls(), "no custom-emoji download for emoji-art over limit")
+	})
+
+	t.Run("emoji under limit still runs custom-emoji vision", func(t *testing.T) {
+		imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("jpeg frame"))
+		}))
+		defer imgSrv.Close()
+
+		slowSpy := &slowPathCheckerSpy{check: func(ctx context.Context, req slowpath.SlowPathRequest) (*slowpath.SlowPathResult, error) {
+			return &slowpath.SlowPathResult{Spam: false, Confidence: 10, Reason: "ok", Providers: []string{"vision"}}, nil
+		}}
+		mockAPI := &mocks.TbAPIMock{
+			GetCustomEmojiStickersFunc: func(config tbapi.GetCustomEmojiStickersConfig) ([]tbapi.Sticker, error) {
+				return []tbapi.Sticker{{FileID: "emoji-file", IsAnimated: true, Thumbnail: &tbapi.PhotoSize{FileID: "emoji-thumb"}}}, nil
+			},
+			GetFileDirectURLFunc: func(fileID string) (string, error) { return imgSrv.URL, nil },
+		}
+		cfg := mediaSlowPathConfig{enabled: true, api: mockAPI, engine: slowSpy, tenantID: "tg-spam"}
+
+		resp := applyMediaSlowPath(context.Background(), cfg, moderation.IncomingEvent{EventID: "e1"},
+			&bot.Message{ID: 42, From: bot.User{ID: 1}, CustomEmojiID: "emoji-1"},
+			bot.Response{CheckResults: []spamcheck.Response{{Name: "emoji", Spam: false, Details: "1/10"}}})
+
+		assert.False(t, resp.Send)
+		require.Len(t, slowSpy.calls, 1, "slowpath runs for a single custom emoji under the limit")
+		require.Len(t, mockAPI.GetCustomEmojiStickersCalls(), 1)
+	})
+}

@@ -172,7 +172,7 @@ func applyMediaSlowPath(ctx context.Context, cfg mediaSlowPathConfig, event mode
 	}
 
 	dl := newImageDownloader(cfg.api)
-	fileID, slowReason := mediaSlowPathFile(ctx, cfg, msg)
+	fileID, slowReason := mediaSlowPathFile(ctx, cfg, msg, emojiCheckFlagged(resp.CheckResults))
 	if fileID == "" {
 		return resp
 	}
@@ -285,7 +285,9 @@ func slowPathCheckDetails(reason string, confidence int) string {
 	return reason + ", " + confidenceText
 }
 
-func mediaSlowPathFile(ctx context.Context, cfg mediaSlowPathConfig, msg *bot.Message) (string, slowpath.EscalationReason) {
+func mediaSlowPathFile(ctx context.Context, cfg mediaSlowPathConfig, msg *bot.Message,
+	emojiOverLimit bool,
+) (string, slowpath.EscalationReason) {
 	if msg.Image != nil && msg.Image.FileID != "" {
 		return msg.Image.FileID, slowpath.EscalationImageContent
 	}
@@ -301,9 +303,25 @@ func mediaSlowPathFile(ctx context.Context, cfg mediaSlowPathConfig, msg *bot.Me
 		return stickerDownloadFileID(msg.Sticker), slowpath.EscalationImageContent
 	}
 	if msg.CustomEmojiID != "" {
+		if emojiOverLimit {
+			// emoji-art over the configured limit: the fastpath emoji check already flags it
+			// and a single custom-emoji tile can't represent the rendered layout for vision
+			observability.Logf(ctx, "[DEBUG] slowpath custom-emoji vision skipped: emoji count over limit")
+			return "", ""
+		}
 		return customEmojiDownloadFileID(ctx, cfg.api, msg.CustomEmojiID), slowpath.EscalationImageContent
 	}
 	return "", ""
+}
+
+// emojiCheckFlagged reports whether the fastpath emoji check flagged too many emojis.
+func emojiCheckFlagged(cr []spamcheck.Response) bool {
+	for _, r := range cr {
+		if r.Name == "emoji" && r.Spam {
+			return true
+		}
+	}
+	return false
 }
 
 func customEmojiDownloadFileID(ctx context.Context, api TbAPI, customEmojiID string) string {
