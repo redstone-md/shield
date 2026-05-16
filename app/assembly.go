@@ -476,7 +476,7 @@ func expandPath(path string) string {
 	return ep
 }
 
-func makeSlowPathEngine(opts options) *slowpath.Engine {
+func makeSlowPathEngine(opts options, ruleSet rules.RuleSet) *slowpath.Engine {
 	hasProvider := opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "" || opts.Gemini.Token != ""
 	if !hasProvider {
 		return nil
@@ -484,7 +484,7 @@ func makeSlowPathEngine(opts options) *slowpath.Engine {
 
 	eng := slowpath.NewEngine(slowpath.EngineConfig{})
 	brk := slowpath.DefaultBreakerConfig()
-	configureSlowPathPrompts(eng, opts)
+	applySlowPathPrompts(eng, ruleSet)
 
 	if opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "" {
 		config := openai.DefaultConfig(opts.OpenAI.Token)
@@ -548,27 +548,13 @@ func makeSlowPathChatEngine(opts options) *slowpath.Engine {
 	return eng
 }
 
-func configureSlowPathPrompts(eng *slowpath.Engine, opts options) {
-	registry := slowpath.NewInMemoryPromptRegistry()
-	configured := false
-
-	overridePrompt, err := readPromptOverride(opts.Files.DynamicDataPath)
-	if err != nil {
-		log.Printf("[WARN] slowpath prompt override ignored: %v", err)
+func applySlowPathPrompts(eng *slowpath.Engine, ruleSet rules.RuleSet) {
+	if eng == nil {
+		return
 	}
-
-	if prompt := resolveSlowPathPrompt(opts.OpenAI.Prompt, overridePrompt); prompt != "" {
-		registry.Set(slowpath.PromptEntry{Version: "override", Provider: "openai", SystemPrompt: prompt, Active: true})
-		configured = true
-	}
-	if prompt := resolveSlowPathPrompt(opts.Gemini.Prompt, overridePrompt); prompt != "" {
-		registry.Set(slowpath.PromptEntry{Version: "override", Provider: "gemini", SystemPrompt: prompt, Active: true})
-		configured = true
-	}
-
-	if configured {
-		eng.SetPromptRegistry(registry)
-	}
+	eng.SetSystemPrompt("openai", ruleSet.OpenAI.Prompt)
+	eng.SetSystemPrompt("gemini", ruleSet.Gemini.Prompt)
+	eng.SetVisionPrompt(ruleSet.LLM.VisionPrompt)
 }
 
 func readPromptOverride(dynamicPath string) (string, error) {

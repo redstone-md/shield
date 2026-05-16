@@ -12,6 +12,7 @@ import (
 	"github.com/umputun/tg-spam/app/events"
 	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/rules"
+	"github.com/umputun/tg-spam/app/slowpath"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/approved"
@@ -652,4 +653,20 @@ func TestBuildDetectorConfig_CasDisabledClearsAPI(t *testing.T) {
 
 	cfg := buildDetectorConfig(opts, rs)
 	assert.Empty(t, cfg.CasAPI, "CAS API must be cleared when CasEnabled is false")
+}
+
+func TestApplySlowPathPrompts_FromRuleSet(t *testing.T) {
+	eng := slowpath.NewEngine(slowpath.EngineConfig{})
+	rs := rules.RuleSet{
+		OpenAI: rules.LLMRules{Prompt: "openai sys"},
+		Gemini: rules.LLMRules{Prompt: "gemini sys"},
+		LLM:    rules.LLMCommonRules{VisionPrompt: "vision sys"},
+	}
+
+	applySlowPathPrompts(eng, rs)
+
+	system, _, _, err := slowpath.ExportResolvePrompt(eng, "openai")
+	require.NoError(t, err)
+	assert.Equal(t, "openai sys", system)
+	assert.Equal(t, "vision sys", slowpath.ExportVisionPrompt(eng))
 }

@@ -119,7 +119,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	applyExplicitRuleSetOverrides(&activeRuleSet, opts)
 
 	detector := makeDetectorWithRuleSet(opts, activeRuleSet)
-	slowPathEngine := makeSlowPathEngine(opts)
+	slowPathEngine := makeSlowPathEngine(opts, activeRuleSet)
 	slowPathChatEngine := makeSlowPathChatEngine(opts)
 	spamBot, err := makeSpamBot(ctx, opts, activeRuleSet, dataDB, detector)
 	if err != nil {
