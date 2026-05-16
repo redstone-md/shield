@@ -317,8 +317,9 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 
 func bootstrapRuleSet(opts options) rules.RuleSet {
 	return rules.RuleSet{
-		WorkspaceID: opts.InstanceID,
-		Source:      "bootstrap",
+		WorkspaceID:   opts.InstanceID,
+		Source:        "bootstrap",
+		SchemaVersion: rules.CurrentSchemaVersion,
 		Meta: rules.MetaRules{
 			LinksLimit:      opts.Meta.LinksLimit,
 			MentionsLimit:   opts.Meta.MentionsLimit,
@@ -358,10 +359,27 @@ func bootstrapRuleSet(opts options) rules.RuleSet {
 			RateLimit:        opts.Report.RateLimit,
 			RatePeriod:       opts.Report.RatePeriod,
 		},
+		Detection: rules.DetectionRules{
+			MaxEmoji:            opts.MaxEmoji,
+			MinMsgLen:           opts.MinMsgLen,
+			SimilarityThreshold: opts.SimilarityThreshold,
+			MinSpamProbability:  opts.MinSpamProbability,
+			MultiLangWords:      opts.MultiLangWords,
+			CasEnabled:          opts.CAS.API != "",
+			HistorySize:         opts.HistoryMinSize,
+			FirstMessagesCount:  opts.FirstMessagesCount,
+			ParanoidMode:        opts.ParanoidMode,
+		},
+		LLM: rules.LLMCommonRules{
+			Mode:      opts.LLM.Mode,
+			Consensus: opts.LLM.Consensus,
+		},
 		OpenAI: rules.LLMRules{
 			Enabled:            opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "",
 			Veto:               opts.OpenAI.Veto,
 			Model:              opts.OpenAI.Model,
+			VisionModel:        opts.OpenAI.VisionModel,
+			Prompt:             opts.OpenAI.Prompt,
 			HistorySize:        opts.OpenAI.HistorySize,
 			CheckShortMessages: opts.OpenAI.CheckShortMessages,
 			CustomPrompts:      opts.OpenAI.CustomPrompts,
@@ -370,6 +388,8 @@ func bootstrapRuleSet(opts options) rules.RuleSet {
 			Enabled:            opts.Gemini.Token != "",
 			Veto:               opts.Gemini.Veto,
 			Model:              opts.Gemini.Model,
+			VisionModel:        opts.Gemini.VisionModel,
+			Prompt:             opts.Gemini.Prompt,
 			HistorySize:        opts.Gemini.HistorySize,
 			CheckShortMessages: opts.Gemini.CheckShortMessages,
 			CustomPrompts:      opts.Gemini.CustomPrompts,
