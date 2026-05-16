@@ -298,6 +298,31 @@ func TestDetector_LLMContextExcludesSpamMessages(t *testing.T) {
 	assert.NotContains(t, captured[1], "spammer")
 }
 
+func TestDetector_LLMContextExcludesEarlyShortSpamMessages(t *testing.T) {
+	d := NewDetector(Config{HistorySize: 5, MaxAllowedEmoji: 1, MinMsgLen: 10})
+	var captured string
+	openAIMock := &mocks.OpenAIClientMock{
+		CreateChatCompletionFunc: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+			captured = req.Messages[1].Content
+			return openai.ChatCompletionResponse{
+				Choices: []openai.ChatCompletionChoice{{
+					Message: openai.ChatCompletionMessage{Content: `{"spam": false, "reason":"ok", "confidence":20}`},
+				}},
+			}, nil
+		},
+	}
+	d.WithOpenAIChecker(openAIMock, OpenAIConfig{Model: "gpt4", CheckShortMessagesWithOpenAI: true})
+
+	spam, _ := d.Check(spamcheck.Request{Msg: "🔥🔥", UserID: "1", UserName: "spammer"})
+	assert.True(t, spam)
+	require.Len(t, d.spamHistory.Last(5), 1)
+
+	spam, _ = d.Check(spamcheck.Request{Msg: "ok", UserID: "2", UserName: "regular"})
+	assert.False(t, spam)
+	assert.NotContains(t, captured, "🔥🔥")
+	assert.NotContains(t, captured, "spammer")
+}
+
 func TestDetector_CheckWithLLMConsensus(t *testing.T) {
 	makeOpenAIResponse := func(spam bool, reason string, confidence int) openai.ChatCompletionResponse {
 		return openai.ChatCompletionResponse{

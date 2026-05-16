@@ -282,7 +282,6 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 		forceLLM := req.ForceLLM && llmEligible
 		if isSpamDetected(cr) || !llmEligible || (!forceLLM && !openaiChecksShort && !geminiChecksShort) {
 			if isSpamDetected(cr) {
-				d.addToLLMHistory(req)
 				d.spamHistory.Push(req)
 				return true, cr // spam from the checks above
 			}
