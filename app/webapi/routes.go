@@ -128,6 +128,8 @@ func (s *Server) setupWebUIRoutes(router *routegroup.Bundle) {
 		webUI.HandleFunc("GET /manage_dictionary", s.htmlManageDictionaryHandler)
 		webUI.HandleFunc("GET /detected_spam", s.htmlDetectedSpamHandler)
 		webUI.HandleFunc("GET /list_settings", s.htmlSettingsHandler)
+		webUI.HandleFunc("GET /settings/edit", s.htmlSettingsEditHandler)
+		webUI.HandleFunc("POST /settings/save", s.saveSettingsHandler)
 		webUI.HandleFunc("POST /detected_spam/add", s.htmlAddDetectedSpamHandler)
 		webUI.HandleFunc("GET /dm-users", s.getDMUsersHandler)
 

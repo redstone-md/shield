@@ -8,10 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-pkgz/routegroup"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/umputun/tg-spam/app/rules"
+	"github.com/umputun/tg-spam/app/webapi/mocks"
 )
 
 type settingsRuleSetStub struct {
@@ -84,4 +86,18 @@ func TestSaveSettingsHandler_ValidationError(t *testing.T) {
 	assert.Equal(t, "#settings-error", rr.Header().Get("HX-Retarget"))
 	assert.Contains(t, rr.Body.String(), "detection.max_emoji")
 	assert.Equal(t, rules.RuleSet{}, prov.updated, "nothing persisted on validation error")
+}
+
+func TestSettingsEditRoute_Registered(t *testing.T) {
+	prov := &settingsRuleSetStub{get: rules.RuleSet{}}
+	srv := NewServer(Config{
+		RuleSetProvider: prov,
+		SpamFilter:      &mocks.SpamFilterMock{},
+		Settings:        Settings{TenantID: "tg-spam"},
+	})
+	router := srv.routes(routegroup.New(http.NewServeMux()))
+
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/settings/edit", http.NoBody))
+	assert.NotEqual(t, http.StatusNotFound, rr.Code, "GET /settings/edit must be routed")
 }
