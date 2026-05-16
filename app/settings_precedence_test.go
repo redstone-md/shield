@@ -56,3 +56,31 @@ func TestEnvPinnedKeys(t *testing.T) {
 	assert.True(t, pinned["openai.veto"], "OPENAI_VETO must be reported as pinned")
 	assert.False(t, pinned["detection.min_msg_len"], "unset MIN_MSG_LEN must not be pinned")
 }
+
+func TestApplyExplicitOverrides_LLMPrompt(t *testing.T) {
+	t.Setenv("OPENAI_PROMPT", "custom openai prompt")
+	t.Setenv("GEMINI_PROMPT", "custom gemini prompt")
+
+	var opts options
+	opts.OpenAI.Prompt = "custom openai prompt"
+	opts.Gemini.Prompt = "custom gemini prompt"
+
+	rs := rules.RuleSet{
+		OpenAI: rules.LLMRules{Prompt: "old openai"},
+		Gemini: rules.LLMRules{Prompt: "old gemini"},
+	}
+	applyExplicitRuleSetOverrides(&rs, opts)
+
+	assert.Equal(t, "custom openai prompt", rs.OpenAI.Prompt)
+	assert.Equal(t, "custom gemini prompt", rs.Gemini.Prompt)
+}
+
+func TestApplyExplicitOverrides_LLMPromptUntouchedWithoutEnv(t *testing.T) {
+	var opts options
+	opts.OpenAI.Prompt = "custom openai prompt"
+
+	rs := rules.RuleSet{OpenAI: rules.LLMRules{Prompt: "old openai"}}
+	applyExplicitRuleSetOverrides(&rs, opts)
+
+	assert.Equal(t, "old openai", rs.OpenAI.Prompt, "no env set: ruleset value kept")
+}

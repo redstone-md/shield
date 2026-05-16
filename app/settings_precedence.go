@@ -138,6 +138,9 @@ func applyExplicitLLMOverrides(rs *rules.RuleSet, opts options) {
 	if configured("openai.custom-prompt", "OPENAI_CUSTOM_PROMPT") {
 		rs.OpenAI.CustomPrompts = opts.OpenAI.CustomPrompts
 	}
+	if configured("openai.prompt", "OPENAI_PROMPT") {
+		rs.OpenAI.Prompt = opts.OpenAI.Prompt
+	}
 
 	if configured("gemini.token", "GEMINI_TOKEN") {
 		rs.Gemini.Enabled = opts.Gemini.Token != ""
@@ -156,6 +159,9 @@ func applyExplicitLLMOverrides(rs *rules.RuleSet, opts options) {
 	}
 	if configured("gemini.custom-prompt", "GEMINI_CUSTOM_PROMPT") {
 		rs.Gemini.CustomPrompts = opts.Gemini.CustomPrompts
+	}
+	if configured("gemini.prompt", "GEMINI_PROMPT") {
+		rs.Gemini.Prompt = opts.Gemini.Prompt
 	}
 }
 
