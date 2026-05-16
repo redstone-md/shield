@@ -145,7 +145,7 @@ func TestEngine_ResolvePromptUnknownProvider(t *testing.T) {
 	e := NewEngine(EngineConfig{})
 	system, _, _, err := e.resolvePrompt("missing", "")
 	require.NoError(t, err)
-	assert.Equal(t, "", system)
+	assert.Empty(t, system)
 }
 
 func TestEngineInvocationFromResult(t *testing.T) {
@@ -199,7 +199,7 @@ func TestEngineDefaultProvider(t *testing.T) {
 
 func TestEngine_SetVisionPrompt(t *testing.T) {
 	e := NewEngine(EngineConfig{})
-	assert.Equal(t, "", e.visionPromptOrDefault("")) // sanity: helper exists
+	assert.Empty(t, e.visionPromptOrDefault("")) // sanity: helper exists
 
 	e.SetVisionPrompt("custom vision prompt")
 	assert.Equal(t, "custom vision prompt", e.visionPromptOrDefault(""))

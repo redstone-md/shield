@@ -1,7 +1,7 @@
 package slowpath
 
 // ExportResolvePrompt exposes resolvePrompt for tests in other packages.
-func ExportResolvePrompt(e *Engine, provider string) (string, []string, string, error) {
+func ExportResolvePrompt(e *Engine, provider string) (system string, customs []string, version string, err error) {
 	return e.resolvePrompt(provider, "")
 }
 
