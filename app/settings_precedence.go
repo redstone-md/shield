@@ -14,6 +14,7 @@ func applyExplicitRuleSetOverrides(rs *rules.RuleSet, opts options) {
 	applyExplicitModerationOverrides(rs, opts)
 	applyExplicitReportOverrides(rs, opts)
 	applyExplicitLLMOverrides(rs, opts)
+	applyExplicitDetectionOverrides(rs, opts)
 }
 
 func applyExplicitMetaOverrides(rs *rules.RuleSet, opts options) {
@@ -155,6 +156,42 @@ func applyExplicitLLMOverrides(rs *rules.RuleSet, opts options) {
 	}
 	if configured("gemini.custom-prompt", "GEMINI_CUSTOM_PROMPT") {
 		rs.Gemini.CustomPrompts = opts.Gemini.CustomPrompts
+	}
+}
+
+func applyExplicitDetectionOverrides(rs *rules.RuleSet, opts options) {
+	if configured("max-emoji", "MAX_EMOJI") {
+		rs.Detection.MaxEmoji = opts.MaxEmoji
+	}
+	if configured("min-msg-len", "MIN_MSG_LEN") {
+		rs.Detection.MinMsgLen = opts.MinMsgLen
+	}
+	if configured("similarity-threshold", "SIMILARITY_THRESHOLD") {
+		rs.Detection.SimilarityThreshold = opts.SimilarityThreshold
+	}
+	if configured("min-probability", "MIN_PROBABILITY") {
+		rs.Detection.MinSpamProbability = opts.MinSpamProbability
+	}
+	if configured("multi-lang", "MULTI_LANG") {
+		rs.Detection.MultiLangWords = opts.MultiLangWords
+	}
+	if configured("first-messages-count", "FIRST_MESSAGES_COUNT") {
+		rs.Detection.FirstMessagesCount = opts.FirstMessagesCount
+	}
+	if configured("paranoid", "PARANOID") {
+		rs.Detection.ParanoidMode = opts.ParanoidMode
+	}
+	if configured("history-min-size", "HISTORY_MIN_SIZE") {
+		rs.Detection.HistorySize = opts.HistoryMinSize
+	}
+	if configured("cas.api", "CAS_API") {
+		rs.Detection.CasEnabled = opts.CAS.API != ""
+	}
+	if configured("llm.mode", "LLM_MODE") {
+		rs.LLM.Mode = opts.LLM.Mode
+	}
+	if configured("llm.consensus", "LLM_CONSENSUS") {
+		rs.LLM.Consensus = opts.LLM.Consensus
 	}
 }
 
