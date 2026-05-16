@@ -296,6 +296,7 @@ The web UI provides management interfaces:
 - **Manage Users**: view and control the approved users list.
 - **Detected Spam**: browse detected spam history.
 - **Settings**: configure bot parameters, super-users, and find your Telegram user ID.
+- **Edit Settings**: at `/settings/edit`, change the detection and LLM tuning (thresholds, per-check toggles, LLM mode/veto/consensus, models, system and vision prompts) directly in the browser. Saving stores a new versioned rule set and applies the change live without a restart. A setting that is also pinned by an environment variable shows an `env-pinned` warning badge, since the env value overrides the stored rule set on the next restart — remove it from the environment to manage that setting from the UI.
 
 <details markdown>
   <summary>Screenshots</summary>
