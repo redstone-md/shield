@@ -39,7 +39,25 @@ import (
 
 //go:embed assets/* assets/components/*
 var templateFS embed.FS
-var tmpl = template.Must(template.ParseFS(templateFS, "assets/*.html", "assets/components/*.html"))
+var tmpl = template.Must(template.New("").Funcs(template.FuncMap{"dict": templateDict}).
+	ParseFS(templateFS, "assets/*.html", "assets/components/*.html"))
+
+// templateDict builds a map from alternating key/value pairs, for use as a
+// html/template FuncMap function so templates can pass named arguments to sub-templates.
+func templateDict(pairs ...any) (map[string]any, error) {
+	if len(pairs)%2 != 0 {
+		return nil, fmt.Errorf("dict requires an even number of arguments, got %d", len(pairs))
+	}
+	m := make(map[string]any, len(pairs)/2)
+	for i := 0; i < len(pairs); i += 2 {
+		key, ok := pairs[i].(string)
+		if !ok {
+			return nil, fmt.Errorf("dict key %d is not a string", i)
+		}
+		m[key] = pairs[i+1]
+	}
+	return m, nil
+}
 
 // startTime tracks when the server started
 var startTime = time.Now()
