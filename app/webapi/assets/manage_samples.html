@@ -1,84 +1,74 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Manage Samples - TG-Spam</title>
+    <title>Manage Samples - Shield</title>
     {{template "heads.html"}}
 </head>
-<body>
-{{template "navbar.html"}}
-
-<div class="container mt-4">
-    <h2>Manage Samples</h2>
-
-    <!-- Forms for Adding New Samples -->
-    <div class="row mb-4">
-        <div class="col-md-6 mb-3">
+<body x-data="{ navOpen: false }">
+{{template "sidebar.html"}}
+<div class="scrim" x-show="navOpen" @click="navOpen=false" x-cloak></div>
+<main class="main">
+    <header class="topbar">
+        <button class="topbar__burger" @click="navOpen=!navOpen" aria-label="Toggle navigation"><i class="bi bi-list"></i></button>
+        <h2 class="page-title">Manage Samples</h2>
+    </header>
+    <div class="content">
+        <div class="grid-2 mb-4">
             <form hx-post="/update/spam" hx-target="#samples-list" hx-swap="innerHTML" hx-on::after-request="this.reset()">
-                <textarea name="msg" class="form-control mb-2" placeholder="Enter spam sample"></textarea>
+                <textarea name="msg" class="input mb-2" placeholder="Enter spam sample"></textarea>
                 <button type="submit" class="btn btn-danger">Add Spam</button>
             </form>
-        </div>
-        <div class="col-md-6">
             <form hx-post="/update/ham" hx-target="#samples-list" hx-swap="innerHTML" hx-on::after-request="this.reset()">
-                <textarea name="msg" class="form-control mb-2" placeholder="Enter ham sample"></textarea>
-                <button type="submit" class="btn btn-success">Add Ham</button>
+                <textarea name="msg" class="input mb-2" placeholder="Enter ham sample"></textarea>
+                <button type="submit" class="btn btn-ham">Add Ham</button>
             </form>
         </div>
+
+        {{template "samples_list" .}}
     </div>
-
-    <!-- Include the samples list template -->
-    {{template "samples_list" .}}
-</div>
-
+</main>
 </body>
 </html>
 
-
-<!-- list of samples, both spam and ham -->
 {{define "samples_list"}}
-    <div class="row" id="samples-list">
-        <div class="col-md-6">
-            <h4>
-                Spam Samples ({{.TotalSpamSamples}})
-                <a href="/download/spam" class="btn btn-custom-blue btn-sm">Download</a>
-            </h4>
-            <ul class="list-group" id="spam-samples-list">
-                {{range .SpamSamples}}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span id="loading-{{.ID}}">{{.Sample}} <img class="htmx-indicator" src="/spinner.svg"/></span>
-                        <form method="POST" hx-post="/delete/spam" hx-target="#samples-list" hx-swap="outerHTML" hx-indicator="#loading-{{.ID}}">
-                            <input type="hidden" name="msg" value="{{.Sample}}">
-                            <button type="submit" class="btn btn-sm btn-danger">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </form>
-                    </li>
-                {{else}}
-                    <li class="list-group-item">No spam samples found</li>
-                {{end}}
-            </ul>
-        </div>
-
-        <div class="col-md-6">
-            <h4>
-                Ham Samples ({{.TotalHamSamples}})
-                <a href="/download/ham" class="btn btn-custom-blue btn-sm">Download</a>
-            </h4>
-            <ul class="list-group" id="ham-samples-list">
-                {{range .HamSamples}}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        {{.Sample}}
-                        <form method="POST" hx-post="/delete/ham" hx-target="#samples-list" hx-swap="outerHTML">
-                            <input type="hidden" name="msg" value="{{.Sample}}">
-                            <button type="submit" class="btn btn-sm btn-danger">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </form>
-                    </li>
-                {{else}}
-                    <li class="list-group-item">No ham samples found</li>
-                {{end}}
-            </ul>
-        </div>
+<div class="grid-2" id="samples-list">
+    <div>
+        <h4 class="flex center gap-2">
+            Spam Samples ({{.TotalSpamSamples}})
+            <a href="/download/spam" class="btn btn-ghost btn-sm">Download</a>
+        </h4>
+        <ul class="list" id="spam-samples-list">
+            {{range .SpamSamples}}
+            <li class="list-item">
+                <span id="loading-{{.ID}}">{{.Sample}} <img class="htmx-indicator" src="/spinner.svg"/></span>
+                <form method="POST" hx-post="/delete/spam" hx-target="#samples-list" hx-swap="outerHTML" hx-indicator="#loading-{{.ID}}">
+                    <input type="hidden" name="msg" value="{{.Sample}}">
+                    <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
+                </form>
+            </li>
+            {{else}}
+            <li class="list-item">No spam samples found</li>
+            {{end}}
+        </ul>
     </div>
+    <div>
+        <h4 class="flex center gap-2">
+            Ham Samples ({{.TotalHamSamples}})
+            <a href="/download/ham" class="btn btn-ghost btn-sm">Download</a>
+        </h4>
+        <ul class="list" id="ham-samples-list">
+            {{range .HamSamples}}
+            <li class="list-item">
+                {{.Sample}}
+                <form method="POST" hx-post="/delete/ham" hx-target="#samples-list" hx-swap="outerHTML">
+                    <input type="hidden" name="msg" value="{{.Sample}}">
+                    <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
+                </form>
+            </li>
+            {{else}}
+            <li class="list-item">No ham samples found</li>
+            {{end}}
+        </ul>
+    </div>
+</div>
 {{end}}
