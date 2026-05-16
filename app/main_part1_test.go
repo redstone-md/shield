@@ -280,29 +280,6 @@ func TestBuildDetectorConfigSetsLLMMode(t *testing.T) {
 	assert.Equal(t, tgspam.LLMModeAlways, cfg.LLMMode)
 }
 
-func TestReadPromptOverride(t *testing.T) {
-	t.Run("missing file", func(t *testing.T) {
-		prompt, err := readPromptOverride(t.TempDir())
-		require.NoError(t, err)
-		assert.Empty(t, prompt)
-	})
-
-	t.Run("trims markdown prompt", func(t *testing.T) {
-		dir := t.TempDir()
-		require.NoError(t, os.WriteFile(path.Join(dir, promptOverrideFile), []byte("\ncustom prompt\n"), 0o600))
-
-		prompt, err := readPromptOverride(dir)
-		require.NoError(t, err)
-		assert.Equal(t, "custom prompt", prompt)
-	})
-}
-
-func TestResolveSlowPathPrompt(t *testing.T) {
-	assert.Equal(t, "provider prompt", resolveSlowPathPrompt("provider prompt", "file prompt"))
-	assert.Equal(t, "file prompt", resolveSlowPathPrompt(" ", "file prompt"))
-	assert.Empty(t, resolveSlowPathPrompt("", ""))
-}
-
 func TestMakeSlowPathChatEngine(t *testing.T) {
 	t.Run("disabled without token", func(t *testing.T) {
 		var opts options

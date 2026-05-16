@@ -558,27 +558,3 @@ func applySlowPathPrompts(eng *slowpath.Engine, ruleSet rules.RuleSet) {
 	eng.SetSystemPrompt("gemini", ruleSet.Gemini.Prompt)
 	eng.SetVisionPrompt(ruleSet.LLM.VisionPrompt)
 }
-
-func readPromptOverride(dynamicPath string) (string, error) {
-	if dynamicPath == "" {
-		return "", nil
-	}
-
-	path := filepath.Join(dynamicPath, promptOverrideFile)
-	data, err := os.ReadFile(path) // #nosec G304 -- path supplied by operator config
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return "", nil
-		}
-		return "", fmt.Errorf("read %s: %w", path, err)
-	}
-
-	return strings.TrimSpace(string(data)), nil
-}
-
-func resolveSlowPathPrompt(providerPrompt, overridePrompt string) string {
-	if strings.TrimSpace(providerPrompt) != "" {
-		return providerPrompt
-	}
-	return overridePrompt
-}
