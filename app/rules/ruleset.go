@@ -2,6 +2,10 @@ package rules
 
 import "time"
 
+// CurrentSchemaVersion is the RuleSet payload schema version. Bump it whenever new
+// fields are added so older persisted rulesets can be detected and backfilled.
+const CurrentSchemaVersion = 1
+
 // RuleSet is the single-tenant moderation configuration snapshot.
 type RuleSet struct {
 	WorkspaceID   string    `json:"workspace_id"`

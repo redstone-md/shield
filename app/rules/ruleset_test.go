@@ -51,3 +51,7 @@ func TestRuleSet_LegacyPayloadDecodesNewFieldsAsZero(t *testing.T) {
 	assert.Equal(t, LLMCommonRules{}, got.LLM)
 	assert.Empty(t, got.OpenAI.Prompt)
 }
+
+func TestCurrentSchemaVersion(t *testing.T) {
+	assert.Equal(t, 1, CurrentSchemaVersion)
+}
