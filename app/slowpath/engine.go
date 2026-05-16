@@ -13,22 +13,25 @@ type EngineConfig struct {
 }
 
 type Engine struct {
-	providers map[string]LLMProvider
-	chat      map[string]ChatProvider
-	vision    map[string]VisionProvider
-	breakers  map[string]*ProviderBreaker
-	budget    BudgetTracker
-	registry  PromptRegistry
-	config    EngineConfig
+	providers     map[string]LLMProvider
+	chat          map[string]ChatProvider
+	vision        map[string]VisionProvider
+	breakers      map[string]*ProviderBreaker
+	budget        BudgetTracker
+	registry      PromptRegistry
+	systemPrompts map[string]string
+	visionPrompt  string
+	config        EngineConfig
 }
 
 func NewEngine(cfg EngineConfig) *Engine {
 	return &Engine{
-		providers: make(map[string]LLMProvider),
-		chat:      make(map[string]ChatProvider),
-		vision:    make(map[string]VisionProvider),
-		breakers:  make(map[string]*ProviderBreaker),
-		config:    cfg,
+		providers:     make(map[string]LLMProvider),
+		chat:          make(map[string]ChatProvider),
+		vision:        make(map[string]VisionProvider),
+		breakers:      make(map[string]*ProviderBreaker),
+		systemPrompts: make(map[string]string),
+		config:        cfg,
 	}
 }
 
@@ -56,6 +59,17 @@ func (e *Engine) RegisterVision(p VisionProvider, breakerCfg BreakerConfig) {
 
 func (e *Engine) SetBudgetTracker(bt BudgetTracker)   { e.budget = bt }
 func (e *Engine) SetPromptRegistry(pr PromptRegistry) { e.registry = pr }
+
+// SetVisionPrompt sets the system prompt used for vision (image) checks.
+func (e *Engine) SetVisionPrompt(prompt string) { e.visionPrompt = prompt }
+
+// visionPromptOrDefault returns the configured vision prompt, or fallback when unset.
+func (e *Engine) visionPromptOrDefault(fallback string) string {
+	if e.visionPrompt != "" {
+		return e.visionPrompt
+	}
+	return fallback
+}
 
 func (e *Engine) Check(ctx context.Context, req SlowPathRequest) (*SlowPathResult, error) {
 	if len(req.ImageData) > 0 {
@@ -172,7 +186,7 @@ func (e *Engine) checkVision(ctx context.Context, req SlowPathRequest) (*SlowPat
 		return &SlowPathResult{EventID: req.EventID, Skipped: true}, nil
 	}
 
-	prompt := defaultVisionPrompt
+	prompt := e.visionPromptOrDefault(defaultVisionPrompt)
 	result, err := e.callVisionWithBreaker(ctx, provider, req.ImageData, req.ImageMIME, prompt, v)
 	if err != nil {
 		return nil, err

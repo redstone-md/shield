@@ -205,6 +205,19 @@ func TestEngineDefaultProvider(t *testing.T) {
 	assert.Equal(t, []string{"gemini"}, result.Providers)
 }
 
+func TestEngine_SetVisionPrompt(t *testing.T) {
+	e := NewEngine(EngineConfig{})
+	assert.Equal(t, "", e.visionPromptOrDefault("")) // sanity: helper exists
+
+	e.SetVisionPrompt("custom vision prompt")
+	assert.Equal(t, "custom vision prompt", e.visionPromptOrDefault(""))
+}
+
+func TestEngine_VisionPromptFallsBackToDefault(t *testing.T) {
+	e := NewEngine(EngineConfig{})
+	assert.Equal(t, defaultVisionPrompt, e.visionPromptOrDefault(defaultVisionPrompt))
+}
+
 type stubLLMProvider struct {
 	name   string
 	result *ProviderResult
