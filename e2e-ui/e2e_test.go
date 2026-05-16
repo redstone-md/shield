@@ -180,7 +180,7 @@ func TestChecker_PageLoads(t *testing.T) {
 	title, err := page.Title()
 	require.NoError(t, err)
 	assert.Contains(t, title, "Checker")
-	assert.Contains(t, title, "TG-Spam")
+	assert.Contains(t, title, "Shield")
 
 	// verify main elements
 	waitVisible(t, page.Locator("h2:has-text('Message Checker')"))
@@ -260,9 +260,9 @@ func TestFeedback_PageLoads(t *testing.T) {
 	assert.Contains(t, title, "Feedback")
 
 	waitVisible(t, page.Locator("h2:has-text('Feedback')"))
-	waitVisible(t, page.Locator("a[data-bs-toggle='tab'][href='#labels']"))
-	waitVisible(t, page.Locator("a[data-bs-toggle='tab'][href='#candidates']"))
-	waitVisible(t, page.Locator("a[data-bs-toggle='tab'][href='#knowledge']"))
+	waitVisible(t, page.Locator("button.tab:has-text('Labels')"))
+	waitVisible(t, page.Locator("button.tab:has-text('Candidates')"))
+	waitVisible(t, page.Locator("button.tab:has-text('Knowledge')"))
 }
 
 // --- navigation tests ---
@@ -273,7 +273,7 @@ func TestNavbar_NavigationWorks(t *testing.T) {
 	require.NoError(t, err)
 
 	// verify navbar is visible
-	waitVisible(t, page.Locator(".navbar"))
+	waitVisible(t, page.Locator(".sidebar"))
 
 	// test navigation links
 	tests := []struct {
@@ -326,7 +326,7 @@ func TestChecker_CheckMessage(t *testing.T) {
 	require.NoError(t, page.Locator("button[type='submit']:has-text('Check')").Click())
 
 	// wait for result container with alert-light (outer container)
-	result := page.Locator("#result .alert-light")
+	result := page.Locator("#result .alert")
 	waitVisible(t, result)
 
 	// check that result contains either "Spam detected" or "No spam detected"
