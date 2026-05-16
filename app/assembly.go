@@ -247,51 +247,7 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 	detectorConfig := buildDetectorConfig(opts, ruleSet)
 	detector := tgspam.NewDetector(detectorConfig)
 
-	if ruleSet.OpenAI.Enabled && (opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "") {
-		log.Printf("[WARN] openai enabled")
-		openAIConfig := tgspam.OpenAIConfig{
-			SystemPrompt:                 opts.OpenAI.Prompt,
-			CustomPrompts:                opts.OpenAI.CustomPrompts,
-			Model:                        ruleSet.OpenAI.Model,
-			MaxTokensResponse:            opts.OpenAI.MaxTokensResponse,
-			MaxTokensRequest:             opts.OpenAI.MaxTokensRequest,
-			MaxSymbolsRequest:            opts.OpenAI.MaxSymbolsRequest,
-			RetryCount:                   opts.OpenAI.RetryCount,
-			ReasoningEffort:              opts.OpenAI.ReasoningEffort,
-			CheckShortMessagesWithOpenAI: ruleSet.OpenAI.CheckShortMessages,
-		}
-
-		config := openai.DefaultConfig(opts.OpenAI.Token)
-		if opts.OpenAI.APIBase != "" {
-			config.BaseURL = opts.OpenAI.APIBase
-		}
-		debugLogFields("openai config", openAIConfig)
-
-		detector.WithOpenAIChecker(openai.NewClientWithConfig(config), openAIConfig)
-	}
-
-	if ruleSet.Gemini.Enabled && opts.Gemini.Token != "" {
-		log.Printf("[WARN] gemini enabled")
-		geminiConfig := tgspam.GeminiConfig{
-			SystemPrompt:       opts.Gemini.Prompt,
-			CustomPrompts:      opts.Gemini.CustomPrompts,
-			Model:              ruleSet.Gemini.Model,
-			MaxOutputTokens:    opts.Gemini.MaxTokensResponse,
-			MaxSymbolsRequest:  opts.Gemini.MaxSymbolsRequest,
-			RetryCount:         opts.Gemini.RetryCount,
-			CheckShortMessages: ruleSet.Gemini.CheckShortMessages,
-		}
-
-		client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
-			APIKey:  opts.Gemini.Token,
-			Backend: genai.BackendGeminiAPI,
-		})
-		if err != nil {
-			log.Fatalf("[ERROR] failed to create gemini client: %v", err)
-		}
-		debugLogFields("gemini config", geminiConfig)
-		detector.WithGeminiChecker(client.Models, geminiConfig)
-	}
+	applyLLMCheckers(detector, opts, ruleSet)
 
 	detector.WithMetaChecks(buildMetaChecks(ruleSet, ruleSet.Detection.MinMsgLen)...)
 	debugLogFields("detector config", detectorConfig)
@@ -321,6 +277,52 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 	}
 
 	return detector
+}
+
+// applyLLMCheckers (re)builds and attaches the OpenAI and Gemini text checkers on the
+// detector from the current ruleset. Safe to call repeatedly for live reload.
+func applyLLMCheckers(detector *tgspam.Detector, opts options, ruleSet rules.RuleSet) {
+	if ruleSet.OpenAI.Enabled && (opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "") {
+		openAIConfig := tgspam.OpenAIConfig{
+			SystemPrompt:                 ruleSet.OpenAI.Prompt,
+			CustomPrompts:                ruleSet.OpenAI.CustomPrompts,
+			Model:                        ruleSet.OpenAI.Model,
+			MaxTokensResponse:            opts.OpenAI.MaxTokensResponse,
+			MaxTokensRequest:             opts.OpenAI.MaxTokensRequest,
+			MaxSymbolsRequest:            opts.OpenAI.MaxSymbolsRequest,
+			RetryCount:                   opts.OpenAI.RetryCount,
+			ReasoningEffort:              opts.OpenAI.ReasoningEffort,
+			CheckShortMessagesWithOpenAI: ruleSet.OpenAI.CheckShortMessages,
+		}
+		config := openai.DefaultConfig(opts.OpenAI.Token)
+		if opts.OpenAI.APIBase != "" {
+			config.BaseURL = opts.OpenAI.APIBase
+		}
+		debugLogFields("openai config", openAIConfig)
+		detector.WithOpenAIChecker(openai.NewClientWithConfig(config), openAIConfig)
+	}
+
+	if ruleSet.Gemini.Enabled && opts.Gemini.Token != "" {
+		geminiConfig := tgspam.GeminiConfig{
+			SystemPrompt:       ruleSet.Gemini.Prompt,
+			CustomPrompts:      ruleSet.Gemini.CustomPrompts,
+			Model:              ruleSet.Gemini.Model,
+			MaxOutputTokens:    opts.Gemini.MaxTokensResponse,
+			MaxSymbolsRequest:  opts.Gemini.MaxSymbolsRequest,
+			RetryCount:         opts.Gemini.RetryCount,
+			CheckShortMessages: ruleSet.Gemini.CheckShortMessages,
+		}
+		client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
+			APIKey:  opts.Gemini.Token,
+			Backend: genai.BackendGeminiAPI,
+		})
+		if err != nil {
+			log.Printf("[ERROR] failed to create gemini client: %v", err)
+			return
+		}
+		debugLogFields("gemini config", geminiConfig)
+		detector.WithGeminiChecker(client.Models, geminiConfig)
+	}
 }
 
 func buildDetectorConfig(opts options, ruleSet rules.RuleSet) tgspam.Config {

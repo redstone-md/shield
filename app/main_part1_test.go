@@ -655,6 +655,15 @@ func TestBuildDetectorConfig_CasDisabledClearsAPI(t *testing.T) {
 	assert.Empty(t, cfg.CasAPI, "CAS API must be cleared when CasEnabled is false")
 }
 
+func TestApplyLLMCheckers_NoLLMConfigured(t *testing.T) {
+	// no tokens configured -> applyLLMCheckers must be a safe no-op
+	var opts options
+	detector := tgspam.NewDetector(tgspam.Config{})
+	rs := rules.RuleSet{}
+
+	assert.NotPanics(t, func() { applyLLMCheckers(detector, opts, rs) })
+}
+
 func TestApplySlowPathPrompts_FromRuleSet(t *testing.T) {
 	eng := slowpath.NewEngine(slowpath.EngineConfig{})
 	rs := rules.RuleSet{
