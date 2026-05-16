@@ -46,6 +46,7 @@ func (m *mockOnboardTenantStore) UpdateStatus(_ context.Context, _, status strin
 }
 
 type mockOnboardWorkspaceStore struct {
+	mu      sync.Mutex
 	wsID    int64
 	addErr  error
 	members []storage.WorkspaceMemberRecord
@@ -63,6 +64,8 @@ func (m *mockOnboardWorkspaceStore) Get(_ context.Context, _ string) (storage.Wo
 }
 
 func (m *mockOnboardWorkspaceStore) AddMember(_ context.Context, wsID int64, userID, role string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.members = append(m.members, storage.WorkspaceMemberRecord{
 		WorkspaceID: wsID, UserID: userID, Role: role,
 	})
