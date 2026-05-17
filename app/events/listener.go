@@ -18,6 +18,7 @@ import (
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
+	"github.com/umputun/tg-spam/app/audit"
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/observability"
@@ -85,6 +86,7 @@ type TelegramListener struct {
 	PolicyProfileName       string
 	AuditWriter             AuditWriter
 	IncidentCreator         IncidentCreator
+	AppealService           *audit.AppealService
 	UsageMeter              UsageMeter
 	MetricsRecorder         MetricsRecorder
 	SlowPathEnabled         bool
@@ -95,6 +97,7 @@ type TelegramListener struct {
 
 	adminHandler    *admin
 	reportsHandler  *userReports
+	appealHandler   *appealHandler
 	processor       incomingEventProcessor
 	pipeline        listenerPipeline
 	dmUsers         dmUsers // recent DM senders, stored in memory for admin UI
@@ -255,6 +258,10 @@ func (l *TelegramListener) initHandlers() {
 		primChatID: l.chatID, adminChatID: l.adminChatID,
 		trainingMode: l.TrainingMode, softBanMode: l.SoftBanMode, dry: l.Dry,
 	}
+
+	if l.AppealService != nil {
+		l.appealHandler = newAppealHandler(l.TbAPI, l.AppealService, l.adminChatID)
+	}
 }
 
 func (l *TelegramListener) eventLoop(ctx context.Context) error {
@@ -326,6 +333,10 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 	}
 
 	if update.Message == nil {
+		return nil
+	}
+
+	if update.Message.Chat.Type == "private" && l.procAppealStart(ctx, update) {
 		return nil
 	}
 
@@ -407,6 +418,28 @@ func (l *TelegramListener) handleCallback(ctx context.Context, cb *tbapi.Callbac
 			}
 		}
 	}
+}
+
+// procAppealStart routes a private-chat "/start <incidentID>" deep link to the
+// appeal handler. It returns false for a bare /start or any non-/start text so
+// the message continues through normal processing.
+func (l *TelegramListener) procAppealStart(ctx context.Context, update tbapi.Update) (handled bool) {
+	if l.appealHandler == nil || update.Message == nil {
+		return false
+	}
+	const prefix = "/start "
+	text := strings.TrimSpace(update.Message.Text)
+	if !strings.HasPrefix(text, prefix) {
+		return false
+	}
+	payload := strings.TrimSpace(strings.TrimPrefix(text, prefix))
+	if payload == "" {
+		return false
+	}
+	if err := l.appealHandler.Handle(ctx, update.Message, payload); err != nil {
+		log.Printf("[WARN] failed to handle appeal /start: %v", err)
+	}
+	return true
 }
 
 func (l *TelegramListener) procSuperCommand(ctx context.Context, update tbapi.Update) (handled bool) {

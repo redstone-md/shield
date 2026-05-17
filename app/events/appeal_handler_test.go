@@ -44,6 +44,29 @@ func newAppealTestMessage(userID int64, text string) *tbapi.Message {
 	}
 }
 
+func TestProcAppealStart(t *testing.T) {
+	filer := &fakeAppealFiler{
+		incident:    audit.Incident{ID: 10, SpamUserID: 555, Status: audit.IncidentStatusOpen},
+		existingErr: errors.New("no appeal yet"),
+		submitted:   audit.Appeal{ID: 88},
+	}
+	var sent []tbapi.MessageConfig
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			sent = append(sent, c.(tbapi.MessageConfig))
+			return tbapi.Message{}, nil
+		},
+	}
+	l := &TelegramListener{appealHandler: newAppealHandler(mockAPI, filer, 12345)}
+
+	update := tbapi.Update{Message: newAppealTestMessage(555, "/start 10")}
+	assert.True(t, l.procAppealStart(context.Background(), update), "/start with payload is handled")
+	assert.Equal(t, []int64{10}, filer.submitCalls)
+
+	bare := tbapi.Update{Message: newAppealTestMessage(555, "/start")}
+	assert.False(t, l.procAppealStart(context.Background(), bare), "bare /start is not handled here")
+}
+
 func TestAppealHandler_Handle(t *testing.T) {
 	tests := []struct {
 		name       string
