@@ -89,6 +89,15 @@ func TestAppealHandler_Handle(t *testing.T) {
 			wantReply: "Апелляция уже подана, ожидайте решения модераторов.",
 		},
 		{
+			name:    "appeal already reviewed",
+			payload: "10",
+			filer: &fakeAppealFiler{
+				incident: audit.Incident{ID: 10, SpamUserID: 555, Status: audit.IncidentStatusAppealed},
+				existing: audit.Appeal{ID: 1, Status: audit.AppealAccepted},
+			},
+			wantReply: "Апелляция уже рассмотрена.",
+		},
+		{
 			name:    "success",
 			payload: "10",
 			filer: &fakeAppealFiler{
