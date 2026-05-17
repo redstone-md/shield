@@ -133,7 +133,7 @@ func (a *admin) callbackWarningHamConfirmed(ctx context.Context, query *tbapi.Ca
 		a.autoLearner.LearnHam(ctx, cleanMsg, query.From.UserName)
 	}
 	if a.detectedSpam != nil {
-		if _, _, err := a.deleteAllWarns(ctx, userID, ""); err != nil {
+		if err := a.deleteAllWarns(ctx, userID, ""); err != nil {
 			return fmt.Errorf("failed to remove warning strikes for %d: %w", userID, err)
 		}
 	}

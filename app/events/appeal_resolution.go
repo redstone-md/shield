@@ -42,8 +42,7 @@ func (b *appealBotAdapter) ClearUserWarnings(ctx context.Context, userID int64) 
 	if b.listener.adminHandler == nil || b.listener.DetectedSpamCounter == nil {
 		return nil
 	}
-	_, _, err := b.listener.adminHandler.deleteAllWarns(ctx, userID, "")
-	return err
+	return b.listener.adminHandler.deleteAllWarns(ctx, userID, "")
 }
 
 // NotifyAppealResult DMs the user the appeal outcome. Best-effort: a blocked
