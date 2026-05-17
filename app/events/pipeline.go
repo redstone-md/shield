@@ -214,6 +214,7 @@ type pipelineContext struct {
 	banUserStr  string
 	outcome     PolicyOutcome
 	strikeCount int
+	incidentID  int64
 }
 
 func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error {
@@ -385,6 +386,32 @@ func (l *TelegramListener) processEnforce(ctx context.Context, pc pipelineContex
 	return l.cleanupAfterAction(ctx, pc, errs)
 }
 
+// ensureIncident creates the audit incident for a warn/ban before the group
+// message is posted, so the incident id can be embedded in the appeal button.
+// It is idempotent: the later AuditWriter.Write call resolves to the same
+// incident. Returns 0 when incidents are disabled or the response is not
+// actionable, in which case no appeal button is attached.
+func (l *TelegramListener) ensureIncident(ctx context.Context, pc pipelineContext) int64 {
+	if l.IncidentCreator == nil || !pc.resp.Send || pc.resp.BanInterval <= 0 {
+		return 0
+	}
+	userName := ""
+	if pc.msg != nil && pc.msg.From.ID != 0 {
+		userName = pc.msg.From.DisplayName
+	}
+	msgText := ""
+	if pc.msg != nil {
+		msgText = pc.msg.Text
+	}
+	id, err := l.IncidentCreator.CreateIncident(ctx, pc.event.IdempotencyKey, pc.fromChat,
+		l.RuleSetVersion, pc.spamUserID, userName, msgText, pc.resp.CheckResults, nil)
+	if err != nil {
+		observability.Logf(ctx, "[WARN] early incident creation failed: %v", err)
+		return 0
+	}
+	return id
+}
+
 func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) error {
 	errs := new(multierror.Error)
 
@@ -392,6 +419,7 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 		return l.cleanupAfterAction(ctx, pc, errs)
 	}
 
+	pc.incidentID = l.ensureIncident(ctx, pc)
 	warnNum := pc.strikeCount + 1
 	warnTotal := l.ModerationConfig.WarnStrikes
 	if warnTotal <= 0 {
@@ -408,6 +436,8 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 		messageID:   pc.msg.ID,
 		text:        warnText,
 		warnDelTime: l.ModerationConfig.WarnDeleteDuration,
+		incidentID:  pc.incidentID,
+		botUsername: l.BotUsername,
 	}
 	if err := l.ActionExecutor.WarnUser(ctx, warnReq); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to send warning: %w", err))
@@ -445,8 +475,29 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 	return l.cleanupAfterAction(ctx, pc, errs)
 }
 
+const banGroupMessageText = "🚫 Пользователь забанен за спам"
+
+// postBanGroupMessage posts the self-deleting ban notice with the appeal
+// button to the group chat. It is skipped for channel bans, restrictions
+// (mutes), and dry/training runs where no real ban happened.
+func (l *TelegramListener) postBanGroupMessage(ctx context.Context, pc pipelineContext, incidentID int64) {
+	if l.Dry || l.TrainingMode || pc.outcome.Restrict || pc.resp.ChannelID != 0 {
+		return
+	}
+	if err := l.ActionExecutor.PostBanMessage(ctx, banMessageRequest{
+		chatID:      pc.fromChat,
+		text:        banGroupMessageText,
+		incidentID:  incidentID,
+		botUsername: l.BotUsername,
+		delTime:     l.ModerationConfig.WarnDeleteDuration,
+	}); err != nil {
+		observability.Logf(ctx, "[WARN] failed to post ban group message: %v", err)
+	}
+}
+
 func (l *TelegramListener) applyBanAction(ctx context.Context, pc pipelineContext,
 	actionResult *moderation.ModerationActionResult, errs *multierror.Error) {
+	incidentID := l.ensureIncident(ctx, pc)
 	banReq := banRequest{
 		duration:  pc.outcome.Duration,
 		userID:    pc.resp.User.ID,
@@ -465,13 +516,14 @@ func (l *TelegramListener) applyBanAction(ctx context.Context, pc pipelineContex
 		actionResult.Error = err.Error()
 		multierror.Append(errs, fmt.Errorf("failed to apply %s for %s: %w",
 			pc.outcome.Decision.Action, pc.banUserStr, err))
-	} else if l.adminChatID != 0 && pc.msg.From.ID != 0 {
-		actionResult.Applied = true
+		return
+	}
+	actionResult.Applied = true
+	if l.adminChatID != 0 && pc.msg.From.ID != 0 {
 		l.adminHandler.ReportBan(pc.banUserStr, pc.msg, pc.outcome.Duration, pc.outcome.Restrict,
 			slowpathReason(pc.resp.CheckResults))
-	} else {
-		actionResult.Applied = true
 	}
+	l.postBanGroupMessage(ctx, pc, incidentID)
 }
 
 func (l *TelegramListener) applyDeleteAction(ctx context.Context, pc pipelineContext,

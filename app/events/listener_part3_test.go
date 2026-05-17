@@ -81,7 +81,8 @@ func TestTelegramListener_DoWithBotBan(t *testing.T) {
 		assert.Len(t, mockLogger.SaveCalls(), 1)
 		assert.Equal(t, "text 123", mockLogger.SaveCalls()[0].Msg.Text)
 		assert.Equal(t, "user", mockLogger.SaveCalls()[0].Msg.From.Username)
-		assert.Empty(t, mockAPI.SendCalls())
+		assert.Len(t, mockAPI.SendCalls(), 1, "ban group message should be sent after a real user ban")
+		assert.Equal(t, banGroupMessageText, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text)
 		assert.Len(t, mockAPI.RequestCalls(), 1)
 		assert.Equal(t, int64(123), mockAPI.RequestCalls()[0].C.(tbapi.BanChatMemberConfig).ChatID)
 

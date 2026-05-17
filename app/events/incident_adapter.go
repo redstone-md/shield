@@ -22,7 +22,7 @@ func (a *incidentAdapter) CreateIncident(
 	messageText string,
 	checks []spamcheck.Response,
 	slow *slowpath.SlowPathInvocation,
-) error {
+) (int64, error) {
 	data := audit.AuditEventData{
 		IdempotencyKey: idempotencyKey,
 		ChatID:         chatID,

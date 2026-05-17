@@ -134,6 +134,78 @@ func TestTelegramActionExecutor_WarnUser(t *testing.T) {
 	assert.Equal(t, "key-3", journal.calls[0].IdempotencyKey)
 }
 
+func TestTelegramActionExecutor_WarnUserAppealButton(t *testing.T) {
+	var sent tbapi.MessageConfig
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			sent = c.(tbapi.MessageConfig)
+			return tbapi.Message{MessageID: 1}, nil
+		},
+	}
+	exec := newTelegramActionExecutor(mockAPI, false, false, nil, nil)
+
+	err := exec.WarnUser(context.Background(), warnRequest{
+		chatID:      100,
+		subjectID:   200,
+		messageID:   5,
+		text:        "warned",
+		incidentID:  42,
+		botUsername: "shield_bot",
+	})
+	require.NoError(t, err)
+
+	markup, ok := sent.ReplyMarkup.(tbapi.InlineKeyboardMarkup)
+	require.True(t, ok, "warn message must carry an inline keyboard")
+	require.Len(t, markup.InlineKeyboard, 1)
+	require.Len(t, markup.InlineKeyboard[0], 1)
+	btn := markup.InlineKeyboard[0][0]
+	assert.Equal(t, "Обжаловать", btn.Text)
+	require.NotNil(t, btn.URL)
+	assert.Equal(t, "https://t.me/shield_bot?start=42", *btn.URL)
+}
+
+func TestTelegramActionExecutor_WarnUserNoButtonWithoutIncident(t *testing.T) {
+	var sent tbapi.MessageConfig
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			sent = c.(tbapi.MessageConfig)
+			return tbapi.Message{MessageID: 1}, nil
+		},
+	}
+	exec := newTelegramActionExecutor(mockAPI, false, false, nil, nil)
+
+	err := exec.WarnUser(context.Background(), warnRequest{chatID: 100, subjectID: 200, text: "warned"})
+	require.NoError(t, err)
+	assert.Nil(t, sent.ReplyMarkup, "no incident id -> no appeal button")
+}
+
+func TestTelegramActionExecutor_PostBanMessage(t *testing.T) {
+	var sent tbapi.MessageConfig
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			sent = c.(tbapi.MessageConfig)
+			return tbapi.Message{MessageID: 7}, nil
+		},
+	}
+	exec := newTelegramActionExecutor(mockAPI, false, false, nil, nil)
+
+	err := exec.PostBanMessage(context.Background(), banMessageRequest{
+		chatID:      100,
+		text:        "🚫 Пользователь забанен за спам",
+		incidentID:  42,
+		botUsername: "shield_bot",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "🚫 Пользователь забанен за спам", sent.Text)
+	markup, ok := sent.ReplyMarkup.(tbapi.InlineKeyboardMarkup)
+	require.True(t, ok, "ban message must carry the appeal keyboard")
+	require.Len(t, markup.InlineKeyboard, 1)
+	require.Len(t, markup.InlineKeyboard[0], 1)
+	btn := markup.InlineKeyboard[0][0]
+	require.NotNil(t, btn.URL)
+	assert.Equal(t, "https://t.me/shield_bot?start=42", *btn.URL)
+}
+
 type moderationActionsSpy struct {
 	calls []storage.ModerationActionEntry
 	last  storage.ModerationActionReplay

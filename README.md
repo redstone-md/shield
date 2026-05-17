@@ -259,6 +259,23 @@ Regular users can reply to suspicious messages with `/report`. Enable with `--re
 
 Super-users forwarding spam to the admin chat (or replying `/spam`) adds it to spam samples automatically. Unbanning adds the message to ham samples. The bot learns new patterns on the fly.
 
+### Appeal flow
+
+When the bot warns or bans a user it posts a group-chat message carrying an
+**"Обжаловать"** (Appeal) inline button. A ban now posts its own group message
+(previously only the admin chat was notified); both the warn and the ban
+message auto-delete after `WarnDeleteDuration`, so the appeal button is
+available for that window.
+
+Tapping the button opens the bot DM and files a one-tap appeal (no reason
+text). The appeal is sent to the admin chat with **Принять / Отклонить**
+buttons. Accepting unbans the user, clears all of their warning strikes and
+DMs them the outcome; rejecting closes the incident and DMs the user. Each
+incident accepts a single appeal — a moderator decision is final.
+
+The same accept/reject behavior backs the web `/appeals` admin UI, so an
+appeal resolved on the website unbans and notifies the user identically.
+
 ## Web server and UI
 
 Enable with `--server.enabled`. Listen address: `--server.listen` (default `:8080`).

@@ -35,6 +35,7 @@ type admin struct {
 	warnDeleteDuration     time.Duration
 	aggressiveCleanup      bool
 	aggressiveCleanupLimit int
+	appeals                appealResolver
 }
 
 const (
