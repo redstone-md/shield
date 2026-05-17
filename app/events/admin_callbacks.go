@@ -565,6 +565,7 @@ func (a *admin) callbackAppealResolve(ctx context.Context, query *tbapi.Callback
 	if err != nil {
 		return fmt.Errorf("failed to load appeal %d: %w", appealID, err)
 	}
+	// only accepted/rejected are terminal; triaged/escalated appeals stay resolvable
 	if ap.Status == audit.AppealAccepted || ap.Status == audit.AppealRejected {
 		if _, rErr := a.tbAPI.Request(tbapi.NewCallback(query.ID, "Апелляция уже рассмотрена")); rErr != nil {
 			return fmt.Errorf("failed to answer callback: %w", rErr)
@@ -572,7 +573,11 @@ func (a *admin) callbackAppealResolve(ctx context.Context, query *tbapi.Callback
 		return nil
 	}
 
-	if _, err := a.tbAPI.Request(tbapi.NewCallback(query.ID, "принято")); err != nil {
+	toast := "принято"
+	if !accept {
+		toast = "отклонено"
+	}
+	if _, err := a.tbAPI.Request(tbapi.NewCallback(query.ID, toast)); err != nil {
 		return fmt.Errorf("failed to answer callback: %w", err)
 	}
 

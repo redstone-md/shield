@@ -31,9 +31,7 @@ type appealFiler interface {
 // files appeals (appealFiler) and resolves them. Satisfied by *audit.AppealService.
 type appealService interface {
 	appealFiler
-	GetAppeal(ctx context.Context, appealID int64) (audit.Appeal, error)
-	Accept(ctx context.Context, appealID int64, resolverID, resolutionText string) error
-	Reject(ctx context.Context, appealID int64, resolverID, resolutionText string) error
+	appealResolver
 }
 
 // appealHandler processes "/start <incidentID>" deep links sent to the bot DM,

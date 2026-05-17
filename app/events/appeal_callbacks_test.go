@@ -99,3 +99,9 @@ func TestAdmin_callbackAppealResolve_BadID(t *testing.T) {
 	err := a.InlineCallbackHandler(context.Background(), appealCallbackQuery("AAxyz"))
 	require.Error(t, err)
 }
+
+func TestAdmin_callbackAppealResolve_NoResolver(t *testing.T) {
+	a := &admin{adminChatID: 12345}
+	err := a.InlineCallbackHandler(context.Background(), appealCallbackQuery("AA88"))
+	require.Error(t, err)
+}
