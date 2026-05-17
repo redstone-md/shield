@@ -121,6 +121,9 @@ func (e telegramActionExecutor) WarnUser(ctx context.Context, req warnRequest) e
 	msgConfig := tbapi.NewMessage(req.chatID, req.text)
 	msgConfig.ParseMode = tbapi.ModeHTML
 	msgConfig.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
+	if kb, ok := appealKeyboard(req.botUsername, req.incidentID); ok {
+		msgConfig.ReplyMarkup = kb
+	}
 	msg, err := e.tbAPI.Send(msgConfig)
 	if err != nil {
 		e.recordAction(ctx, commandWarnUser, req.chatID, req.subjectID, req.messageID, attempt, err)
@@ -234,6 +237,21 @@ func (e telegramActionExecutor) recordAction(ctx context.Context,
 	}
 }
 
+// appealKeyboard builds the single-button "Обжаловать" inline keyboard that
+// deep-links the punished user to the bot DM with the incident id as payload.
+// The second return value is false when there is no incident to appeal.
+func appealKeyboard(botUsername string, incidentID int64) (tbapi.InlineKeyboardMarkup, bool) {
+	if botUsername == "" || incidentID <= 0 {
+		return tbapi.InlineKeyboardMarkup{}, false
+	}
+	url := fmt.Sprintf("https://t.me/%s?start=%d", botUsername, incidentID)
+	return tbapi.NewInlineKeyboardMarkup(
+		tbapi.NewInlineKeyboardRow(
+			tbapi.NewInlineKeyboardButtonURL("Обжаловать", url),
+		),
+	), true
+}
+
 type banRequest struct {
 	tbAPI TbAPI
 
@@ -254,6 +272,8 @@ type warnRequest struct {
 	messageID   int
 	text        string
 	warnDelTime time.Duration // time to delete the warning message, 0 to keep
+	incidentID  int64         // incident backing the appeal button, 0 to omit the button
+	botUsername string        // bot username for the appeal deep link
 }
 
 // The bot must be an administrator in the supergroup for this to work
