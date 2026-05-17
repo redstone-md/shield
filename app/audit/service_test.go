@@ -543,6 +543,30 @@ func TestFullWorkflow_EscalationPath(t *testing.T) {
 	assert.Contains(t, bot.unbannedIDs, int64(789))
 }
 
+func TestAuditService_CreateIncident_ReturnsID(t *testing.T) {
+	incStore := newMockIncidentStore()
+	svc := NewService(incStore)
+
+	id, err := svc.CreateIncident(context.Background(), AuditEventData{
+		IdempotencyKey: "key-1",
+		ChatID:         100,
+		SpamUserID:     200,
+		MessageText:    "buy now",
+		CheckResults:   []SpamCheckResult{{Name: "regex", Spam: true, Details: "matched"}},
+	})
+	require.NoError(t, err)
+	assert.Positive(t, id)
+
+	id2, err := svc.CreateIncident(context.Background(), AuditEventData{
+		IdempotencyKey: "key-1",
+		ChatID:         100,
+		SpamUserID:     200,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, id, id2, "same idempotency key returns the same incident id")
+	assert.Len(t, incStore.incidents, 1, "no duplicate incident inserted")
+}
+
 func TestListIncidents_Filtering(t *testing.T) {
 	incStore := newMockIncidentStore()
 	svc := NewAuditService(incStore)

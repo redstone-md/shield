@@ -32,6 +32,8 @@ type enrichedAuditLogger interface {
 	SaveAudit(ctx context.Context, record AuditRecord) error
 }
 
+// IncidentCreator creates an incident record from a detected spam event and returns the new incident ID.
+// implementations must be idempotent on idempotencyKey.
 type IncidentCreator interface {
 	CreateIncident(
 		ctx context.Context,
@@ -43,7 +45,7 @@ type IncidentCreator interface {
 		messageText string,
 		checks []spamcheck.Response,
 		slowPath *slowpath.SlowPathInvocation,
-	) error
+	) (int64, error)
 }
 
 type defaultAuditWriter struct {
@@ -84,7 +86,7 @@ func (w defaultAuditWriter) Write(ctx context.Context, record AuditRecord) error
 		if record.Message != nil {
 			msgText = record.Message.Text
 		}
-		if err := w.incidentCreator.CreateIncident(ctx,
+		if _, err := w.incidentCreator.CreateIncident(ctx,
 			record.Event.IdempotencyKey, record.ChatID, record.RuleSetVersion,
 			record.SpamUserID, userName, msgText,
 			record.Response.CheckResults, record.SlowPath,

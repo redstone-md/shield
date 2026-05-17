@@ -53,7 +53,16 @@ func (s *Service) CreateFromSpam(ctx context.Context, incident Incident) (Incide
 	return created, nil
 }
 
-func (s *Service) CreateIncident(ctx context.Context, data AuditEventData) error {
+// CreateIncident creates a new incident from automated spam detection data and returns its ID.
+// if data.IdempotencyKey is set and an incident with that key already exists, the existing ID is returned without inserting a duplicate.
+func (s *Service) CreateIncident(ctx context.Context, data AuditEventData) (int64, error) {
+	if data.IdempotencyKey != "" {
+		existing, err := s.store.GetByIdempotencyKey(ctx, "", data.IdempotencyKey)
+		if err == nil && existing.ID > 0 {
+			return existing.ID, nil
+		}
+	}
+
 	reasonCode := ReasonUnknown
 	reasonText := "spam detected"
 	for _, cr := range data.CheckResults {
@@ -82,9 +91,9 @@ func (s *Service) CreateIncident(ctx context.Context, data AuditEventData) error
 	created, err := s.store.Create(ctx, incident)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") || strings.Contains(err.Error(), "duplicate key") {
-			return nil
+			return 0, nil
 		}
-		return fmt.Errorf("create incident: %w", err)
+		return 0, fmt.Errorf("create incident: %w", err)
 	}
 
 	_, _ = s.store.AddComment(ctx, IncidentComment{
@@ -105,7 +114,7 @@ func (s *Service) CreateIncident(ctx context.Context, data AuditEventData) error
 		})
 	}
 
-	return nil
+	return created.ID, nil
 }
 
 type ReportParams struct {
