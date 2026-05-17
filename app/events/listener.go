@@ -250,6 +250,10 @@ func (l *TelegramListener) initHandlers() {
 		aggressiveCleanup: l.AggressiveCleanup, aggressiveCleanupLimit: l.AggressiveCleanupLimit,
 	}
 
+	if l.AppealService != nil {
+		l.adminHandler.appeals = l.AppealService
+	}
+
 	l.reportsHandler = &userReports{
 		ReportConfig: l.ReportConfig, tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers,
 		actions: l.ActionExecutor, autoLearner: l.AutoLearner,
