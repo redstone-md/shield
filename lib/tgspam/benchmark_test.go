@@ -22,7 +22,7 @@ func BenchmarkDetector_Check(b *testing.B) {
 		{"Ham_Long", strings.Repeat("This is a regular message about project updates and team coordination. ", 5)},
 		{"Spam_Stopword", "Buy now! Free money waiting for you! Click here to claim!"},
 		{"Spam_Emoji", "Hello 😁🐶🍕🎉🔥💯🎊🎈🎀"},
-		{"Mixed_Confusables", "Buy nоw frее mоney"}, // Cyrillic о/е mixed in
+		{"Mixed_Confusables", "Buy nоw frее mоney"}, // cyrillic о/е mixed in
 	}
 
 	for _, bc := range benchCases {

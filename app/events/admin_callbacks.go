@@ -577,8 +577,8 @@ func (a *admin) callbackAppealResolve(ctx context.Context, query *tbapi.Callback
 	if !accept {
 		toast = "отклонено"
 	}
-	if _, err := a.tbAPI.Request(tbapi.NewCallback(query.ID, toast)); err != nil {
-		return fmt.Errorf("failed to answer callback: %w", err)
+	if _, cbErr := a.tbAPI.Request(tbapi.NewCallback(query.ID, toast)); cbErr != nil {
+		return fmt.Errorf("failed to answer callback: %w", cbErr)
 	}
 
 	resolverID := query.From.UserName
