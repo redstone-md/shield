@@ -84,6 +84,7 @@ type TelegramListener struct {
 	PolicyEngine            PolicyEngine
 	PolicyProfileName       string
 	AuditWriter             AuditWriter
+	IncidentCreator         IncidentCreator
 	UsageMeter              UsageMeter
 	MetricsRecorder         MetricsRecorder
 	SlowPathEnabled         bool

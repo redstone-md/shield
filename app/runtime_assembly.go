@@ -485,7 +485,9 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 		BotWhitelist:            opts.BotWhitelist,
 	}
 	if a.AuditService != nil {
-		listener.AuditWriter = events.NewDefaultAuditWriter(a.SpamLogger, a.Locator, events.NewIncidentAdapter(a.AuditService))
+		incidentCreator := events.NewIncidentAdapter(a.AuditService)
+		listener.AuditWriter = events.NewDefaultAuditWriter(a.SpamLogger, a.Locator, incidentCreator)
+		listener.IncidentCreator = incidentCreator
 	}
 	if a.UsageMetering != nil {
 		listener.UsageMeter = &usageMeterAdapter{store: a.UsageMetering}
