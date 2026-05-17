@@ -199,8 +199,11 @@ func TestTelegramActionExecutor_PostBanMessage(t *testing.T) {
 	assert.Equal(t, "🚫 Пользователь забанен за спам", sent.Text)
 	markup, ok := sent.ReplyMarkup.(tbapi.InlineKeyboardMarkup)
 	require.True(t, ok, "ban message must carry the appeal keyboard")
-	require.NotNil(t, markup.InlineKeyboard[0][0].URL)
-	assert.Equal(t, "https://t.me/shield_bot?start=42", *markup.InlineKeyboard[0][0].URL)
+	require.Len(t, markup.InlineKeyboard, 1)
+	require.Len(t, markup.InlineKeyboard[0], 1)
+	btn := markup.InlineKeyboard[0][0]
+	require.NotNil(t, btn.URL)
+	assert.Equal(t, "https://t.me/shield_bot?start=42", *btn.URL)
 }
 
 type moderationActionsSpy struct {
