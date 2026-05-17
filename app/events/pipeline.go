@@ -475,18 +475,25 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 	return l.cleanupAfterAction(ctx, pc, errs)
 }
 
-const banGroupMessageText = "🚫 Пользователь забанен за спам"
+const (
+	banGroupMessageText      = "🚫 Пользователь забанен за спам"
+	restrictGroupMessageText = "🔇 Пользователь ограничен за спам"
+)
 
-// postBanGroupMessage posts the self-deleting ban notice with the appeal
-// button to the group chat. It is skipped for channel bans, restrictions
-// (mutes), and dry/training runs where no real ban happened.
+// postBanGroupMessage posts the self-deleting ban or restriction notice with
+// the appeal button to the group chat. It is skipped for channel bans and
+// dry/training runs where no real enforcement happened.
 func (l *TelegramListener) postBanGroupMessage(ctx context.Context, pc pipelineContext, incidentID int64) {
-	if l.Dry || l.TrainingMode || pc.outcome.Restrict || pc.resp.ChannelID != 0 {
+	if l.Dry || l.TrainingMode || pc.resp.ChannelID != 0 {
 		return
+	}
+	text := banGroupMessageText
+	if pc.outcome.Restrict {
+		text = restrictGroupMessageText
 	}
 	if err := l.ActionExecutor.PostBanMessage(ctx, banMessageRequest{
 		chatID:      pc.fromChat,
-		text:        banGroupMessageText,
+		text:        text,
 		incidentID:  incidentID,
 		botUsername: l.BotUsername,
 		delTime:     l.ModerationConfig.WarnDeleteDuration,
