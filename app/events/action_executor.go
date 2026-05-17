@@ -18,6 +18,7 @@ type ActionExecutor interface {
 	ForwardMessage(ctx context.Context, fromChatID, toChatID int64, msgID int) error
 	DeleteExtraMessages(ctx context.Context, checkResults []spamcheck.Response, userID int64, username string, chatID int64) error
 	WarnUser(ctx context.Context, req warnRequest) error
+	PostBanMessage(ctx context.Context, req banMessageRequest) error
 }
 
 type telegramActionExecutor struct {
@@ -131,21 +132,42 @@ func (e telegramActionExecutor) WarnUser(ctx context.Context, req warnRequest) e
 	}
 
 	e.recordAction(ctx, commandWarnUser, req.chatID, req.subjectID, req.messageID, attempt, nil)
+	e.scheduleDelete(ctx, req.chatID, msg.MessageID, req.warnDelTime)
+	return nil
+}
 
-	if req.warnDelTime > 0 {
-		warnMsgID := msg.MessageID
-		chatID := req.chatID
-		go func() {
-			observability.Logf(ctx, "[DEBUG] scheduled warning message %d deletion in %v", warnMsgID, req.warnDelTime)
-			time.Sleep(req.warnDelTime)
-			observability.Logf(ctx, "[DEBUG] deleting warning message %d after %v", warnMsgID, req.warnDelTime)
-			if err := e.DeleteMessage(context.Background(), chatID, warnMsgID); err != nil {
-				observability.Logf(ctx, "[WARN] failed to delete warning message %d: %v", warnMsgID, err)
-			} else {
-				observability.Logf(ctx, "[DEBUG] warning message %d deleted successfully", warnMsgID)
-			}
-		}()
+// scheduleDelete deletes a posted message after delTime in a background
+// goroutine. delTime <= 0 keeps the message.
+func (e telegramActionExecutor) scheduleDelete(ctx context.Context, chatID int64, msgID int, delTime time.Duration) {
+	if delTime <= 0 {
+		return
 	}
+	go func() {
+		observability.Logf(ctx, "[DEBUG] scheduled message %d deletion in %v", msgID, delTime)
+		time.Sleep(delTime)
+		observability.Logf(ctx, "[DEBUG] deleting scheduled message %d after %v", msgID, delTime)
+		if err := e.DeleteMessage(context.Background(), chatID, msgID); err != nil {
+			observability.Logf(ctx, "[WARN] failed to delete scheduled message %d: %v", msgID, err)
+		} else {
+			observability.Logf(ctx, "[DEBUG] scheduled message %d deleted successfully", msgID)
+		}
+	}()
+}
+
+// PostBanMessage posts a short ban notice to the group chat carrying the
+// appeal button and schedules its deletion the same way a warning is deleted.
+func (e telegramActionExecutor) PostBanMessage(ctx context.Context, req banMessageRequest) error {
+	msgConfig := tbapi.NewMessage(req.chatID, req.text)
+	msgConfig.ParseMode = tbapi.ModeHTML
+	msgConfig.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
+	if kb, ok := appealKeyboard(req.botUsername, req.incidentID); ok {
+		msgConfig.ReplyMarkup = kb
+	}
+	msg, err := e.tbAPI.Send(msgConfig)
+	if err != nil {
+		return fmt.Errorf("post ban message to chat %d: %w", req.chatID, err)
+	}
+	e.scheduleDelete(ctx, req.chatID, msg.MessageID, req.delTime)
 	return nil
 }
 
@@ -274,6 +296,14 @@ type warnRequest struct {
 	warnDelTime time.Duration // time to delete the warning message, 0 to keep
 	incidentID  int64         // incident backing the appeal button, 0 to omit the button
 	botUsername string        // bot username for the appeal deep link
+}
+
+type banMessageRequest struct {
+	chatID      int64
+	text        string
+	incidentID  int64
+	botUsername string
+	delTime     time.Duration // time to auto-delete the ban message, 0 to keep
 }
 
 // The bot must be an administrator in the supergroup for this to work

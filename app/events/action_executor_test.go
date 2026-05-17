@@ -179,6 +179,30 @@ func TestTelegramActionExecutor_WarnUserNoButtonWithoutIncident(t *testing.T) {
 	assert.Nil(t, sent.ReplyMarkup, "no incident id -> no appeal button")
 }
 
+func TestTelegramActionExecutor_PostBanMessage(t *testing.T) {
+	var sent tbapi.MessageConfig
+	mockAPI := &mocks.TbAPIMock{
+		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+			sent = c.(tbapi.MessageConfig)
+			return tbapi.Message{MessageID: 7}, nil
+		},
+	}
+	exec := newTelegramActionExecutor(mockAPI, false, false, nil, nil)
+
+	err := exec.PostBanMessage(context.Background(), banMessageRequest{
+		chatID:      100,
+		text:        "🚫 Пользователь забанен за спам",
+		incidentID:  42,
+		botUsername: "shield_bot",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "🚫 Пользователь забанен за спам", sent.Text)
+	markup, ok := sent.ReplyMarkup.(tbapi.InlineKeyboardMarkup)
+	require.True(t, ok, "ban message must carry the appeal keyboard")
+	require.NotNil(t, markup.InlineKeyboard[0][0].URL)
+	assert.Equal(t, "https://t.me/shield_bot?start=42", *markup.InlineKeyboard[0][0].URL)
+}
+
 type moderationActionsSpy struct {
 	calls []storage.ModerationActionEntry
 	last  storage.ModerationActionReplay
