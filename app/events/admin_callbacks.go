@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/hashicorp/go-multierror"
 
+	"github.com/umputun/tg-spam/app/audit"
 	"github.com/umputun/tg-spam/app/bot"
 )
 
@@ -70,6 +72,22 @@ func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.Callback
 		return nil
 	}
 
+	if strings.HasPrefix(callbackData, appealAcceptPrefix) {
+		if err := a.callbackAppealResolve(ctx, query, true); err != nil {
+			return fmt.Errorf("failed to accept appeal: %w", err)
+		}
+		log.Printf("[INFO] appeal accepted, chatID: %d, data: %s", chatID, callbackData)
+		return nil
+	}
+
+	if strings.HasPrefix(callbackData, appealRejectPrefix) {
+		if err := a.callbackAppealResolve(ctx, query, false); err != nil {
+			return fmt.Errorf("failed to reject appeal: %w", err)
+		}
+		log.Printf("[INFO] appeal rejected, chatID: %d, data: %s", chatID, callbackData)
+		return nil
+	}
+
 	log.Printf("[DEBUG] unban action activated, chatID: %d, userID: %s, orig: %q", chatID, callbackData, query.Message.Text)
 	if err := a.callbackUnbanConfirmed(ctx, query); err != nil {
 		return fmt.Errorf("failed to unban user: %w", err)
@@ -115,7 +133,7 @@ func (a *admin) callbackWarningHamConfirmed(ctx context.Context, query *tbapi.Ca
 		a.autoLearner.LearnHam(ctx, cleanMsg, query.From.UserName)
 	}
 	if a.detectedSpam != nil {
-		if _, _, err := a.deleteAllWarns(ctx, userID, ""); err != nil {
+		if err := a.deleteAllWarns(ctx, userID, ""); err != nil {
 			return fmt.Errorf("failed to remove warning strikes for %d: %w", userID, err)
 		}
 	}
@@ -517,4 +535,75 @@ func (a *admin) extractUsername(text string) (string, error) {
 	}
 
 	return "", errors.New("username not found")
+}
+
+// appealResolver resolves user appeals from the admin-chat inline buttons.
+type appealResolver interface {
+	GetAppeal(ctx context.Context, appealID int64) (audit.Appeal, error)
+	Accept(ctx context.Context, appealID int64, resolverID, resolutionText string) error
+	Reject(ctx context.Context, appealID int64, resolverID, resolutionText string) error
+}
+
+// callbackAppealResolve handles the "✅ Принять" / "❌ Отклонить" admin buttons.
+// a second tap on an already-resolved appeal is answered with a notice and
+// performs no action.
+func (a *admin) callbackAppealResolve(ctx context.Context, query *tbapi.CallbackQuery, accept bool) error {
+	if a.appeals == nil {
+		return fmt.Errorf("appeal resolver not configured")
+	}
+
+	prefix := appealAcceptPrefix
+	if !accept {
+		prefix = appealRejectPrefix
+	}
+	appealID, err := strconv.ParseInt(strings.TrimPrefix(query.Data, prefix), 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse appeal id from %q: %w", query.Data, err)
+	}
+
+	ap, err := a.appeals.GetAppeal(ctx, appealID)
+	if err != nil {
+		return fmt.Errorf("failed to load appeal %d: %w", appealID, err)
+	}
+	// only accepted/rejected are terminal; triaged/escalated appeals stay resolvable
+	if ap.Status == audit.AppealAccepted || ap.Status == audit.AppealRejected {
+		if _, rErr := a.tbAPI.Request(tbapi.NewCallback(query.ID, "Апелляция уже рассмотрена")); rErr != nil {
+			return fmt.Errorf("failed to answer callback: %w", rErr)
+		}
+		return nil
+	}
+
+	toast := "принято"
+	if !accept {
+		toast = "отклонено"
+	}
+	if _, cbErr := a.tbAPI.Request(tbapi.NewCallback(query.ID, toast)); cbErr != nil {
+		return fmt.Errorf("failed to answer callback: %w", cbErr)
+	}
+
+	resolverID := query.From.UserName
+	if resolverID == "" {
+		resolverID = fmt.Sprintf("%d", query.From.ID)
+	}
+
+	outcome := "✅ апелляция принята"
+	if accept {
+		err = a.appeals.Accept(ctx, appealID, resolverID, "")
+	} else {
+		outcome = "❌ апелляция отклонена"
+		err = a.appeals.Reject(ctx, appealID, resolverID, "")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to resolve appeal %d: %w", appealID, err)
+	}
+
+	updText := query.Message.Text + fmt.Sprintf("\n\n%s администратором %s за %v",
+		outcome, markdownUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
+	editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, updText)
+	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
+	if err := send(editMsg, a.tbAPI); err != nil {
+		return fmt.Errorf("failed to edit appeal message, chatID:%d, msgID:%d, %w",
+			query.Message.Chat.ID, query.Message.MessageID, err)
+	}
+	return nil
 }

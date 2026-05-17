@@ -259,6 +259,23 @@ Regular users can reply to suspicious messages with `/report`. Enable with `--re
 
 Super-users forwarding spam to the admin chat (or replying `/spam`) adds it to spam samples automatically. Unbanning adds the message to ham samples. The bot learns new patterns on the fly.
 
+### Appeal flow
+
+When the bot warns or bans a user it posts a group-chat message carrying an
+**"Обжаловать"** (Appeal) inline button. A ban now posts its own group message
+(previously only the admin chat was notified); both the warn and the ban
+message auto-delete after `WarnDeleteDuration`, so the appeal button is
+available for that window.
+
+Tapping the button opens the bot DM and files a one-tap appeal (no reason
+text). The appeal is sent to the admin chat with **Принять / Отклонить**
+buttons. Accepting unbans the user, clears all of their warning strikes and
+DMs them the outcome; rejecting closes the incident and DMs the user. Each
+incident accepts a single appeal — a moderator decision is final.
+
+The same accept/reject behavior backs the web `/appeals` admin UI, so an
+appeal resolved on the website unbans and notifies the user identically.
+
 ## Web server and UI
 
 Enable with `--server.enabled`. Listen address: `--server.listen` (default `:8080`).
@@ -296,6 +313,7 @@ The web UI provides management interfaces:
 - **Manage Users**: view and control the approved users list.
 - **Detected Spam**: browse detected spam history.
 - **Settings**: configure bot parameters, super-users, and find your Telegram user ID.
+- **Edit Settings**: at `/settings/edit`, change the detection and LLM tuning (thresholds, per-check toggles, LLM mode/veto/consensus, models, system and vision prompts) directly in the browser. Saving stores a new versioned rule set and applies the change live without a restart. A setting that is also pinned by an environment variable shows an `env-pinned` warning badge, since the env value overrides the stored rule set on the next restart — remove it from the environment to manage that setting from the UI.
 
 <details markdown>
   <summary>Screenshots</summary>

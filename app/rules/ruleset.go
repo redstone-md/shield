@@ -2,18 +2,25 @@ package rules
 
 import "time"
 
+// CurrentSchemaVersion is the RuleSet payload schema version. Bump it whenever new
+// fields are added so older persisted rulesets can be detected and backfilled.
+const CurrentSchemaVersion = 2
+
 // RuleSet is the single-tenant moderation configuration snapshot.
 type RuleSet struct {
-	WorkspaceID string    `json:"workspace_id"`
-	Version     int       `json:"version"`
-	Source      string    `json:"source"`
-	CreatedAt   time.Time `json:"created_at"`
+	WorkspaceID   string    `json:"workspace_id"`
+	Version       int       `json:"version"`
+	Source        string    `json:"source"`
+	SchemaVersion int       `json:"schema_version"`
+	CreatedAt     time.Time `json:"created_at"`
 
 	Meta            MetaRules            `json:"meta"`
 	Duplicates      DuplicateRules       `json:"duplicates"`
 	AbnormalSpacing AbnormalSpacingRules `json:"abnormal_spacing"`
 	Moderation      ModerationRules      `json:"moderation"`
 	Reports         ReportRules          `json:"reports"`
+	Detection       DetectionRules       `json:"detection"`
+	LLM             LLMCommonRules       `json:"llm"`
 	OpenAI          LLMRules             `json:"openai"`
 	Gemini          LLMRules             `json:"gemini"`
 	PolicyProfile   string               `json:"policy_profile"`
@@ -68,7 +75,29 @@ type LLMRules struct {
 	Enabled            bool     `json:"enabled"`
 	Veto               bool     `json:"veto"`
 	Model              string   `json:"model"`
+	VisionModel        string   `json:"vision_model"`
+	Prompt             string   `json:"prompt"`
 	HistorySize        int      `json:"history_size"`
 	CheckShortMessages bool     `json:"check_short_messages"`
 	CustomPrompts      []string `json:"custom_prompts,omitempty"`
+}
+
+// DetectionRules holds detection tuning previously sourced only from env flags.
+type DetectionRules struct {
+	MaxEmoji            int     `json:"max_emoji"`
+	MinMsgLen           int     `json:"min_msg_len"`
+	SimilarityThreshold float64 `json:"similarity_threshold"`
+	MinSpamProbability  float64 `json:"min_spam_probability"`
+	MultiLangWords      int     `json:"multi_lang_words"`
+	CasEnabled          bool    `json:"cas_enabled"`
+	HistorySize         int     `json:"history_size"`
+	FirstMessagesCount  int     `json:"first_messages_count"`
+	ParanoidMode        bool    `json:"paranoid_mode"`
+}
+
+// LLMCommonRules holds LLM settings shared across providers.
+type LLMCommonRules struct {
+	Mode         string `json:"mode"`      // "" | missed | flagged | always
+	Consensus    string `json:"consensus"` // any | all
+	VisionPrompt string `json:"vision_prompt"`
 }

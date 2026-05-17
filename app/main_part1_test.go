@@ -12,6 +12,7 @@ import (
 	"github.com/umputun/tg-spam/app/events"
 	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/rules"
+	"github.com/umputun/tg-spam/app/slowpath"
 	"github.com/umputun/tg-spam/app/storage"
 	"github.com/umputun/tg-spam/app/storage/engine"
 	"github.com/umputun/tg-spam/lib/approved"
@@ -273,33 +274,10 @@ func Test_makeDetector(t *testing.T) {
 
 func TestBuildDetectorConfigSetsLLMMode(t *testing.T) {
 	var opts options
-	opts.LLM.Mode = "always"
-	cfg := buildDetectorConfig(opts, rules.RuleSet{})
+	rs := rules.RuleSet{LLM: rules.LLMCommonRules{Mode: "always"}}
+	cfg := buildDetectorConfig(opts, rs)
 
 	assert.Equal(t, tgspam.LLMModeAlways, cfg.LLMMode)
-}
-
-func TestReadPromptOverride(t *testing.T) {
-	t.Run("missing file", func(t *testing.T) {
-		prompt, err := readPromptOverride(t.TempDir())
-		require.NoError(t, err)
-		assert.Empty(t, prompt)
-	})
-
-	t.Run("trims markdown prompt", func(t *testing.T) {
-		dir := t.TempDir()
-		require.NoError(t, os.WriteFile(path.Join(dir, promptOverrideFile), []byte("\ncustom prompt\n"), 0o600))
-
-		prompt, err := readPromptOverride(dir)
-		require.NoError(t, err)
-		assert.Equal(t, "custom prompt", prompt)
-	})
-}
-
-func TestResolveSlowPathPrompt(t *testing.T) {
-	assert.Equal(t, "provider prompt", resolveSlowPathPrompt("provider prompt", "file prompt"))
-	assert.Equal(t, "file prompt", resolveSlowPathPrompt(" ", "file prompt"))
-	assert.Empty(t, resolveSlowPathPrompt("", ""))
 }
 
 func TestMakeSlowPathChatEngine(t *testing.T) {
@@ -603,4 +581,78 @@ func TestCacheInvalidationOnControlPlaneChanges(t *testing.T) {
 
 	require.NoError(t, assembly.DetectedSpamService.SetAddedToSamplesFlag(ctx, opts.InstanceID, 999))
 	assert.Equal(t, 1, spamNotified)
+}
+
+func TestBuildDetectorConfig_ReadsDetectionFromRuleSet(t *testing.T) {
+	var opts options
+	// opts values must be ignored for these fields now
+	opts.MaxEmoji = 999
+	opts.MinMsgLen = 999
+	opts.SimilarityThreshold = 9.9
+	opts.MinSpamProbability = 99
+	opts.MultiLangWords = 99
+	opts.FirstMessagesCount = 99
+	opts.LLM.Mode = "always"
+	opts.LLM.Consensus = "all"
+	opts.CAS.API = "https://api.cas.chat"
+
+	rs := rules.RuleSet{
+		Detection: rules.DetectionRules{
+			MaxEmoji:            3,
+			MinMsgLen:           50,
+			SimilarityThreshold: 0.5,
+			MinSpamProbability:  50,
+			MultiLangWords:      2,
+			CasEnabled:          true,
+			FirstMessagesCount:  1,
+			ParanoidMode:        false,
+		},
+		LLM: rules.LLMCommonRules{Mode: "flagged", Consensus: "any"},
+	}
+
+	cfg := buildDetectorConfig(opts, rs)
+
+	assert.Equal(t, 3, cfg.MaxAllowedEmoji)
+	assert.Equal(t, 50, cfg.MinMsgLen)
+	assert.InEpsilon(t, 0.5, cfg.SimilarityThreshold, 0.0001)
+	assert.InEpsilon(t, 50.0, cfg.MinSpamProbability, 0.0001)
+	assert.Equal(t, 2, cfg.MultiLangWords)
+	assert.Equal(t, 1, cfg.FirstMessagesCount)
+	assert.Equal(t, tgspam.LLMMode("flagged"), cfg.LLMMode)
+	assert.Equal(t, tgspam.LLMConsensusMode("any"), cfg.LLMConsensus)
+	assert.Equal(t, "https://api.cas.chat", cfg.CasAPI)
+}
+
+func TestBuildDetectorConfig_CasDisabledClearsAPI(t *testing.T) {
+	var opts options
+	opts.CAS.API = "https://api.cas.chat"
+	rs := rules.RuleSet{Detection: rules.DetectionRules{CasEnabled: false}}
+
+	cfg := buildDetectorConfig(opts, rs)
+	assert.Empty(t, cfg.CasAPI, "CAS API must be cleared when CasEnabled is false")
+}
+
+func TestApplyLLMCheckers_NoLLMConfigured(t *testing.T) {
+	// no tokens configured -> applyLLMCheckers must be a safe no-op
+	var opts options
+	detector := tgspam.NewDetector(tgspam.Config{})
+	rs := rules.RuleSet{}
+
+	assert.NotPanics(t, func() { applyLLMCheckers(detector, opts, rs) })
+}
+
+func TestApplySlowPathPrompts_FromRuleSet(t *testing.T) {
+	eng := slowpath.NewEngine(slowpath.EngineConfig{})
+	rs := rules.RuleSet{
+		OpenAI: rules.LLMRules{Prompt: "openai sys"},
+		Gemini: rules.LLMRules{Prompt: "gemini sys"},
+		LLM:    rules.LLMCommonRules{VisionPrompt: "vision sys"},
+	}
+
+	applySlowPathPrompts(eng, rs)
+
+	system, _, _, err := slowpath.ExportResolvePrompt(eng, "openai")
+	require.NoError(t, err)
+	assert.Equal(t, "openai sys", system)
+	assert.Equal(t, "vision sys", slowpath.ExportVisionPrompt(eng))
 }

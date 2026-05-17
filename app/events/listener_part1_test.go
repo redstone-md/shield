@@ -52,10 +52,13 @@ type actionExecutorSpy struct {
 	forwardMessage     func(ctx context.Context, fromChatID, toChatID int64, msgID int) error
 	deleteExtra        func(ctx context.Context, checkResults []spamcheck.Response, userID int64, username string, chatID int64) error
 	warnUser           func(ctx context.Context, req warnRequest) error
+	postBanMessage     func(ctx context.Context, req banMessageRequest) error
 	banCtxs            []context.Context
 	banCalls           []banRequest
 	warnCtxs           []context.Context
 	warnCalls          []warnRequest
+	postBanCtxs        []context.Context
+	postBanCalls       []banMessageRequest
 	deleteMessageCalls []struct {
 		Context context.Context
 		ChatID  int64
@@ -189,6 +192,15 @@ func (s *actionExecutorSpy) WarnUser(ctx context.Context, req warnRequest) error
 	s.warnCalls = append(s.warnCalls, req)
 	if s.warnUser != nil {
 		return s.warnUser(ctx, req)
+	}
+	return nil
+}
+
+func (s *actionExecutorSpy) PostBanMessage(ctx context.Context, req banMessageRequest) error {
+	s.postBanCtxs = append(s.postBanCtxs, ctx)
+	s.postBanCalls = append(s.postBanCalls, req)
+	if s.postBanMessage != nil {
+		return s.postBanMessage(ctx, req)
 	}
 	return nil
 }

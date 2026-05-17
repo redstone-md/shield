@@ -77,7 +77,7 @@ func TestScoringEngine_ReasonIncludesSignals(t *testing.T) {
 
 func TestScoringEngine_DefaultWeightIsOne(t *testing.T) {
 	se := NewScoringEngine(1.0)
-	// Weight=0 means "not set", default treated as 1.0 in aggregation
+	// weight=0 means "not set", default treated as 1.0 in aggregation
 	se.AddSignal(spamcheck.Response{Name: "stopword", Spam: true, Score: 1.0, Weight: 0})
 	rs := se.Score()
 	// fallback to boolean OR since no weighted signals

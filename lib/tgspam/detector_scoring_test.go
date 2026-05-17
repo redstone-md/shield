@@ -129,8 +129,8 @@ func TestDetector_ScoringBackwardCompat(t *testing.T) {
 }
 
 func TestDetector_ScoringThresholdBoundary(t *testing.T) {
-	// Use MinMsgLen=5 and messages longer than 5 runes so they reach scoreSignals (line 292).
-	// Short messages (< MinMsgLen) early-return at line 266 using boolean OR, bypassing scoring engine.
+	// use MinMsgLen=5 and messages longer than 5 runes so they reach scoreSignals (line 292).
+	// short messages (< MinMsgLen) early-return at line 266 using boolean OR, bypassing scoring engine.
 	d := NewDetector(Config{
 		MaxAllowedEmoji:    -1,
 		MinMsgLen:          5,
@@ -143,7 +143,7 @@ func TestDetector_ScoringThresholdBoundary(t *testing.T) {
 
 	t.Run("single signal below threshold still spam via early return", func(t *testing.T) {
 		// "Buy now everything!" is 18 runes > MinMsgLen=5, hits scoreSignals.
-		// Single stopword: total = 1.0 * 1.0 = 1.0 < threshold 2.0 → scoring says ham.
+		// single stopword: total = 1.0 * 1.0 = 1.0 < threshold 2.0 → scoring says ham.
 		spam, cr := d.Check(spamcheck.Request{Msg: "Buy now everything is on sale today!", UserID: "t1"})
 		_ = cr
 		assert.False(t, spam, "single stopword total=1.0 < threshold=2.0 → not spam")

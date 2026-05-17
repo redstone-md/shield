@@ -128,6 +128,8 @@ func (s *Server) setupWebUIRoutes(router *routegroup.Bundle) {
 		webUI.HandleFunc("GET /manage_dictionary", s.htmlManageDictionaryHandler)
 		webUI.HandleFunc("GET /detected_spam", s.htmlDetectedSpamHandler)
 		webUI.HandleFunc("GET /list_settings", s.htmlSettingsHandler)
+		webUI.HandleFunc("GET /settings/edit", s.htmlSettingsEditHandler)
+		webUI.HandleFunc("POST /settings/save", s.saveSettingsHandler)
 		webUI.HandleFunc("POST /detected_spam/add", s.htmlAddDetectedSpamHandler)
 		webUI.HandleFunc("GET /dm-users", s.getDMUsersHandler)
 
@@ -146,6 +148,7 @@ func (s *Server) setupWebUIRoutes(router *routegroup.Bundle) {
 
 		staticFiles := newStaticFS(templateFS,
 			staticFileMapping{urlPath: "styles.css", filesysPath: "assets/styles.css"},
+			staticFileMapping{urlPath: "app.js", filesysPath: "assets/app.js"},
 			staticFileMapping{urlPath: "logo.png", filesysPath: "assets/logo.png"},
 			staticFileMapping{urlPath: "spinner.svg", filesysPath: "assets/spinner.svg"},
 		)

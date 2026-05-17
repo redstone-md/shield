@@ -14,6 +14,7 @@ func applyExplicitRuleSetOverrides(rs *rules.RuleSet, opts options) {
 	applyExplicitModerationOverrides(rs, opts)
 	applyExplicitReportOverrides(rs, opts)
 	applyExplicitLLMOverrides(rs, opts)
+	applyExplicitDetectionOverrides(rs, opts)
 }
 
 func applyExplicitMetaOverrides(rs *rules.RuleSet, opts options) {
@@ -137,6 +138,9 @@ func applyExplicitLLMOverrides(rs *rules.RuleSet, opts options) {
 	if configured("openai.custom-prompt", "OPENAI_CUSTOM_PROMPT") {
 		rs.OpenAI.CustomPrompts = opts.OpenAI.CustomPrompts
 	}
+	if configured("openai.prompt", "OPENAI_PROMPT") {
+		rs.OpenAI.Prompt = opts.OpenAI.Prompt
+	}
 
 	if configured("gemini.token", "GEMINI_TOKEN") {
 		rs.Gemini.Enabled = opts.Gemini.Token != ""
@@ -156,10 +160,91 @@ func applyExplicitLLMOverrides(rs *rules.RuleSet, opts options) {
 	if configured("gemini.custom-prompt", "GEMINI_CUSTOM_PROMPT") {
 		rs.Gemini.CustomPrompts = opts.Gemini.CustomPrompts
 	}
+	if configured("gemini.prompt", "GEMINI_PROMPT") {
+		rs.Gemini.Prompt = opts.Gemini.Prompt
+	}
+}
+
+func applyExplicitDetectionOverrides(rs *rules.RuleSet, opts options) {
+	if configured("max-emoji", "MAX_EMOJI") {
+		rs.Detection.MaxEmoji = opts.MaxEmoji
+	}
+	if configured("min-msg-len", "MIN_MSG_LEN") {
+		rs.Detection.MinMsgLen = opts.MinMsgLen
+	}
+	if configured("similarity-threshold", "SIMILARITY_THRESHOLD") {
+		rs.Detection.SimilarityThreshold = opts.SimilarityThreshold
+	}
+	if configured("min-probability", "MIN_PROBABILITY") {
+		rs.Detection.MinSpamProbability = opts.MinSpamProbability
+	}
+	if configured("multi-lang", "MULTI_LANG") {
+		rs.Detection.MultiLangWords = opts.MultiLangWords
+	}
+	if configured("first-messages-count", "FIRST_MESSAGES_COUNT") {
+		rs.Detection.FirstMessagesCount = opts.FirstMessagesCount
+	}
+	if configured("paranoid", "PARANOID") {
+		rs.Detection.ParanoidMode = opts.ParanoidMode
+	}
+	if configured("history-min-size", "HISTORY_MIN_SIZE") {
+		rs.Detection.HistorySize = opts.HistoryMinSize
+	}
+	if configured("cas.api", "CAS_API") {
+		rs.Detection.CasEnabled = opts.CAS.API != ""
+	}
+	if configured("llm.mode", "LLM_MODE") {
+		rs.LLM.Mode = opts.LLM.Mode
+	}
+	if configured("llm.consensus", "LLM_CONSENSUS") {
+		rs.LLM.Consensus = opts.LLM.Consensus
+	}
+}
+
+// envPinnedKey maps a RuleSet JSON path to its CLI flag and env var.
+type envPinnedKey struct {
+	flag string
+	env  string
+}
+
+var envPinnedRegistry = map[string]envPinnedKey{
+	"detection.max_emoji":            {"max-emoji", "MAX_EMOJI"},
+	"detection.min_msg_len":          {"min-msg-len", "MIN_MSG_LEN"},
+	"detection.similarity_threshold": {"similarity-threshold", "SIMILARITY_THRESHOLD"},
+	"detection.min_spam_probability": {"min-probability", "MIN_PROBABILITY"},
+	"detection.multi_lang_words":     {"multi-lang", "MULTI_LANG"},
+	"detection.first_messages_count": {"first-messages-count", "FIRST_MESSAGES_COUNT"},
+	"detection.paranoid_mode":        {"paranoid", "PARANOID"},
+	"detection.history_size":         {"history-min-size", "HISTORY_MIN_SIZE"},
+	"detection.cas_enabled":          {"cas.api", "CAS_API"},
+	"llm.mode":                       {"llm.mode", "LLM_MODE"},
+	"llm.consensus":                  {"llm.consensus", "LLM_CONSENSUS"},
+	"openai.veto":                    {"openai.veto", "OPENAI_VETO"},
+	"openai.model":                   {"openai.model", "OPENAI_MODEL"},
+	"openai.history_size":            {"openai.history-size", "OPENAI_HISTORY_SIZE"},
+	"openai.check_short_messages":    {"openai.check-short-messages", "OPENAI_CHECK_SHORT_MESSAGES"},
+	"openai.prompt":                  {"openai.prompt", "OPENAI_PROMPT"},
+	"gemini.veto":                    {"gemini.veto", "GEMINI_VETO"},
+	"gemini.model":                   {"gemini.model", "GEMINI_MODEL"},
+	"gemini.history_size":            {"gemini.history-size", "GEMINI_HISTORY_SIZE"},
+	"gemini.check_short_messages":    {"gemini.check-short-messages", "GEMINI_CHECK_SHORT_MESSAGES"},
+	"gemini.prompt":                  {"gemini.prompt", "GEMINI_PROMPT"},
+}
+
+// envPinnedKeys returns RuleSet JSON paths whose value is explicitly set via env/CLI
+// and therefore overrides the stored ruleset on the next restart.
+func envPinnedKeys() map[string]bool {
+	pinned := make(map[string]bool, len(envPinnedRegistry))
+	for path, k := range envPinnedRegistry {
+		if configured(k.flag, k.env) {
+			pinned[path] = true
+		}
+	}
+	return pinned
 }
 
 func configured(flagName, envName string) bool {
-	if _, ok := os.LookupEnv(envName); ok {
+	if v, ok := os.LookupEnv(envName); ok && v != "" {
 		return true
 	}
 	return cliFlagSet(flagName)

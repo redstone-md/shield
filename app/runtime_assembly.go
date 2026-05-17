@@ -109,10 +109,17 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 	if err != nil {
 		return nil, fmt.Errorf("can't load active rule set, %w", err)
 	}
+	if backfilled, changed := backfillRuleSetSchema(activeRuleSet, opts); changed {
+		log.Printf("[INFO] backfilling rule set schema to version %d", rules.CurrentSchemaVersion)
+		if _, err = ruleSets.Update(ctx, backfilled); err != nil {
+			return nil, fmt.Errorf("can't backfill rule set schema, %w", err)
+		}
+		activeRuleSet = backfilled
+	}
 	applyExplicitRuleSetOverrides(&activeRuleSet, opts)
 
 	detector := makeDetectorWithRuleSet(opts, activeRuleSet)
-	slowPathEngine := makeSlowPathEngine(opts)
+	slowPathEngine := makeSlowPathEngine(opts, activeRuleSet)
 	slowPathChatEngine := makeSlowPathChatEngine(opts)
 	spamBot, err := makeSpamBot(ctx, opts, activeRuleSet, dataDB, detector)
 	if err != nil {
@@ -317,8 +324,9 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 
 func bootstrapRuleSet(opts options) rules.RuleSet {
 	return rules.RuleSet{
-		WorkspaceID: opts.InstanceID,
-		Source:      "bootstrap",
+		WorkspaceID:   opts.InstanceID,
+		Source:        "bootstrap",
+		SchemaVersion: rules.CurrentSchemaVersion,
 		Meta: rules.MetaRules{
 			LinksLimit:      opts.Meta.LinksLimit,
 			MentionsLimit:   opts.Meta.MentionsLimit,
@@ -358,10 +366,27 @@ func bootstrapRuleSet(opts options) rules.RuleSet {
 			RateLimit:        opts.Report.RateLimit,
 			RatePeriod:       opts.Report.RatePeriod,
 		},
+		Detection: rules.DetectionRules{
+			MaxEmoji:            opts.MaxEmoji,
+			MinMsgLen:           opts.MinMsgLen,
+			SimilarityThreshold: opts.SimilarityThreshold,
+			MinSpamProbability:  opts.MinSpamProbability,
+			MultiLangWords:      opts.MultiLangWords,
+			CasEnabled:          opts.CAS.API != "",
+			HistorySize:         opts.HistoryMinSize,
+			FirstMessagesCount:  opts.FirstMessagesCount,
+			ParanoidMode:        opts.ParanoidMode,
+		},
+		LLM: rules.LLMCommonRules{
+			Mode:      opts.LLM.Mode,
+			Consensus: opts.LLM.Consensus,
+		},
 		OpenAI: rules.LLMRules{
 			Enabled:            opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "",
 			Veto:               opts.OpenAI.Veto,
 			Model:              opts.OpenAI.Model,
+			VisionModel:        opts.OpenAI.VisionModel,
+			Prompt:             opts.OpenAI.Prompt,
 			HistorySize:        opts.OpenAI.HistorySize,
 			CheckShortMessages: opts.OpenAI.CheckShortMessages,
 			CustomPrompts:      opts.OpenAI.CustomPrompts,
@@ -370,11 +395,32 @@ func bootstrapRuleSet(opts options) rules.RuleSet {
 			Enabled:            opts.Gemini.Token != "",
 			Veto:               opts.Gemini.Veto,
 			Model:              opts.Gemini.Model,
+			VisionModel:        opts.Gemini.VisionModel,
+			Prompt:             opts.Gemini.Prompt,
 			HistorySize:        opts.Gemini.HistorySize,
 			CheckShortMessages: opts.Gemini.CheckShortMessages,
 			CustomPrompts:      opts.Gemini.CustomPrompts,
 		},
 	}
+}
+
+// backfillRuleSetSchema seeds new fields into a ruleset persisted before the
+// current schema version. Identity and versioning fields are preserved; only the
+// detection/LLM/prompt fields are seeded from env-derived defaults. The second
+// return value reports whether the ruleset was modified.
+func backfillRuleSetSchema(rs rules.RuleSet, opts options) (rules.RuleSet, bool) {
+	if rs.SchemaVersion >= rules.CurrentSchemaVersion {
+		return rs, false
+	}
+	seed := bootstrapRuleSet(opts)
+	rs.SchemaVersion = rules.CurrentSchemaVersion
+	rs.Detection = seed.Detection
+	rs.LLM = seed.LLM
+	rs.OpenAI.Prompt = seed.OpenAI.Prompt
+	rs.OpenAI.VisionModel = seed.OpenAI.VisionModel
+	rs.Gemini.Prompt = seed.Gemini.Prompt
+	rs.Gemini.VisionModel = seed.Gemini.VisionModel
+	return rs, true
 }
 
 func makeApprovedUsersStore(
@@ -439,7 +485,12 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 		BotWhitelist:            opts.BotWhitelist,
 	}
 	if a.AuditService != nil {
-		listener.AuditWriter = events.NewDefaultAuditWriter(a.SpamLogger, a.Locator, events.NewIncidentAdapter(a.AuditService))
+		incidentCreator := events.NewIncidentAdapter(a.AuditService)
+		listener.AuditWriter = events.NewDefaultAuditWriter(a.SpamLogger, a.Locator, incidentCreator)
+		listener.IncidentCreator = incidentCreator
+	}
+	if a.AppealService != nil {
+		listener.AppealService = a.AppealService
 	}
 	if a.UsageMetering != nil {
 		listener.UsageMeter = &usageMeterAdapter{store: a.UsageMetering}
@@ -462,6 +513,9 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 	}
 	a.TelegramListener = listener
 	a.Web.BotUsername = listener.BotUsername
+	if a.AppealService != nil {
+		a.AppealService.SetBotService(events.NewAppealBotAdapter(listener))
+	}
 	return listener
 }
 
@@ -480,25 +534,36 @@ func activateWebRuntime(ctx context.Context, opts options, web webRuntimeAssembl
 	return activateServer(ctx, opts, web, dmUsersProvider)
 }
 
+func applyLiveReload(a *runtimeAssembly, opts options, rs rules.RuleSet) {
+	log.Printf("[INFO] rule set changed: version=%d, applying live reload", rs.Version)
+	applyExplicitRuleSetOverrides(&rs, opts)
+
+	if a.TelegramListener != nil {
+		a.TelegramListener.ApplyRuleSet(rs)
+	}
+
+	if a.Detector != nil {
+		cfg := buildDetectorConfig(opts, rs)
+		a.Detector.UpdateConfig(cfg)
+		a.Detector.ReplaceMetaChecks(buildMetaChecks(rs, rs.Detection.MinMsgLen)...)
+		applyLLMCheckers(a.Detector, opts, rs)
+	}
+
+	if a.SlowPathEngine != nil {
+		applySlowPathPrompts(a.SlowPathEngine, rs)
+	}
+
+	if a.SpamBot != nil {
+		a.SpamBot.ApplyRuleSet(rs)
+	}
+	a.ActiveRuleSet = rs
+
+	log.Printf("[INFO] live reload applied: version=%d", rs.Version)
+}
+
 func (a *runtimeAssembly) wireLiveReload(opts options) {
 	a.RuleSetService.OnChange(func(rs rules.RuleSet) {
-		log.Printf("[INFO] rule set changed: version=%d, applying live reload", rs.Version)
-		applyExplicitRuleSetOverrides(&rs, opts)
-
-		if a.TelegramListener != nil {
-			a.TelegramListener.ApplyRuleSet(rs)
-		}
-
-		if a.Detector != nil {
-			cfg := buildDetectorConfig(opts, rs)
-			a.Detector.UpdateConfig(cfg)
-			a.Detector.ReplaceMetaChecks(buildMetaChecks(rs, opts.MinMsgLen)...)
-		}
-
-		a.SpamBot.ApplyRuleSet(rs)
-		a.ActiveRuleSet = rs
-
-		log.Printf("[INFO] live reload applied: version=%d", rs.Version)
+		applyLiveReload(a, opts, rs)
 	})
 
 	if a.ApprovedUsersService != nil {

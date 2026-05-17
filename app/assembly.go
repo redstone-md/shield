@@ -227,6 +227,7 @@ func activateServer(
 		Version:               revision,
 		Dbg:                   opts.Dbg,
 		Settings:              settings,
+		EnvPinnedKeys:         envPinnedKeys(),
 	}}
 
 	go func() {
@@ -247,53 +248,9 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 	detectorConfig := buildDetectorConfig(opts, ruleSet)
 	detector := tgspam.NewDetector(detectorConfig)
 
-	if ruleSet.OpenAI.Enabled && (opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "") {
-		log.Printf("[WARN] openai enabled")
-		openAIConfig := tgspam.OpenAIConfig{
-			SystemPrompt:                 opts.OpenAI.Prompt,
-			CustomPrompts:                opts.OpenAI.CustomPrompts,
-			Model:                        ruleSet.OpenAI.Model,
-			MaxTokensResponse:            opts.OpenAI.MaxTokensResponse,
-			MaxTokensRequest:             opts.OpenAI.MaxTokensRequest,
-			MaxSymbolsRequest:            opts.OpenAI.MaxSymbolsRequest,
-			RetryCount:                   opts.OpenAI.RetryCount,
-			ReasoningEffort:              opts.OpenAI.ReasoningEffort,
-			CheckShortMessagesWithOpenAI: ruleSet.OpenAI.CheckShortMessages,
-		}
+	applyLLMCheckers(detector, opts, ruleSet)
 
-		config := openai.DefaultConfig(opts.OpenAI.Token)
-		if opts.OpenAI.APIBase != "" {
-			config.BaseURL = opts.OpenAI.APIBase
-		}
-		debugLogFields("openai config", openAIConfig)
-
-		detector.WithOpenAIChecker(openai.NewClientWithConfig(config), openAIConfig)
-	}
-
-	if ruleSet.Gemini.Enabled && opts.Gemini.Token != "" {
-		log.Printf("[WARN] gemini enabled")
-		geminiConfig := tgspam.GeminiConfig{
-			SystemPrompt:       opts.Gemini.Prompt,
-			CustomPrompts:      opts.Gemini.CustomPrompts,
-			Model:              ruleSet.Gemini.Model,
-			MaxOutputTokens:    opts.Gemini.MaxTokensResponse,
-			MaxSymbolsRequest:  opts.Gemini.MaxSymbolsRequest,
-			RetryCount:         opts.Gemini.RetryCount,
-			CheckShortMessages: ruleSet.Gemini.CheckShortMessages,
-		}
-
-		client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
-			APIKey:  opts.Gemini.Token,
-			Backend: genai.BackendGeminiAPI,
-		})
-		if err != nil {
-			log.Fatalf("[ERROR] failed to create gemini client: %v", err)
-		}
-		debugLogFields("gemini config", geminiConfig)
-		detector.WithGeminiChecker(client.Models, geminiConfig)
-	}
-
-	detector.WithMetaChecks(buildMetaChecks(ruleSet, opts.MinMsgLen)...)
+	detector.WithMetaChecks(buildMetaChecks(ruleSet, ruleSet.Detection.MinMsgLen)...)
 	debugLogFields("detector config", detectorConfig)
 
 	// initialize Lua plugins if enabled
@@ -323,32 +280,82 @@ func makeDetectorWithRuleSet(opts options, ruleSet rules.RuleSet) *tgspam.Detect
 	return detector
 }
 
+// applyLLMCheckers (re)builds and attaches the OpenAI and Gemini text checkers on the
+// detector from the current ruleset. Safe to call repeatedly for live reload.
+func applyLLMCheckers(detector *tgspam.Detector, opts options, ruleSet rules.RuleSet) {
+	if ruleSet.OpenAI.Enabled && (opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "") {
+		openAIConfig := tgspam.OpenAIConfig{
+			SystemPrompt:                 ruleSet.OpenAI.Prompt,
+			CustomPrompts:                ruleSet.OpenAI.CustomPrompts,
+			Model:                        ruleSet.OpenAI.Model,
+			MaxTokensResponse:            opts.OpenAI.MaxTokensResponse,
+			MaxTokensRequest:             opts.OpenAI.MaxTokensRequest,
+			MaxSymbolsRequest:            opts.OpenAI.MaxSymbolsRequest,
+			RetryCount:                   opts.OpenAI.RetryCount,
+			ReasoningEffort:              opts.OpenAI.ReasoningEffort,
+			CheckShortMessagesWithOpenAI: ruleSet.OpenAI.CheckShortMessages,
+		}
+		config := openai.DefaultConfig(opts.OpenAI.Token)
+		if opts.OpenAI.APIBase != "" {
+			config.BaseURL = opts.OpenAI.APIBase
+		}
+		debugLogFields("openai config", openAIConfig)
+		detector.WithOpenAIChecker(openai.NewClientWithConfig(config), openAIConfig)
+	}
+
+	if ruleSet.Gemini.Enabled && opts.Gemini.Token != "" {
+		geminiConfig := tgspam.GeminiConfig{
+			SystemPrompt:       ruleSet.Gemini.Prompt,
+			CustomPrompts:      ruleSet.Gemini.CustomPrompts,
+			Model:              ruleSet.Gemini.Model,
+			MaxOutputTokens:    opts.Gemini.MaxTokensResponse,
+			MaxSymbolsRequest:  opts.Gemini.MaxSymbolsRequest,
+			RetryCount:         opts.Gemini.RetryCount,
+			CheckShortMessages: ruleSet.Gemini.CheckShortMessages,
+		}
+		client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
+			APIKey:  opts.Gemini.Token,
+			Backend: genai.BackendGeminiAPI,
+		})
+		if err != nil {
+			log.Printf("[ERROR] failed to create gemini client: %v", err)
+			return
+		}
+		debugLogFields("gemini config", geminiConfig)
+		detector.WithGeminiChecker(client.Models, geminiConfig)
+	}
+}
+
 func buildDetectorConfig(opts options, ruleSet rules.RuleSet) tgspam.Config {
+	casAPI := ""
+	if ruleSet.Detection.CasEnabled {
+		casAPI = opts.CAS.API
+	}
 	cfg := tgspam.Config{
-		MaxAllowedEmoji:     opts.MaxEmoji,
-		MinMsgLen:           opts.MinMsgLen,
-		SimilarityThreshold: opts.SimilarityThreshold,
-		MinSpamProbability:  opts.MinSpamProbability,
-		CasAPI:              opts.CAS.API,
+		MaxAllowedEmoji:     ruleSet.Detection.MaxEmoji,
+		MinMsgLen:           ruleSet.Detection.MinMsgLen,
+		SimilarityThreshold: ruleSet.Detection.SimilarityThreshold,
+		MinSpamProbability:  ruleSet.Detection.MinSpamProbability,
+		CasAPI:              casAPI,
 		CasUserAgent:        opts.CAS.UserAgent,
 		HTTPClient:          &http.Client{Timeout: opts.CAS.Timeout},
-		FirstMessageOnly:    !opts.ParanoidMode,
-		FirstMessagesCount:  opts.FirstMessagesCount,
+		FirstMessageOnly:    !ruleSet.Detection.ParanoidMode,
+		FirstMessagesCount:  ruleSet.Detection.FirstMessagesCount,
 		OpenAIVeto:          ruleSet.OpenAI.Veto,
 		OpenAIHistorySize:   ruleSet.OpenAI.HistorySize,
 		GeminiVeto:          ruleSet.Gemini.Veto,
 		GeminiHistorySize:   ruleSet.Gemini.HistorySize,
-		LLMMode:             tgspam.LLMMode(opts.LLM.Mode),
-		LLMConsensus:        tgspam.LLMConsensusMode(opts.LLM.Consensus),
+		LLMMode:             tgspam.LLMMode(ruleSet.LLM.Mode),
+		LLMConsensus:        tgspam.LLMConsensusMode(ruleSet.LLM.Consensus),
 		LLMRequestTimeout:   opts.LLM.RequestTimeout,
-		MultiLangWords:      opts.MultiLangWords,
-		HistorySize:         opts.HistorySize,
+		MultiLangWords:      ruleSet.Detection.MultiLangWords,
+		HistorySize:         ruleSet.Detection.HistorySize,
 	}
 
-	if opts.FirstMessagesCount > 0 {
+	if ruleSet.Detection.FirstMessagesCount > 0 {
 		cfg.FirstMessageOnly = true
 	}
-	if opts.ParanoidMode {
+	if ruleSet.Detection.ParanoidMode {
 		cfg.FirstMessageOnly = false
 		cfg.FirstMessagesCount = 0
 	}
@@ -472,7 +479,7 @@ func expandPath(path string) string {
 	return ep
 }
 
-func makeSlowPathEngine(opts options) *slowpath.Engine {
+func makeSlowPathEngine(opts options, ruleSet rules.RuleSet) *slowpath.Engine {
 	hasProvider := opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "" || opts.Gemini.Token != ""
 	if !hasProvider {
 		return nil
@@ -480,7 +487,7 @@ func makeSlowPathEngine(opts options) *slowpath.Engine {
 
 	eng := slowpath.NewEngine(slowpath.EngineConfig{})
 	brk := slowpath.DefaultBreakerConfig()
-	configureSlowPathPrompts(eng, opts)
+	applySlowPathPrompts(eng, ruleSet)
 
 	if opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "" {
 		config := openai.DefaultConfig(opts.OpenAI.Token)
@@ -544,49 +551,11 @@ func makeSlowPathChatEngine(opts options) *slowpath.Engine {
 	return eng
 }
 
-func configureSlowPathPrompts(eng *slowpath.Engine, opts options) {
-	registry := slowpath.NewInMemoryPromptRegistry()
-	configured := false
-
-	overridePrompt, err := readPromptOverride(opts.Files.DynamicDataPath)
-	if err != nil {
-		log.Printf("[WARN] slowpath prompt override ignored: %v", err)
+func applySlowPathPrompts(eng *slowpath.Engine, ruleSet rules.RuleSet) {
+	if eng == nil {
+		return
 	}
-
-	if prompt := resolveSlowPathPrompt(opts.OpenAI.Prompt, overridePrompt); prompt != "" {
-		registry.Set(slowpath.PromptEntry{Version: "override", Provider: "openai", SystemPrompt: prompt, Active: true})
-		configured = true
-	}
-	if prompt := resolveSlowPathPrompt(opts.Gemini.Prompt, overridePrompt); prompt != "" {
-		registry.Set(slowpath.PromptEntry{Version: "override", Provider: "gemini", SystemPrompt: prompt, Active: true})
-		configured = true
-	}
-
-	if configured {
-		eng.SetPromptRegistry(registry)
-	}
-}
-
-func readPromptOverride(dynamicPath string) (string, error) {
-	if dynamicPath == "" {
-		return "", nil
-	}
-
-	path := filepath.Join(dynamicPath, promptOverrideFile)
-	data, err := os.ReadFile(path) // #nosec G304 -- path supplied by operator config
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return "", nil
-		}
-		return "", fmt.Errorf("read %s: %w", path, err)
-	}
-
-	return strings.TrimSpace(string(data)), nil
-}
-
-func resolveSlowPathPrompt(providerPrompt, overridePrompt string) string {
-	if strings.TrimSpace(providerPrompt) != "" {
-		return providerPrompt
-	}
-	return overridePrompt
+	eng.SetSystemPrompt("openai", ruleSet.OpenAI.Prompt)
+	eng.SetSystemPrompt("gemini", ruleSet.Gemini.Prompt)
+	eng.SetVisionPrompt(ruleSet.LLM.VisionPrompt)
 }

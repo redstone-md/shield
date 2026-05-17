@@ -1,20 +1,21 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Appeals - TG-Spam</title>
+    <title>Appeals - Shield</title>
     {{template "heads.html"}}
 </head>
-<body>
-{{template "navbar.html"}}
-
-<div class="container mt-4">
-    <h2 class="text-center mb-4">Appeals Queue</h2>
-
-    <div class="row mb-3">
-        <div class="col-12 col-md-6 offset-md-3">
-            <select class="form-select" id="status-filter"
-                    hx-get="/appeals" hx-target="#appeals-content" hx-trigger="change"
-                    name="status">
+<body x-data="{ navOpen: false }">
+{{template "sidebar.html"}}
+<div class="scrim" x-show="navOpen" @click="navOpen=false" x-cloak></div>
+<main class="main">
+    <header class="topbar">
+        <button class="topbar__burger" @click="navOpen=!navOpen" aria-label="Toggle navigation"><i class="bi bi-list"></i></button>
+        <h2 class="page-title">Appeals Queue</h2>
+    </header>
+    <div class="content">
+        <div class="field" style="max-width:280px">
+            <label for="status-filter">Status</label>
+            <select class="select" id="status-filter" hx-get="/appeals" hx-target="#appeals-content" hx-trigger="change" name="status">
                 <option value="new" selected>New</option>
                 <option value="triaged">Triaged</option>
                 <option value="escalated">Escalated</option>
@@ -22,20 +23,19 @@
                 <option value="rejected">Rejected</option>
             </select>
         </div>
-    </div>
 
-    <div id="appeals-content">
-        {{template "appeals_list" .}}
+        <div id="appeals-content">
+            {{template "appeals_list" .}}
+        </div>
     </div>
-</div>
-
+</main>
 </body>
 </html>
 
 {{define "appeals_list"}}
-<div class="table-responsive">
-    <table class="table table-striped">
-        <thead class="custom-table-header">
+<div class="table-wrap">
+    <table class="table">
+        <thead>
             <tr>
                 <th>ID</th>
                 <th>Incident</th>
@@ -53,19 +53,17 @@
                 <td><a href="/incidents/{{.IncidentID}}">#{{.IncidentID}}</a></td>
                 <td>{{.AppellantName}}</td>
                 <td>
-                    <span class="badge {{if eq .Status "new"}}bg-warning{{else if eq .Status "triaged"}}bg-info{{else if eq .Status "escalated"}}bg-danger{{else if eq .Status "accepted"}}bg-success{{else}}bg-secondary{{end}}">
+                    <span class="badge {{if eq .Status "new"}}badge-warn{{else if eq .Status "triaged"}}badge-info{{else if eq .Status "escalated"}}badge-spam{{else if eq .Status "accepted"}}badge-ham{{else}}badge-muted{{end}}">
                         {{.Status}}
                     </span>
                 </td>
                 <td>{{.AppealText}}</td>
                 <td>{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
-                <td>
-                    <a href="/appeals/{{.ID}}" class="btn btn-sm btn-outline-primary">Review</a>
-                </td>
+                <td><a href="/appeals/{{.ID}}" class="btn btn-sm btn-ghost">Review</a></td>
             </tr>
             {{else}}
             <tr>
-                <td colspan="7" class="text-center text-muted">No appeals found</td>
+                <td colspan="7" class="center-text muted">No appeals found</td>
             </tr>
             {{end}}
         </tbody>

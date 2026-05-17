@@ -75,8 +75,8 @@ func TestDMUsers_settingsPageContainsDMUsersSection(t *testing.T) {
 
 	assert.Contains(t, body, `id="dm-users-panel"`)
 	assert.Contains(t, body, "Don't know your ID? Message the bot!")
-	assert.Contains(t, body, `data-bs-toggle="collapse"`)
-	assert.Contains(t, body, `data-bs-target="#dm-users-panel"`)
+	assert.Contains(t, body, `x-show="show"`)
+	assert.Contains(t, body, `@click="show = !show"`)
 
 	assert.Contains(t, body, "How to find your Telegram User ID")
 	assert.Contains(t, body, "Open a chat with the bot")
@@ -86,6 +86,5 @@ func TestDMUsers_settingsPageContainsDMUsersSection(t *testing.T) {
 	assert.Contains(t, body, `hx-get="/dm-users"`)
 	assert.NotContains(t, body, `sse-connect="/dm-users/stream"`, "SSE should not be in settings page")
 
-	assert.Contains(t, body, "function copyUserID(userId, btn)")
-	assert.Contains(t, body, "navigator.clipboard")
+	assert.Contains(t, body, "app.js")
 }

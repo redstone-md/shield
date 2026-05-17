@@ -3,6 +3,7 @@ package controlplane
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -45,6 +46,7 @@ func (m *mockOnboardTenantStore) UpdateStatus(_ context.Context, _, status strin
 }
 
 type mockOnboardWorkspaceStore struct {
+	mu      sync.Mutex
 	wsID    int64
 	addErr  error
 	members []storage.WorkspaceMemberRecord
@@ -62,6 +64,8 @@ func (m *mockOnboardWorkspaceStore) Get(_ context.Context, _ string) (storage.Wo
 }
 
 func (m *mockOnboardWorkspaceStore) AddMember(_ context.Context, wsID int64, userID, role string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.members = append(m.members, storage.WorkspaceMemberRecord{
 		WorkspaceID: wsID, UserID: userID, Role: role,
 	})
@@ -73,17 +77,22 @@ func (m *mockOnboardWorkspaceStore) GetMember(_ context.Context, _ int64, _ stri
 }
 
 type mockOnboardRuleSetStore struct {
+	mu           sync.Mutex
 	bootstrapped bool
 	rs           rules.RuleSet
 }
 
 func (m *mockOnboardRuleSetStore) EnsureBootstrap(_ context.Context, rs rules.RuleSet) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.bootstrapped = true
 	m.rs = rs
 	return true, nil
 }
 
 func (m *mockOnboardRuleSetStore) Active(_ context.Context, _ string) (rules.RuleSet, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.rs.Version = 1
 	return m.rs, nil
 }
