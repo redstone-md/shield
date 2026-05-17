@@ -179,8 +179,13 @@ func (m *mockAppealStore) UpdateReplayResult(_ context.Context, id int64, result
 }
 
 type mockBotService struct {
-	unbannedIDs []int64
-	hamAdded    []string
+	unbannedIDs     []int64
+	hamAdded        []string
+	clearedWarnings []int64
+	notified        []struct {
+		userID   int64
+		accepted bool
+	}
 }
 
 func (m *mockBotService) UnbanUser(_ context.Context, userID int64) error {
@@ -190,6 +195,19 @@ func (m *mockBotService) UnbanUser(_ context.Context, userID int64) error {
 
 func (m *mockBotService) AddHamSample(_ context.Context, text string) error {
 	m.hamAdded = append(m.hamAdded, text)
+	return nil
+}
+
+func (m *mockBotService) ClearUserWarnings(_ context.Context, userID int64) error {
+	m.clearedWarnings = append(m.clearedWarnings, userID)
+	return nil
+}
+
+func (m *mockBotService) NotifyAppealResult(_ context.Context, userID int64, accepted bool) error {
+	m.notified = append(m.notified, struct {
+		userID   int64
+		accepted bool
+	}{userID: userID, accepted: accepted})
 	return nil
 }
 
@@ -589,4 +607,41 @@ func TestListIncidents_Filtering(t *testing.T) {
 	resolved, err := svc.ListByStatus(context.Background(), IncidentStatusResolved, 10)
 	require.NoError(t, err)
 	assert.Len(t, resolved, 1)
+}
+
+func TestAppealService_AcceptInvokesBotService(t *testing.T) {
+	appeals := newMockAppealStore()
+	incidents := newMockIncidentStore()
+	inc, err := incidents.Create(context.Background(), Incident{SpamUserID: 555, MessageText: "spam text"})
+	require.NoError(t, err)
+	ap, err := appeals.Create(context.Background(), Appeal{IncidentID: inc.ID, AppellantUserID: 555, Status: AppealNew})
+	require.NoError(t, err)
+
+	bot := &mockBotService{}
+	svc := NewAppealService(appeals, incidents, bot)
+
+	require.NoError(t, svc.Accept(context.Background(), ap.ID, "admin", ""))
+	assert.Equal(t, []int64{555}, bot.unbannedIDs)
+	assert.Equal(t, []int64{555}, bot.clearedWarnings)
+	require.Len(t, bot.notified, 1)
+	assert.Equal(t, int64(555), bot.notified[0].userID)
+	assert.True(t, bot.notified[0].accepted)
+}
+
+func TestAppealService_RejectNotifiesUser(t *testing.T) {
+	appeals := newMockAppealStore()
+	incidents := newMockIncidentStore()
+	inc, err := incidents.Create(context.Background(), Incident{SpamUserID: 666})
+	require.NoError(t, err)
+	ap, err := appeals.Create(context.Background(), Appeal{IncidentID: inc.ID, AppellantUserID: 666, Status: AppealNew})
+	require.NoError(t, err)
+
+	bot := &mockBotService{}
+	svc := NewAppealService(appeals, incidents, bot)
+
+	require.NoError(t, svc.Reject(context.Background(), ap.ID, "admin", ""))
+	assert.Empty(t, bot.unbannedIDs, "reject must not unban")
+	require.Len(t, bot.notified, 1)
+	assert.Equal(t, int64(666), bot.notified[0].userID)
+	assert.False(t, bot.notified[0].accepted)
 }

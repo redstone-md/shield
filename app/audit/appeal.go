@@ -9,6 +9,8 @@ import (
 type BotService interface {
 	UnbanUser(ctx context.Context, userID int64) error
 	AddHamSample(ctx context.Context, text string) error
+	ClearUserWarnings(ctx context.Context, userID int64) error
+	NotifyAppealResult(ctx context.Context, userID int64, accepted bool) error
 }
 
 type FeedbackLabeler interface {
@@ -28,6 +30,12 @@ func NewAppealService(appeals AppealStore, incidents IncidentStore, bot BotServi
 
 func (s *AppealService) SetFeedbackLabeler(labeler FeedbackLabeler) {
 	s.labeler = labeler
+}
+
+// SetBotService wires the bot adapter used to unban users, clear warnings and
+// notify them of appeal outcomes. It is set after the listener is constructed.
+func (s *AppealService) SetBotService(bot BotService) {
+	s.bot = bot
 }
 
 func (s *AppealService) Submit(
@@ -114,6 +122,8 @@ func (s *AppealService) Accept(ctx context.Context, appealID int64, resolverID, 
 		if inc.MessageText != "" {
 			_ = s.bot.AddHamSample(ctx, inc.MessageText)
 		}
+		_ = s.bot.ClearUserWarnings(ctx, inc.SpamUserID)
+		_ = s.bot.NotifyAppealResult(ctx, inc.SpamUserID, true)
 	}
 
 	s.autoLabel(ctx, inc, "false_positive", resolverID)
@@ -141,6 +151,10 @@ func (s *AppealService) Reject(ctx context.Context, appealID int64, resolverID, 
 
 	if err := s.incidents.UpdateStatus(ctx, ap.IncidentID, IncidentStatusClosed, resolverID); err != nil {
 		return fmt.Errorf("update incident status: %w", err)
+	}
+
+	if s.bot != nil {
+		_ = s.bot.NotifyAppealResult(ctx, ap.AppellantUserID, false)
 	}
 
 	s.autoLabelAppeal(ctx, ap, "rejected", resolverID)
@@ -190,6 +204,16 @@ func (s *AppealService) ListByStatus(ctx context.Context, status AppealStatus, l
 
 func (s *AppealService) GetForIncident(ctx context.Context, incidentID int64) (Appeal, error) {
 	return s.appeals.GetByIncident(ctx, incidentID)
+}
+
+// GetAppeal returns a single appeal by id.
+func (s *AppealService) GetAppeal(ctx context.Context, appealID int64) (Appeal, error) {
+	return s.appeals.Get(ctx, appealID)
+}
+
+// GetIncident returns a single incident by id.
+func (s *AppealService) GetIncident(ctx context.Context, incidentID int64) (Incident, error) {
+	return s.incidents.Get(ctx, incidentID)
 }
 
 func (s *AppealService) autoLabel(ctx context.Context, inc Incident, label, _ string) {
