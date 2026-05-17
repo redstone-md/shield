@@ -62,6 +62,7 @@ func TestProcAppealStart(t *testing.T) {
 	update := tbapi.Update{Message: newAppealTestMessage(555, "/start 10")}
 	assert.True(t, l.procAppealStart(context.Background(), update), "/start with payload is handled")
 	assert.Equal(t, []int64{10}, filer.submitCalls)
+	assert.NotEmpty(t, sent, "handled /start must produce a reply")
 
 	bare := tbapi.Update{Message: newAppealTestMessage(555, "/start")}
 	assert.False(t, l.procAppealStart(context.Background(), bare), "bare /start is not handled here")

@@ -18,7 +18,6 @@ import (
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
-	"github.com/umputun/tg-spam/app/audit"
 	"github.com/umputun/tg-spam/app/bot"
 	"github.com/umputun/tg-spam/app/moderation"
 	"github.com/umputun/tg-spam/app/observability"
@@ -86,7 +85,7 @@ type TelegramListener struct {
 	PolicyProfileName       string
 	AuditWriter             AuditWriter
 	IncidentCreator         IncidentCreator
-	AppealService           *audit.AppealService
+	AppealService           appealService
 	UsageMeter              UsageMeter
 	MetricsRecorder         MetricsRecorder
 	SlowPathEnabled         bool

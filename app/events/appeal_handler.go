@@ -27,6 +27,15 @@ type appealFiler interface {
 	GetIncident(ctx context.Context, incidentID int64) (audit.Incident, error)
 }
 
+// appealService is the listener-level view of the appeal subsystem: it both
+// files appeals (appealFiler) and resolves them. Satisfied by *audit.AppealService.
+type appealService interface {
+	appealFiler
+	GetAppeal(ctx context.Context, appealID int64) (audit.Appeal, error)
+	Accept(ctx context.Context, appealID int64, resolverID, resolutionText string) error
+	Reject(ctx context.Context, appealID int64, resolverID, resolutionText string) error
+}
+
 // appealHandler processes "/start <incidentID>" deep links sent to the bot DM,
 // files the appeal and notifies the admin chat.
 type appealHandler struct {
