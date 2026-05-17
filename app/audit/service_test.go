@@ -614,17 +614,17 @@ func TestAppealService_AcceptInvokesBotService(t *testing.T) {
 	incidents := newMockIncidentStore()
 	inc, err := incidents.Create(context.Background(), Incident{SpamUserID: 555, MessageText: "spam text"})
 	require.NoError(t, err)
-	ap, err := appeals.Create(context.Background(), Appeal{IncidentID: inc.ID, AppellantUserID: 555, Status: AppealNew})
+	ap, err := appeals.Create(context.Background(), Appeal{IncidentID: inc.ID, AppellantUserID: 444, Status: AppealNew})
 	require.NoError(t, err)
 
 	bot := &mockBotService{}
 	svc := NewAppealService(appeals, incidents, bot)
 
 	require.NoError(t, svc.Accept(context.Background(), ap.ID, "admin", ""))
-	assert.Equal(t, []int64{555}, bot.unbannedIDs)
-	assert.Equal(t, []int64{555}, bot.clearedWarnings)
+	assert.Equal(t, []int64{555}, bot.unbannedIDs, "unban must target the punished user")
+	assert.Equal(t, []int64{555}, bot.clearedWarnings, "clear warnings must target the punished user")
 	require.Len(t, bot.notified, 1)
-	assert.Equal(t, int64(555), bot.notified[0].userID)
+	assert.Equal(t, int64(444), bot.notified[0].userID, "notify must target the appellant")
 	assert.True(t, bot.notified[0].accepted)
 }
 
@@ -633,7 +633,7 @@ func TestAppealService_RejectNotifiesUser(t *testing.T) {
 	incidents := newMockIncidentStore()
 	inc, err := incidents.Create(context.Background(), Incident{SpamUserID: 666})
 	require.NoError(t, err)
-	ap, err := appeals.Create(context.Background(), Appeal{IncidentID: inc.ID, AppellantUserID: 666, Status: AppealNew})
+	ap, err := appeals.Create(context.Background(), Appeal{IncidentID: inc.ID, AppellantUserID: 777, Status: AppealNew})
 	require.NoError(t, err)
 
 	bot := &mockBotService{}
@@ -642,6 +642,6 @@ func TestAppealService_RejectNotifiesUser(t *testing.T) {
 	require.NoError(t, svc.Reject(context.Background(), ap.ID, "admin", ""))
 	assert.Empty(t, bot.unbannedIDs, "reject must not unban")
 	require.Len(t, bot.notified, 1)
-	assert.Equal(t, int64(666), bot.notified[0].userID)
+	assert.Equal(t, int64(777), bot.notified[0].userID, "notify must target the appellant")
 	assert.False(t, bot.notified[0].accepted)
 }

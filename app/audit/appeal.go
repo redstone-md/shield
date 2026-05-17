@@ -33,7 +33,7 @@ func (s *AppealService) SetFeedbackLabeler(labeler FeedbackLabeler) {
 }
 
 // SetBotService wires the bot adapter used to unban users, clear warnings and
-// notify them of appeal outcomes. It is set after the listener is constructed.
+// notify them of appeal outcomes. It may be called after construction.
 func (s *AppealService) SetBotService(bot BotService) {
 	s.bot = bot
 }
@@ -123,7 +123,7 @@ func (s *AppealService) Accept(ctx context.Context, appealID int64, resolverID, 
 			_ = s.bot.AddHamSample(ctx, inc.MessageText)
 		}
 		_ = s.bot.ClearUserWarnings(ctx, inc.SpamUserID)
-		_ = s.bot.NotifyAppealResult(ctx, inc.SpamUserID, true)
+		_ = s.bot.NotifyAppealResult(ctx, ap.AppellantUserID, true)
 	}
 
 	s.autoLabel(ctx, inc, "false_positive", resolverID)
