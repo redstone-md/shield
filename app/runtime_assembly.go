@@ -276,6 +276,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		ApprovedUsersService:   approvedUsersSvc,
 		DictionaryService:      dictSvc,
 		DetectedSpamService:    detectedSpamSvc,
+		AuditService:           auditSvc,
 		AppealService:          appealSvc,
 		FeedbackService:        feedbackSvc,
 		ReviewService:          reviewSvc,
