@@ -34,3 +34,9 @@ func TestAppealBotAdapter_ClearUserWarningsNoCounter(t *testing.T) {
 	adapter := NewAppealBotAdapter(&TelegramListener{})
 	assert.NoError(t, adapter.ClearUserWarnings(context.Background(), 1), "no detected-spam counter -> no-op")
 }
+
+func TestAppealBotAdapter_UnbanUserNoAdminHandler(t *testing.T) {
+	adapter := NewAppealBotAdapter(&TelegramListener{})
+	err := adapter.UnbanUser(context.Background(), 1)
+	require.ErrorContains(t, err, "admin handler not initialized")
+}

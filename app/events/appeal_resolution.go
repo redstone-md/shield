@@ -49,6 +49,9 @@ func (b *appealBotAdapter) ClearUserWarnings(ctx context.Context, userID int64) 
 // NotifyAppealResult DMs the user the appeal outcome. Best-effort: a blocked
 // bot or closed DM returns an error that the caller logs and ignores.
 func (b *appealBotAdapter) NotifyAppealResult(_ context.Context, userID int64, accepted bool) error {
+	if b.listener.TbAPI == nil {
+		return fmt.Errorf("tbAPI not initialized")
+	}
 	text := "❌ Апелляция отклонена."
 	if accepted {
 		text = "✅ Апелляция принята — вы разбанены, предупреждения сняты."
