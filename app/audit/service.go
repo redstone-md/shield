@@ -54,7 +54,7 @@ func (s *Service) CreateFromSpam(ctx context.Context, incident Incident) (Incide
 }
 
 // CreateIncident creates a new incident from automated spam detection data and returns its ID.
-// if data.IdempotencyKey is set and an incident with that key already exists, the existing ID is returned without inserting a duplicate.
+// If data.IdempotencyKey is set and an incident with that key already exists, the existing ID is returned without inserting a duplicate.
 func (s *Service) CreateIncident(ctx context.Context, data AuditEventData) (int64, error) {
 	if data.IdempotencyKey != "" {
 		existing, err := s.store.GetByIdempotencyKey(ctx, "", data.IdempotencyKey)

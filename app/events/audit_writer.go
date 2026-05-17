@@ -33,7 +33,7 @@ type enrichedAuditLogger interface {
 }
 
 // IncidentCreator creates an incident record from a detected spam event and returns the new incident ID.
-// implementations must be idempotent on idempotencyKey.
+// Implementations must be idempotent on IdempotencyKey.
 type IncidentCreator interface {
 	CreateIncident(
 		ctx context.Context,
