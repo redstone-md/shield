@@ -146,6 +146,7 @@ func (a *admin) ReportWarn(warnUserStr string, msg *bot.Message, warnNum, warnTo
 	msgConfig.ReplyMarkup = tbapi.NewInlineKeyboardMarkup(
 		tbapi.NewInlineKeyboardRow(
 			tbapi.NewInlineKeyboardButtonData("Не спам", fmt.Sprintf("%s%d:%d", warnHamAskPrefix, userID, msg.ID)),
+			tbapi.NewInlineKeyboardButtonData("⚑ info", fmt.Sprintf("%s%d:%d", infoPrefix, userID, msg.ID)),
 		),
 	)
 	if _, err := a.tbAPI.Send(msgConfig); err != nil {

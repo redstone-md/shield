@@ -150,9 +150,11 @@ func (a *admin) callbackWarningHamConfirmed(ctx context.Context, query *tbapi.Ca
 }
 
 func (a *admin) callbackWarningHamCancel(query *tbapi.CallbackQuery) error {
+	suffix := strings.TrimPrefix(query.Data, warnHamCancel)
 	markup := tbapi.NewInlineKeyboardMarkup(
 		tbapi.NewInlineKeyboardRow(
-			tbapi.NewInlineKeyboardButtonData("Не спам", warnHamAskPrefix+strings.TrimPrefix(query.Data, warnHamCancel)),
+			tbapi.NewInlineKeyboardButtonData("Не спам", warnHamAskPrefix+suffix),
+			tbapi.NewInlineKeyboardButtonData("⚑ info", infoPrefix+suffix),
 		),
 	)
 	editMsg := tbapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, markup)
@@ -463,7 +465,8 @@ func (a *admin) getCleanWarningMessage(msg string) (string, error) {
 	endLine := len(msgLines)
 	for i, line := range msgLines[2:] {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "Причина:") || strings.HasPrefix(trimmed, "ham подтвержден") {
+		if strings.HasPrefix(trimmed, "Причина:") || strings.HasPrefix(trimmed, "ham подтвержден") ||
+			strings.HasPrefix(trimmed, "spam detection results") || strings.HasPrefix(trimmed, "**spam detection results**") {
 			endLine = i + 2
 			break
 		}

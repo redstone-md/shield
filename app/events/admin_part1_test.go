@@ -204,11 +204,15 @@ func TestAdmin_reportWarnAddsNotSpamButton(t *testing.T) {
 	msgConfig := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
 	markup := msgConfig.ReplyMarkup.(tbapi.InlineKeyboardMarkup)
 	require.Len(t, markup.InlineKeyboard, 1)
-	require.Len(t, markup.InlineKeyboard[0], 1)
+	require.Len(t, markup.InlineKeyboard[0], 2)
 	button := markup.InlineKeyboard[0][0]
 	assert.Equal(t, "Не спам", button.Text)
 	require.NotNil(t, button.CallbackData)
 	assert.Equal(t, "W?7187750383:777", *button.CallbackData)
+	infoButton := markup.InlineKeyboard[0][1]
+	assert.Equal(t, "⚑ info", infoButton.Text)
+	require.NotNil(t, infoButton.CallbackData)
+	assert.Equal(t, "!7187750383:777", *infoButton.CallbackData)
 }
 
 func TestAdmin_getCleanMessage(t *testing.T) {
@@ -273,15 +277,50 @@ func TestAdmin_getCleanMessage(t *testing.T) {
 
 func TestAdmin_getCleanWarningMessage(t *testing.T) {
 	a := &admin{}
-	msg := `<b>⚠️ WARNING 1/3</b> <a href="https://t.me/dorothy">Dorothy</a> (7187750383)
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name: "stops at Причина",
+			input: `<b>⚠️ WARNING 1/3</b> <a href="https://t.me/dorothy">Dorothy</a> (7187750383)
 
 Проводим инвайтинг в чаты, рассылку по группам
 
-Причина: slowpath spam reason`
+Причина: slowpath spam reason`,
+			expected: "Проводим инвайтинг в чаты, рассылку по группам",
+		},
+		{
+			name: "stops at rendered spam detection results",
+			input: `⚠️ WARNING 1/3 Dorothy (7187750383)
 
-	result, err := a.getCleanWarningMessage(msg)
-	require.NoError(t, err)
-	assert.Equal(t, "Проводим инвайтинг в чаты, рассылку по группам", result)
+Проводим инвайтинг в чаты, рассылку по группам
+
+spam detection results
+- cas: spam, spam detected`,
+			expected: "Проводим инвайтинг в чаты, рассылку по группам",
+		},
+		{
+			name: "stops at markdown spam detection results",
+			input: `⚠️ WARNING 1/3 Dorothy (7187750383)
+
+Проводим инвайтинг в чаты, рассылку по группам
+
+**spam detection results**
+- cas: spam, spam detected`,
+			expected: "Проводим инвайтинг в чаты, рассылку по группам",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := a.getCleanWarningMessage(tt.input)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
 
 func TestAdmin_getCleanMessage2(t *testing.T) {

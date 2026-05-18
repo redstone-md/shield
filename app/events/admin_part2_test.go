@@ -670,6 +670,35 @@ func TestAdmin_WarningNotSpamCallback(t *testing.T) {
 		require.NotNil(t, edit.ReplyMarkup)
 		assert.Empty(t, edit.ReplyMarkup.InlineKeyboard)
 	})
+
+	t.Run("cancel restores not-spam and info buttons", func(t *testing.T) {
+		mockAPI := &mocks.TbAPIMock{
+			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{}, nil },
+		}
+		adm := admin{tbAPI: mockAPI, adminChatID: 456}
+
+		query := &tbapi.CallbackQuery{
+			Data: "WX7187750383:777",
+			Message: &tbapi.Message{
+				MessageID: 100,
+				Chat:      tbapi.Chat{ID: 456},
+				Text:      "<b>⚠️ WARNING 1/3</b> Dorothy (7187750383)\n\nfalse positive\n\n",
+			},
+		}
+
+		err := adm.InlineCallbackHandler(context.Background(), query)
+		require.NoError(t, err)
+		require.Len(t, mockAPI.SendCalls(), 1)
+		edit := mockAPI.SendCalls()[0].C.(tbapi.EditMessageReplyMarkupConfig)
+		buttons := edit.ReplyMarkup.InlineKeyboard[0]
+		require.Len(t, buttons, 2)
+		assert.Equal(t, "Не спам", buttons[0].Text)
+		require.NotNil(t, buttons[0].CallbackData)
+		assert.Equal(t, "W?7187750383:777", *buttons[0].CallbackData)
+		assert.Equal(t, "⚑ info", buttons[1].Text)
+		require.NotNil(t, buttons[1].CallbackData)
+		assert.Equal(t, "!7187750383:777", *buttons[1].CallbackData)
+	})
 }
 
 type autoLearnerSpy struct {
