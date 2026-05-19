@@ -24,9 +24,9 @@ require (
 	github.com/sony/gobreaker/v2 v2.4.0
 	github.com/stretchr/testify v1.11.1
 	github.com/yuin/gopher-lua v1.1.1
-	golang.org/x/image v0.38.0
-	golang.org/x/text v0.36.0
-	golang.org/x/time v0.11.0
+	golang.org/x/image v0.40.0
+	golang.org/x/text v0.37.0
+	golang.org/x/time v0.15.0
 	google.golang.org/genai v1.52.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	modernc.org/sqlite v1.49.1
