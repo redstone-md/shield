@@ -4,30 +4,30 @@ go 1.25.0
 
 require (
 	github.com/OvyFlash/telegram-bot-api v0.0.0-20251112155921-e82db5fd534b
-	github.com/fatih/color v1.18.0
+	github.com/fatih/color v1.19.0
 	github.com/forPelevin/gomoji v1.4.1
-	github.com/fsnotify/fsnotify v1.9.0
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-pkgz/expirable-cache/v3 v3.1.0
 	github.com/go-pkgz/fileutils v0.4.0
-	github.com/go-pkgz/lgr v0.12.1
+	github.com/go-pkgz/lgr v0.12.3
 	github.com/go-pkgz/repeater v1.2.0
-	github.com/go-pkgz/rest v1.20.6
+	github.com/go-pkgz/rest v1.21.0
 	github.com/go-pkgz/routegroup v1.6.0
 	github.com/go-pkgz/testutils v0.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/lib/pq v1.10.9
-	github.com/playwright-community/playwright-go v0.5200.1
+	github.com/lib/pq v1.12.3
+	github.com/playwright-community/playwright-go v0.5700.1
 	github.com/sandwich-go/gpt3-encoder v0.0.0-20230203030618-cd99729dd0dd
 	github.com/sashabaranov/go-openai v1.41.2
 	github.com/sony/gobreaker/v2 v2.4.0
 	github.com/stretchr/testify v1.11.1
-	github.com/yuin/gopher-lua v1.1.1
+	github.com/yuin/gopher-lua v1.1.2
 	golang.org/x/image v0.38.0
 	golang.org/x/text v0.36.0
 	golang.org/x/time v0.11.0
-	google.golang.org/genai v1.52.1
+	google.golang.org/genai v1.57.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	modernc.org/sqlite v1.49.1
 )
@@ -65,7 +65,7 @@ require (
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/deckarep/golang-set/v2 v2.7.0 // indirect
+	github.com/deckarep/golang-set/v2 v2.8.0 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/docker/go-connections v0.7.0 // indirect
