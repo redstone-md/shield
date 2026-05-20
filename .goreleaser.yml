@@ -50,15 +50,15 @@ brews:
   -
     name: tg-spam
     tap:
-      owner: umputun
+      owner: redstone-md
       name: homebrew-apps
       branch: master
     directory: Formula
     commit_author:
-      name: umputun
-      email: umputun@gmail.com
+      name: redstone-md
+      email: noreply@redstone.md
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-    homepage: "https://tg-spam.umputun.dev"
+    homepage: "https://github.com/redstone-md/shield"
     description: "tg-spam is a self-hosted Telegram bot fighting spam like no tomorrow."
     license: "MIT"
     extra_install: |
@@ -70,9 +70,9 @@ nfpms:
   - id: tg-spam
     package_name: tg-spam
     file_name_template: "{{.ProjectName}}_{{.Tag}}_{{.Os}}_{{.Arch}}"
-    vendor: Umputun
-    homepage: https://tg-spam.umputun.dev
-    maintainer: Umputun <umputun@gmail.com>
+    vendor: Redstone MD
+    homepage: https://github.com/redstone-md/shield
+    maintainer: Redstone MD <noreply@redstone.md>
     description: tg-spam is a self-hosted Telegram bot fighting spam like no tomorrow
     license: MIT
     formats:

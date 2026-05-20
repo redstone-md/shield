@@ -1,10 +1,12 @@
-FROM ghcr.io/umputun/baseimage/buildgo:v1.20.1 AS build
+FROM golang:1.25-alpine AS build
 
 ARG GIT_BRANCH
 ARG GITHUB_SHA
 ARG CI
 
 WORKDIR /build
+
+RUN apk add --no-cache ca-certificates git
 
 # Copy go.mod and go.sum first for better layer caching
 COPY go.mod go.sum ./
@@ -32,10 +34,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM alpine:3.23
 # enables automatic changelog generation by tools like Dependabot
-LABEL org.opencontainers.image.source="https://github.com/umputun/tg-spam"
+LABEL org.opencontainers.image.source="https://github.com/redstone-md/shield" \
+      org.opencontainers.image.licenses="MIT"
 ENV TGSPAM_IN_DOCKER=1
 RUN apk add --no-cache tzdata ffmpeg
 COPY --from=build /build/tg-spam /srv/tg-spam
+COPY LICENSE /srv/LICENSE
 
 COPY data /srv/preset
 COPY data/.not_mounted /srv/data/.not_mounted
