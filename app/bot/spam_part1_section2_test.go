@@ -34,9 +34,9 @@ func TestSpamFilter_OnMessage_WithMultipleLinkTypes(t *testing.T) {
 	})
 }
 
-func TestSpamFilter_OnMessage_SpamInQuotedReplyToTextFromExternalChannel(t *testing.T) {
+func TestSpamFilter_OnMessage_IgnoresReplyToTextFromExternalChannel(t *testing.T) {
 	runSpamFilterOnMessageCase(t, spamFilterOnMessageCase{
-		name: "spam in quoted/reply-to text from external channel",
+		name: "ignores reply-to text from external channel",
 		message: Message{
 			Text: "Есть в наличии",
 			From: User{ID: 1, Username: "user1"},
@@ -59,11 +59,9 @@ func TestSpamFilter_OnMessage_SpamInQuotedReplyToTextFromExternalChannel(t *test
 			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
 		},
 		wantRequest: spamcheck.Request{
-			Msg:        "Есть в наличии\nМефедрон VHQ Кристалл 1г",
-			UserID:     "1",
-			UserName:   "user1",
-			LLMMessage: "Current message text:\nЕсть в наличии\n\nReplied-to message context, not part of the current message:\nМефедрон VHQ Кристалл 1г",
-			HistoryMsg: "Есть в наличии",
+			Msg:      "Есть в наличии",
+			UserID:   "1",
+			UserName: "user1",
 		},
 	})
 }
@@ -100,9 +98,9 @@ func TestSpamFilter_OnMessage_MessageWithEmptyReplyToText(t *testing.T) {
 	})
 }
 
-func TestSpamFilter_OnMessage_EmptyMainTextWithSpamInReplyTo(t *testing.T) {
+func TestSpamFilter_OnMessage_EmptyMainTextIgnoresReplyTo(t *testing.T) {
 	runSpamFilterOnMessageCase(t, spamFilterOnMessageCase{
-		name: "empty main text with spam in reply-to",
+		name: "empty main text ignores reply-to",
 		message: Message{
 			Text: "",
 			From: User{ID: 1, Username: "user1"},
@@ -125,17 +123,16 @@ func TestSpamFilter_OnMessage_EmptyMainTextWithSpamInReplyTo(t *testing.T) {
 			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
 		},
 		wantRequest: spamcheck.Request{
-			Msg:        "\nspam in quoted message",
-			UserID:     "1",
-			UserName:   "user1",
-			LLMMessage: "Current message text:\n\n\nReplied-to message context, not part of the current message:\nspam in quoted message",
+			Msg:      "",
+			UserID:   "1",
+			UserName: "user1",
 		},
 	})
 }
 
-func TestSpamFilter_OnMessage_SpamInQuoteFieldTelegramTextquote(t *testing.T) {
+func TestSpamFilter_OnMessage_IgnoresTelegramTextQuote(t *testing.T) {
 	runSpamFilterOnMessageCase(t, spamFilterOnMessageCase{
-		name: "spam in Quote field (telegram TextQuote)",
+		name: "ignores Quote field (telegram TextQuote)",
 		message: Message{
 			Text:  "Мяу в наличии!",
 			From:  User{ID: 1, Username: "user1"},
@@ -150,11 +147,9 @@ func TestSpamFilter_OnMessage_SpamInQuoteFieldTelegramTextquote(t *testing.T) {
 			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
 		},
 		wantRequest: spamcheck.Request{
-			Msg:        "Мяу в наличии!\nМефедрон VHQ Кристалл 1г",
-			UserID:     "1",
-			UserName:   "user1",
-			LLMMessage: "Current message text:\nМяу в наличии!\n\nQuoted text selected by the sender:\nМефедрон VHQ Кристалл 1г",
-			HistoryMsg: "Мяу в наличии!",
+			Msg:      "Мяу в наличии!",
+			UserID:   "1",
+			UserName: "user1",
 		},
 	})
 }
@@ -203,9 +198,9 @@ func TestSpamFilter_OnMessage_SpamDetectedFromChannelMessage(t *testing.T) {
 	})
 }
 
-func TestSpamFilter_OnMessage_BothQuoteAndReplytoTextPresentQuoteTakesPrecedence(t *testing.T) {
+func TestSpamFilter_OnMessage_IgnoresQuoteAndReplyToText(t *testing.T) {
 	runSpamFilterOnMessageCase(t, spamFilterOnMessageCase{
-		name: "both Quote and ReplyTo.Text present - Quote takes precedence",
+		name: "ignores both Quote and ReplyTo.Text",
 		message: Message{
 			Text:  "check this",
 			From:  User{ID: 1, Username: "user1"},
@@ -228,11 +223,9 @@ func TestSpamFilter_OnMessage_BothQuoteAndReplytoTextPresentQuoteTakesPrecedence
 			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
 		},
 		wantRequest: spamcheck.Request{
-			Msg:        "check this\nspam quote text",
-			UserID:     "1",
-			UserName:   "user1",
-			LLMMessage: "Current message text:\ncheck this\n\nQuoted text selected by the sender:\nspam quote text",
-			HistoryMsg: "check this",
+			Msg:      "check this",
+			UserID:   "1",
+			UserName: "user1",
 		},
 	})
 }
