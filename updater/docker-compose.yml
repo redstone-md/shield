@@ -2,7 +2,7 @@
 # updater gets samples from github repo "https://github.com/radio-t/tg-spam-samples.git and updates tg-spam samples
 services:
   tg-spam:
-    image: ghcr.io/umputun/tg-spam:latest # use :master tag for latest (unstable) version
+    image: ghcr.io/redstone-md/shield:latest # use :master tag for latest (unstable) version
     hostname: tg-spam
     restart: always
     container_name: tg-spam
@@ -31,10 +31,10 @@ services:
       - ./log:/srv/log                  # map log folder to /srv/log
     command: --super=name1 --super=name2
 
-  tg-spam-updater:
-    image: ghcr.io/umputun/tg-spam-updater:latest # use :master tag for latest (unstable) version
-    hostname: tg-spam-updater
-    container_name: tg-spam-updater
+  shield-updater:
+    image: ghcr.io/redstone-md/shield-updater:latest # use :master tag for latest (unstable) version
+    hostname: shield-updater
+    container_name: shield-updater
     restart: always
     logging: *default_logging
     user: "1000:1000" # run with the same user as the host machine to avoid permission issues

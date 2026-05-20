@@ -55,7 +55,8 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: docker/build-push-action@v7
         with:
-          context: ./updater
+          context: .
+          file: updater/Dockerfile
           platforms: ${{ matrix.platform }}
           push: false
           build-args: |
@@ -68,26 +69,28 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
-          context: ./updater
+          context: .
+          file: updater/Dockerfile
           platforms: ${{ matrix.platform }}
           build-args: |
             CI=github
             GITHUB_SHA=${{ github.sha }}
             GIT_BRANCH=${{ github.ref_name }}
-          outputs: type=image,name=ghcr.io/${{ github.actor }}/tg-spam-updater,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/shield-updater,push-by-digest=true,name-canonical=true,push=true
 
       - name: build and push to DockerHub
         id: build-dockerhub
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
-          context: ./updater
+          context: .
+          file: updater/Dockerfile
           platforms: ${{ matrix.platform }}
           build-args: |
             CI=github
             GITHUB_SHA=${{ github.sha }}
             GIT_BRANCH=${{ github.ref_name }}
-          outputs: type=image,name=docker.io/${{ github.actor }}/tg-spam-updater,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=docker.io/${{ github.repository_owner }}/shield-updater,push-by-digest=true,name-canonical=true,push=true
 
       - name: export digests
         if: github.event_name != 'pull_request'
@@ -182,19 +185,19 @@ jobs:
       - name: create ghcr manifest and push
         working-directory: /tmp/digests/ghcr
         run: |
-          tags="-t ghcr.io/${{ github.actor }}/tg-spam-updater:${{ steps.tags.outputs.tag }}"
+          tags="-t ghcr.io/${{ github.repository_owner }}/shield-updater:${{ steps.tags.outputs.tag }}"
           if [[ "${{ steps.tags.outputs.is_release }}" == "true" ]]; then
-            tags="$tags -t ghcr.io/${{ github.actor }}/tg-spam-updater:latest"
+            tags="$tags -t ghcr.io/${{ github.repository_owner }}/shield-updater:latest"
           fi
           docker buildx imagetools create $tags \
-            $(printf 'ghcr.io/${{ github.actor }}/tg-spam-updater@sha256:%s ' *)
+            $(printf 'ghcr.io/${{ github.repository_owner }}/shield-updater@sha256:%s ' *)
 
       - name: create dockerhub manifest and push
         working-directory: /tmp/digests/dockerhub
         run: |
-          tags="-t docker.io/${{ github.actor }}/tg-spam-updater:${{ steps.tags.outputs.tag }}"
+          tags="-t docker.io/${{ github.repository_owner }}/shield-updater:${{ steps.tags.outputs.tag }}"
           if [[ "${{ steps.tags.outputs.is_release }}" == "true" ]]; then
-            tags="$tags -t docker.io/${{ github.actor }}/tg-spam-updater:latest"
+            tags="$tags -t docker.io/${{ github.repository_owner }}/shield-updater:latest"
           fi
           docker buildx imagetools create $tags \
-            $(printf 'docker.io/${{ github.actor }}/tg-spam-updater@sha256:%s ' *)
+            $(printf 'docker.io/${{ github.repository_owner }}/shield-updater@sha256:%s ' *)

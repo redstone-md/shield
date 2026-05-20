@@ -1,12 +1,14 @@
-FROM ghcr.io/umputun/baseimage/app:latest as base
+FROM alpine:3.23
 
 # enables automatic changelog generation by tools like Dependabot
-LABEL org.opencontainers.image.source="https://github.com/umputun/tg-spam"
+LABEL org.opencontainers.image.source="https://github.com/redstone-md/shield" \
+      org.opencontainers.image.licenses="MIT"
 
 ENV UPDATER_IN_DOCKER=1
-COPY update-git.sh /srv/update-git.sh
-RUN chmod +x /srv/update-git.sh
 RUN apk add --no-cache --update git tzdata ca-certificates rsync
+COPY LICENSE /srv/LICENSE
+COPY updater/update-git.sh /srv/update-git.sh
+RUN chmod +x /srv/update-git.sh
 
 WORKDIR /srv
-ENTRYPOINT ["/init.sh", "/srv/update-git.sh"]
+ENTRYPOINT ["/srv/update-git.sh"]

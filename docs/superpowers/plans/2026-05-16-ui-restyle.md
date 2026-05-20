@@ -2613,7 +2613,7 @@ Expected: no findings. (Only `routes.go` and the three test files changed in Go;
 
 - [ ] **Step 3: Normalize comments**
 
-Run: `command -v unfuck-ai-comments >/dev/null || go install github.com/umputun/unfuck-ai-comments@latest; unfuck-ai-comments run --fmt --skip=mocks ./...`
+Run: `make unfuck-ai-comments`
 Expected: no changes, or only trivial comment fixes. If it changes files, `git add` and amend them into the relevant commit or make a follow-up `chore` commit.
 
 - [ ] **Step 4: Scan README for stale UI references**

@@ -8,7 +8,7 @@ The utility is designed to be run either as a docker container or as a standalon
 
 ### Docker
 
-The docker image is available at [docker hub](https://hub.docker.com/r/umputun/tg-spam-updater/) and from [github packages](ghcr.io/umputun/tg-spam.updater). The following command arguments are supported: 
+The docker image is available from [GitHub Packages](https://github.com/redstone-md/shield/pkgs/container/shield-updater). The following command arguments are supported:
 
 - first argument is a git repository url (required)
 - second argument is a path to the local repository (optional, default is `./samples`)
@@ -16,7 +16,7 @@ The docker image is available at [docker hub](https://hub.docker.com/r/umputun/t
 **Example of running the utility as a docker container:**
 
 ```bash
-docker run -d --name tg-spam-updater -v $(pwd)/tg-spam-samples:/samples ghcr.io/umputun/tg-spam.updater https://github.com/radio-t/tg-spam-samples.git /samples
+docker run -d --name shield-updater -v $(pwd)/tg-spam-samples:/samples ghcr.io/redstone-md/shield-updater https://github.com/radio-t/tg-spam-samples.git /samples
 ```
 The command above will run the updater as a docker container and mount the local directory `./tg-spam-samples` to the container's `/samples` directory. The updater will clone the remote repository to the local directory and then update it every minute.
 
@@ -24,8 +24,8 @@ The command above will run the updater as a docker container and mount the local
 
 ```yaml
 services:
-  tg-spam-updater:
-    image: ghcr.io/umputun/tg-spam-updater:latest
+  shield-updater:
+    image: ghcr.io/redstone-md/shield-updater:latest
     restart: always
     user: "1000:1000" # run with the same user as the host machine to avoid permission issues
     command: ["https://github.com/radio-t/tg-spam-samples.git", "/samples"]
@@ -35,4 +35,4 @@ services:
 
 **permission issues**
 
-If the updater is run as a Docker container, there may be a discrepancy in file ownership between the host and the container. By default, containers run with a user ID (UID) of 1001. If the host's directory is owned by a different user, this can lead to permission issues. To circumvent this, you can use the `APP_UID` environment variable, either from the command line or within a Docker Compose file. For instance: `docker run -d --name tg-spam-updater -e APP_UID=502 ....`. It's also recommended to create the samples directory on the host before running the container.
+If the updater is run as a Docker container, there may be a discrepancy in file ownership between the host and the container. Set `user: "1000:1000"` in Compose or pass `--user $(id -u):$(id -g)` to `docker run` when the mounted samples directory should be owned by the host user. It's also recommended to create the samples directory on the host before running the container.

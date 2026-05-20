@@ -2,15 +2,15 @@
 
 Shield is a self-hosted Telegram moderation and anti-spam bot. It watches group messages, scores them through fast local checks, optionally escalates harder cases to LLM or vision providers, and applies moderation policy such as allow, delete, restrict, warn, or ban.
 
-> Note: the runtime package, binary, Docker image, and some internal paths still use the legacy `tg-spam` name. This README uses **Shield** for the repository/product and `tg-spam` where it is the current executable or image name.
+> Note: the runtime package, binary, and some internal paths still use the legacy `tg-spam` name. This README uses **Shield** for the repository/product and `tg-spam` where it is the current executable name.
 
 <div align="center">
-  <img class="logo" src="https://github.com/umputun/tg-spam/raw/master/site/tg-spam-bg.png" width="400px" alt="TG-Spam | Spam Hunter"/>
+  <img class="logo" src="https://github.com/redstone-md/shield/raw/master/site/tg-spam-bg.png" width="400px" alt="TG-Spam | Spam Hunter"/>
 </div>
 
 <div align="center">
 
-[![build](https://github.com/umputun/tg-spam/actions/workflows/ci.yml/badge.svg)](https://github.com/umputun/tg-spam/actions/workflows/ci.yml)&nbsp;[![Coverage Status](https://coveralls.io/repos/github/umputun/tg-spam/badge.svg?branch=master)](https://coveralls.io/github/umputun/tg-spam?branch=master)&nbsp;[![Go Report Card](https://goreportcard.com/badge/github.com/umputun/tg-spam)](https://goreportcard.com/report/github.com/umputun/tg-spam)&nbsp;[![Docker Hub](https://img.shields.io/docker/automated/jrottenberg/ffmpeg.svg)](https://hub.docker.com/r/umputun/tg-spam)
+[![build](https://github.com/redstone-md/shield/actions/workflows/ci.yml/badge.svg)](https://github.com/redstone-md/shield/actions/workflows/ci.yml)&nbsp;[![Go Report Card](https://goreportcard.com/badge/github.com/redstone-md/shield)](https://goreportcard.com/report/github.com/redstone-md/shield)
 
 </div>
 
@@ -41,10 +41,10 @@ For non-technical setup instructions, see [INSTALL.md](/INSTALL.md).
 
 ## Installation
 
-- **Docker** (primary method): image available at [umputun/tg-spam](https://hub.docker.com/r/umputun/tg-spam) and [ghcr.io/umputun/tg-spam](https://ghcr.io/umputun/tg-spam).
-- **Binary releases**: [releases page](https://github.com/umputun/tg-spam/releases/latest).
+- **Docker** (primary method): image available at [ghcr.io/redstone-md/shield](https://github.com/redstone-md/shield/pkgs/container/shield).
+- **Binary releases**: [releases page](https://github.com/redstone-md/shield/releases/latest).
 - **From source**: `make build` produces `.bin/tg-spam`.
-- **macOS**: `brew tap umputun/apps && brew install umputun/apps/tg-spam`.
+- **macOS**: `brew tap redstone-md/apps && brew install redstone-md/apps/tg-spam`.
 
 ## Configuration
 
@@ -209,7 +209,7 @@ Custom spam detection logic without editing Go code. Enable with `--lua-plugins.
 
 Each plugin exposes a `check(request)` function returning `(isSpam bool, details string)`. Helper functions: `count_substring`, `match_regex`, `contains_any`, `to_lower`, `to_upper`, `trim`, `split`, `join`, `starts_with`, `ends_with`.
 
-Example plugins: [_examples/lua_plugins](https://github.com/umputun/tg-spam/tree/master/_examples/lua_plugins).
+Example plugins: [_examples/lua_plugins](https://github.com/redstone-md/shield/tree/master/_examples/lua_plugins).
 
 ## Persistence and migration
 
@@ -301,7 +301,7 @@ Protected by basic auth (user `tg-spam`). Default password is auto-generated and
 | GET | `/settings` | Current bot settings |
 | GET | `/dm-users` | Recent DM senders |
 
-For request examples, see [webapp.rest](https://github.com/umputun/tg-spam/blob/master/webapp.rest).
+For request examples, see [webapp.rest](https://github.com/redstone-md/shield/blob/master/webapp.rest).
 
 ### Web UI
 
@@ -318,11 +318,11 @@ The web UI provides management interfaces:
 <details markdown>
   <summary>Screenshots</summary>
 
-![msg-checker](https://github.com/umputun/tg-spam/raw/master/site/docs/msg-checker.png)
+![msg-checker](https://github.com/redstone-md/shield/raw/master/site/docs/msg-checker.png)
 
-![manage-samples](https://github.com/umputun/tg-spam/raw/master/site/docs/manage-samples.png)
+![manage-samples](https://github.com/redstone-md/shield/raw/master/site/docs/manage-samples.png)
 
-![manage-users](https://github.com/umputun/tg-spam/raw/master/site/docs/manage-users.png)
+![manage-users](https://github.com/redstone-md/shield/raw/master/site/docs/manage-users.png)
 </details>
 
 ## Docker compose
@@ -346,7 +346,7 @@ Set at least `TELEGRAM_TOKEN`, `TELEGRAM_GROUP`, and `SERVER_ENABLED=true` in `.
 ```yaml
 services:
   tg-spam:
-    image: ghcr.io/umputun/tg-spam:latest
+    image: ghcr.io/redstone-md/shield:latest
     restart: always
     environment:
       - TELEGRAM_TOKEN=your-bot-token
@@ -360,7 +360,7 @@ services:
 ```yaml
 services:
   tg-spam:
-    image: ghcr.io/umputun/tg-spam:latest
+    image: ghcr.io/redstone-md/shield:latest
     hostname: tg-spam
     restart: always
     container_name: tg-spam
@@ -419,7 +419,7 @@ The bot monitors a single group. To protect multiple groups, run separate instan
 
 ## Using as a library
 
-Import `github.com/umputun/tg-spam/lib/tgspam` and use the `Detector` directly:
+Import `github.com/redstone-md/shield/lib/tgspam` and use the `Detector` directly:
 
 ```go
 package main
@@ -430,8 +430,8 @@ import (
     "net/http"
     "strings"
 
-    "github.com/umputun/tg-spam/lib/spamcheck"
-    "github.com/umputun/tg-spam/lib/tgspam"
+    "github.com/redstone-md/shield/lib/spamcheck"
+    "github.com/redstone-md/shield/lib/tgspam"
 )
 
 func main() {
@@ -466,21 +466,21 @@ func main() {
 }
 ```
 
-For API docs, see [pkg.go.dev](https://pkg.go.dev/github.com/umputun/tg-spam/lib). For complete examples, see [_examples/](https://github.com/umputun/tg-spam/tree/master/_examples/).
+For API docs, see [pkg.go.dev](https://pkg.go.dev/github.com/redstone-md/shield/lib). For complete examples, see [_examples/](https://github.com/redstone-md/shield/tree/master/_examples/).
 
 ## Getting spam samples from CAS
 
-The provided [`cas-export.sh`](https://raw.githubusercontent.com/umputun/tg-spam/master/cas-export.sh) script downloads spam samples from the CAS API. Requires `jq` and `curl`. Use the output as a base for your spam samples, not as-is — every group has different spam patterns.
+The provided [`cas-export.sh`](https://raw.githubusercontent.com/redstone-md/shield/master/cas-export.sh) script downloads spam samples from the CAS API. Requires `jq` and `curl`. Use the output as a base for your spam samples, not as-is — every group has different spam patterns.
 
 ```bash
-curl -s https://raw.githubusercontent.com/umputun/tg-spam/master/cas-export.sh > cas-export.sh
+curl -s https://raw.githubusercontent.com/redstone-md/shield/master/cas-export.sh > cas-export.sh
 chmod +x cas-export.sh
 ./cas-export.sh
 ```
 
 ## Updating samples from a remote git repository
 
-A utility container is provided for automated sample updates from git. See [updater/README.md](https://github.com/umputun/tg-spam/tree/master/updater/README.md).
+A utility container is provided for automated sample updates from git. See [updater/README.md](https://github.com/redstone-md/shield/tree/master/updater/README.md).
 
 ## Development
 
@@ -494,7 +494,7 @@ make e2e-ui         # run headless UI e2e tests
 make e2e-ui-debug   # run visible-browser UI e2e tests
 ```
 
-The Go module path is `github.com/umputun/tg-spam`. Avoid renaming imports until a runtime migration is planned separately.
+The Go module path is `github.com/redstone-md/shield`.
 
 ## Repository map
 

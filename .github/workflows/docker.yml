@@ -52,7 +52,7 @@ jobs:
             CI=github
             GITHUB_SHA=${{ github.event.workflow_run.head_sha }}
             GIT_BRANCH=${{ github.event.workflow_run.head_branch }}
-          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/tg-spam,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/shield,push-by-digest=true,name-canonical=true,push=true
 
       - name: export digest
         run: |
@@ -118,9 +118,9 @@ jobs:
       - name: create ghcr manifest and push
         working-directory: /tmp/digests/ghcr
         run: |
-          tags="-t ghcr.io/${{ github.repository_owner }}/tg-spam:${{ steps.tags.outputs.tag }}"
+          tags="-t ghcr.io/${{ github.repository_owner }}/shield:${{ steps.tags.outputs.tag }}"
           if [[ "${{ steps.tags.outputs.is_release }}" == "true" ]]; then
-            tags="$tags -t ghcr.io/${{ github.repository_owner }}/tg-spam:latest"
+            tags="$tags -t ghcr.io/${{ github.repository_owner }}/shield:latest"
           fi
           docker buildx imagetools create $tags \
-            $(printf 'ghcr.io/${{ github.repository_owner }}/tg-spam@sha256:%s ' *)
+            $(printf 'ghcr.io/${{ github.repository_owner }}/shield@sha256:%s ' *)

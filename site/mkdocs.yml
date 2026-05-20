@@ -1,12 +1,12 @@
-site_name: TG-Spam
-site_url: https://tgspam.umputun.dev/
-site_author: Umputun
+site_name: Shield
+site_url: https://redstone-md.github.io/shield/
+site_author: Redstone MD
 site_description: >-
-  TG-Spam is a self-hosted, anti-spam bot for the telegram.
+  Shield is a self-hosted anti-spam bot for Telegram groups.
 
-repo_name: umputun/tg-spam
-repo_url: https://github.com/umputun/tg-spam
-copyright: Some rights reserved &copy; 2023 Umputun
+repo_name: redstone-md/shield
+repo_url: https://github.com/redstone-md/shield
+copyright: Some rights reserved &copy; 2026 Redstone MD
 
 theme:
   name: material
@@ -37,14 +37,9 @@ extra:
   generator: true
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/umputun
+      link: https://github.com/redstone-md/shield
     - icon: fontawesome/brands/docker
-      link: https://hub.docker.com/r/umputun/tg-spam/
-    - icon: fontawesome/brands/twitter
-      link: https://twitter.com/umputun
-  analytics:
-    provider: custom
-    analytic_id: 04942b40-0a7a-47a1-9dbc-76eb9a9e7999
+      link: https://github.com/redstone-md/shield/pkgs/container/shield
 
 markdown_extensions:
   - smarty
@@ -86,4 +81,4 @@ markdown_extensions:
   - pymdownx.tilde
 
 nav:
-  - TG-SPAM: index.md
+  - Shield: index.md

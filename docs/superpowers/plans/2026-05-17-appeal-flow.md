@@ -282,7 +282,7 @@ func TestTelegramActionExecutor_WarnUserNoButtonWithoutIncident(t *testing.T) {
 }
 ```
 
-If `action_executor_test.go` does not already import `github.com/umputun/tg-spam/app/events/mocks`, `github.com/stretchr/testify/assert`, `github.com/stretchr/testify/require`, or `tbapi "github.com/OvyFlash/telegram-bot-api"`, add them.
+If `action_executor_test.go` does not already import `github.com/redstone-md/shield/app/events/mocks`, `github.com/stretchr/testify/assert`, `github.com/stretchr/testify/require`, or `tbapi "github.com/OvyFlash/telegram-bot-api"`, add them.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -549,9 +549,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/moderation"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 type incidentCreatorStub struct {
@@ -591,7 +591,7 @@ func TestProcessWarn_PassesIncidentIDToWarnRequest(t *testing.T) {
 }
 ```
 
-Note: the `incidentCreatorStub` signature must match the real `IncidentCreator` interface exactly. If the compiler reports the `*slowPathStub` parameter type is wrong, change that last parameter to the real type `*slowpath.SlowPathInvocation` and import `github.com/umputun/tg-spam/app/slowpath`; delete the `slowPathStub` reference. (`slowPathStub` is a placeholder name only — the real type is `*slowpath.SlowPathInvocation`.)
+Note: the `incidentCreatorStub` signature must match the real `IncidentCreator` interface exactly. If the compiler reports the `*slowPathStub` parameter type is wrong, change that last parameter to the real type `*slowpath.SlowPathInvocation` and import `github.com/redstone-md/shield/app/slowpath`; delete the `slowPathStub` reference. (`slowPathStub` is a placeholder name only — the real type is `*slowpath.SlowPathInvocation`.)
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -966,7 +966,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/events/mocks"
+	"github.com/redstone-md/shield/app/events/mocks"
 )
 
 func TestAppealBotAdapter_NotifyAppealResult(t *testing.T) {
@@ -1012,7 +1012,7 @@ import (
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
-	"github.com/umputun/tg-spam/app/audit"
+	"github.com/redstone-md/shield/app/audit"
 )
 
 // appealBotAdapter adapts the telegram listener to the audit.BotService
@@ -1107,8 +1107,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/audit"
-	"github.com/umputun/tg-spam/app/events/mocks"
+	"github.com/redstone-md/shield/app/audit"
+	"github.com/redstone-md/shield/app/events/mocks"
 )
 
 type fakeAppealFiler struct {
@@ -1261,7 +1261,7 @@ import (
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
-	"github.com/umputun/tg-spam/app/audit"
+	"github.com/redstone-md/shield/app/audit"
 )
 
 // callback prefixes for appeal accept/reject inline buttons; dispatched in
@@ -1454,7 +1454,7 @@ In `app/events/listener.go`, add the `AppealService` field next to `IncidentCrea
 Add `audit` to the imports of `listener.go`:
 
 ```go
-	"github.com/umputun/tg-spam/app/audit"
+	"github.com/redstone-md/shield/app/audit"
 ```
 
 Add the `appealHandler` field to the unexported handler block (next to `adminHandler` / `reportsHandler`, around line 95):
@@ -1569,8 +1569,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/audit"
-	"github.com/umputun/tg-spam/app/events/mocks"
+	"github.com/redstone-md/shield/app/audit"
+	"github.com/redstone-md/shield/app/events/mocks"
 )
 
 type fakeAppealResolver struct {
@@ -1695,8 +1695,8 @@ import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/umputun/tg-spam/app/audit"
-	"github.com/umputun/tg-spam/app/bot"
+	"github.com/redstone-md/shield/app/audit"
+	"github.com/redstone-md/shield/app/bot"
 )
 ```
 
@@ -1894,7 +1894,7 @@ If a `CHANGES`/changelog section exists, add a matching one-line entry.
 
 - [ ] **Step 2: Normalize comments**
 
-Run: `command -v unfuck-ai-comments >/dev/null || go install github.com/umputun/unfuck-ai-comments@latest; unfuck-ai-comments run --fmt --skip=mocks ./...`
+Run: `make unfuck-ai-comments`
 Expected: completes; review and keep any changes it makes.
 
 - [ ] **Step 3: Run the full test suite**

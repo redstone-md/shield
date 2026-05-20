@@ -18,10 +18,10 @@ sync_files() {
 }
 
 # Clone or update the internal git repo and sync changes to $location
-function sync_repo() {
+sync_repo() {
   if [ ! -d "$internal_location/.git" ]; then
     log "cloning git repo to $internal_location"
-    git clone -q $gitrepo $internal_location
+    git clone -q "$gitrepo" "$internal_location"
     sync_files
   else
     git -C $internal_location fetch

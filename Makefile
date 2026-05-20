@@ -8,14 +8,14 @@ REV=$(if $(filter --,$(GIT_REV)),latest,$(GIT_REV)) # fallback to latest if not 
 
 
 docker:
-	docker build -t umputun/tg-spam .
+	docker build -t ghcr.io/redstone-md/shield .
 
 race_test:
 	go test -race -timeout=60s -count 1 ./...
 
 prep_site:
 	cp -fv README.md site/docs/index.md
-	sed -i '' 's|https:\/\/github.com\/umputun\/tg-spam\/raw\/master\/site\/tg-spam-bg.png|logo.png|' site/docs/index.md
+	sed -i '' 's|https:\/\/github.com\/redstone-md\/shield\/raw\/master\/site\/tg-spam-bg.png|logo.png|' site/docs/index.md
 	sed -i '' 's|^.*/workflows/ci.yml.*$$||' site/docs/index.md
 
 release:

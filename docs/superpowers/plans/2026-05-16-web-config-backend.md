@@ -271,7 +271,7 @@ func TestBootstrapRuleSet_CasDisabledWhenNoAPI(t *testing.T) {
 }
 ```
 
-Required imports for the file: `"testing"`, `"github.com/stretchr/testify/assert"`, `"github.com/umputun/tg-spam/app/rules"`.
+Required imports for the file: `"testing"`, `"github.com/stretchr/testify/assert"`, `"github.com/redstone-md/shield/app/rules"`.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -595,7 +595,7 @@ func TestApplyExplicitOverrides_DetectionFieldsUntouchedWithoutEnv(t *testing.T)
 }
 ```
 
-Add `"github.com/umputun/tg-spam/app/rules"` to the test file imports.
+Add `"github.com/redstone-md/shield/app/rules"` to the test file imports.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -888,7 +888,7 @@ Expected: no new findings in `app/rules`, `app/`, `app/settings_precedence.go`.
 
 - [ ] **Step 3: Normalize comments**
 
-Run: `command -v unfuck-ai-comments >/dev/null || go install github.com/umputun/unfuck-ai-comments@latest; unfuck-ai-comments run --fmt --skip=mocks ./...`
+Run: `make unfuck-ai-comments`
 Expected: no diff, or only intended lowercase fixes — review and re-commit if it changes files.
 
 - [ ] **Step 4: Commit any normalization changes**

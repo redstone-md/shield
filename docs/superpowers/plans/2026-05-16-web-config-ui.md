@@ -102,7 +102,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/rules"
+	"github.com/redstone-md/shield/app/rules"
 )
 
 func TestRuleSetFromForm_AppliesValues(t *testing.T) {
@@ -179,7 +179,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/umputun/tg-spam/app/rules"
+	"github.com/redstone-md/shield/app/rules"
 )
 
 // ruleSetFromForm applies submitted form values onto a copy of base and returns the
@@ -560,7 +560,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/rules"
+	"github.com/redstone-md/shield/app/rules"
 )
 
 type ruleSetProviderStub struct {
@@ -617,7 +617,7 @@ package webapi
 import (
 	"net/http"
 
-	"github.com/umputun/tg-spam/app/rules"
+	"github.com/redstone-md/shield/app/rules"
 )
 
 // llmModeOptions and llmConsensusOptions are the allowed values for the enum selects.
