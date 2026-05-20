@@ -58,13 +58,12 @@
 ## Spam Detection Architecture
 
 ### Quoted/Reply-to Text Handling
-- When checking messages for spam, quoted text is concatenated with the main message text
-- This catches spammers who quote spam content from external channels
-- `Quote` (from Telegram's TextQuote) takes precedence over `ReplyTo.Text`
-- The concatenation uses newline separator: `msg.Text + "\n" + msg.Quote`
-- Empty quote/reply-to text is ignored (no extra newline added)
-- All three paths apply the same Quote concatenation: auto-detection (`app/bot/spam.go:OnMessage`), admin `/spam` (`app/events/admin.go:directReport`), and user `/report` (`app/events/reports.go:DirectUserReport`)
-- Quote concatenation is placed AFTER the transform fallback block so image-only messages with quotes get both caption text and quote text
+- Automatic spam detection checks only the current message text from the sender.
+- Do not include `ReplyTo.Text` or Telegram `Quote` text in `app/bot/spam.go:OnMessage`; it biases LLM checks by making replied-to content look authored by the current user.
+- Admin `/spam` (`app/events/admin.go:directReport`) and user `/report` (`app/events/reports.go:DirectUserReport`) still append `origMsg.Quote.Text` to the reported message text for explicit moderation/training workflows.
+- The reporting-path concatenation uses a newline separator: `msgTxt + "\n" + origMsg.Quote.Text`.
+- Empty quote text is ignored (no extra newline added).
+- Quote concatenation in reporting paths is placed AFTER the transform fallback block so image-only messages with quotes get both caption text and quote text.
 
 ### Channel Message Handling
 - When a channel posts in a group, Telegram uses a shared fake user `Channel_Bot` (ID `136817688`) in `msg.From`

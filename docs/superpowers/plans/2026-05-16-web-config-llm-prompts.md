@@ -326,7 +326,7 @@ git commit -m "refactor(slowpath): delete unused PromptRegistry and PromptEntry"
 **Files:**
 - Modify: `app/assembly.go` (`makeSlowPathEngine`, `configureSlowPathPrompts`)
 - Modify: `app/runtime_assembly.go` (`makeSlowPathEngine` caller, ~line 115)
-- Test: `app/assembly_test.go` or `app/main_part1_test.go` (add test, package `main`)
+- Test: `app/assembly_test.go` or `app/main_runtime_assembly_test.go` (add test, package `main`)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -422,7 +422,7 @@ git commit -m "feat(slowpath): source slowpath prompts from the ruleset"
 
 **Files:**
 - Modify: `app/assembly.go` (`makeDetectorWithRuleSet`)
-- Test: `app/assembly_test.go` or `app/main_part1_test.go`
+- Test: `app/assembly_test.go` or `app/main_runtime_assembly_test.go`
 
 - [ ] **Step 1: Write the failing test**
 

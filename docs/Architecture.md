@@ -315,7 +315,7 @@ classDiagram
 | Audit/feedback | `app/audit/*_test.go`, `app/feedback/*_test.go` | Incident, appeal, feedback, review services |
 | Detection | `lib/tgspam/*_test.go` | Detector, classifier, LLM, plugins, scoring, benchmarks |
 | Text processing | `lib/textnorm/*_test.go`, `lib/spamcheck/*_test.go` | Normalizer, confusables, scoring |
-| Runtime assembly | `app/main_part*_test.go` | Integration tests for runtime assembly |
+| Runtime assembly | `app/main_*_test.go` | Integration tests for runtime assembly |
 | E2E UI | `e2e-ui/e2e_test.go` | Playwright end-to-end UI tests |
 | Load/stress | Various `*_load_test.go`, `*_stress_test.go`, `*_benchmark_test.go` | Pipeline, storage engine, observability, detection |
 

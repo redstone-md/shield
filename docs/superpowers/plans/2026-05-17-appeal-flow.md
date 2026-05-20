@@ -27,7 +27,7 @@
 - `app/events/listener.go` — `IncidentCreator`/`AppealService`/`appealHandler` fields; `procAppealStart`; `handleUpdate` hook; `initHandlers` wiring.
 - `app/events/admin.go` — `admin.appeals` field.
 - `app/events/admin_callbacks.go` — `AA`/`AR` callback dispatch; `callbackAppealResolve`.
-- `app/events/listener_part1_test.go` — `actionExecutorSpy` gains `PostBanMessage`.
+- `app/events/listener_idempotency_test.go` — `actionExecutorSpy` gains `PostBanMessage`.
 - `app/runtime_assembly.go` — wire `IncidentCreator`, `AppealService`, `SetBotService`.
 - `README.md` — document the ban group message and the appeal flow.
 
@@ -365,7 +365,7 @@ git commit -m "feat: add appeal button to warn messages"
 
 **Files:**
 - Modify: `app/events/action_executor.go:15-21` (`ActionExecutor` interface), `:115-147` (`WarnUser` — reuse helper)
-- Modify: `app/events/listener_part1_test.go:49-77` (`actionExecutorSpy` struct), and add a `PostBanMessage` method
+- Modify: `app/events/listener_idempotency_test.go:49-77` (`actionExecutorSpy` struct), and add a `PostBanMessage` method
 - Test: `app/events/action_executor_test.go`
 
 - [ ] **Step 1: Write the failing test**
@@ -488,7 +488,7 @@ type ActionExecutor interface {
 
 - [ ] **Step 6: Add `PostBanMessage` to the `actionExecutorSpy` test fake**
 
-In `app/events/listener_part1_test.go`, the `actionExecutorSpy` struct (lines 49-77) implements `ActionExecutor`. Add these fields inside the struct (next to `warnUser` / `warnCalls`):
+In `app/events/listener_idempotency_test.go`, the `actionExecutorSpy` struct (lines 49-77) implements `ActionExecutor`. Add these fields inside the struct (next to `warnUser` / `warnCalls`):
 
 ```go
 	postBanMessage func(ctx context.Context, req banMessageRequest) error
@@ -520,7 +520,7 @@ Expected: builds clean.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add app/events/action_executor.go app/events/action_executor_test.go app/events/listener_part1_test.go
+git add app/events/action_executor.go app/events/action_executor_test.go app/events/listener_idempotency_test.go
 git commit -m "feat: add self-deleting ban group message executor"
 ```
 

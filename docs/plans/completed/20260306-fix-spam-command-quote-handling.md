@@ -3,7 +3,7 @@
 ## Overview
 - When an admin uses `/spam` (or a user uses `/report`) on a message containing quoted text from an external channel, only the main message text (e.g., "Thank you") is processed — the quoted spam content is ignored
 - This results in useless spam samples being added to the classifier and incorrect diagnostic results shown to admins
-- The auto-detection path (`bot/spam.go:OnMessage`) correctly concatenates `msg.Quote` with `msg.Text`, but the admin/report paths skip this step
+- At the time of this fix, the auto-detection path (`bot/spam.go:OnMessage`) concatenated `msg.Quote` with `msg.Text`, but the admin/report paths skipped this step
 - Fix: include `origMsg.Quote.Text` in `msgTxt` in both `directReport` and user report handlers
 - Related to #376
 
@@ -93,7 +93,7 @@ if origMsg.Quote != nil && origMsg.Quote.Text != "" {
 
 **Placement is critical**: the Quote concatenation must go AFTER the transform fallback. If placed before it, an image-only message with a Quote would have non-empty `msgTxt` (from Quote) and skip the transform fallback, losing the caption text.
 
-This mirrors the logic in `bot/spam.go:OnMessage` (lines 83-89) which uses the same concatenation pattern with `msg.Quote` (the `bot.Message` string version of the same data).
+This originally mirrored the auto-detection logic in `bot/spam.go:OnMessage`. That changed later: automatic detection now checks only the current sender's message text, while explicit `/spam` and `/report` workflows still include `origMsg.Quote.Text` for moderator-driven training and review.
 
 **Note**: `DirectWarnReport` also uses `origMsg.Text` but only for logging — no fix needed there.
 

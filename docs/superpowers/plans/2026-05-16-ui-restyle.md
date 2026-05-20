@@ -928,7 +928,7 @@ git commit -m "feat(webui): restyle checker page"
 - [ ] **Step 2: Verify**
 
 Run: `go test ./app/webapi/ -run TestServer_htmlManageSamplesHandler`
-Expected: FAIL — `webapi_part4_test.go:141` still asserts `<div class="row" id="samples-list">`. This assertion is fixed in Task 16. Confirm the failure is **only** that string assertion, not a template parse panic.
+Expected: FAIL — `server_html_settings_test.go:141` still asserts `<div class="row" id="samples-list">`. This assertion is fixed in Task 16. Confirm the failure is **only** that string assertion, not a template parse panic.
 
 - [ ] **Step 3: Commit**
 
@@ -1016,7 +1016,7 @@ git commit -m "feat(webui): restyle manage samples page"
 - [ ] **Step 2: Verify**
 
 Run: `go test ./app/webapi/ -run TestServer_htmlManageUsersHandler`
-Expected: PASS (the test asserts `<title>Manage Users - TG-Spam</title>` at `webapi_part4_test.go:165` — this fails until Task 16). Confirm the only failure is that title string, not a parse panic. If `go test` reports a parse panic, fix the template; otherwise proceed.
+Expected: PASS (the test asserts `<title>Manage Users - TG-Spam</title>` at `server_html_settings_test.go:165` — this fails until Task 16). Confirm the only failure is that title string, not a parse panic. If `go test` reports a parse panic, fix the template; otherwise proceed.
 
 - [ ] **Step 3: Commit**
 
@@ -1283,7 +1283,7 @@ git commit -m "feat(webui): restyle manage dictionary page"
 - [ ] **Step 2: Verify**
 
 Run: `go test ./app/webapi/ -run TestServer_htmlDetectedSpamHandler`
-Expected: FAIL — `webapi_part3_test.go:335` still asserts `btn-custom-blue`. Fixed in Task 16. Confirm the only failure is that assertion, not a parse panic.
+Expected: FAIL — `server_mutation_handlers_test.go:335` still asserts `btn-custom-blue`. Fixed in Task 16. Confirm the only failure is that assertion, not a parse panic.
 
 - [ ] **Step 3: Commit**
 
@@ -2228,7 +2228,7 @@ The 8 settings tabs become Alpine tabs (R3). The "find your ID" Bootstrap `colla
 - [ ] **Step 3: Verify**
 
 Run: `go test ./app/webapi/ -run "TestServer_htmlSettingsHandler|TestDMUsers"`
-Expected: FAIL — `TestDMUsers_settingsPageContainsDMUsersSection` (`webapi_part9_test.go:78-79,89-90`) still asserts `data-bs-toggle="collapse"` and the inline `copyUserID` script. Fixed in Task 16. Confirm there is no template parse panic and `TestServer_htmlSettingsHandler` passes.
+Expected: FAIL — `TestDMUsers_settingsPageContainsDMUsersSection` (`dm_users_html_settings_test.go:78-79,89-90`) still asserts `data-bs-toggle="collapse"` and the inline `copyUserID` script. Fixed in Task 16. Confirm there is no template parse panic and `TestServer_htmlSettingsHandler` passes.
 
 - [ ] **Step 4: Commit**
 
@@ -2437,13 +2437,13 @@ git commit -m "chore(webui): remove obsolete navbar component"
 ### Task 16: Update webapi unit-test assertions
 
 **Files:**
-- Modify: `app/webapi/webapi_part3_test.go:335`
-- Modify: `app/webapi/webapi_part4_test.go:71,140,141,165,314,345`
-- Modify: `app/webapi/webapi_part9_test.go:55-91`
+- Modify: `app/webapi/server_mutation_handlers_test.go:335`
+- Modify: `app/webapi/server_html_settings_test.go:71,140,141,165,314,345`
+- Modify: `app/webapi/dm_users_html_settings_test.go:55-91`
 
-- [ ] **Step 1: Fix the download-button class assertion in `webapi_part3_test.go`**
+- [ ] **Step 1: Fix the download-button class assertion in `server_mutation_handlers_test.go`**
 
-At `webapi_part3_test.go:335`, replace:
+At `server_mutation_handlers_test.go:335`, replace:
 
 ```go
 		assert.Contains(t, body, "btn-custom-blue")
@@ -2455,7 +2455,7 @@ with:
 		assert.Contains(t, body, "btn-ghost")
 ```
 
-- [ ] **Step 2: Fix the title and samples-list assertions in `webapi_part4_test.go`**
+- [ ] **Step 2: Fix the title and samples-list assertions in `server_html_settings_test.go`**
 
 Replace each of these five title assertions (lines 71, 140, 165, 314, 345) — change `TG-Spam` to `Shield`:
 
@@ -2475,7 +2475,7 @@ Replace each of these five title assertions (lines 71, 140, 165, 314, 345) — c
 		assert.Contains(t, body, "<title>Settings - Shield</title>", "template should contain the correct title")
 ```
 
-And at `webapi_part4_test.go:141`, replace the samples-list markup assertion:
+And at `server_html_settings_test.go:141`, replace the samples-list markup assertion:
 
 ```go
 	assert.Contains(t, body, `<div class="row" id="samples-list">`, "template should contain a samples list")
@@ -2487,7 +2487,7 @@ with:
 	assert.Contains(t, body, `id="samples-list"`, "template should contain a samples list")
 ```
 
-- [ ] **Step 3: Fix the DM-users settings-section test in `webapi_part9_test.go`**
+- [ ] **Step 3: Fix the DM-users settings-section test in `dm_users_html_settings_test.go`**
 
 Replace the body of `TestDMUsers_settingsPageContainsDMUsersSection` (lines 76-90) — the panel id, instructional text, and `hx-get` assertions stay; the Bootstrap `data-bs-*` collapse assertions become Alpine assertions, and the inline-`copyUserID` assertions are dropped (`copyUserID` now lives in the static `app.js`):
 
@@ -2517,7 +2517,7 @@ Expected: PASS — all assertions now match the restyled markup.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/webapi/webapi_part3_test.go app/webapi/webapi_part4_test.go app/webapi/webapi_part9_test.go
+git add app/webapi/server_mutation_handlers_test.go app/webapi/server_html_settings_test.go app/webapi/dm_users_html_settings_test.go
 git commit -m "test(webui): update assertions for restyled markup"
 ```
 
