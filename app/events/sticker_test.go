@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/umputun/tg-spam/app/bot"
+	"github.com/redstone-md/shield/app/bot"
 )
 
 func Test_stickerDownloadFileID(t *testing.T) {

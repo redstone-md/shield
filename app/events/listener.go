@@ -18,12 +18,12 @@ import (
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/app/policy"
-	"github.com/umputun/tg-spam/app/rules"
-	"github.com/umputun/tg-spam/app/slowpath"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/moderation"
+	"github.com/redstone-md/shield/app/observability"
+	"github.com/redstone-md/shield/app/policy"
+	"github.com/redstone-md/shield/app/rules"
+	"github.com/redstone-md/shield/app/slowpath"
 )
 
 type UsageMeter interface {

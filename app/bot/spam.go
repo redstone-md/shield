@@ -10,12 +10,12 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/app/rules"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/lib/approved"
-	"github.com/umputun/tg-spam/lib/spamcheck"
-	"github.com/umputun/tg-spam/lib/tgspam"
+	"github.com/redstone-md/shield/app/observability"
+	"github.com/redstone-md/shield/app/rules"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/lib/approved"
+	"github.com/redstone-md/shield/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/tgspam"
 )
 
 //go:generate go run github.com/matryer/moq@latest --out mocks/message_checker.go --pkg mocks --skip-ensure --with-resets . MessageChecker

@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/umputun/tg-spam/app/rules"
+	"github.com/redstone-md/shield/app/rules"
 )
 
 func TestMemoryCache_TenantIsolation(t *testing.T) {

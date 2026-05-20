@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/app/storage/engine"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/app/storage/engine"
 	"io"
 	"net/http"
 	"os"

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	lua "github.com/yuin/gopher-lua"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 func TestChecker_BasicHelpers(t *testing.T) {

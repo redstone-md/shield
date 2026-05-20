@@ -15,7 +15,7 @@ import (
 	"github.com/go-pkgz/lgr"
 	"github.com/jessevdk/go-flags"
 
-	"github.com/umputun/tg-spam/app/events"
+	"github.com/redstone-md/shield/app/events"
 )
 
 type options struct {

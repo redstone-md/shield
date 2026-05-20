@@ -2,10 +2,10 @@ package events
 
 import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/events/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/events/mocks"
 	"testing"
 )
 
@@ -335,7 +335,7 @@ func TestAdmin_getCleanMessage2(t *testing.T) {
 - classifier: spam, probability of spam: 71.70%
 - cas: ham, record not found
 
-_unbanned by umputun in 1m5s_`
+_unbanned by moderator in 1m5s_`
 
 	a := &admin{}
 	result, err := a.getCleanMessage(msg)
@@ -351,7 +351,7 @@ func TestAdmin_extractUsername(t *testing.T) {
 		expectError    bool
 	}{
 		{name: "markdown format", banMessage: "**permanently banned [John_Doe](tg://user?id=123456)** some text", expectedResult: "John_Doe"},
-		{name: "plain format", banMessage: "permanently banned {200312168 umputun Umputun U} some text", expectedResult: "umputun"},
+		{name: "plain format", banMessage: "permanently banned {200312168 moderator Moderator U} some text", expectedResult: "moderator"},
 		{name: "t.me channel link", banMessage: "**permanently banned [spamchannel](https://t.me/spamchannel)**\n\nspam text", expectedResult: "spamchannel"},
 		{name: "plain channel with ID", banMessage: "**permanently banned mychannel (-100999888)**\n\nspam text", expectedResult: "mychannel"},
 		{name: "plain channel multi-word title", banMessage: "**permanently banned Spam News Channel (-100999888)**\n\ntext", expectedResult: "Spam News Channel"},

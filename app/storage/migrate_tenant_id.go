@@ -8,7 +8,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/umputun/tg-spam/app/storage/engine"
+	"github.com/redstone-md/shield/app/storage/engine"
 )
 
 func migrateTenantID(ctx context.Context, tx *sqlx.Tx, dbType engine.Type, table string) {

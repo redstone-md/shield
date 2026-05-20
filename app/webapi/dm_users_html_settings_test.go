@@ -1,10 +1,10 @@
 package webapi
 
 import (
+	"github.com/redstone-md/shield/app/events"
+	"github.com/redstone-md/shield/app/webapi/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/app/events"
-	"github.com/umputun/tg-spam/app/webapi/mocks"
 	"net/http"
 	"net/http/httptest"
 	"testing"

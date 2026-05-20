@@ -10,10 +10,10 @@ import (
 
 	_ "modernc.org/sqlite" // sqlite driver loaded here
 
-	"github.com/umputun/tg-spam/lib/tgspam"
+	"github.com/redstone-md/shield/lib/tgspam"
 
-	"github.com/umputun/tg-spam/_examples/simplechat/storage"
-	"github.com/umputun/tg-spam/_examples/simplechat/web"
+	"github.com/redstone-md/shield/_examples/simplechat/storage"
+	"github.com/redstone-md/shield/_examples/simplechat/web"
 )
 
 func main() {

@@ -3,11 +3,11 @@ package events
 import (
 	"context"
 	tbapi "github.com/OvyFlash/telegram-bot-api"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/events/mocks"
+	"github.com/redstone-md/shield/app/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/events/mocks"
-	"github.com/umputun/tg-spam/app/rules"
 	"testing"
 	"time"
 )

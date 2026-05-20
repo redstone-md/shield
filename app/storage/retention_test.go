@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/storage/engine"
+	"github.com/redstone-md/shield/app/storage/engine"
 )
 
 func TestRetentionService_CleanNow(t *testing.T) {

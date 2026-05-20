@@ -13,9 +13,9 @@ import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/app/observability"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/moderation"
+	"github.com/redstone-md/shield/app/observability"
 )
 
 type incomingEventProcessor interface {

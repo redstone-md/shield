@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/umputun/tg-spam/lib/approved"
-	"github.com/umputun/tg-spam/lib/spamcheck"
-	"github.com/umputun/tg-spam/lib/tgspam/plugin"
+	"github.com/redstone-md/shield/lib/approved"
+	"github.com/redstone-md/shield/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/tgspam/plugin"
 )
 
 //go:generate moq --out mocks/sample_updater.go --pkg mocks --skip-ensure --with-resets . SampleUpdater

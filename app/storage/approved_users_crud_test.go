@@ -3,8 +3,8 @@ package storage
 import (
 	"context"
 	"fmt"
-	"github.com/umputun/tg-spam/app/storage/engine"
-	"github.com/umputun/tg-spam/lib/approved"
+	"github.com/redstone-md/shield/app/storage/engine"
+	"github.com/redstone-md/shield/lib/approved"
 	"sync"
 	"time"
 )

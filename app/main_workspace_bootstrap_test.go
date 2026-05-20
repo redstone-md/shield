@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/controlplane"
+	"github.com/redstone-md/shield/app/controlplane"
 )
 
 func TestAssembleRuntimeBootstrapsWorkspace(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/umputun/tg-spam/app/rules"
+	"github.com/redstone-md/shield/app/rules"
 )
 
 func applyExplicitRuleSetOverrides(rs *rules.RuleSet, opts options) {

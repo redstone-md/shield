@@ -6,7 +6,7 @@ import (
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
-	"github.com/umputun/tg-spam/app/audit"
+	"github.com/redstone-md/shield/app/audit"
 )
 
 // appealBotAdapter adapts the telegram listener to the audit.BotService

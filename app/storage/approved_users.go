@@ -10,8 +10,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "modernc.org/sqlite" // sqlite driver loaded here
 
-	"github.com/umputun/tg-spam/app/storage/engine"
-	"github.com/umputun/tg-spam/lib/approved"
+	"github.com/redstone-md/shield/app/storage/engine"
+	"github.com/redstone-md/shield/lib/approved"
 )
 
 // ApprovedUsers is a storage for approved users

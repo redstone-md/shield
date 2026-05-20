@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 // PermanentBanDuration defines duration of permanent ban:

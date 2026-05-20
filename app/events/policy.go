@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/app/policy"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/moderation"
+	"github.com/redstone-md/shield/app/policy"
 )
 
 type PolicyEngine interface {

@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/rules"
-	"github.com/umputun/tg-spam/app/webapi/mocks"
+	"github.com/redstone-md/shield/app/rules"
+	"github.com/redstone-md/shield/app/webapi/mocks"
 )
 
 type settingsRuleSetStub struct {

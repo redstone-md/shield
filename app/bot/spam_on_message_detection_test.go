@@ -1,9 +1,9 @@
 package bot
 
 import (
+	"github.com/redstone-md/shield/app/bot/mocks"
+	"github.com/redstone-md/shield/lib/spamcheck"
 	"github.com/stretchr/testify/assert"
-	"github.com/umputun/tg-spam/app/bot/mocks"
-	"github.com/umputun/tg-spam/lib/spamcheck"
 	"testing"
 )
 

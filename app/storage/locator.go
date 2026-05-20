@@ -12,9 +12,9 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "modernc.org/sqlite" // sqlite driver loaded here
 
-	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/app/storage/engine"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/observability"
+	"github.com/redstone-md/shield/app/storage/engine"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 // locator-related command constants

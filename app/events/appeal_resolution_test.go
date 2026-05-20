@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/events/mocks"
+	"github.com/redstone-md/shield/app/events/mocks"
 )
 
 func TestAppealBotAdapter_NotifyAppealResult(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 
 	cache "github.com/go-pkgz/expirable-cache/v3"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 // duplicateDetector tracks message history for duplicate detection

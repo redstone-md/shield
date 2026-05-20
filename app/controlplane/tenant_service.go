@@ -6,7 +6,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/umputun/tg-spam/app/storage"
+	"github.com/redstone-md/shield/app/storage"
 )
 
 type TenantStore interface {

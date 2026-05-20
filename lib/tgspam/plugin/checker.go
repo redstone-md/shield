@@ -11,7 +11,7 @@ import (
 
 	lua "github.com/yuin/gopher-lua"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 // Checker implements a Lua plugin engine for spam detection

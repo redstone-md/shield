@@ -3,9 +3,9 @@ package events
 import (
 	"context"
 
-	"github.com/umputun/tg-spam/app/audit"
-	"github.com/umputun/tg-spam/app/slowpath"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/audit"
+	"github.com/redstone-md/shield/app/slowpath"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 type incidentAdapter struct {

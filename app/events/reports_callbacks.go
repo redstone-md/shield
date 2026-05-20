@@ -8,7 +8,7 @@ import (
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
-	"github.com/umputun/tg-spam/app/bot"
+	"github.com/redstone-md/shield/app/bot"
 )
 
 func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.CallbackQuery) error {

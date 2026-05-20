@@ -3,10 +3,10 @@ package tgspam
 import (
 	"bytes"
 	"fmt"
+	"github.com/redstone-md/shield/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/tgspam/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/lib/spamcheck"
-	"github.com/umputun/tg-spam/lib/tgspam/mocks"
 	"io"
 	"net/http"
 	"strings"

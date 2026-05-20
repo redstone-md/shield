@@ -10,7 +10,7 @@ import (
 	tokenizer "github.com/sandwich-go/gpt3-encoder"
 	"github.com/sashabaranov/go-openai"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 //go:generate moq --out mocks/openai_client.go --pkg mocks --with-resets --skip-ensure . openAIClient:OpenAIClientMock

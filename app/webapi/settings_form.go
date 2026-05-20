@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/umputun/tg-spam/app/rules"
+	"github.com/redstone-md/shield/app/rules"
 )
 
 // ruleSetFromForm applies submitted form values onto a copy of base and returns the

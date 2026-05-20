@@ -13,11 +13,11 @@ import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	openai "github.com/sashabaranov/go-openai"
 
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/app/slowpath"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/moderation"
+	"github.com/redstone-md/shield/app/observability"
+	"github.com/redstone-md/shield/app/slowpath"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 func (l *TelegramListener) makeIncomingEvent(update tbapi.Update, msg *bot.Message) moderation.IncomingEvent {

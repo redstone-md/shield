@@ -10,10 +10,10 @@ import (
 
 	"github.com/go-pkgz/rest"
 
-	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/app/storage/engine"
-	"github.com/umputun/tg-spam/lib/approved"
+	"github.com/redstone-md/shield/app/observability"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/app/storage/engine"
+	"github.com/redstone-md/shield/lib/approved"
 )
 
 // htmlSpamCheckHandler handles GET / request.

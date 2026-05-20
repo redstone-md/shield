@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-pkgz/rest"
 
-	"github.com/umputun/tg-spam/app/feedback"
+	"github.com/redstone-md/shield/app/feedback"
 )
 
 func (s *Server) createLabelHandler(w http.ResponseWriter, r *http.Request) {

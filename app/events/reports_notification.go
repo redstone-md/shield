@@ -8,7 +8,7 @@ import (
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
-	"github.com/umputun/tg-spam/app/storage"
+	"github.com/redstone-md/shield/app/storage"
 )
 
 func (r *userReports) sendAutoBanNotification(reports []storage.Report) error {

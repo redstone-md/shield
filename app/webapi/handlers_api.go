@@ -11,11 +11,11 @@ import (
 
 	"github.com/go-pkgz/rest"
 
-	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/app/rules"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/lib/approved"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/observability"
+	"github.com/redstone-md/shield/app/rules"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/lib/approved"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 func (s *Server) checkMsgHandler(w http.ResponseWriter, r *http.Request) {

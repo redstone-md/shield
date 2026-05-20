@@ -9,7 +9,7 @@ import (
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
-	"github.com/umputun/tg-spam/app/audit"
+	"github.com/redstone-md/shield/app/audit"
 )
 
 // callback prefixes for appeal accept/reject inline buttons; dispatched in

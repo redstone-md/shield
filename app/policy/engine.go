@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/moderation"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 type PolicyInput struct {

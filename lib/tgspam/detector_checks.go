@@ -16,8 +16,8 @@ import (
 	"github.com/go-pkgz/repeater"
 	"github.com/go-pkgz/repeater/strategy"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
-	"github.com/umputun/tg-spam/lib/textnorm"
+	"github.com/redstone-md/shield/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/textnorm"
 )
 
 // isSpam checks if a given message is similar to any of the known bad messages

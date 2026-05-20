@@ -7,8 +7,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/umputun/tg-spam/lib/approved"
-	"github.com/umputun/tg-spam/lib/tgspam/plugin"
+	"github.com/redstone-md/shield/lib/approved"
+	"github.com/redstone-md/shield/lib/tgspam/plugin"
 )
 
 // ApprovedUsers returns a list of approved users.

@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-pkgz/rest"
 
-	"github.com/umputun/tg-spam/app/audit"
-	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/audit"
+	"github.com/redstone-md/shield/app/observability"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 type replayResponse struct {

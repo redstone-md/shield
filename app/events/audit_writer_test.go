@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/events/mocks"
-	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/events/mocks"
+	"github.com/redstone-md/shield/app/moderation"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 type enrichedAuditLoggerSpy struct {

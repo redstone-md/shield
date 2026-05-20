@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/umputun/tg-spam/app/rules"
+	"github.com/redstone-md/shield/app/rules"
 )
 
 type memoryCache struct {

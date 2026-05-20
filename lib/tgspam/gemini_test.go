@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/genai"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
-	"github.com/umputun/tg-spam/lib/tgspam/mocks"
+	"github.com/redstone-md/shield/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/tgspam/mocks"
 )
 
 func TestGeminiChecker_Check(t *testing.T) {

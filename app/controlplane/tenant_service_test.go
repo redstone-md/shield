@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/storage"
+	"github.com/redstone-md/shield/app/storage"
 )
 
 type mockTenantStore struct {

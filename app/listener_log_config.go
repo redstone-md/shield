@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/umputun/tg-spam/app/events"
+	"github.com/redstone-md/shield/app/events"
 )
 
 func loggableTelegramListenerConfig(listener *events.TelegramListener) telegramListenerLogConfig {

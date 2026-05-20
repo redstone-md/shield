@@ -3,7 +3,7 @@ package webapi
 import (
 	"net/http"
 
-	"github.com/umputun/tg-spam/app/observability"
+	"github.com/redstone-md/shield/app/observability"
 )
 
 func (s *Server) htmlFeedbackHandler(w http.ResponseWriter, r *http.Request) {

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/umputun/tg-spam/app/storage/engine"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/storage/engine"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 func (s *StorageTestSuite) TestNewDetectedSpam() {

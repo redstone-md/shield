@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/app/storage/engine"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/app/storage/engine"
 )
 
 func TestDetectedSpamService_Read(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/umputun/tg-spam/app/storage/engine"
+	"github.com/redstone-md/shield/app/storage/engine"
 )
 
 // New creates a new store based on the connection URL and the session duration.

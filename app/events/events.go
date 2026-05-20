@@ -10,10 +10,10 @@ import (
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/moderation"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 //go:generate moq --out mocks/tb_api.go --pkg mocks --with-resets --skip-ensure . TbAPI

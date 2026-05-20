@@ -11,14 +11,14 @@ import (
 	"time"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/events/mocks"
+	"github.com/redstone-md/shield/app/moderation"
+	"github.com/redstone-md/shield/app/slowpath"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/lib/spamcheck"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/events/mocks"
-	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/app/slowpath"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/lib/spamcheck"
 )
 
 type slowPathCheckerSpy struct {

@@ -6,7 +6,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/umputun/tg-spam/lib/approved"
+	"github.com/redstone-md/shield/lib/approved"
 )
 
 type ApprovedUsersStore interface {

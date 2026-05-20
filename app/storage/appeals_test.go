@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/umputun/tg-spam/app/audit"
+	"github.com/redstone-md/shield/app/audit"
 )
 
 func (s *StorageTestSuite) TestAppeals_CreateAndGet() {

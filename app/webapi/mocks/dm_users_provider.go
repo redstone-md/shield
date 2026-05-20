@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	"github.com/umputun/tg-spam/app/events"
+	"github.com/redstone-md/shield/app/events"
 	"sync"
 )
 

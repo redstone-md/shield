@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/storage"
+	"github.com/redstone-md/shield/app/storage"
 )
 
 func TestOnboardingChaos_ConcurrentOnboard(t *testing.T) {

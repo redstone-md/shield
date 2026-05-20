@@ -1,4 +1,4 @@
-module github.com/umputun/tg-spam
+module github.com/redstone-md/shield
 
 go 1.25.0
 

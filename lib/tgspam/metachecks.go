@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 // MetaCheck represents a function type that takes a `spamcheck.Request` as input and returns a boolean value and a `spamcheck.Response`.

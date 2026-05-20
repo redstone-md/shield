@@ -3,9 +3,9 @@ package tgspam
 import (
 	"bytes"
 	"fmt"
+	"github.com/redstone-md/shield/lib/spamcheck"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/lib/spamcheck"
 	"io"
 	"strings"
 	"testing"

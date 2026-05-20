@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
-	"github.com/umputun/tg-spam/lib/tgspam"
-	"github.com/umputun/tg-spam/lib/tgspam/plugin"
+	"github.com/redstone-md/shield/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/tgspam"
+	"github.com/redstone-md/shield/lib/tgspam/plugin"
 )
 
 func main() {

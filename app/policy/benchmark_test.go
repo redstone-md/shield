@@ -3,7 +3,7 @@ package policy
 import (
 	"testing"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 func BenchmarkEngine_Decide(b *testing.B) {

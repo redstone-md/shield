@@ -2,9 +2,9 @@ package tgspam
 
 import (
 	"context"
+	"github.com/redstone-md/shield/lib/tgspam/mocks"
 	"github.com/sashabaranov/go-openai"
 	"github.com/stretchr/testify/assert"
-	"github.com/umputun/tg-spam/lib/tgspam/mocks"
 	"testing"
 	"unicode/utf8"
 )

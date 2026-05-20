@@ -17,10 +17,10 @@ import (
 
 	"github.com/go-pkgz/rest"
 
-	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/app/storage/engine"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/observability"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/app/storage/engine"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 func (s *Server) downloadDetectedSpamHandler(w http.ResponseWriter, r *http.Request) {

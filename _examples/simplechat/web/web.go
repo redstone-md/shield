@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
-	"github.com/umputun/tg-spam/lib/tgspam"
+	"github.com/redstone-md/shield/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/tgspam"
 
-	"github.com/umputun/tg-spam/_examples/simplechat/storage"
+	"github.com/redstone-md/shield/_examples/simplechat/storage"
 )
 
 //go:embed assets/*

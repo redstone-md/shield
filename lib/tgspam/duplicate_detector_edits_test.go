@@ -1,8 +1,8 @@
 package tgspam
 
 import (
+	"github.com/redstone-md/shield/lib/spamcheck"
 	"github.com/stretchr/testify/assert"
-	"github.com/umputun/tg-spam/lib/spamcheck"
 	"testing"
 	"time"
 )

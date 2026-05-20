@@ -5,8 +5,8 @@ package mocks
 
 import (
 	"context"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/lib/spamcheck"
 	"sync"
 )
 

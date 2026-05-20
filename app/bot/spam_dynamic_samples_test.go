@@ -3,11 +3,11 @@ package bot
 import (
 	"context"
 	"errors"
+	"github.com/redstone-md/shield/app/bot/mocks"
+	"github.com/redstone-md/shield/app/rules"
+	"github.com/redstone-md/shield/app/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/app/bot/mocks"
-	"github.com/umputun/tg-spam/app/rules"
-	"github.com/umputun/tg-spam/app/storage"
 	"testing"
 )
 

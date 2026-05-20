@@ -10,8 +10,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/umputun/tg-spam/app/audit"
-	"github.com/umputun/tg-spam/app/storage/engine"
+	"github.com/redstone-md/shield/app/audit"
+	"github.com/redstone-md/shield/app/storage/engine"
 )
 
 const (

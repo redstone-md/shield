@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/spamcheck"
 	"sync"
 )
 

@@ -1,7 +1,7 @@
 package bot
 
 import (
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/spamcheck"
 	"testing"
 	"time"
 )

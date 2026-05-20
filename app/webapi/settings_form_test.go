@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/rules"
+	"github.com/redstone-md/shield/app/rules"
 )
 
 func TestRuleSetFromForm_AppliesValues(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 
 	"google.golang.org/genai"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 //go:generate moq --out mocks/gemini_client.go --pkg mocks --with-resets --skip-ensure . geminiClient:GeminiClientMock

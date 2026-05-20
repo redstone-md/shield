@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
-	"github.com/umputun/tg-spam/lib/tgspam"
+	"github.com/redstone-md/shield/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/tgspam"
 )
 
 // ExampleNewDetector demonstrates how to initialize a new Detector and use it to check a message for spam.

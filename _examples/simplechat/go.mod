@@ -1,11 +1,13 @@
-module github.com/umputun/tg-spam/_examples/simplechat
+module github.com/redstone-md/shield/_examples/simplechat
 
 go 1.25.0
 
 require (
-	github.com/umputun/tg-spam v1.25.0
+	github.com/redstone-md/shield v0.0.0
 	modernc.org/sqlite v1.50.1
 )
+
+replace github.com/redstone-md/shield => ../..
 
 require (
 	cloud.google.com/go v0.116.0 // indirect

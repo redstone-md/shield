@@ -18,10 +18,10 @@ import (
 	"github.com/go-pkgz/fileutils"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/events"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/app/storage/engine"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/events"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/app/storage/engine"
 )
 
 type nopWriteCloser struct{ io.Writer }

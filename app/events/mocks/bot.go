@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	"github.com/umputun/tg-spam/app/bot"
+	"github.com/redstone-md/shield/app/bot"
 	"sync"
 )
 

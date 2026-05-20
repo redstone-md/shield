@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/umputun/tg-spam/app/storage"
+	"github.com/redstone-md/shield/app/storage"
 )
 
 type tenantStatusAdapter struct {

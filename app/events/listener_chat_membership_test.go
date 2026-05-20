@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	tbapi "github.com/OvyFlash/telegram-bot-api"
+	"github.com/redstone-md/shield/app/events/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/app/events/mocks"
 	"testing"
 )
 
@@ -66,14 +66,14 @@ func TestTelegramListener_isAdminChat(t *testing.T) {
 			name:     "allowed, fromUser is superuser and fromChat equals chatID",
 			fromChat: 123,
 			chatID:   123,
-			fromUser: "umputun",
+			fromUser: "moderator",
 			expect:   true,
 		},
 		{
 			name:     "not allowed, fromUser is superuser and fromChat is not chatID",
 			fromChat: 456,
 			chatID:   123777,
-			fromUser: "umputun",
+			fromUser: "moderator",
 			expect:   false,
 		},
 		{
@@ -96,7 +96,7 @@ func TestTelegramListener_isAdminChat(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			listener := TelegramListener{
 				adminChatID: tc.chatID,
-				SuperUsers:  SuperUsers{"umputun"},
+				SuperUsers:  SuperUsers{"moderator"},
 			}
 			result := listener.isAdminChat(tc.fromChat, tc.fromUser, tc.fromID)
 			assert.Equal(t, tc.expect, result)

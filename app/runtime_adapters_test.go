@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/umputun/tg-spam/app/feedback"
+	"github.com/redstone-md/shield/app/feedback"
 )
 
 func TestAutoLearnerAdapter_LearnSpam(t *testing.T) {

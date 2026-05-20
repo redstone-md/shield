@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/app/rules"
+	"github.com/redstone-md/shield/app/observability"
+	"github.com/redstone-md/shield/app/rules"
 )
 
 // llmModeOptions and llmConsensusOptions are the allowed values for the enum selects.

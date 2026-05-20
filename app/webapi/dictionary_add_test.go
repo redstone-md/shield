@@ -3,10 +3,10 @@ package webapi
 import (
 	"context"
 	"errors"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/app/webapi/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/app/webapi/mocks"
 	"io"
 	"net/http"
 	"net/http/httptest"

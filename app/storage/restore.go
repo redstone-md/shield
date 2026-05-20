@@ -8,7 +8,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/umputun/tg-spam/app/storage/engine"
+	"github.com/redstone-md/shield/app/storage/engine"
 )
 
 type RestoreService struct {

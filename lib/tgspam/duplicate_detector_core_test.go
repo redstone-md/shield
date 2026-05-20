@@ -3,9 +3,9 @@ package tgspam
 import (
 	"fmt"
 	cache "github.com/go-pkgz/expirable-cache/v3"
+	"github.com/redstone-md/shield/lib/spamcheck"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/lib/spamcheck"
 	"strconv"
 	"testing"
 	"time"

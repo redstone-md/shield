@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/umputun/tg-spam/app/observability"
+	"github.com/redstone-md/shield/app/observability"
 )
 
 func debugLogFields(label string, value any) {

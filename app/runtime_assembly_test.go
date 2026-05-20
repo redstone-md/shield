@@ -3,10 +3,10 @@ package main
 import (
 	"testing"
 
+	"github.com/redstone-md/shield/app/rules"
+	"github.com/redstone-md/shield/app/slowpath"
+	"github.com/redstone-md/shield/lib/tgspam"
 	"github.com/stretchr/testify/assert"
-	"github.com/umputun/tg-spam/app/rules"
-	"github.com/umputun/tg-spam/app/slowpath"
-	"github.com/umputun/tg-spam/lib/tgspam"
 )
 
 func TestBootstrapRuleSet_SeedsNewFields(t *testing.T) {

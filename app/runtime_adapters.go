@@ -6,10 +6,10 @@ import (
 	"log"
 	"time"
 
-	"github.com/umputun/tg-spam/app/controlplane"
-	"github.com/umputun/tg-spam/app/feedback"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/app/webapi"
+	"github.com/redstone-md/shield/app/controlplane"
+	"github.com/redstone-md/shield/app/feedback"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/app/webapi"
 )
 
 type knowledgeDictAdapter struct {

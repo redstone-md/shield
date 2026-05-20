@@ -15,14 +15,14 @@ import (
 	"github.com/sashabaranov/go-openai"
 	"google.golang.org/genai"
 
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/rules"
-	"github.com/umputun/tg-spam/app/slowpath"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/app/storage/engine"
-	"github.com/umputun/tg-spam/app/webapi"
-	"github.com/umputun/tg-spam/lib/tgspam"
-	"github.com/umputun/tg-spam/lib/tgspam/plugin"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/rules"
+	"github.com/redstone-md/shield/app/slowpath"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/app/storage/engine"
+	"github.com/redstone-md/shield/app/webapi"
+	"github.com/redstone-md/shield/lib/tgspam"
+	"github.com/redstone-md/shield/lib/tgspam/plugin"
 )
 
 // makeDB creates database connection based on options

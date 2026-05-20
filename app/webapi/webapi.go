@@ -18,15 +18,15 @@ import (
 	"github.com/go-pkgz/rest/logger"
 	"github.com/go-pkgz/routegroup"
 
-	"github.com/umputun/tg-spam/app/audit"
-	"github.com/umputun/tg-spam/app/events"
-	"github.com/umputun/tg-spam/app/feedback"
-	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/app/rules"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/app/storage/engine"
-	"github.com/umputun/tg-spam/lib/approved"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/audit"
+	"github.com/redstone-md/shield/app/events"
+	"github.com/redstone-md/shield/app/feedback"
+	"github.com/redstone-md/shield/app/observability"
+	"github.com/redstone-md/shield/app/rules"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/app/storage/engine"
+	"github.com/redstone-md/shield/lib/approved"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 //go:generate moq --out mocks/detector.go --pkg mocks --with-resets --skip-ensure . Detector
@@ -296,7 +296,7 @@ func (s *Server) Run(ctx context.Context) error {
 	router.Use(s.requestMetadataMiddleware)
 	router.Use(logger.New(logger.Log(log.Default()), logger.Prefix("[DEBUG]")).Handler)
 	router.Use(rest.Throttle(1000))
-	router.Use(rest.AppInfo("tg-spam", "umputun", s.Version), rest.Ping)
+	router.Use(rest.AppInfo("tg-spam", "redstone-md", s.Version), rest.Ping)
 	router.Use(s.tenantRateLimitMiddleware())
 	router.Use(s.tenantAuthzMiddleware())
 	router.Use(rest.SizeLimit(1024 * 1024))

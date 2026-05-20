@@ -12,9 +12,9 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/app/storage/engine"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/observability"
+	"github.com/redstone-md/shield/app/storage/engine"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 const maxDetectedSpamEntries = 500

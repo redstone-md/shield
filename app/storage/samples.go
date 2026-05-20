@@ -11,7 +11,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "modernc.org/sqlite/lib" // sqlite driver
 
-	"github.com/umputun/tg-spam/app/storage/engine"
+	"github.com/redstone-md/shield/app/storage/engine"
 )
 
 // Samples is a storage for samples. It supports both ham and spam, as well as preset samples and user's samples

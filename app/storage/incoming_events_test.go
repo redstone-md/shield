@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/app/storage/engine"
+	"github.com/redstone-md/shield/app/moderation"
+	"github.com/redstone-md/shield/app/storage/engine"
 )
 
 func TestIncomingEventsRecord(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/umputun/tg-spam/app/bot"
+	"github.com/redstone-md/shield/app/bot"
 )
 
 func (l *TelegramListener) procNewChatMemberMessage(ctx context.Context, update tbapi.Update) error {

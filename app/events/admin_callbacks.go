@@ -12,8 +12,8 @@ import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/umputun/tg-spam/app/audit"
-	"github.com/umputun/tg-spam/app/bot"
+	"github.com/redstone-md/shield/app/audit"
+	"github.com/redstone-md/shield/app/bot"
 )
 
 func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.CallbackQuery) error {

@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
+	"github.com/redstone-md/shield/app/rules"
 	"github.com/stretchr/testify/assert"
-	"github.com/umputun/tg-spam/app/rules"
 )
 
 func TestConfigured_EmptyEnvIsNotSet(t *testing.T) {

@@ -9,18 +9,18 @@ import (
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 
-	"github.com/umputun/tg-spam/app/audit"
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/controlplane"
-	"github.com/umputun/tg-spam/app/events"
-	"github.com/umputun/tg-spam/app/feedback"
-	"github.com/umputun/tg-spam/app/observability"
-	"github.com/umputun/tg-spam/app/rules"
-	"github.com/umputun/tg-spam/app/slowpath"
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/app/storage/engine"
-	"github.com/umputun/tg-spam/app/webapi"
-	"github.com/umputun/tg-spam/lib/tgspam"
+	"github.com/redstone-md/shield/app/audit"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/controlplane"
+	"github.com/redstone-md/shield/app/events"
+	"github.com/redstone-md/shield/app/feedback"
+	"github.com/redstone-md/shield/app/observability"
+	"github.com/redstone-md/shield/app/rules"
+	"github.com/redstone-md/shield/app/slowpath"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/app/storage/engine"
+	"github.com/redstone-md/shield/app/webapi"
+	"github.com/redstone-md/shield/lib/tgspam"
 )
 
 type runtimeAssembly struct {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	tbapi "github.com/OvyFlash/telegram-bot-api"
+	"github.com/redstone-md/shield/app/events/mocks"
+	"github.com/redstone-md/shield/app/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/app/events/mocks"
-	"github.com/umputun/tg-spam/app/storage"
 	"testing"
 )
 

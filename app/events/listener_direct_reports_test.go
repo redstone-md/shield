@@ -3,11 +3,11 @@ package events
 import (
 	"context"
 	tbapi "github.com/OvyFlash/telegram-bot-api"
+	"github.com/redstone-md/shield/app/bot"
+	"github.com/redstone-md/shield/app/events/mocks"
+	"github.com/redstone-md/shield/lib/spamcheck"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umputun/tg-spam/app/bot"
-	"github.com/umputun/tg-spam/app/events/mocks"
-	"github.com/umputun/tg-spam/lib/spamcheck"
 	"testing"
 	"time"
 )
@@ -225,7 +225,7 @@ func TestTelegramListener_DoWithForwarded(t *testing.T) {
 		Group:      "gr",
 		AdminGroup: "123",
 		StartupMsg: "startup",
-		SuperUsers: SuperUsers{"umputun"},
+		SuperUsers: SuperUsers{"moderator"},
 		Locator:    locator,
 	}
 
@@ -239,7 +239,7 @@ func TestTelegramListener_DoWithForwarded(t *testing.T) {
 		Message: &tbapi.Message{
 			Chat:          tbapi.Chat{ID: 123},
 			Text:          "text 123",
-			From:          &tbapi.User{UserName: "umputun", ID: 77},
+			From:          &tbapi.User{UserName: "moderator", ID: 77},
 			Date:          int(time.Date(2020, 2, 11, 19, 35, 55, 9, time.UTC).Unix()),
 			ForwardOrigin: &tbapi.MessageOrigin{SenderUserName: "forwarded_name"},
 			MessageID:     999999,

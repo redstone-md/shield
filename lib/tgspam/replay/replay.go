@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 // Case describes a single replay fixture: an input message and the expected spam verdict.

@@ -3,8 +3,8 @@ package storage
 import (
 	"context"
 	"github.com/go-pkgz/testutils/containers"
+	"github.com/redstone-md/shield/app/storage/engine"
 	"github.com/stretchr/testify/suite"
-	"github.com/umputun/tg-spam/app/storage/engine"
 	"os"
 	"path/filepath"
 	"testing"

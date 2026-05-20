@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/umputun/tg-spam/app/storage/engine"
+	"github.com/redstone-md/shield/app/storage/engine"
 )
 
 type RetentionConfig struct {

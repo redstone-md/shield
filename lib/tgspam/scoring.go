@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 // ScoringEngine aggregates weighted spam signals against a threshold and renders the verdict.

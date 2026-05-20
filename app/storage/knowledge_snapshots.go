@@ -7,8 +7,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/umputun/tg-spam/app/feedback"
-	"github.com/umputun/tg-spam/app/storage/engine"
+	"github.com/redstone-md/shield/app/feedback"
+	"github.com/redstone-md/shield/app/storage/engine"
 )
 
 const (

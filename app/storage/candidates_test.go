@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/umputun/tg-spam/app/feedback"
+	"github.com/redstone-md/shield/app/feedback"
 )
 
 func (s *StorageTestSuite) TestCandidates_CreateAndGet() {

@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/tg-spam/app/storage"
-	"github.com/umputun/tg-spam/app/webapi/mocks"
-	"github.com/umputun/tg-spam/lib/approved"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/storage"
+	"github.com/redstone-md/shield/app/webapi/mocks"
+	"github.com/redstone-md/shield/lib/approved"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 type approvedUsersProviderSpy struct {

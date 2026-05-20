@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/umputun/tg-spam/app/storage"
+	"github.com/redstone-md/shield/app/storage"
 )
 
 type WorkspaceRole string

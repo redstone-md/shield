@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/umputun/tg-spam/app/moderation"
-	"github.com/umputun/tg-spam/lib/spamcheck"
+	"github.com/redstone-md/shield/app/moderation"
+	"github.com/redstone-md/shield/lib/spamcheck"
 )
 
 func TestIntegration_SameSignalsDifferentProfiles(t *testing.T) {
