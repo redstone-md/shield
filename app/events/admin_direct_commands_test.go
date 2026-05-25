@@ -292,6 +292,29 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		assert.Equal(t, int64(456), mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).ChatID)
 	})
 
+	t.Run("DirectDeleteByID", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		update := tbapi.Update{
+			Message: &tbapi.Message{
+				MessageID: 789,
+				Chat:      tbapi.Chat{ID: 456},
+				From:      &tbapi.User{UserName: "admin", ID: 111},
+				Text:      "/del 999",
+			},
+		}
+
+		err := adm.DirectDeleteByID(context.Background(), update, 456, 999)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.RequestCalls(), 2)
+		assert.Equal(t, 999, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
+		assert.Equal(t, int64(456), mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).ChatID)
+		assert.Equal(t, 789, mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).MessageID)
+		assert.Equal(t, int64(456), mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).ChatID)
+	})
+
 	t.Run("DirectWarnReport", func(t *testing.T) {
 		mockAPI, _, adm, teardown := setupTest()
 		defer teardown()

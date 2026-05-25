@@ -450,14 +450,29 @@ func (l *TelegramListener) procSuperCommand(ctx context.Context, update tbapi.Up
 		return false
 	}
 	cmd, arg := splitCommand(update.Message.Text)
-	if !isBanCommand(cmd) || arg == "" {
+	if arg == "" {
 		return false
 	}
-	log.Printf("[DEBUG] superuser %s requested ban for %q", update.Message.From.UserName, arg)
-	if err := l.adminHandler.DirectBanTarget(ctx, update, arg); err != nil {
-		log.Printf("[WARN] failed to process direct ban target: %v", err)
+	if isDeleteCommand(cmd) {
+		msgID, err := strconv.Atoi(arg)
+		if err != nil {
+			log.Printf("[WARN] invalid message ID in delete command: %q", arg)
+			return false
+		}
+		log.Printf("[DEBUG] superuser %s requested message deletion for msg ID %d", update.Message.From.UserName, msgID)
+		if err := l.adminHandler.DirectDeleteByID(ctx, update, update.Message.Chat.ID, msgID); err != nil {
+			log.Printf("[WARN] failed to process direct delete by ID: %v", err)
+		}
+		return true
 	}
-	return true
+	if isBanCommand(cmd) {
+		log.Printf("[DEBUG] superuser %s requested ban for %q", update.Message.From.UserName, arg)
+		if err := l.adminHandler.DirectBanTarget(ctx, update, arg); err != nil {
+			log.Printf("[WARN] failed to process direct ban target: %v", err)
+		}
+		return true
+	}
+	return false
 }
 
 // procSuperReply processes superuser reply commands: /spam, /ban, /warn, /unwarn.
@@ -518,6 +533,11 @@ func splitCommand(text string) (cmd, arg string) {
 func isBanCommand(cmd string) bool {
 	cmd = strings.TrimSpace(cmd)
 	return strings.EqualFold(cmd, "/ban") || strings.EqualFold(cmd, "ban")
+}
+
+func isDeleteCommand(cmd string) bool {
+	cmd = strings.TrimSpace(cmd)
+	return strings.EqualFold(cmd, "/del") || strings.EqualFold(cmd, "del")
 }
 
 // isReportCommand checks if message text is a /report command variant

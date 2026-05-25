@@ -111,6 +111,16 @@ func (a *admin) DirectDeleteReply(ctx context.Context, update tbapi.Update) erro
 	return nil
 }
 
+func (a *admin) DirectDeleteByID(ctx context.Context, update tbapi.Update, chatID int64, msgID int) error {
+	if err := a.deleteMessage(ctx, chatID, msgID, "delete by id"); err != nil {
+		return fmt.Errorf("direct delete by id failed: %w", err)
+	}
+	if err := a.deleteMessage(ctx, update.Message.Chat.ID, update.Message.MessageID, "delete command"); err != nil {
+		return fmt.Errorf("direct delete by id failed: %w", err)
+	}
+	return nil
+}
+
 func (a *admin) DirectWarnReport(update tbapi.Update) error {
 	warnLogFrom := update.Message.ReplyToMessage.From.UserName
 	warnLogID := update.Message.ReplyToMessage.From.ID

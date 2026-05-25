@@ -184,6 +184,51 @@ func TestTelegramListener_DirectDeleteReplyRequiresSuperUser(t *testing.T) {
 	assert.Empty(t, botMock.OnMessageCalls())
 }
 
+func TestTelegramListener_DoWithDirectDeleteByID(t *testing.T) {
+	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
+	mockAPI := &mocks.TbAPIMock{
+		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
+			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+		},
+		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+			return &tbapi.APIResponse{Ok: true}, nil
+		},
+		GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) { return nil, nil },
+	}
+	l := TelegramListener{
+		SpamLogger: mockLogger,
+		TbAPI:      mockAPI,
+		Bot:        &mocks.BotMock{},
+		Group:      "gr",
+		SuperUsers: SuperUsers{"superuser1"},
+		Locator:    &locatorContextSpy{},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	updMsg := tbapi.Update{Message: &tbapi.Message{
+		MessageID: 101,
+		Chat:      tbapi.Chat{ID: 456},
+		Text:      "/del 202",
+		From:      &tbapi.User{UserName: "superuser1", ID: 77},
+	}}
+	updChan := make(chan tbapi.Update, 1)
+	updChan <- updMsg
+	close(updChan)
+	mockAPI.GetUpdatesChanFunc = func(config tbapi.UpdateConfig) tbapi.UpdatesChannel { return updChan }
+
+	err := l.Do(ctx)
+	require.EqualError(t, err, "telegram update chan closed")
+
+	require.Len(t, mockAPI.RequestCalls(), 2)
+	assert.Equal(t, 202, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
+	assert.Equal(t, int64(456), mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).ChatID)
+	assert.Equal(t, 101, mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).MessageID)
+	assert.Equal(t, int64(456), mockAPI.RequestCalls()[1].C.(tbapi.DeleteMessageConfig).ChatID)
+	assert.Empty(t, mockLogger.SaveCalls())
+}
+
 func TestTelegramListener_DoWithDirectBanTarget(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
