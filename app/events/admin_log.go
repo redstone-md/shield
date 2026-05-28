@@ -6,7 +6,7 @@ func (a *admin) logConfig() adminLogConfig {
 	}
 	return adminLogConfig{
 		SuperUsers:             a.superUsers,
-		PrimaryChatID:          a.primChatID,
+		PrimaryChatID:          a.firstChatID(),
 		AdminChatID:            a.adminChatID,
 		TrainingMode:           a.trainingMode,
 		SoftBan:                a.softBan,

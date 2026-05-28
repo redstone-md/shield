@@ -100,8 +100,13 @@ type TelegramListener struct {
 	processor       incomingEventProcessor
 	pipeline        listenerPipeline
 	dmUsers         dmUsers // recent DM senders, stored in memory for admin UI
-	chatID          int64
-	adminChatID     int64
+	Groups              []string         // list of group names/ids to monitor
+	chatIDs             []int64          // resolved chat IDs for all groups
+	chatIDsSet          map[int64]struct{} // O(1) lookup for isChatAllowed
+	linkedChannelIDs    map[int64]int64  // chatID - per group
+	primChatIDs         []int64          // all group chatIDs for banning everywhere
+	chatID              int64            // first group chatID (backward compat)
+	adminChatID         int64
 	linkedChannelID int64 // channel linked to the discussion group, resolved at startup
 
 	msgs struct {
@@ -109,6 +114,29 @@ type TelegramListener struct {
 		ch   chan bot.Response
 	}
 	chatLimiter *chatRateLimiter
+}
+
+
+// syncChatIDs initializes derived multi-group fields from the legacy chatID field.
+// This is used for backward compatibility when tests or code set chatID directly.
+func (l *TelegramListener) syncChatIDs() {
+	if len(l.chatIDs) == 0 && l.chatID != 0 {
+		l.chatIDs = []int64{l.chatID}
+		l.chatIDsSet = map[int64]struct{}{l.chatID: {}}
+		l.primChatIDs = []int64{l.chatID}
+	}
+	if l.chatIDsSet == nil {
+		l.chatIDsSet = make(map[int64]struct{})
+		for _, id := range l.chatIDs {
+			l.chatIDsSet[id] = struct{}{}
+		}
+	}
+	if l.linkedChannelIDs == nil {
+		l.linkedChannelIDs = make(map[int64]int64)
+	}
+	if l.linkedChannelID != 0 && l.chatID != 0 {
+		l.linkedChannelIDs[l.chatID] = l.linkedChannelID
+	}
 }
 
 // GetDMUsers returns the list of recent DM senders
@@ -165,7 +193,14 @@ func (l *TelegramListener) ApplyRuleSet(rs rules.RuleSet) {
 
 // Do process all events, blocked call
 func (l *TelegramListener) Do(ctx context.Context) error {
-	log.Printf("[INFO] start telegram listener for %q", l.Group)
+	groups := l.Groups
+	if len(groups) == 0 && l.Group != "" {
+		groups = []string{l.Group}
+	}
+	if len(groups) == 0 {
+		return fmt.Errorf("no groups configured")
+	}
+	log.Printf("[INFO] start telegram listener for %v", groups)
 
 	if l.TrainingMode {
 		log.Printf("[WARN] training mode, no bans")
@@ -181,24 +216,42 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 		log.Printf("[DEBUG] delete-guest-bots disabled")
 	}
 
-	var getChatErr error
-	if l.chatID, getChatErr = l.getChatID(l.Group); getChatErr != nil {
-		return fmt.Errorf("failed to get chat ID for group %q: %w", l.Group, getChatErr)
-	}
-	log.Printf("[INFO] primary chat ID: %d", l.chatID)
+	// resolve all groups to chat IDs
+	l.chatIDs = make([]int64, 0, len(groups))
+	l.chatIDsSet = make(map[int64]struct{}, len(groups))
+	l.linkedChannelIDs = make(map[int64]int64, len(groups))
 
-	chatInfo, err := l.TbAPI.GetChat(tbapi.ChatInfoConfig{ChatConfig: tbapi.ChatConfig{ChatID: l.chatID}})
-	if err != nil {
-		log.Printf("[WARN] failed to get chat info for linked channel resolution: %v", err)
-	} else if chatInfo.LinkedChatID != 0 {
-		l.linkedChannelID = chatInfo.LinkedChatID
-		log.Printf("[INFO] linked channel ID: %d", l.linkedChannelID)
+	for _, g := range groups {
+		chatID, err := l.getChatID(g)
+		if err != nil {
+			return fmt.Errorf("failed to get chat ID for group %q: %w", g, err)
+		}
+		l.chatIDs = append(l.chatIDs, chatID)
+		l.chatIDsSet[chatID] = struct{}{}
+		log.Printf("[INFO] resolved group %q -> chat ID %d", g, chatID)
+
+		chatInfo, err := l.TbAPI.GetChat(tbapi.ChatInfoConfig{ChatConfig: tbapi.ChatConfig{ChatID: chatID}})
+		if err != nil {
+			log.Printf("[WARN] failed to get chat info for group %d: %v", chatID, err)
+		} else if chatInfo.LinkedChatID != 0 {
+			l.linkedChannelIDs[chatID] = chatInfo.LinkedChatID
+			log.Printf("[INFO] linked channel for group %d: %d", chatID, chatInfo.LinkedChatID)
+		}
 	}
+
+	// set backward-compat fields from first group
+	l.chatID = l.chatIDs[0]
+	if linkedID, ok := l.linkedChannelIDs[l.chatID]; ok {
+		l.linkedChannelID = linkedID
+	}
+	l.primChatIDs = make([]int64, len(l.chatIDs))
+	copy(l.primChatIDs, l.chatIDs)
 
 	if err := l.updateSupers(); err != nil {
 		log.Printf("[WARN] failed to update superusers: %v", err)
 	}
 
+	var getChatErr error
 	if l.AdminGroup != "" {
 		if l.adminChatID, getChatErr = l.getChatID(l.AdminGroup); getChatErr != nil {
 			return fmt.Errorf("failed to get chat ID for admin group %q: %w", l.AdminGroup, getChatErr)
@@ -244,7 +297,7 @@ func (l *TelegramListener) initHandlers() {
 		tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers, actions: l.ActionExecutor,
 		autoLearner: l.AutoLearner, detectedSpam: l.DetectedSpamCounter,
 		mediaSlowPath: l.mediaSlowPathConfig(),
-		primChatID:    l.chatID, adminChatID: l.adminChatID,
+		primChatIDs:   l.primChatIDs, adminChatID: l.adminChatID,
 		trainingMode: l.TrainingMode, softBan: l.SoftBanMode, dry: l.Dry, warnMsg: l.WarnMsg,
 		moderation: l.ModerationConfig, warnDeleteDuration: l.ModerationConfig.WarnDeleteDuration,
 		aggressiveCleanup: l.AggressiveCleanup, aggressiveCleanupLimit: l.AggressiveCleanupLimit,
@@ -258,7 +311,7 @@ func (l *TelegramListener) initHandlers() {
 		ReportConfig: l.ReportConfig, tbAPI: l.TbAPI, bot: l.Bot, locator: l.Locator, superUsers: l.SuperUsers,
 		actions: l.ActionExecutor, autoLearner: l.AutoLearner,
 		detectedSpam: l.DetectedSpamCounter, tenantID: l.TenantID, moderation: l.ModerationConfig,
-		primChatID: l.chatID, adminChatID: l.adminChatID,
+		primChatIDs: l.primChatIDs, adminChatID: l.adminChatID,
 		trainingMode: l.TrainingMode, softBanMode: l.SoftBanMode, dry: l.Dry,
 	}
 

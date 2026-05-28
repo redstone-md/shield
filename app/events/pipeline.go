@@ -579,7 +579,7 @@ func (l *TelegramListener) cleanupAfterAction(ctx context.Context, pc pipelineCo
 	canDelete := pc.resp.DeleteReplyTo && pc.resp.ReplyTo != 0 && !l.Dry &&
 		!l.SuperUsers.IsSuper(pc.msg.From.Username, pc.msg.From.ID) && !l.TrainingMode
 	if canDelete {
-		if err := l.ActionExecutor.DeleteMessage(ctx, l.chatID, pc.resp.ReplyTo); err != nil {
+		if err := l.ActionExecutor.DeleteMessage(ctx, pc.fromChat, pc.resp.ReplyTo); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 	}

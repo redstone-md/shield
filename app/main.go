@@ -24,7 +24,8 @@ type options struct {
 
 	Telegram struct {
 		Token        string        `long:"token" env:"TOKEN" description:"telegram bot token"`
-		Group        string        `long:"group" env:"GROUP" description:"group name/id"`
+		Group        string        `long:"group" env:"GROUP" description:"group name/id (legacy, use GROUPS)"`
+		Groups       []string      `long:"groups" env:"GROUPS" env-delim:"," description:"comma-separated list of group names/ids"`
 		Timeout      time.Duration `long:"timeout" env:"TIMEOUT" default:"30s" description:"http client timeout for telegram" `
 		IdleDuration time.Duration `long:"idle" env:"IDLE" default:"30s" description:"idle duration"`
 	} `group:"telegram" namespace:"telegram" env-namespace:"TELEGRAM"`
@@ -288,7 +289,7 @@ func execute(ctx context.Context, opts options) error {
 	}
 
 	convertOnly := opts.Convert == "only"
-	if !opts.Server.Enabled && !convertOnly && (opts.Telegram.Token == "" || opts.Telegram.Group == "") {
+	if !opts.Server.Enabled && !convertOnly && (opts.Telegram.Token == "" || (opts.Telegram.Group == "" && len(opts.Telegram.Groups) == 0)) {
 		return errors.New("telegram token and group are required")
 	}
 
@@ -317,7 +318,7 @@ func execute(ctx context.Context, opts options) error {
 	}
 
 	// activate web server if enabled, server-only mode (no telegram token)
-	if opts.Server.Enabled && (opts.Telegram.Token == "" || opts.Telegram.Group == "") {
+	if opts.Server.Enabled && (opts.Telegram.Token == "" || (opts.Telegram.Group == "" && len(opts.Telegram.Groups) == 0)) {
 		// server starts in background goroutine without DM users provider
 		if srvErr := activateWebRuntime(ctx, opts, assembly.Web, nil); srvErr != nil {
 			return fmt.Errorf("can't activate web server, %w", srvErr)

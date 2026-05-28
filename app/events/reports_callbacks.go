@@ -17,7 +17,7 @@ func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.Callba
 		return fmt.Errorf("failed to parse callback data: %w", err)
 	}
 
-	reports, err := r.Storage.GetByMessage(ctx, msgID, r.primChatID)
+	reports, err := r.Storage.GetByMessage(ctx, msgID, r.firstChatID())
 	if err != nil {
 		return fmt.Errorf("failed to get reports for msgID:%d: %w", msgID, err)
 	}
@@ -104,7 +104,7 @@ func (r *userReports) callbackReportReject(ctx context.Context, query *tbapi.Cal
 		return fmt.Errorf("failed to parse callback data: %w", err)
 	}
 
-	reports, err := r.Storage.GetByMessage(ctx, msgID, r.primChatID)
+	reports, err := r.Storage.GetByMessage(ctx, msgID, r.firstChatID())
 	if err != nil {
 		return fmt.Errorf("failed to get reports for msgID:%d: %w", msgID, err)
 	}
@@ -137,7 +137,7 @@ func (r *userReports) callbackReportBanReporterAsk(ctx context.Context, query *t
 		return fmt.Errorf("failed to parse callback data: %w", err)
 	}
 
-	reports, err := r.Storage.GetByMessage(ctx, msgID, r.primChatID)
+	reports, err := r.Storage.GetByMessage(ctx, msgID, r.firstChatID())
 	if err != nil {
 		return fmt.Errorf("failed to get reports for msgID:%d: %w", msgID, err)
 	}
@@ -184,7 +184,7 @@ func (r *userReports) callbackReportBanReporterConfirm(ctx context.Context, quer
 		return fmt.Errorf("failed to parse callback data: %w", err)
 	}
 
-	reports, err := r.Storage.GetByMessage(ctx, msgID, r.primChatID)
+	reports, err := r.Storage.GetByMessage(ctx, msgID, r.firstChatID())
 	if err != nil {
 		return fmt.Errorf("failed to get reports for msgID:%d: %w", msgID, err)
 	}
@@ -229,7 +229,7 @@ func (r *userReports) callbackReportBanReporterConfirm(ctx context.Context, quer
 		log.Printf("[WARN] failed to delete reporter %d from database: %v", reporterID, delErr)
 	}
 
-	remainingReports, err := r.Storage.GetByMessage(ctx, msgID, r.primChatID)
+	remainingReports, err := r.Storage.GetByMessage(ctx, msgID, r.firstChatID())
 	if err != nil {
 		log.Printf("[WARN] failed to get remaining reports for msgID:%d: %v", msgID, err)
 	}
@@ -278,9 +278,9 @@ func (r *userReports) callbackReportBanReporterConfirm(ctx context.Context, quer
 
 		keyboard := tbapi.NewInlineKeyboardMarkup(
 			tbapi.NewInlineKeyboardRow(
-				tbapi.NewInlineKeyboardButtonData("✅ Забанить", fmt.Sprintf("R+%d:%d", reportedUserID, msgID)),
-				tbapi.NewInlineKeyboardButtonData("❌ Отклонить", fmt.Sprintf("R-%d:%d", reportedUserID, msgID)),
-				tbapi.NewInlineKeyboardButtonData("⛔️ Забанить репортера", fmt.Sprintf("R?%d:%d", reportedUserID, msgID)),
+				tbapi.NewInlineKeyboardButtonData("✅ Забанить", fmt.Sprintf("R+%d:%d:%d", reportedUserID, msgID, chatID)),
+				tbapi.NewInlineKeyboardButtonData("❌ Отклонить", fmt.Sprintf("R-%d:%d:%d", reportedUserID, msgID, chatID)),
+				tbapi.NewInlineKeyboardButtonData("⛔️ Забанить репортера", fmt.Sprintf("R?%d:%d:%d", reportedUserID, msgID, chatID)),
 			),
 		)
 
@@ -297,16 +297,17 @@ func (r *userReports) callbackReportBanReporterConfirm(ctx context.Context, quer
 }
 
 func (r *userReports) callbackReportCancel(_ context.Context, query *tbapi.CallbackQuery) error {
-	reportedUserID, msgID, err := parseCallbackData(query.Data)
+	reportedUserID, msgID, callbackChatID, err := parseCallbackDataWithChat(query.Data)
 	if err != nil {
 		return fmt.Errorf("failed to parse callback data: %w", err)
 	}
+	chatID := resolveCallbackChatID(callbackChatID, r.primChatIDs)
 
 	keyboard := tbapi.NewInlineKeyboardMarkup(
 		tbapi.NewInlineKeyboardRow(
-			tbapi.NewInlineKeyboardButtonData("✅ Забанить", fmt.Sprintf("R+%d:%d", reportedUserID, msgID)),
-			tbapi.NewInlineKeyboardButtonData("❌ Отклонить", fmt.Sprintf("R-%d:%d", reportedUserID, msgID)),
-			tbapi.NewInlineKeyboardButtonData("⛔️ Забанить репортера", fmt.Sprintf("R?%d:%d", reportedUserID, msgID)),
+			tbapi.NewInlineKeyboardButtonData("✅ Забанить", fmt.Sprintf("R+%d:%d:%d", reportedUserID, msgID, chatID)),
+			tbapi.NewInlineKeyboardButtonData("❌ Отклонить", fmt.Sprintf("R-%d:%d:%d", reportedUserID, msgID, chatID)),
+			tbapi.NewInlineKeyboardButtonData("⛔️ Забанить репортера", fmt.Sprintf("R?%d:%d:%d", reportedUserID, msgID, chatID)),
 		),
 	)
 

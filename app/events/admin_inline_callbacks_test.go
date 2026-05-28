@@ -52,7 +52,7 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 		adm := &admin{
 			tbAPI:        mockAPI,
 			bot:          botMock,
-			primChatID:   123,
+			primChatIDs:   []int64{123},
 			adminChatID:  456,
 			locator:      locatorMock,
 			trainingMode: trainingMode,

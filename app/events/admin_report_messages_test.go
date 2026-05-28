@@ -208,11 +208,11 @@ func TestAdmin_reportWarnAddsNotSpamButton(t *testing.T) {
 	button := markup.InlineKeyboard[0][0]
 	assert.Equal(t, "Не спам", button.Text)
 	require.NotNil(t, button.CallbackData)
-	assert.Equal(t, "W?7187750383:777", *button.CallbackData)
+	assert.Equal(t, "W?7187750383:777:0", *button.CallbackData)
 	infoButton := markup.InlineKeyboard[0][1]
 	assert.Equal(t, "⚑ info", infoButton.Text)
 	require.NotNil(t, infoButton.CallbackData)
-	assert.Equal(t, "!7187750383:777", *infoButton.CallbackData)
+	assert.Equal(t, "!7187750383:777:0", *infoButton.CallbackData)
 }
 
 func TestAdmin_getCleanMessage(t *testing.T) {

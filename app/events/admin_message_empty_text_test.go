@@ -107,7 +107,7 @@ func TestAdmin_MsgHandlerWithEmptyText(t *testing.T) {
 		tbAPI:      mockAPI,
 		bot:        botMock,
 		locator:    locatorMock,
-		primChatID: 123,
+		primChatIDs: []int64{123},
 	}
 
 	for _, tt := range tests {

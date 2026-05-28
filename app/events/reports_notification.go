@@ -156,9 +156,9 @@ func (r *userReports) sendReportNotification(ctx context.Context, reports []stor
 
 	keyboard := tbapi.NewInlineKeyboardMarkup(
 		tbapi.NewInlineKeyboardRow(
-			tbapi.NewInlineKeyboardButtonData("✅ Забанить", fmt.Sprintf("R+%d:%d", reportedUserID, msgID)),
-			tbapi.NewInlineKeyboardButtonData("❌ Отклонить", fmt.Sprintf("R-%d:%d", reportedUserID, msgID)),
-			tbapi.NewInlineKeyboardButtonData("⛔️ Забанить репортера", fmt.Sprintf("R?%d:%d", reportedUserID, msgID)),
+			tbapi.NewInlineKeyboardButtonData("✅ Забанить", fmt.Sprintf("R+%d:%d:%d", reportedUserID, msgID, chatID)),
+			tbapi.NewInlineKeyboardButtonData("❌ Отклонить", fmt.Sprintf("R-%d:%d:%d", reportedUserID, msgID, chatID)),
+			tbapi.NewInlineKeyboardButtonData("⛔️ Забанить репортера", fmt.Sprintf("R?%d:%d:%d", reportedUserID, msgID, chatID)),
 		),
 	)
 
@@ -221,9 +221,9 @@ func (r *userReports) updateReportNotification(_ context.Context, reports []stor
 
 	keyboard := tbapi.NewInlineKeyboardMarkup(
 		tbapi.NewInlineKeyboardRow(
-			tbapi.NewInlineKeyboardButtonData("✅ Забанить", fmt.Sprintf("R+%d:%d", reportedUserID, msgID)),
-			tbapi.NewInlineKeyboardButtonData("❌ Отклонить", fmt.Sprintf("R-%d:%d", reportedUserID, msgID)),
-			tbapi.NewInlineKeyboardButtonData("⛔️ Забанить репортера", fmt.Sprintf("R?%d:%d", reportedUserID, msgID)),
+			tbapi.NewInlineKeyboardButtonData("✅ Забанить", fmt.Sprintf("R+%d:%d:%d", reportedUserID, msgID, chatID)),
+			tbapi.NewInlineKeyboardButtonData("❌ Отклонить", fmt.Sprintf("R-%d:%d:%d", reportedUserID, msgID, chatID)),
+			tbapi.NewInlineKeyboardButtonData("⛔️ Забанить репортера", fmt.Sprintf("R?%d:%d:%d", reportedUserID, msgID, chatID)),
 		),
 	)
 

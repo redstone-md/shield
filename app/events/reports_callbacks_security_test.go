@@ -43,7 +43,7 @@ func TestUserReports_CallbackReportBanReporterConfirm(t *testing.T) {
 
 		rep := &userReports{
 			tbAPI:        mockAPI,
-			primChatID:   200,
+			primChatIDs:   []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 		}
 
@@ -92,7 +92,7 @@ func TestUserReports_CallbackReportBanReporterConfirm(t *testing.T) {
 
 		rep := &userReports{
 			tbAPI:        mockAPI,
-			primChatID:   200,
+			primChatIDs:   []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 		}
 
@@ -141,7 +141,7 @@ func TestUserReports_CallbackReportBanReporterConfirm(t *testing.T) {
 
 		rep := &userReports{
 			tbAPI:        mockAPI,
-			primChatID:   200,
+			primChatIDs:   []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 			actions:      actions,
 		}
@@ -171,11 +171,11 @@ func TestUserReports_CallbackReportCancel(t *testing.T) {
 					require.Len(t, editMarkup.ReplyMarkup.InlineKeyboard, 1, "should have 1 row of buttons")
 					require.Len(t, editMarkup.ReplyMarkup.InlineKeyboard[0], 3, "row should have 3 buttons")
 					assert.Equal(t, "✅ Забанить", editMarkup.ReplyMarkup.InlineKeyboard[0][0].Text)
-					assert.Equal(t, "R+666:100", *editMarkup.ReplyMarkup.InlineKeyboard[0][0].CallbackData)
+					assert.Equal(t, "R+666:100:200", *editMarkup.ReplyMarkup.InlineKeyboard[0][0].CallbackData)
 					assert.Equal(t, "❌ Отклонить", editMarkup.ReplyMarkup.InlineKeyboard[0][1].Text)
-					assert.Equal(t, "R-666:100", *editMarkup.ReplyMarkup.InlineKeyboard[0][1].CallbackData)
+					assert.Equal(t, "R-666:100:200", *editMarkup.ReplyMarkup.InlineKeyboard[0][1].CallbackData)
 					assert.Equal(t, "⛔️ Забанить репортера", editMarkup.ReplyMarkup.InlineKeyboard[0][2].Text)
-					assert.Equal(t, "R?666:100", *editMarkup.ReplyMarkup.InlineKeyboard[0][2].CallbackData)
+					assert.Equal(t, "R?666:100:200", *editMarkup.ReplyMarkup.InlineKeyboard[0][2].CallbackData)
 				}
 				return tbapi.Message{}, nil
 			},
@@ -184,7 +184,7 @@ func TestUserReports_CallbackReportCancel(t *testing.T) {
 		rep := &userReports{tbAPI: mockAPI}
 
 		query := &tbapi.CallbackQuery{
-			Data:    "RX666:100",
+			Data:    "RX666:100:200",
 			From:    &tbapi.User{UserName: "admin"},
 			Message: &tbapi.Message{Chat: tbapi.Chat{ID: 456}, MessageID: 999},
 		}
@@ -217,12 +217,12 @@ func TestUserReports_HandleReportCallback_SecurityValidation(t *testing.T) {
 		rep := &userReports{
 			tbAPI:        mockAPI,
 			adminChatID:  456,
-			primChatID:   200,
+			primChatIDs:   []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 		}
 
 		query := &tbapi.CallbackQuery{
-			Data: "R-666:100",
+			Data: "R-666:100:200",
 			From: &tbapi.User{UserName: "admin"},
 			Message: &tbapi.Message{
 				Chat:      tbapi.Chat{ID: 456},
@@ -261,12 +261,12 @@ func TestUserReports_HandleReportCallback_SecurityValidation(t *testing.T) {
 		rep := &userReports{
 			tbAPI:        mockAPI,
 			adminChatID:  456,
-			primChatID:   200,
+			primChatIDs:   []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 		}
 
 		query := &tbapi.CallbackQuery{
-			Data: "R-666:100",
+			Data: "R-666:100:200",
 			From: &tbapi.User{UserName: "attacker"},
 			Message: &tbapi.Message{
 				Chat:      tbapi.Chat{ID: 789},
@@ -314,12 +314,12 @@ func TestUserReports_HandleReportCallback_SecurityValidation(t *testing.T) {
 			tbAPI:        mockAPI,
 			bot:          mockBot,
 			adminChatID:  456,
-			primChatID:   200,
+			primChatIDs:   []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 		}
 
 		query := &tbapi.CallbackQuery{
-			Data: "R+666:100",
+			Data: "R+666:100:200",
 			From: &tbapi.User{UserName: "attacker"},
 			Message: &tbapi.Message{
 				Chat:      tbapi.Chat{ID: 123},
@@ -360,7 +360,7 @@ func TestUserReports_HandleReportCallback_SecurityValidation(t *testing.T) {
 		rep := &userReports{
 			tbAPI:        mockAPI,
 			adminChatID:  456,
-			primChatID:   200,
+			primChatIDs:   []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 		}
 
@@ -386,7 +386,7 @@ func TestUserReports_HandleReportCallback_SecurityValidation(t *testing.T) {
 	t.Run("callback with invalid data format should return error", func(t *testing.T) {
 		rep := &userReports{
 			adminChatID: 456,
-			primChatID:  200,
+			primChatIDs:  []int64{200},
 		}
 
 		query := &tbapi.CallbackQuery{
@@ -407,7 +407,7 @@ func TestUserReports_HandleReportCallback_SecurityValidation(t *testing.T) {
 	t.Run("callback with unknown prefix should return error", func(t *testing.T) {
 		rep := &userReports{
 			adminChatID: 456,
-			primChatID:  200,
+			primChatIDs:  []int64{200},
 		}
 
 		query := &tbapi.CallbackQuery{

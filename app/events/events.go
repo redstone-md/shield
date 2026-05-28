@@ -553,8 +553,16 @@ func mediaInfoDetails(info *bot.MediaInfo) string {
 // parseCallbackData parses callback data format: [prefix]userID:msgID
 // prefix can be: ?, +, !, two-char warning prefixes (W?, W+, WX), or two-char report prefixes (R+, R-, R?, R!, RX)
 func parseCallbackData(data string) (userID int64, msgID int, err error) {
+	userID, msgID, _, err = parseCallbackDataWithChat(data)
+	return
+}
+
+// parseCallbackDataWithChat parses callback data in two formats:
+//   - New (3-part): [prefix]userID:msgID:chatID
+//   - Legacy (2-part): [prefix]userID:msgID  (chatID returned as 0)
+func parseCallbackDataWithChat(data string) (userID int64, msgID int, chatID int64, err error) {
 	if len(data) < 3 {
-		return 0, 0, fmt.Errorf("unexpected callback data, too short %q", data)
+		return 0, 0, 0, fmt.Errorf("unexpected callback data, too short %q", data)
 	}
 
 	// remove prefix if present from the parsed data
@@ -568,17 +576,38 @@ func parseCallbackData(data string) (userID int64, msgID int, err error) {
 	}
 
 	parts := strings.Split(data, ":")
-	if len(parts) != 2 {
-		return 0, 0, fmt.Errorf("unexpected callback data, should have both ids %q", data)
+	if len(parts) < 2 || len(parts) > 3 {
+		return 0, 0, 0, fmt.Errorf("unexpected callback data, expected 2 or 3 parts %q", data)
 	}
 	if userID, err = strconv.ParseInt(parts[0], 10, 64); err != nil {
-		return 0, 0, fmt.Errorf("failed to parse userID %q: %w", parts[0], err)
+		return 0, 0, 0, fmt.Errorf("failed to parse userID %q: %w", parts[0], err)
 	}
 	if msgID, err = strconv.Atoi(parts[1]); err != nil {
-		return 0, 0, fmt.Errorf("failed to parse msgID %q: %w", parts[1], err)
+		return 0, 0, 0, fmt.Errorf("failed to parse msgID %q: %w", parts[1], err)
 	}
+	if len(parts) == 3 {
+		if chatID, err = strconv.ParseInt(parts[2], 10, 64); err != nil {
+			return 0, 0, 0, fmt.Errorf("failed to parse chatID %q: %w", parts[2], err)
+		}
+	}
+	return userID, msgID, chatID, nil
+}
 
-	return userID, msgID, nil
+// formatCallbackData creates callback data in the new 3-part format.
+func formatCallbackData(prefix string, userID int64, msgID int, chatID int64) string {
+	return fmt.Sprintf("%s%d:%d:%d", prefix, userID, msgID, chatID)
+}
+
+// resolveCallbackChatID returns the chatID from callback data, falling back
+// to the first primary chat ID if chatID is 0 (legacy format).
+func resolveCallbackChatID(chatID int64, fallback []int64) int64 {
+	if chatID != 0 {
+		return chatID
+	}
+	if len(fallback) > 0 {
+		return fallback[0]
+	}
+	return 0
 }
 
 // channelIDFromCallback returns the channel ID if the parsed callback ID is negative (channel),

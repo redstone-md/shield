@@ -44,12 +44,28 @@ type userReports struct {
 	superUsers   SuperUsers
 	actions      ActionExecutor
 	autoLearner  AutoLearner
-	primChatID   int64
+	primChatIDs  []int64
 	adminChatID  int64
 	moderation   ModerationConfig
 	trainingMode bool
 	softBanMode  bool
 	dry          bool
+}
+
+
+func (r *userReports) firstChatID() int64 {
+	if len(r.primChatIDs) > 0 {
+		return r.primChatIDs[0]
+	}
+	return 0
+}
+
+// chatIDOrFallback returns chatID if non-zero, otherwise the first primary chat ID.
+func (r *userReports) chatIDOrFallback(chatID int64) int64 {
+	if chatID != 0 {
+		return chatID
+	}
+	return r.firstChatID()
 }
 
 func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update) error {
@@ -89,14 +105,14 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 		log.Printf("[INFO] reporter %d (%s) exceeded rate limit", update.Message.From.ID, update.Message.From.UserName)
 		_, _ = r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 			MessageID:  update.Message.MessageID,
-			ChatConfig: tbapi.ChatConfig{ChatID: r.primChatID},
+			ChatConfig: tbapi.ChatConfig{ChatID: r.chatIDOrFallback(origMsg.Chat.ID)},
 		}})
 		return fmt.Errorf("rate limit exceeded for reporter %d", update.Message.From.ID)
 	}
 
 	_, err = r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 		MessageID:  update.Message.MessageID,
-		ChatConfig: tbapi.ChatConfig{ChatID: r.primChatID},
+		ChatConfig: tbapi.ChatConfig{ChatID: r.chatIDOrFallback(origMsg.Chat.ID)},
 	}})
 	if err != nil {
 		log.Printf("[WARN] failed to delete report message %d: %v", update.Message.MessageID, err)
@@ -116,7 +132,7 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 	if handled, llmErr := r.tryLLMReportModeration(ctx, update, origMsg, msgTxt); handled {
 		if llmErr == nil {
 			duration, restrict := r.reportPenalty(ctx, origMsg.From.ID)
-			r.notifyPrimaryChat(reportOutcomeBanned, duration, restrict)
+			r.notifyPrimaryChat(reportOutcomeBanned, duration, restrict, r.chatIDOrFallback(origMsg.Chat.ID))
 		}
 		return llmErr
 	}
@@ -127,7 +143,7 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 
 	report := storage.Report{
 		MsgID:            origMsg.MessageID,
-		ChatID:           r.primChatID,
+		ChatID:           r.chatIDOrFallback(origMsg.Chat.ID),
 		ReporterUserID:   update.Message.From.ID,
 		ReporterUserName: update.Message.From.UserName,
 		ReportedUserID:   origMsg.From.ID,
@@ -139,18 +155,21 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 		return fmt.Errorf("failed to add report: %w", addErr)
 	}
 
-	outcome, err := r.checkReportThreshold(ctx, origMsg.MessageID, r.primChatID)
+	outcome, err := r.checkReportThreshold(ctx, origMsg.MessageID, r.chatIDOrFallback(origMsg.Chat.ID))
 	if err != nil {
 		log.Printf("[WARN] failed to check report threshold: %v", err)
 	} else {
-		r.notifyPrimaryChat(outcome, 0, false)
+		r.notifyPrimaryChat(outcome, 0, false, r.chatIDOrFallback(origMsg.Chat.ID))
 	}
 
 	return nil
 }
 
-func (r *userReports) notifyPrimaryChat(outcome reportOutcome, duration time.Duration, restrict bool) {
-	if r.primChatID == 0 {
+func (r *userReports) notifyPrimaryChat(outcome reportOutcome, duration time.Duration, restrict bool, chatID int64) {
+	if chatID == 0 {
+		chatID = r.firstChatID()
+	}
+	if chatID == 0 {
 		return
 	}
 
@@ -166,7 +185,7 @@ func (r *userReports) notifyPrimaryChat(outcome reportOutcome, duration time.Dur
 		return
 	}
 
-	if err := send(tbapi.NewMessage(r.primChatID, text), r.tbAPI); err != nil {
+	if err := send(tbapi.NewMessage(chatID, text), r.tbAPI); err != nil {
 		log.Printf("[WARN] failed to send report status to primary chat: %v", err)
 	}
 }
@@ -206,13 +225,13 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 	}
 
 	if r.actions != nil {
-		if err := r.actions.DeleteMessage(ctx, r.primChatID, origMsg.MessageID); err != nil {
+		if err := r.actions.DeleteMessage(ctx, r.chatIDOrFallback(origMsg.Chat.ID), origMsg.MessageID); err != nil {
 			log.Printf("[WARN] failed to delete LLM-confirmed reported message %d: %v", origMsg.MessageID, err)
 		}
 	} else if !r.dry {
 		_, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 			MessageID:  origMsg.MessageID,
-			ChatConfig: tbapi.ChatConfig{ChatID: r.primChatID},
+			ChatConfig: tbapi.ChatConfig{ChatID: r.chatIDOrFallback(origMsg.Chat.ID)},
 		}})
 		if err != nil {
 			log.Printf("[WARN] failed to delete LLM-confirmed reported message %d: %v", origMsg.MessageID, err)
@@ -222,7 +241,7 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 	req := banRequest{
 		duration: duration,
 		userID:   origMsg.From.ID,
-		chatID:   r.primChatID,
+		chatID:   r.chatIDOrFallback(origMsg.Chat.ID),
 		dry:      r.dry,
 		training: r.trainingMode,
 		userName: origMsg.From.UserName,
@@ -481,8 +500,8 @@ func (r *userReports) executeAutoBan(ctx context.Context, reports []storage.Repo
 }
 
 func (r *userReports) reportActionContext(ctx context.Context, action string, msgID int, userID int64) context.Context {
-	eventID := fmt.Sprintf("report-%s-%d-%d", action, r.primChatID, msgID)
+	eventID := fmt.Sprintf("report-%s-%d-%d", action, r.firstChatID(), msgID)
 	correlationID := fmt.Sprintf("corr-report-%s-%d", action, msgID)
-	idempotencyKey := fmt.Sprintf("report:%s:chat:%d:msg:%d:user:%d", action, r.primChatID, msgID, userID)
+	idempotencyKey := fmt.Sprintf("report:%s:chat:%d:msg:%d:user:%d", action, r.firstChatID(), msgID, userID)
 	return observability.WithModerationMetadata(ctx, eventID, correlationID, idempotencyKey)
 }

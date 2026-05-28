@@ -78,10 +78,26 @@ func (l *TelegramListener) deleteSystemMessage(msgID int, chatID int64, msgType 
 }
 
 func (l *TelegramListener) isLinkedChannel(msg *tbapi.Message) bool {
-	return l.linkedChannelID != 0 && msg.SenderChat != nil && msg.SenderChat.ID == l.linkedChannelID
+	if msg.SenderChat == nil {
+		return false
+	}
+	if l.linkedChannelID != 0 && msg.SenderChat.ID == l.linkedChannelID {
+		return true
+	}
+	for _, linkedID := range l.linkedChannelIDs {
+		if msg.SenderChat.ID == linkedID {
+			return true
+		}
+	}
+	return false
 }
 
 func (l *TelegramListener) isChatAllowed(fromChat int64) bool {
+	if l.chatIDsSet != nil {
+		if _, ok := l.chatIDsSet[fromChat]; ok {
+			return true
+		}
+	}
 	if fromChat == l.chatID {
 		return true
 	}

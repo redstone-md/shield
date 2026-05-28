@@ -58,11 +58,11 @@ func TestUserReports_SendReportNotification(t *testing.T) {
 		require.Len(t, keyboard.InlineKeyboard, 1, "should have 1 row")
 		require.Len(t, keyboard.InlineKeyboard[0], 3, "row should have 3 buttons")
 		assert.Equal(t, "✅ Забанить", keyboard.InlineKeyboard[0][0].Text)
-		assert.Equal(t, "R+666:100", *keyboard.InlineKeyboard[0][0].CallbackData)
+		assert.Equal(t, "R+666:100:200", *keyboard.InlineKeyboard[0][0].CallbackData)
 		assert.Equal(t, "❌ Отклонить", keyboard.InlineKeyboard[0][1].Text)
-		assert.Equal(t, "R-666:100", *keyboard.InlineKeyboard[0][1].CallbackData)
+		assert.Equal(t, "R-666:100:200", *keyboard.InlineKeyboard[0][1].CallbackData)
 		assert.Equal(t, "⛔️ Забанить репортера", keyboard.InlineKeyboard[0][2].Text)
-		assert.Equal(t, "R?666:100", *keyboard.InlineKeyboard[0][2].CallbackData)
+		assert.Equal(t, "R?666:100:200", *keyboard.InlineKeyboard[0][2].CallbackData)
 	})
 
 	t.Run("successful notification with multiple reports", func(t *testing.T) {

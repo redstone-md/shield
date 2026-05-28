@@ -445,6 +445,7 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 		BotUsername:         tbAPI.Self.UserName,
 		TenantID:            opts.InstanceID,
 		Group:               opts.Telegram.Group,
+		Groups:              opts.Telegram.Groups,
 		IdleDuration:        opts.Telegram.IdleDuration,
 		SuperUsers:          opts.SuperUsers,
 		Bot:                 a.SpamBot,
