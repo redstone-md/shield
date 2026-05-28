@@ -128,12 +128,10 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 		msgTxt = msgTxt + "\n" + origMsg.Quote.Text
 	}
 
-	if handled, llmErr := r.tryLLMReportModeration(ctx, update, origMsg, msgTxt); handled {
-		if llmErr == nil {
-			duration, restrict := r.reportPenalty(ctx, origMsg.From.ID)
-			r.notifyPrimaryChat(reportOutcomeBanned, duration, restrict, r.chatIDOrFallback(origMsg.Chat.ID))
-		}
-		return llmErr
+	if r.tryLLMReportModeration(ctx, update, origMsg, msgTxt) {
+		duration, restrict := r.reportPenalty(ctx, origMsg.From.ID)
+		r.notifyPrimaryChat(reportOutcomeBanned, duration, restrict, r.chatIDOrFallback(origMsg.Chat.ID))
+		return nil
 	}
 
 	if r.Storage == nil {
@@ -190,20 +188,20 @@ func (r *userReports) notifyPrimaryChat(outcome reportOutcome, duration time.Dur
 }
 
 func (r *userReports) tryLLMReportModeration(ctx context.Context, update tbapi.Update,
-	origMsg *tbapi.Message, msgTxt string) (bool, error) {
+	origMsg *tbapi.Message, msgTxt string) bool {
 	reviewMsg := transform(origMsg)
 	reviewMsg.ForceLLM = true
 	reviewMsg.LLMContext = reportLLMContext
 
 	resp := r.bot.OnMessage(*reviewMsg, true)
 	if !resp.Send {
-		return false, nil
+		return false
 	}
 
 	log.Printf("[INFO] LLM confirmed reported message %d from %s (%d) as spam",
 		origMsg.MessageID, origMsg.From.UserName, origMsg.From.ID)
 	r.applyImmediateReportModeration(ctx, update, origMsg, msgTxt, resp)
-	return true, nil
+	return true
 }
 
 func (r *userReports) applyImmediateReportModeration(ctx context.Context, update tbapi.Update,
