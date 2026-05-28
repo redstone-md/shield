@@ -145,10 +145,10 @@ func (a *admin) DirectWarnReport(update tbapi.Update) error {
 	errs := new(multierror.Error)
 	ctx := a.warnContext(update, origMsg)
 
-	if err := a.deleteWarnMessage(ctx, origMsg.MessageID, "warn"); err != nil {
+	if err := a.deleteWarnMessage(ctx, origMsg.Chat.ID, origMsg.MessageID, "warn"); err != nil {
 		errs = multierror.Append(errs, err)
 	}
-	if err := a.deleteWarnMessage(ctx, update.Message.MessageID, "admin warn report"); err != nil {
+	if err := a.deleteWarnMessage(ctx, update.Message.Chat.ID, update.Message.MessageID, "admin warn report"); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 
@@ -183,7 +183,7 @@ func (a *admin) DirectWarnReport(update tbapi.Update) error {
 func (a *admin) DirectUnwarnReport(update tbapi.Update) error {
 	origMsg := update.Message.ReplyToMessage
 	ctx := a.warnContext(update, origMsg)
-	if err := a.deleteWarnMessage(ctx, update.Message.MessageID, "admin unwarn report"); err != nil {
+	if err := a.deleteWarnMessage(ctx, update.Message.Chat.ID, update.Message.MessageID, "admin unwarn report"); err != nil {
 		return fmt.Errorf("direct unwarn report failed: %w", err)
 	}
 	if a.detectedSpam == nil {
@@ -392,8 +392,8 @@ func (a *admin) recordManualWarn(ctx context.Context, msg *bot.Message, subjectI
 	}
 }
 
-func (a *admin) deleteWarnMessage(ctx context.Context, msgID int, label string) error {
-	return a.deleteMessage(ctx, a.firstChatID(), msgID, label)
+func (a *admin) deleteWarnMessage(ctx context.Context, chatID int64, msgID int, label string) error {
+	return a.deleteMessage(ctx, a.chatIDOrFallback(chatID), msgID, label)
 }
 
 func (a *admin) deleteMessage(ctx context.Context, chatID int64, msgID int, label string) error {

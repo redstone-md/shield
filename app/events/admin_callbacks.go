@@ -206,13 +206,14 @@ func (a *admin) callbackBanConfirmed(ctx context.Context, query *tbapi.CallbackQ
 		log.Printf("[DEBUG] failed to get clean message: %v", err)
 	}
 
-	userID, msgID, parseErr := parseCallbackData(query.Data)
+	userID, msgID, callbackChatID, parseErr := parseCallbackDataWithChat(query.Data)
 	if parseErr != nil {
 		return fmt.Errorf("failed to parse callback's userID %q: %w", query.Data, parseErr)
 	}
+	targetChatID := resolveCallbackChatID(callbackChatID, a.primChatIDs)
 
 	if a.trainingMode {
-		if err := a.deleteAndBan(ctx, query, userID, msgID); err != nil {
+		if err := a.deleteAndBan(ctx, query, userID, msgID, targetChatID); err != nil {
 			return fmt.Errorf("failed to ban user %d: %w", userID, err)
 		}
 	}
@@ -382,14 +383,13 @@ func (a *admin) callbackShowInfo(ctx context.Context, query *tbapi.CallbackQuery
 	return nil
 }
 
-func (a *admin) deleteAndBan(ctx context.Context, query *tbapi.CallbackQuery, userID int64, msgID int) error {
+func (a *admin) deleteAndBan(ctx context.Context, query *tbapi.CallbackQuery, userID int64, msgID int, chatID int64) error {
 	errs := new(multierror.Error)
 	userName := a.locator.UserNameByID(ctx, userID)
 	banReq := banRequest{
 		duration:  bot.PermanentBanDuration,
 		userID:    userID,
 		channelID: channelIDFromCallback(userID),
-		chatID:    a.firstChatID(),
 		tbAPI:     a.tbAPI,
 		dry:       a.dry,
 		training:  false,
@@ -398,14 +398,14 @@ func (a *admin) deleteAndBan(ctx context.Context, query *tbapi.CallbackQuery, us
 
 	msgFromSuper := userName != "" && a.superUsers.IsSuper(userName, userID)
 	if !msgFromSuper {
-		if err := banUserOrChannel(ctx, banReq); err != nil {
+		if err := a.banInAllChats(ctx, banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", userID, err))
 		}
 	}
 
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 		MessageID:  msgID,
-		ChatConfig: tbapi.ChatConfig{ChatID: a.firstChatID()},
+		ChatConfig: tbapi.ChatConfig{ChatID: a.chatIDOrFallback(chatID)},
 	}})
 	if err != nil {
 		return fmt.Errorf("failed to delete message %d: %w", query.Message.MessageID, err)

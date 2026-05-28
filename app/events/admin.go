@@ -426,7 +426,7 @@ func (a *admin) msgHandlerFallback(ctx context.Context, update tbapi.Update, fwd
 
 	banReq := banRequest{duration: bot.PermanentBanDuration, userID: fwdID,
 		tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
-	if err := banUserOrChannel(ctx, banReq); err != nil {
+	if err := a.banInAllChats(ctx, banReq); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", fwdID, err))
 	}
 
