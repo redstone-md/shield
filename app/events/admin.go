@@ -25,7 +25,7 @@ type admin struct {
 	autoLearner            AutoLearner
 	detectedSpam           DetectedSpamCounter
 	mediaSlowPath          mediaSlowPathConfig
-	primChatID             int64
+	primChatIDs            []int64
 	adminChatID            int64
 	trainingMode           bool
 	softBan                bool
@@ -46,6 +46,52 @@ const (
 	warnHamPrefix      = "W+"
 	warnHamCancel      = "WX"
 )
+
+// firstChatID returns the first primary chat ID, or 0 if none configured.
+func (a *admin) firstChatID() int64 {
+	if len(a.primChatIDs) > 0 {
+		return a.primChatIDs[0]
+	}
+	return 0
+}
+
+// chatIDOrFallback returns chatID if non-zero, otherwise the first primary chat ID.
+func (a *admin) chatIDOrFallback(chatID int64) int64 {
+	if chatID != 0 {
+		return chatID
+	}
+	return a.firstChatID()
+}
+
+// banInAllChats bans a user/channel in every monitored group.
+func (a *admin) banInAllChats(ctx context.Context, req banRequest) error {
+	var errs *multierror.Error
+	for _, chatID := range a.primChatIDs {
+		r := req
+		r.chatID = chatID
+		if err := banUserOrChannel(ctx, r); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("chat %d: %w", chatID, err))
+		}
+	}
+	return errs.ErrorOrNil()
+}
+
+// unbanInAllChats unbans a user/channel in every monitored group.
+func (a *admin) unbanInAllChats(userID int64) error {
+	var errs *multierror.Error
+	for _, chatID := range a.primChatIDs {
+		if userID < 0 {
+			if err := a.unbanChannelInChat(userID, chatID); err != nil {
+				errs = multierror.Append(errs, err)
+			}
+		} else {
+			if err := a.unbanInChat(userID, chatID); err != nil {
+				errs = multierror.Append(errs, err)
+			}
+		}
+	}
+	return errs.ErrorOrNil()
+}
 
 func (a *admin) ReportBan(banUserStr string, msg *bot.Message, duration time.Duration, restrict bool, reasons ...string) {
 	log.Printf("[DEBUG] report to admin chat, ban msgsData for %s, group: %d", banUserStr, a.adminChatID)
@@ -145,8 +191,8 @@ func (a *admin) ReportWarn(warnUserStr string, msg *bot.Message, warnNum, warnTo
 	msgConfig.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
 	msgConfig.ReplyMarkup = tbapi.NewInlineKeyboardMarkup(
 		tbapi.NewInlineKeyboardRow(
-			tbapi.NewInlineKeyboardButtonData("Не спам", fmt.Sprintf("%s%d:%d", warnHamAskPrefix, userID, msg.ID)),
-			tbapi.NewInlineKeyboardButtonData("⚑ info", fmt.Sprintf("%s%d:%d", infoPrefix, userID, msg.ID)),
+			tbapi.NewInlineKeyboardButtonData("Не спам", formatCallbackData(warnHamAskPrefix, userID, msg.ID, msg.ChatID)),
+			tbapi.NewInlineKeyboardButtonData("⚑ info", formatCallbackData(infoPrefix, userID, msg.ID, msg.ChatID)),
 		),
 	)
 	if _, err := a.tbAPI.Send(msgConfig); err != nil {
@@ -247,7 +293,7 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
 		BaseChatMessage: tbapi.BaseChatMessage{
 			MessageID:  info.MsgID,
-			ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
+			ChatConfig: tbapi.ChatConfig{ChatID: info.ChatID},
 		},
 	})
 	if err != nil {
@@ -256,13 +302,13 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 		log.Printf("[INFO] message %d deleted", info.MsgID)
 	}
 
-	if info.UserID == a.primChatID {
-		log.Printf("[WARN] skipping ban in MsgHandler, user ID %d matches group chat", a.primChatID)
+	if info.UserID == a.chatIDOrFallback(info.ChatID) {
+		log.Printf("[WARN] skipping ban in MsgHandler, user ID %d matches group chat", info.ChatID)
 	} else {
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: info.UserID,
 			channelID: channelIDFromCallback(info.UserID),
-			chatID:    a.primChatID, tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
-		if err := banUserOrChannel(ctx, banReq); err != nil {
+			tbAPI:     a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
+		if err := a.banInAllChats(ctx, banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", info.UserID, err))
 		}
 	}
@@ -378,9 +424,9 @@ func (a *admin) msgHandlerFallback(ctx context.Context, update tbapi.Update, fwd
 		a.autoLearner.LearnSpam(ctx, msgTxt, "admin_forward")
 	}
 
-	banReq := banRequest{duration: bot.PermanentBanDuration, userID: fwdID, chatID: a.primChatID,
+	banReq := banRequest{duration: bot.PermanentBanDuration, userID: fwdID,
 		tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
-	if err := banUserOrChannel(ctx, banReq); err != nil {
+	if err := a.banInAllChats(ctx, banReq); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", fwdID, err))
 	}
 
@@ -449,7 +495,7 @@ func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted i
 		_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
 			BaseChatMessage: tbapi.BaseChatMessage{
 				MessageID:  msgID,
-				ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
+				ChatConfig: tbapi.ChatConfig{ChatID: a.firstChatID()},
 			},
 		})
 		if err == nil {

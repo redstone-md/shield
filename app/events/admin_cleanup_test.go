@@ -53,7 +53,7 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 		adm := &admin{
 			tbAPI:                  mockAPI,
 			bot:                    botMock,
-			primChatID:             123,
+			primChatIDs:            []int64{123},
 			adminChatID:            456,
 			locator:                locatorMock,
 			superUsers:             SuperUsers{},
@@ -169,7 +169,7 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 		adm := &admin{
 			tbAPI:                  mockAPI,
 			locator:                locatorMock,
-			primChatID:             123456789,
+			primChatIDs:            []int64{123456789},
 			aggressiveCleanupLimit: 100,
 		}
 
@@ -227,7 +227,7 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 		adm := &admin{
 			tbAPI:                  mockAPI,
 			locator:                locatorMock,
-			primChatID:             123456789,
+			primChatIDs:            []int64{123456789},
 			aggressiveCleanupLimit: 100,
 		}
 
@@ -256,7 +256,7 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 		adm := &admin{
 			tbAPI:                  mockAPI,
 			locator:                locatorMock,
-			primChatID:             123456789,
+			primChatIDs:            []int64{123456789},
 			aggressiveCleanupLimit: 100,
 		}
 

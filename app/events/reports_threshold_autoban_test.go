@@ -139,7 +139,7 @@ func TestUserReports_AutoBan(t *testing.T) {
 		rep := &userReports{
 			tbAPI:       mockAPI,
 			bot:         mockBot,
-			primChatID:  200,
+			primChatIDs: []int64{200},
 			adminChatID: 456,
 			ReportConfig: ReportConfig{
 				Storage:          mockReports,
@@ -196,7 +196,7 @@ func TestUserReports_AutoBan(t *testing.T) {
 		rep := &userReports{
 			tbAPI:       mockAPI,
 			bot:         mockBot,
-			primChatID:  200,
+			primChatIDs: []int64{200},
 			adminChatID: 456,
 			softBanMode: true,
 			ReportConfig: ReportConfig{
@@ -256,7 +256,7 @@ func TestUserReports_AutoBan(t *testing.T) {
 		rep := &userReports{
 			tbAPI:       mockAPI,
 			bot:         mockBot,
-			primChatID:  200,
+			primChatIDs: []int64{200},
 			adminChatID: 456,
 			ReportConfig: ReportConfig{
 				Storage:          mockReports,
@@ -296,7 +296,7 @@ func TestUserReports_AutoBan(t *testing.T) {
 
 		rep := &userReports{
 			tbAPI:       mockAPI,
-			primChatID:  200,
+			primChatIDs: []int64{200},
 			adminChatID: 456,
 			ReportConfig: ReportConfig{
 				Storage:          mockReports,
@@ -343,7 +343,7 @@ func TestUserReports_AutoBan(t *testing.T) {
 		rep := &userReports{
 			tbAPI:       mockAPI,
 			bot:         mockBot,
-			primChatID:  200,
+			primChatIDs: []int64{200},
 			adminChatID: 456,
 			dry:         true,
 			ReportConfig: ReportConfig{
@@ -391,7 +391,7 @@ func TestUserReports_AutoBan(t *testing.T) {
 		rep := &userReports{
 			tbAPI:       mockAPI,
 			bot:         mockBot,
-			primChatID:  200,
+			primChatIDs: []int64{200},
 			adminChatID: 456,
 			ReportConfig: ReportConfig{
 				Storage:          mockReports,

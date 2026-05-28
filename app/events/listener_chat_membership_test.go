@@ -219,7 +219,7 @@ func TestUpdateSupers(t *testing.T) {
 			chatAdmins:      []tbapi.ChatMember{},
 			adminFetchError: errors.New("fetch error"),
 			expectedResult:  []string{},
-			expectedErr:     true,
+			expectedErr:     false,
 		},
 	}
 
@@ -234,13 +234,8 @@ func TestUpdateSupers(t *testing.T) {
 				SuperUsers: tt.superUsers,
 			}
 
-			err := l.updateSupers()
-			if tt.expectedErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.ElementsMatch(t, tt.expectedResult, l.SuperUsers, "Expected: %v, got: %v", tt.expectedResult, l.SuperUsers)
-			}
+			l.updateSupers()
+			assert.ElementsMatch(t, tt.expectedResult, l.SuperUsers, "Expected: %v, got: %v", tt.expectedResult, l.SuperUsers)
 		})
 	}
 }

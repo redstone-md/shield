@@ -51,11 +51,11 @@ func TestUserReports_UpdateReportNotification(t *testing.T) {
 		require.Len(t, editedMsg.ReplyMarkup.InlineKeyboard, 1, "should have 1 row")
 		require.Len(t, editedMsg.ReplyMarkup.InlineKeyboard[0], 3, "row should have 3 buttons")
 		assert.Equal(t, "✅ Забанить", editedMsg.ReplyMarkup.InlineKeyboard[0][0].Text)
-		assert.Equal(t, "R+666:100", *editedMsg.ReplyMarkup.InlineKeyboard[0][0].CallbackData)
+		assert.Equal(t, "R+666:100:200", *editedMsg.ReplyMarkup.InlineKeyboard[0][0].CallbackData)
 		assert.Equal(t, "❌ Отклонить", editedMsg.ReplyMarkup.InlineKeyboard[0][1].Text)
-		assert.Equal(t, "R-666:100", *editedMsg.ReplyMarkup.InlineKeyboard[0][1].CallbackData)
+		assert.Equal(t, "R-666:100:200", *editedMsg.ReplyMarkup.InlineKeyboard[0][1].CallbackData)
 		assert.Equal(t, "⛔️ Забанить репортера", editedMsg.ReplyMarkup.InlineKeyboard[0][2].Text)
-		assert.Equal(t, "R?666:100", *editedMsg.ReplyMarkup.InlineKeyboard[0][2].CallbackData)
+		assert.Equal(t, "R?666:100:200", *editedMsg.ReplyMarkup.InlineKeyboard[0][2].CallbackData)
 	})
 
 	t.Run("successful update adding new reporter to existing notification", func(t *testing.T) {

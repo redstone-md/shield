@@ -78,10 +78,26 @@ func (l *TelegramListener) deleteSystemMessage(msgID int, chatID int64, msgType 
 }
 
 func (l *TelegramListener) isLinkedChannel(msg *tbapi.Message) bool {
-	return l.linkedChannelID != 0 && msg.SenderChat != nil && msg.SenderChat.ID == l.linkedChannelID
+	if msg.SenderChat == nil {
+		return false
+	}
+	if l.linkedChannelID != 0 && msg.SenderChat.ID == l.linkedChannelID {
+		return true
+	}
+	for _, linkedID := range l.linkedChannelIDs {
+		if msg.SenderChat.ID == linkedID {
+			return true
+		}
+	}
+	return false
 }
 
 func (l *TelegramListener) isChatAllowed(fromChat int64) bool {
+	if l.chatIDsSet != nil {
+		if _, ok := l.chatIDsSet[fromChat]; ok {
+			return true
+		}
+	}
 	if fromChat == l.chatID {
 		return true
 	}
@@ -163,7 +179,7 @@ func (l *TelegramListener) getChatID(group string) (int64, error) {
 	return chat.ID, nil
 }
 
-func (l *TelegramListener) updateSupers() error {
+func (l *TelegramListener) updateSupers() {
 	isSuper := func(username string, id int64) bool {
 		for _, super := range l.SuperUsers {
 			if super == fmt.Sprintf("%d", id) {
@@ -176,23 +192,33 @@ func (l *TelegramListener) updateSupers() error {
 		return false
 	}
 
-	admins, err := l.TbAPI.GetChatAdministrators(tbapi.ChatAdministratorsConfig{ChatConfig: tbapi.ChatConfig{ChatID: l.chatID}})
-	if err != nil {
-		return fmt.Errorf("failed to get chat administrators: %w", err)
+	chatIDs := l.chatIDs
+	if len(chatIDs) == 0 {
+		chatIDs = []int64{l.chatID}
 	}
-
-	for _, admin := range admins {
-		if admin.User.UserName == "" && admin.User.ID == 0 {
+	seen := make(map[int64]struct{})
+	for _, chatID := range chatIDs {
+		admins, err := l.TbAPI.GetChatAdministrators(tbapi.ChatAdministratorsConfig{ChatConfig: tbapi.ChatConfig{ChatID: chatID}})
+		if err != nil {
+			log.Printf("[WARN] failed to get chat administrators for %d: %v", chatID, err)
 			continue
 		}
-		if isSuper(admin.User.UserName, admin.User.ID) {
-			continue
+		for _, adm := range admins {
+			if adm.User.UserName == "" && adm.User.ID == 0 {
+				continue
+			}
+			if _, dup := seen[adm.User.ID]; dup {
+				continue
+			}
+			seen[adm.User.ID] = struct{}{}
+			if isSuper(adm.User.UserName, adm.User.ID) {
+				continue
+			}
+			l.SuperUsers = append(l.SuperUsers, fmt.Sprintf("%d", adm.User.ID))
 		}
-		l.SuperUsers = append(l.SuperUsers, fmt.Sprintf("%d", admin.User.ID))
 	}
 
-	log.Printf("[INFO] added admins, full list of supers: {%s}", strings.Join(l.SuperUsers, ", "))
-	return nil
+	log.Printf("[INFO] added admins from %d groups, full list of supers: {%s}", len(l.chatIDs), strings.Join(l.SuperUsers, ", "))
 }
 
 type SuperUsers []string

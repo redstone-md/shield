@@ -18,7 +18,7 @@ func TestUserReports_DirectUserReport_ReportedMessageFromChannelShouldReturnErro
 
 	rep := &userReports{
 		tbAPI:        mockAPI,
-		primChatID:   123,
+		primChatIDs:  []int64{123},
 		adminChatID:  456,
 		superUsers:   SuperUsers{},
 		ReportConfig: ReportConfig{Storage: mockReports},
@@ -63,7 +63,7 @@ func TestUserReports_DirectUserReport_ReportsStorageNotInitializedShouldReturnEr
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatID:  123,
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
 		ReportConfig: ReportConfig{
@@ -120,7 +120,7 @@ func TestUserReports_DirectUserReport_AllowsNonApprovedUsers(t *testing.T) {
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatID:  123,
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
 		ReportConfig: ReportConfig{
@@ -174,7 +174,7 @@ func TestUserReports_DirectUserReport_AllowsAnyUsersWithoutApprovedLookup(t *tes
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatID:  123,
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
 		ReportConfig: ReportConfig{
@@ -230,7 +230,7 @@ func TestUserReports_DirectUserReport_MessageWithQuoteTextIncludesQuoteInStoredR
 	mockBot := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} }}
 
 	rep := &userReports{
-		tbAPI: mockAPI, bot: mockBot, primChatID: 123, adminChatID: 456,
+		tbAPI: mockAPI, bot: mockBot, primChatIDs: []int64{123}, adminChatID: 456,
 		superUsers: SuperUsers{},
 		ReportConfig: ReportConfig{
 			Storage: mockReports, RateLimit: 10, RatePeriod: 1 * time.Hour, Threshold: 2,
@@ -279,7 +279,7 @@ func TestUserReports_DirectUserReport_MessageWithoutQuoteStoresOnlyText(t *testi
 	mockBot := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} }}
 
 	rep := &userReports{
-		tbAPI: mockAPI, bot: mockBot, primChatID: 123, adminChatID: 456,
+		tbAPI: mockAPI, bot: mockBot, primChatIDs: []int64{123}, adminChatID: 456,
 		superUsers: SuperUsers{},
 		ReportConfig: ReportConfig{
 			Storage: mockReports, RateLimit: 10, RatePeriod: 1 * time.Hour, Threshold: 2,
@@ -327,7 +327,7 @@ func TestUserReports_DirectUserReport_MessageWithEmptyQuoteTextStoresOnlyText(t 
 	mockBot := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} }}
 
 	rep := &userReports{
-		tbAPI: mockAPI, bot: mockBot, primChatID: 123, adminChatID: 456,
+		tbAPI: mockAPI, bot: mockBot, primChatIDs: []int64{123}, adminChatID: 456,
 		superUsers: SuperUsers{},
 		ReportConfig: ReportConfig{
 			Storage: mockReports, RateLimit: 10, RatePeriod: 1 * time.Hour, Threshold: 2,
@@ -376,7 +376,7 @@ func TestUserReports_DirectUserReport_EmptyTextWithQuotePresentUsesTransformFall
 	mockBot := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response { return bot.Response{} }}
 
 	rep := &userReports{
-		tbAPI: mockAPI, bot: mockBot, primChatID: 123, adminChatID: 456,
+		tbAPI: mockAPI, bot: mockBot, primChatIDs: []int64{123}, adminChatID: 456,
 		superUsers: SuperUsers{},
 		ReportConfig: ReportConfig{
 			Storage: mockReports, RateLimit: 10, RatePeriod: 1 * time.Hour, Threshold: 2,
@@ -411,7 +411,7 @@ func TestUserReports_DirectUserReport_SuperUserShouldUseSpamInsteadOfReport(t *t
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatID:  123,
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{"superuser"},
 		ReportConfig: ReportConfig{

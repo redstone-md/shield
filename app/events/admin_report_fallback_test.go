@@ -46,7 +46,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 
 		adminHandler := admin{
 			tbAPI: mockAPI, bot: botMock, locator: locatorMock,
-			primChatID: 123, adminChatID: 456, superUsers: SuperUsers{"superuser"},
+			primChatIDs: []int64{123}, adminChatID: 456, superUsers: SuperUsers{"superuser"},
 		}
 
 		msg := &tbapi.Message{
@@ -88,7 +88,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 
 		adminHandler := admin{
 			tbAPI: mockAPI, bot: botMock, locator: locatorMock,
-			primChatID: 123, adminChatID: 456,
+			primChatIDs: []int64{123}, adminChatID: 456,
 		}
 
 		msg := &tbapi.Message{
@@ -119,7 +119,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 
 		adminHandler := admin{
 			tbAPI: mockAPI, bot: botMock, locator: locatorMock,
-			primChatID: 123, adminChatID: 456,
+			primChatIDs: []int64{123}, adminChatID: 456,
 		}
 
 		msg := &tbapi.Message{
@@ -163,7 +163,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 
 		adminHandler := admin{
 			tbAPI: mockAPI, bot: botMock, locator: locatorMock,
-			primChatID: 123, adminChatID: 456, dry: true,
+			primChatIDs: []int64{123}, adminChatID: 456, dry: true,
 		}
 
 		msg := &tbapi.Message{
@@ -215,7 +215,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 
 		adminHandler := admin{
 			tbAPI: mockAPI, bot: botMock, locator: locatorMock,
-			primChatID: 123, adminChatID: 456, trainingMode: true,
+			primChatIDs: []int64{123}, adminChatID: 456, trainingMode: true,
 		}
 
 		msg := &tbapi.Message{
@@ -247,7 +247,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 
 		adminHandler := admin{
 			tbAPI: mockAPI, bot: botMock, locator: locatorMock,
-			primChatID: 123, adminChatID: 456, superUsers: SuperUsers{"superuser"},
+			primChatIDs: []int64{123}, adminChatID: 456, superUsers: SuperUsers{"superuser"},
 		}
 
 		msg := &tbapi.Message{
@@ -279,7 +279,7 @@ func TestAdmin_MsgHandlerFallback(t *testing.T) {
 
 		adminHandler := admin{
 			tbAPI: mockAPI, bot: botMock, locator: locatorMock,
-			primChatID: 123, adminChatID: 456, superUsers: SuperUsers{"555"},
+			primChatIDs: []int64{123}, adminChatID: 456, superUsers: SuperUsers{"555"},
 		}
 
 		msg := &tbapi.Message{
@@ -335,7 +335,7 @@ func TestAdmin_DirectSpamReport_ImageOnly(t *testing.T) {
 	adm := &admin{
 		tbAPI:       mockAPI,
 		bot:         botMock,
-		primChatID:  123,
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		locator:     locatorMock,
 		superUsers:  SuperUsers{},
@@ -383,7 +383,7 @@ func TestAdmin_DirectSpamReport_QuoteHandling(t *testing.T) {
 			UpdateSpamFunc: func(msg string) error { return nil },
 		}
 		adm := &admin{
-			tbAPI: mockAPI, bot: botMock, primChatID: 123, adminChatID: 456,
+			tbAPI: mockAPI, bot: botMock, primChatIDs: []int64{123}, adminChatID: 456,
 			locator: &mocks.LocatorMock{}, superUsers: SuperUsers{},
 		}
 		return mockAPI, botMock, adm

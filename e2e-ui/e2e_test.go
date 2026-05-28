@@ -309,7 +309,7 @@ func TestChecker_CheckEmptyMessage(t *testing.T) {
 	require.NoError(t, page.Locator("button[type='submit']:has-text('Check')").Click())
 
 	// wait for result - empty message should not be spam
-	result := page.Locator("#result .alert")
+	result := page.Locator("#result .alert").First()
 	waitVisible(t, result)
 }
 
@@ -326,7 +326,7 @@ func TestChecker_CheckMessage(t *testing.T) {
 	require.NoError(t, page.Locator("button[type='submit']:has-text('Check')").Click())
 
 	// wait for the result element (#result .alert)
-	result := page.Locator("#result .alert")
+	result := page.Locator("#result .alert").First()
 	waitVisible(t, result)
 
 	// check that result contains either "Spam detected" or "No spam detected"

@@ -26,7 +26,7 @@ func (b *appealBotAdapter) UnbanUser(_ context.Context, userID int64) error {
 	if b.listener.adminHandler == nil {
 		return fmt.Errorf("admin handler not initialized")
 	}
-	return b.listener.adminHandler.unban(userID)
+	return b.listener.adminHandler.unbanInAllChats(userID)
 }
 
 // AddHamSample feeds the appealed message back as a ham sample.

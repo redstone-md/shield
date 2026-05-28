@@ -52,9 +52,9 @@ func (a *admin) DirectBanTarget(ctx context.Context, update tbapi.Update, target
 		return fmt.Errorf("direct ban target failed: %w", err)
 	}
 
-	banReq := banRequest{duration: bot.PermanentBanDuration, userID: userID, chatID: a.primChatID,
+	banReq := banRequest{duration: bot.PermanentBanDuration, userID: userID,
 		tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: userName}
-	if err := banUserOrChannel(ctx, banReq); err != nil {
+	if err := a.banInAllChats(ctx, banReq); err != nil {
 		return fmt.Errorf("failed to ban user %d: %w", userID, err)
 	}
 	return nil
@@ -145,10 +145,10 @@ func (a *admin) DirectWarnReport(update tbapi.Update) error {
 	errs := new(multierror.Error)
 	ctx := a.warnContext(update, origMsg)
 
-	if err := a.deleteWarnMessage(ctx, origMsg.MessageID, "warn"); err != nil {
+	if err := a.deleteWarnMessage(ctx, origMsg.Chat.ID, origMsg.MessageID, "warn"); err != nil {
 		errs = multierror.Append(errs, err)
 	}
-	if err := a.deleteWarnMessage(ctx, update.Message.MessageID, "admin warn report"); err != nil {
+	if err := a.deleteWarnMessage(ctx, update.Message.Chat.ID, update.Message.MessageID, "admin warn report"); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 
@@ -183,7 +183,7 @@ func (a *admin) DirectWarnReport(update tbapi.Update) error {
 func (a *admin) DirectUnwarnReport(update tbapi.Update) error {
 	origMsg := update.Message.ReplyToMessage
 	ctx := a.warnContext(update, origMsg)
-	if err := a.deleteWarnMessage(ctx, update.Message.MessageID, "admin unwarn report"); err != nil {
+	if err := a.deleteWarnMessage(ctx, update.Message.Chat.ID, update.Message.MessageID, "admin unwarn report"); err != nil {
 		return fmt.Errorf("direct unwarn report failed: %w", err)
 	}
 	if a.detectedSpam == nil {
@@ -341,7 +341,7 @@ func (a *admin) applyWarnEscalation(ctx context.Context, origMsg *tbapi.Message,
 	req := banRequest{
 		duration: duration,
 		userID:   origMsg.From.ID,
-		chatID:   a.primChatID,
+		chatID:   a.chatIDOrFallback(origMsg.Chat.ID),
 		dry:      a.dry,
 		training: a.trainingMode,
 		userName: origMsg.From.UserName,
@@ -378,7 +378,7 @@ func (a *admin) recordManualWarn(ctx context.Context, msg *bot.Message, subjectI
 		userName = msg.SenderChat.UserName
 	}
 	entry := storage.DetectedSpamInfo{
-		GID:            fmt.Sprint(a.primChatID),
+		GID:            fmt.Sprint(a.firstChatID()),
 		Text:           msg.Text,
 		UserID:         subjectID,
 		UserName:       userName,
@@ -392,8 +392,8 @@ func (a *admin) recordManualWarn(ctx context.Context, msg *bot.Message, subjectI
 	}
 }
 
-func (a *admin) deleteWarnMessage(ctx context.Context, msgID int, label string) error {
-	return a.deleteMessage(ctx, a.primChatID, msgID, label)
+func (a *admin) deleteWarnMessage(ctx context.Context, chatID int64, msgID int, label string) error {
+	return a.deleteMessage(ctx, a.chatIDOrFallback(chatID), msgID, label)
 }
 
 func (a *admin) deleteMessage(ctx context.Context, chatID int64, msgID int, label string) error {
@@ -419,7 +419,7 @@ func (a *admin) deleteMessage(ctx context.Context, chatID int64, msgID int, labe
 func (a *admin) sendWarnMessage(ctx context.Context, origMsg *tbapi.Message, warnMsg string) error {
 	if a.actions != nil {
 		if err := a.actions.WarnUser(ctx, warnRequest{
-			chatID:      a.primChatID,
+			chatID:      a.chatIDOrFallback(origMsg.Chat.ID),
 			subjectID:   warnSubjectID(origMsg),
 			messageID:   origMsg.MessageID,
 			text:        warnMsg,
@@ -430,16 +430,18 @@ func (a *admin) sendWarnMessage(ctx context.Context, origMsg *tbapi.Message, war
 		return nil
 	}
 
-	if err := send(tbapi.NewMessage(a.primChatID, escapeMarkDownV1Text(warnMsg)), a.tbAPI); err != nil {
+	if err := send(tbapi.NewMessage(a.chatIDOrFallback(origMsg.Chat.ID), escapeMarkDownV1Text(warnMsg)), a.tbAPI); err != nil {
 		return fmt.Errorf("failed to send warning to main chat: %w", err)
 	}
 	return nil
 }
 
 func (a *admin) warnContext(update tbapi.Update, origMsg *tbapi.Message) context.Context {
-	eventID := fmt.Sprintf("warn-%d-%d", a.primChatID, origMsg.MessageID)
+	eventID := fmt.Sprintf("warn-%d-%d", a.chatIDOrFallback(origMsg.Chat.ID), origMsg.MessageID)
 	correlationID := fmt.Sprintf("corr-warn-%d", origMsg.MessageID)
-	idempotencyKey := fmt.Sprintf("warn:chat:%d:msg:%d:cmd:%d", a.primChatID, origMsg.MessageID, update.Message.MessageID)
+	origChat := a.chatIDOrFallback(origMsg.Chat.ID)
+	idempotencyKey := fmt.Sprintf("warn:chat:%d:msg:%d:cmd:%d",
+		origChat, origMsg.MessageID, update.Message.MessageID)
 	return observability.WithModerationMetadata(context.Background(), eventID, correlationID, idempotencyKey)
 }
 
@@ -488,7 +490,7 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 	errs := new(multierror.Error)
 
 	var channelID int64
-	if origMsg.SenderChat != nil && origMsg.SenderChat.ID != 0 && origMsg.SenderChat.ID != a.primChatID {
+	if origMsg.SenderChat != nil && origMsg.SenderChat.ID != 0 && origMsg.SenderChat.ID != a.chatIDOrFallback(origMsg.Chat.ID) {
 		channelID = origMsg.SenderChat.ID
 	}
 
@@ -545,7 +547,7 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 		MessageID:  origMsg.MessageID,
-		ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
+		ChatConfig: tbapi.ChatConfig{ChatID: a.chatIDOrFallback(origMsg.Chat.ID)},
 	}})
 	if err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to delete message %d: %w", origMsg.MessageID, err))
@@ -555,7 +557,7 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 
 	_, err = a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 		MessageID:  update.Message.MessageID,
-		ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
+		ChatConfig: tbapi.ChatConfig{ChatID: update.Message.Chat.ID},
 	}})
 	if err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to delete message %d: %w", update.Message.MessageID, err))
@@ -568,13 +570,14 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 		username = a.channelDisplayName(origMsg.SenderChat)
 	}
 
-	if origMsg.SenderChat != nil && origMsg.SenderChat.ID == a.primChatID {
-		log.Printf("[WARN] skipping ban for anonymous admin post, sender chat %d matches group chat", a.primChatID)
+	if origMsg.SenderChat != nil && origMsg.SenderChat.ID == a.chatIDOrFallback(origMsg.Chat.ID) {
+		log.Printf("[WARN] skipping ban for anonymous admin post, sender chat %d matches group chat",
+			a.chatIDOrFallback(origMsg.Chat.ID))
 	} else {
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: origMsg.From.ID, channelID: channelID,
-			chatID: a.primChatID, tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
+			tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
 
-		if err := banUserOrChannel(ctx, banReq); err != nil {
+		if err := a.banInAllChats(ctx, banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", origMsg.From.ID, err))
 		}
 	}
@@ -583,7 +586,7 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 	if channelID != 0 {
 		cleanupUserID = channelID
 	}
-	if a.aggressiveCleanup && !a.dry && (origMsg.SenderChat == nil || origMsg.SenderChat.ID != a.primChatID) {
+	if a.aggressiveCleanup && !a.dry && (origMsg.SenderChat == nil || origMsg.SenderChat.ID != a.chatIDOrFallback(origMsg.Chat.ID)) {
 		go func() {
 			cleanupCtx := context.WithoutCancel(ctx)
 			deleted, err := a.deleteUserMessages(cleanupCtx, cleanupUserID)

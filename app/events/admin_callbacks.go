@@ -206,13 +206,14 @@ func (a *admin) callbackBanConfirmed(ctx context.Context, query *tbapi.CallbackQ
 		log.Printf("[DEBUG] failed to get clean message: %v", err)
 	}
 
-	userID, msgID, parseErr := parseCallbackData(query.Data)
+	userID, msgID, callbackChatID, parseErr := parseCallbackDataWithChat(query.Data)
 	if parseErr != nil {
 		return fmt.Errorf("failed to parse callback's userID %q: %w", query.Data, parseErr)
 	}
+	targetChatID := resolveCallbackChatID(callbackChatID, a.primChatIDs)
 
 	if a.trainingMode {
-		if err := a.deleteAndBan(ctx, query, userID, msgID); err != nil {
+		if err := a.deleteAndBan(ctx, query, userID, msgID, targetChatID); err != nil {
 			return fmt.Errorf("failed to ban user %d: %w", userID, err)
 		}
 	}
@@ -224,8 +225,8 @@ func (a *admin) callbackBanConfirmed(ctx context.Context, query *tbapi.CallbackQ
 			userName = ""
 		}
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: userID, channelID: channelIDFromCallback(userID),
-			chatID: a.primChatID, tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: userName, restrict: false}
-		if err := banUserOrChannel(ctx, banReq); err != nil {
+			tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: userName, restrict: false}
+		if err := a.banInAllChats(ctx, banReq); err != nil {
 			return fmt.Errorf("failed to ban user %d: %w", userID, err)
 		}
 	}
@@ -259,14 +260,8 @@ func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.Callbac
 	}
 
 	if !a.trainingMode {
-		if userID < 0 {
-			if uerr := a.unbanChannel(userID); uerr != nil {
-				return uerr
-			}
-		} else {
-			if uerr := a.unban(userID); uerr != nil {
-				return uerr
-			}
+		if uerr := a.unbanInAllChats(userID); uerr != nil {
+			return uerr
 		}
 	}
 
@@ -306,10 +301,10 @@ func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.Callbac
 	return nil
 }
 
-func (a *admin) unban(userID int64) error {
+func (a *admin) unbanInChat(userID, chatID int64) error {
 	if a.softBan {
 		_, err := a.tbAPI.Request(tbapi.RestrictChatMemberConfig{
-			ChatMemberConfig: tbapi.ChatMemberConfig{UserID: userID, ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID}},
+			ChatMemberConfig: tbapi.ChatMemberConfig{UserID: userID, ChatConfig: tbapi.ChatConfig{ChatID: chatID}},
 			Permissions: &tbapi.ChatPermissions{
 				CanSendMessages:      true,
 				CanSendAudios:        true,
@@ -331,7 +326,7 @@ func (a *admin) unban(userID int64) error {
 	}
 
 	cfg := tbapi.UnbanChatMemberConfig{
-		ChatMemberConfig: tbapi.ChatMemberConfig{UserID: userID, ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID}},
+		ChatMemberConfig: tbapi.ChatMemberConfig{UserID: userID, ChatConfig: tbapi.ChatConfig{ChatID: chatID}},
 		OnlyIfBanned:     true,
 	}
 	_, err := a.tbAPI.Request(cfg)
@@ -341,9 +336,9 @@ func (a *admin) unban(userID int64) error {
 	return nil
 }
 
-func (a *admin) unbanChannel(channelID int64) error {
+func (a *admin) unbanChannelInChat(channelID, chatID int64) error {
 	_, err := a.tbAPI.Request(tbapi.UnbanChatSenderChatConfig{
-		ChatConfig:   tbapi.ChatConfig{ChatID: a.primChatID},
+		ChatConfig:   tbapi.ChatConfig{ChatID: chatID},
 		SenderChatID: channelID,
 	})
 	if err != nil {
@@ -388,14 +383,13 @@ func (a *admin) callbackShowInfo(ctx context.Context, query *tbapi.CallbackQuery
 	return nil
 }
 
-func (a *admin) deleteAndBan(ctx context.Context, query *tbapi.CallbackQuery, userID int64, msgID int) error {
+func (a *admin) deleteAndBan(ctx context.Context, query *tbapi.CallbackQuery, userID int64, msgID int, chatID int64) error {
 	errs := new(multierror.Error)
 	userName := a.locator.UserNameByID(ctx, userID)
 	banReq := banRequest{
 		duration:  bot.PermanentBanDuration,
 		userID:    userID,
 		channelID: channelIDFromCallback(userID),
-		chatID:    a.primChatID,
 		tbAPI:     a.tbAPI,
 		dry:       a.dry,
 		training:  false,
@@ -404,14 +398,14 @@ func (a *admin) deleteAndBan(ctx context.Context, query *tbapi.CallbackQuery, us
 
 	msgFromSuper := userName != "" && a.superUsers.IsSuper(userName, userID)
 	if !msgFromSuper {
-		if err := banUserOrChannel(ctx, banReq); err != nil {
+		if err := a.banInAllChats(ctx, banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", userID, err))
 		}
 	}
 
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
 		MessageID:  msgID,
-		ChatConfig: tbapi.ChatConfig{ChatID: a.primChatID},
+		ChatConfig: tbapi.ChatConfig{ChatID: a.chatIDOrFallback(chatID)},
 	}})
 	if err != nil {
 		return fmt.Errorf("failed to delete message %d: %w", query.Message.MessageID, err)
@@ -490,8 +484,8 @@ func (a *admin) sendWithUnbanMarkup(text, action string, user bot.User, msgID in
 
 	tbMsg.ReplyMarkup = tbapi.NewInlineKeyboardMarkup(
 		tbapi.NewInlineKeyboardRow(
-			tbapi.NewInlineKeyboardButtonData("⛔︎ "+action, fmt.Sprintf("%s%d:%d", confirmationPrefix, user.ID, msgID)),
-			tbapi.NewInlineKeyboardButtonData("️⚑ info", fmt.Sprintf("%s%d:%d", infoPrefix, user.ID, msgID)),
+			tbapi.NewInlineKeyboardButtonData("⛔︎ "+action, formatCallbackData(confirmationPrefix, user.ID, msgID, chatID)),
+			tbapi.NewInlineKeyboardButtonData("️⚑ info", formatCallbackData(infoPrefix, user.ID, msgID, chatID)),
 		),
 	)
 
