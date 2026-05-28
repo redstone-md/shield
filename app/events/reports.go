@@ -202,11 +202,12 @@ func (r *userReports) tryLLMReportModeration(ctx context.Context, update tbapi.U
 
 	log.Printf("[INFO] LLM confirmed reported message %d from %s (%d) as spam",
 		origMsg.MessageID, origMsg.From.UserName, origMsg.From.ID)
-	return true, r.applyImmediateReportModeration(ctx, update, origMsg, msgTxt, resp)
+	r.applyImmediateReportModeration(ctx, update, origMsg, msgTxt, resp)
+	return true, nil
 }
 
 func (r *userReports) applyImmediateReportModeration(ctx context.Context, update tbapi.Update,
-	origMsg *tbapi.Message, msgTxt string, resp bot.Response) error {
+	origMsg *tbapi.Message, msgTxt string, resp bot.Response) {
 	duration, restrict := r.reportPenalty(ctx, origMsg.From.ID)
 	ctx = r.reportActionContext(ctx, "llm_auto", origMsg.MessageID, origMsg.From.ID)
 
@@ -290,7 +291,6 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 		}
 	}
 
-	return nil
 }
 
 func (r *userReports) reportPenalty(ctx context.Context, userID int64) (time.Duration, bool) {

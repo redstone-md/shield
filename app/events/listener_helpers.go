@@ -179,7 +179,7 @@ func (l *TelegramListener) getChatID(group string) (int64, error) {
 	return chat.ID, nil
 }
 
-func (l *TelegramListener) updateSupers() error {
+func (l *TelegramListener) updateSupers() {
 	isSuper := func(username string, id int64) bool {
 		for _, super := range l.SuperUsers {
 			if super == fmt.Sprintf("%d", id) {
@@ -219,7 +219,6 @@ func (l *TelegramListener) updateSupers() error {
 	}
 
 	log.Printf("[INFO] added admins from %d groups, full list of supers: {%s}", len(l.chatIDs), strings.Join(l.SuperUsers, ", "))
-	return nil
 }
 
 type SuperUsers []string

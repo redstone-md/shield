@@ -224,9 +224,7 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 	l.primChatIDs = make([]int64, len(l.chatIDs))
 	copy(l.primChatIDs, l.chatIDs)
 
-	if err := l.updateSupers(); err != nil {
-		log.Printf("[WARN] failed to update superusers: %v", err)
-	}
+	l.updateSupers()
 
 	var getChatErr error
 	if l.AdminGroup != "" {
