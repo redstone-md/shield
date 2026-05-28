@@ -439,7 +439,9 @@ func (a *admin) sendWarnMessage(ctx context.Context, origMsg *tbapi.Message, war
 func (a *admin) warnContext(update tbapi.Update, origMsg *tbapi.Message) context.Context {
 	eventID := fmt.Sprintf("warn-%d-%d", a.chatIDOrFallback(origMsg.Chat.ID), origMsg.MessageID)
 	correlationID := fmt.Sprintf("corr-warn-%d", origMsg.MessageID)
-	idempotencyKey := fmt.Sprintf("warn:chat:%d:msg:%d:cmd:%d", a.chatIDOrFallback(origMsg.Chat.ID), origMsg.MessageID, update.Message.MessageID)
+	origChat := a.chatIDOrFallback(origMsg.Chat.ID)
+	idempotencyKey := fmt.Sprintf("warn:chat:%d:msg:%d:cmd:%d",
+		origChat, origMsg.MessageID, update.Message.MessageID)
 	return observability.WithModerationMetadata(context.Background(), eventID, correlationID, idempotencyKey)
 }
 
@@ -569,7 +571,8 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 	}
 
 	if origMsg.SenderChat != nil && origMsg.SenderChat.ID == a.chatIDOrFallback(origMsg.Chat.ID) {
-		log.Printf("[WARN] skipping ban for anonymous admin post, sender chat %d matches group chat", a.chatIDOrFallback(origMsg.Chat.ID))
+		log.Printf("[WARN] skipping ban for anonymous admin post, sender chat %d matches group chat",
+			a.chatIDOrFallback(origMsg.Chat.ID))
 	} else {
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: origMsg.From.ID, channelID: channelID,
 			tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}

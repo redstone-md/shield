@@ -259,14 +259,8 @@ func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.Callbac
 	}
 
 	if !a.trainingMode {
-		if userID < 0 {
-			if uerr := a.unbanInAllChats(userID); uerr != nil {
-				return uerr
-			}
-		} else {
-			if uerr := a.unbanInAllChats(userID); uerr != nil {
-				return uerr
-			}
+		if uerr := a.unbanInAllChats(userID); uerr != nil {
+			return uerr
 		}
 	}
 
@@ -306,7 +300,7 @@ func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.Callbac
 	return nil
 }
 
-func (a *admin) unbanInChat(userID int64, chatID int64) error {
+func (a *admin) unbanInChat(userID, chatID int64) error {
 	if a.softBan {
 		_, err := a.tbAPI.Request(tbapi.RestrictChatMemberConfig{
 			ChatMemberConfig: tbapi.ChatMemberConfig{UserID: userID, ChatConfig: tbapi.ChatConfig{ChatID: chatID}},
@@ -341,7 +335,7 @@ func (a *admin) unbanInChat(userID int64, chatID int64) error {
 	return nil
 }
 
-func (a *admin) unbanChannelInChat(channelID int64, chatID int64) error {
+func (a *admin) unbanChannelInChat(channelID, chatID int64) error {
 	_, err := a.tbAPI.Request(tbapi.UnbanChatSenderChatConfig{
 		ChatConfig:   tbapi.ChatConfig{ChatID: chatID},
 		SenderChatID: channelID,

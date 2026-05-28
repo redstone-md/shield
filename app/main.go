@@ -289,7 +289,8 @@ func execute(ctx context.Context, opts options) error {
 	}
 
 	convertOnly := opts.Convert == "only"
-	if !opts.Server.Enabled && !convertOnly && (opts.Telegram.Token == "" || (opts.Telegram.Group == "" && len(opts.Telegram.Groups) == 0)) {
+	hasGroup := opts.Telegram.Group != "" || len(opts.Telegram.Groups) > 0
+	if !opts.Server.Enabled && !convertOnly && (opts.Telegram.Token == "" || !hasGroup) {
 		return errors.New("telegram token and group are required")
 	}
 
@@ -318,7 +319,7 @@ func execute(ctx context.Context, opts options) error {
 	}
 
 	// activate web server if enabled, server-only mode (no telegram token)
-	if opts.Server.Enabled && (opts.Telegram.Token == "" || (opts.Telegram.Group == "" && len(opts.Telegram.Groups) == 0)) {
+	if opts.Server.Enabled && (opts.Telegram.Token == "" || !hasGroup) {
 		// server starts in background goroutine without DM users provider
 		if srvErr := activateWebRuntime(ctx, opts, assembly.Web, nil); srvErr != nil {
 			return fmt.Errorf("can't activate web server, %w", srvErr)

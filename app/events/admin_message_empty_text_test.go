@@ -104,9 +104,9 @@ func TestAdmin_MsgHandlerWithEmptyText(t *testing.T) {
 	}
 
 	adminHandler := admin{
-		tbAPI:      mockAPI,
-		bot:        botMock,
-		locator:    locatorMock,
+		tbAPI:       mockAPI,
+		bot:         botMock,
+		locator:     locatorMock,
 		primChatIDs: []int64{123},
 	}
 

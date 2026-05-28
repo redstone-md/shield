@@ -53,7 +53,7 @@ func TestUserReports_DirectUserReport_SuccessfulReportFromRegularUser(t *testing
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatIDs:  []int64{123},
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{"superuser"},
 		ReportConfig: ReportConfig{
@@ -128,7 +128,7 @@ func TestUserReports_DirectUserReport_LlmConfirmedReportTriggersImmediateModerat
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatIDs:  []int64{123},
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
 		ReportConfig: ReportConfig{
@@ -170,7 +170,7 @@ func TestUserReports_DirectUserReport_ReporterIsSuperuserShouldReturnError(t *te
 
 	rep := &userReports{
 		tbAPI:        mockAPI,
-		primChatIDs:   []int64{123},
+		primChatIDs:  []int64{123},
 		adminChatID:  456,
 		superUsers:   SuperUsers{"superuser"},
 		ReportConfig: ReportConfig{Storage: mockReports},
@@ -204,7 +204,7 @@ func TestUserReports_DirectUserReport_ReportedUserIsSuperuserShouldReturnError(t
 
 	rep := &userReports{
 		tbAPI:        mockAPI,
-		primChatIDs:   []int64{123},
+		primChatIDs:  []int64{123},
 		adminChatID:  456,
 		superUsers:   SuperUsers{"superuser"},
 		ReportConfig: ReportConfig{Storage: mockReports},
@@ -238,7 +238,7 @@ func TestUserReports_DirectUserReport_ForumTopicCreationMessageShouldReturnError
 
 	rep := &userReports{
 		tbAPI:        mockAPI,
-		primChatIDs:   []int64{123},
+		primChatIDs:  []int64{123},
 		adminChatID:  456,
 		superUsers:   SuperUsers{},
 		ReportConfig: ReportConfig{Storage: mockReports},
@@ -285,7 +285,7 @@ func TestUserReports_DirectUserReport_RateLimitExceededShouldDeleteCommandAndRet
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatIDs:  []int64{123},
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
 		ReportConfig: ReportConfig{
@@ -339,7 +339,7 @@ func TestUserReports_DirectUserReport_ReportsStorageAddError(t *testing.T) {
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatIDs:  []int64{123},
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
 		ReportConfig: ReportConfig{
@@ -397,7 +397,7 @@ func TestUserReports_DirectUserReport_EmptyMessageTextShouldUseTransformedMessag
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatIDs:  []int64{123},
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
 		ReportConfig: ReportConfig{

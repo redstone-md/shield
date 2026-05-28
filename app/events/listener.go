@@ -94,49 +94,26 @@ type TelegramListener struct {
 	CandidateGenerator      CandidateGenerator
 	AutoLearner             AutoLearner
 
-	adminHandler    *admin
-	reportsHandler  *userReports
-	appealHandler   *appealHandler
-	processor       incomingEventProcessor
-	pipeline        listenerPipeline
-	dmUsers         dmUsers // recent DM senders, stored in memory for admin UI
-	Groups              []string         // list of group names/ids to monitor
-	chatIDs             []int64          // resolved chat IDs for all groups
-	chatIDsSet          map[int64]struct{} // O(1) lookup for isChatAllowed
-	linkedChannelIDs    map[int64]int64  // chatID - per group
-	primChatIDs         []int64          // all group chatIDs for banning everywhere
-	chatID              int64            // first group chatID (backward compat)
-	adminChatID         int64
-	linkedChannelID int64 // channel linked to the discussion group, resolved at startup
+	adminHandler     *admin
+	reportsHandler   *userReports
+	appealHandler    *appealHandler
+	processor        incomingEventProcessor
+	pipeline         listenerPipeline
+	dmUsers          dmUsers            // recent DM senders, stored in memory for admin UI
+	Groups           []string           // list of group names/ids to monitor
+	chatIDs          []int64            // resolved chat IDs for all groups
+	chatIDsSet       map[int64]struct{} // O(1) lookup for isChatAllowed
+	linkedChannelIDs map[int64]int64    // chatID - per group
+	primChatIDs      []int64            // all group chatIDs for banning everywhere
+	chatID           int64              // first group chatID (backward compat)
+	adminChatID      int64
+	linkedChannelID  int64 // channel linked to the discussion group, resolved at startup
 
 	msgs struct {
 		once sync.Once
 		ch   chan bot.Response
 	}
 	chatLimiter *chatRateLimiter
-}
-
-
-// syncChatIDs initializes derived multi-group fields from the legacy chatID field.
-// This is used for backward compatibility when tests or code set chatID directly.
-func (l *TelegramListener) syncChatIDs() {
-	if len(l.chatIDs) == 0 && l.chatID != 0 {
-		l.chatIDs = []int64{l.chatID}
-		l.chatIDsSet = map[int64]struct{}{l.chatID: {}}
-		l.primChatIDs = []int64{l.chatID}
-	}
-	if l.chatIDsSet == nil {
-		l.chatIDsSet = make(map[int64]struct{})
-		for _, id := range l.chatIDs {
-			l.chatIDsSet[id] = struct{}{}
-		}
-	}
-	if l.linkedChannelIDs == nil {
-		l.linkedChannelIDs = make(map[int64]int64)
-	}
-	if l.linkedChannelID != 0 && l.chatID != 0 {
-		l.linkedChannelIDs[l.chatID] = l.linkedChannelID
-	}
 }
 
 // GetDMUsers returns the list of recent DM senders

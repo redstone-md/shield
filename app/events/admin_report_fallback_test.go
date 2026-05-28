@@ -335,7 +335,7 @@ func TestAdmin_DirectSpamReport_ImageOnly(t *testing.T) {
 	adm := &admin{
 		tbAPI:       mockAPI,
 		bot:         botMock,
-		primChatIDs:  []int64{123},
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		locator:     locatorMock,
 		superUsers:  SuperUsers{},

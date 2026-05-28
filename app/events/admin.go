@@ -47,7 +47,6 @@ const (
 	warnHamCancel      = "WX"
 )
 
-
 // firstChatID returns the first primary chat ID, or 0 if none configured.
 func (a *admin) firstChatID() int64 {
 	if len(a.primChatIDs) > 0 {
@@ -308,7 +307,7 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 	} else {
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: info.UserID,
 			channelID: channelIDFromCallback(info.UserID),
-			tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
+			tbAPI:     a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
 		if err := a.banInAllChats(ctx, banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", info.UserID, err))
 		}

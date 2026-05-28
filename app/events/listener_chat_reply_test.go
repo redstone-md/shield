@@ -157,7 +157,7 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 
 		l := TelegramListener{
 			SpamLogger:  mockLogger,
-			Group:      "gr",
+			Group:       "gr",
 			TbAPI:       mockAPI,
 			Bot:         botMock,
 			BotUsername: "some_bot",
@@ -516,7 +516,7 @@ func TestTelegramListener_handleChatReplyUsesSlowPathEngine(t *testing.T) {
 	}
 	l := TelegramListener{
 		TbAPI:              mockAPI,
-		Group:      "gr",
+		Group:              "gr",
 		SlowPathChatEngine: chatEngine,
 		TenantID:           "tg-spam",
 		SuperUsers:         SuperUsers{"super"},
@@ -584,7 +584,7 @@ func TestTelegramListener_handleChatReplyRateLimits(t *testing.T) {
 	}
 	l := TelegramListener{
 		TbAPI: mockAPI,
-		Group:      "gr",
+		Group: "gr",
 		SlowPathChatEngine: &slowPathChatEngineStub{replyFunc: func(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error) {
 			return &slowpath.ChatResult{Text: "answer"}, nil
 		}},

@@ -18,7 +18,7 @@ func TestUserReports_DirectUserReport_ReportedMessageFromChannelShouldReturnErro
 
 	rep := &userReports{
 		tbAPI:        mockAPI,
-		primChatIDs:   []int64{123},
+		primChatIDs:  []int64{123},
 		adminChatID:  456,
 		superUsers:   SuperUsers{},
 		ReportConfig: ReportConfig{Storage: mockReports},
@@ -63,7 +63,7 @@ func TestUserReports_DirectUserReport_ReportsStorageNotInitializedShouldReturnEr
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatIDs:  []int64{123},
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
 		ReportConfig: ReportConfig{
@@ -120,7 +120,7 @@ func TestUserReports_DirectUserReport_AllowsNonApprovedUsers(t *testing.T) {
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatIDs:  []int64{123},
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
 		ReportConfig: ReportConfig{
@@ -174,7 +174,7 @@ func TestUserReports_DirectUserReport_AllowsAnyUsersWithoutApprovedLookup(t *tes
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatIDs:  []int64{123},
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
 		ReportConfig: ReportConfig{
@@ -411,7 +411,7 @@ func TestUserReports_DirectUserReport_SuperUserShouldUseSpamInsteadOfReport(t *t
 	rep := &userReports{
 		tbAPI:       mockAPI,
 		bot:         mockBot,
-		primChatIDs:  []int64{123},
+		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{"superuser"},
 		ReportConfig: ReportConfig{

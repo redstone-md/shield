@@ -42,7 +42,7 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		rep := &userReports{
 			tbAPI:        mockAPI,
 			adminChatID:  456,
-			primChatIDs:   []int64{200},
+			primChatIDs:  []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 			bot:          mockBot,
 			actions:      actions,
@@ -98,7 +98,7 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		rep := &userReports{
 			tbAPI:        mockAPI,
 			adminChatID:  456,
-			primChatIDs:   []int64{200},
+			primChatIDs:  []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 			bot:          mockBot,
 		}
@@ -132,7 +132,7 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 
 		rep := &userReports{
 			adminChatID:  456,
-			primChatIDs:   []int64{200},
+			primChatIDs:  []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 		}
 
@@ -185,7 +185,7 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		rep := &userReports{
 			tbAPI:       mockAPI,
 			bot:         mockBot,
-			primChatIDs:  []int64{200},
+			primChatIDs: []int64{200},
 			softBanMode: true,
 			ReportConfig: ReportConfig{
 				Storage: mockReports,
@@ -245,7 +245,7 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		rep := &userReports{
 			tbAPI:       mockAPI,
 			bot:         mockBot,
-			primChatIDs:  []int64{200},
+			primChatIDs: []int64{200},
 			softBanMode: false,
 			ReportConfig: ReportConfig{
 				Storage: mockReports,
@@ -291,7 +291,7 @@ func TestUserReports_ExecuteAutoBanUsesSharedActionExecutor(t *testing.T) {
 		tbAPI:       mockAPI,
 		bot:         mockBot,
 		actions:     actions,
-		primChatIDs:  []int64{200},
+		primChatIDs: []int64{200},
 		adminChatID: 456,
 		softBanMode: true,
 		ReportConfig: ReportConfig{
@@ -337,7 +337,7 @@ func TestUserReports_CallbackReportReject(t *testing.T) {
 		rep := &userReports{
 			tbAPI:        mockAPI,
 			adminChatID:  456,
-			primChatIDs:   []int64{200},
+			primChatIDs:  []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 		}
 
@@ -367,7 +367,7 @@ func TestUserReports_CallbackReportReject(t *testing.T) {
 
 		rep := &userReports{
 			adminChatID:  456,
-			primChatIDs:   []int64{200},
+			primChatIDs:  []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 		}
 
@@ -414,7 +414,7 @@ func TestUserReports_CallbackReportBanReporterAsk(t *testing.T) {
 
 		rep := &userReports{
 			tbAPI:        mockAPI,
-			primChatIDs:   []int64{200},
+			primChatIDs:  []int64{200},
 			ReportConfig: ReportConfig{Storage: mockReports},
 		}
 

@@ -52,7 +52,6 @@ type userReports struct {
 	dry          bool
 }
 
-
 func (r *userReports) firstChatID() int64 {
 	if len(r.primChatIDs) > 0 {
 		return r.primChatIDs[0]

@@ -60,7 +60,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 			tbAPI:       mockAPI,
 			bot:         botMock,
 			locator:     locatorMock,
-			primChatIDs:  []int64{123},
+			primChatIDs: []int64{123},
 			adminChatID: 456,
 		}
 
@@ -171,7 +171,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 			tbAPI:       mockAPI,
 			bot:         botMock,
 			locator:     locatorMock,
-			primChatIDs:  []int64{123},
+			primChatIDs: []int64{123},
 			adminChatID: 456,
 			superUsers:  SuperUsers{"superuser"},
 		}
@@ -240,7 +240,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 			tbAPI:       mockAPI,
 			bot:         botMock,
 			locator:     locatorMock,
-			primChatIDs:  []int64{123},
+			primChatIDs: []int64{123},
 			adminChatID: 456,
 			superUsers:  SuperUsers{"superuser"},
 		}
@@ -404,7 +404,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 			tbAPI:       mockAPI,
 			bot:         botMock,
 			locator:     locatorMock,
-			primChatIDs:  []int64{123},
+			primChatIDs: []int64{123},
 			adminChatID: 456,
 		}
 
@@ -462,7 +462,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 			tbAPI:       mockAPI,
 			bot:         botMock,
 			locator:     locatorMock,
-			primChatIDs:  []int64{123},
+			primChatIDs: []int64{123},
 			adminChatID: 456,
 			superUsers:  SuperUsers{"superuser"},
 			dry:         true,
@@ -534,7 +534,7 @@ func TestAdmin_MsgHandler(t *testing.T) {
 			tbAPI:       mockAPI,
 			bot:         botMock,
 			locator:     locatorMock,
-			primChatIDs:  []int64{123},
+			primChatIDs: []int64{123},
 			adminChatID: 456,
 			superUsers:  SuperUsers{"superuser"},
 		}
