@@ -12,6 +12,8 @@ Shield is a self-hosted Telegram moderation and anti-spam bot. It watches group 
 
 [![build](https://github.com/redstone-md/shield/actions/workflows/ci.yml/badge.svg)](https://github.com/redstone-md/shield/actions/workflows/ci.yml)&nbsp;[![Go Report Card](https://goreportcard.com/badge/github.com/redstone-md/shield)](https://goreportcard.com/report/github.com/redstone-md/shield)
 
+<img src="site/powered_by.png" alt="Powered by Shield"/>
+
 </div>
 
 ## What Shield does
