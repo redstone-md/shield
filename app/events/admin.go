@@ -293,7 +293,7 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
 		BaseChatMessage: tbapi.BaseChatMessage{
 			MessageID:  info.MsgID,
-			ChatConfig: tbapi.ChatConfig{ChatID: a.firstChatID()},
+			ChatConfig: tbapi.ChatConfig{ChatID: info.ChatID},
 		},
 	})
 	if err != nil {
@@ -302,8 +302,8 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 		log.Printf("[INFO] message %d deleted", info.MsgID)
 	}
 
-	if info.UserID == a.firstChatID() {
-		log.Printf("[WARN] skipping ban in MsgHandler, user ID %d matches group chat", a.firstChatID())
+	if info.UserID == a.chatIDOrFallback(info.ChatID) {
+		log.Printf("[WARN] skipping ban in MsgHandler, user ID %d matches group chat", info.ChatID)
 	} else {
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: info.UserID,
 			channelID: channelIDFromCallback(info.UserID),

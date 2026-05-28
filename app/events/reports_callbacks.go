@@ -12,12 +12,13 @@ import (
 )
 
 func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.CallbackQuery) error {
-	reportedUserID, msgID, err := parseCallbackData(query.Data)
+	reportedUserID, msgID, callbackChatID, err := parseCallbackDataWithChat(query.Data)
 	if err != nil {
 		return fmt.Errorf("failed to parse callback data: %w", err)
 	}
+	lookupChatID := resolveCallbackChatID(callbackChatID, r.primChatIDs)
 
-	reports, err := r.Storage.GetByMessage(ctx, msgID, r.firstChatID())
+	reports, err := r.Storage.GetByMessage(ctx, msgID, lookupChatID)
 	if err != nil {
 		return fmt.Errorf("failed to get reports for msgID:%d: %w", msgID, err)
 	}
@@ -99,12 +100,13 @@ func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.Callba
 }
 
 func (r *userReports) callbackReportReject(ctx context.Context, query *tbapi.CallbackQuery) error {
-	_, msgID, err := parseCallbackData(query.Data)
+	_, msgID, callbackChatID, err := parseCallbackDataWithChat(query.Data)
 	if err != nil {
 		return fmt.Errorf("failed to parse callback data: %w", err)
 	}
+	lookupChatID := resolveCallbackChatID(callbackChatID, r.primChatIDs)
 
-	reports, err := r.Storage.GetByMessage(ctx, msgID, r.firstChatID())
+	reports, err := r.Storage.GetByMessage(ctx, msgID, lookupChatID)
 	if err != nil {
 		return fmt.Errorf("failed to get reports for msgID:%d: %w", msgID, err)
 	}
@@ -132,12 +134,13 @@ func (r *userReports) callbackReportReject(ctx context.Context, query *tbapi.Cal
 }
 
 func (r *userReports) callbackReportBanReporterAsk(ctx context.Context, query *tbapi.CallbackQuery) error {
-	reportedUserID, msgID, err := parseCallbackData(query.Data)
+	reportedUserID, msgID, callbackChatID, err := parseCallbackDataWithChat(query.Data)
 	if err != nil {
 		return fmt.Errorf("failed to parse callback data: %w", err)
 	}
+	lookupChatID := resolveCallbackChatID(callbackChatID, r.primChatIDs)
 
-	reports, err := r.Storage.GetByMessage(ctx, msgID, r.firstChatID())
+	reports, err := r.Storage.GetByMessage(ctx, msgID, lookupChatID)
 	if err != nil {
 		return fmt.Errorf("failed to get reports for msgID:%d: %w", msgID, err)
 	}
@@ -179,12 +182,13 @@ func (r *userReports) callbackReportBanReporterAsk(ctx context.Context, query *t
 }
 
 func (r *userReports) callbackReportBanReporterConfirm(ctx context.Context, query *tbapi.CallbackQuery) error {
-	reporterID, msgID, err := parseCallbackData(query.Data)
+	reporterID, msgID, callbackChatID, err := parseCallbackDataWithChat(query.Data)
 	if err != nil {
 		return fmt.Errorf("failed to parse callback data: %w", err)
 	}
+	lookupChatID := resolveCallbackChatID(callbackChatID, r.primChatIDs)
 
-	reports, err := r.Storage.GetByMessage(ctx, msgID, r.firstChatID())
+	reports, err := r.Storage.GetByMessage(ctx, msgID, lookupChatID)
 	if err != nil {
 		return fmt.Errorf("failed to get reports for msgID:%d: %w", msgID, err)
 	}
@@ -229,7 +233,7 @@ func (r *userReports) callbackReportBanReporterConfirm(ctx context.Context, quer
 		log.Printf("[WARN] failed to delete reporter %d from database: %v", reporterID, delErr)
 	}
 
-	remainingReports, err := r.Storage.GetByMessage(ctx, msgID, r.firstChatID())
+	remainingReports, err := r.Storage.GetByMessage(ctx, msgID, lookupChatID)
 	if err != nil {
 		log.Printf("[WARN] failed to get remaining reports for msgID:%d: %v", msgID, err)
 	}

@@ -325,7 +325,7 @@ func (a *admin) unbanInChat(userID, chatID int64) error {
 	}
 
 	cfg := tbapi.UnbanChatMemberConfig{
-		ChatMemberConfig: tbapi.ChatMemberConfig{UserID: userID, ChatConfig: tbapi.ChatConfig{ChatID: a.firstChatID()}},
+		ChatMemberConfig: tbapi.ChatMemberConfig{UserID: userID, ChatConfig: tbapi.ChatConfig{ChatID: chatID}},
 		OnlyIfBanned:     true,
 	}
 	_, err := a.tbAPI.Request(cfg)
