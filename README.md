@@ -12,7 +12,7 @@ Shield is a self-hosted Telegram moderation and anti-spam bot. It watches group 
 
 [![build](https://github.com/redstone-md/shield/actions/workflows/ci.yml/badge.svg)](https://github.com/redstone-md/shield/actions/workflows/ci.yml)&nbsp;[![Go Report Card](https://goreportcard.com/badge/github.com/redstone-md/shield)](https://goreportcard.com/report/github.com/redstone-md/shield)
 
-<img src="site/powered_by.png" alt="Powered by Shield"/>
+<img src="site/powered_by.png" alt="Powered by redstone.md"/>
 
 </div>
 
@@ -57,7 +57,8 @@ The bot is configured through command-line flags or environment variables. Out o
 | Environment variable | Flag | Purpose |
 |---|---|---|
 | `TELEGRAM_TOKEN` | `--telegram.token` | Telegram bot token from BotFather |
-| `TELEGRAM_GROUP` | `--telegram.group` | Group username or numeric group ID |
+| `TELEGRAM_GROUP` | `--telegram.group` | Group username or numeric group ID (single group, legacy) |
+| `TELEGRAM_GROUPS` | `--telegram.groups` | Comma-separated group IDs/usernames (overrides `TELEGRAM_GROUP` when set) |
 
 ### Common optional settings
 
@@ -337,7 +338,7 @@ $EDITOR .env
 docker compose up -d
 ```
 
-Set at least `TELEGRAM_TOKEN`, `TELEGRAM_GROUP`, and `SERVER_ENABLED=true` in `.env` for the tgadmin web UI. For the bundled Cloudflare Tunnel sidecar, add `CLOUDFLARED_TOKEN=<tunnel-token>` to `.env`; Compose interpolates `${CLOUDFLARED_TOKEN}` before service-level `env_file` values are loaded.
+Set at least `TELEGRAM_TOKEN`, `TELEGRAM_GROUP` (or `TELEGRAM_GROUPS`), and `SERVER_ENABLED=true` in `.env` for the tgadmin web UI. For the bundled Cloudflare Tunnel sidecar, add `CLOUDFLARED_TOKEN=<tunnel-token>` to `.env`; Compose interpolates `${CLOUDFLARED_TOKEN}` before service-level `env_file` values are loaded.
 
 [`docker-compose-tgadmin.yml`](docker-compose-tgadmin.yml) is kept as a compatibility alias for the same tgadmin topology.
 
@@ -408,6 +409,7 @@ Set the required Railway variables in the service settings:
 ```env
 TELEGRAM_TOKEN=<bot-token>
 TELEGRAM_GROUP=<group-name-or-id>
+TELEGRAM_GROUPS=<comma-separated-groups>
 SERVER_ENABLED=true
 SERVER_LISTEN=:8080
 FILES_DYNAMIC=/srv/data
@@ -417,7 +419,14 @@ Do not run the Compose `cloudflared-tgadmin` sidecar on Railway; Railway provide
 
 ## Multiple groups
 
-The bot monitors a single group. To protect multiple groups, run separate instances with different bot tokens. Multiple instances can share the same database or data directory.
+Set `TELEGRAM_GROUPS` to a comma-separated list of group IDs or usernames to monitor multiple groups with a single bot instance. Bans and unbans apply to all managed groups; message deletions target the originating chat. Strikes are global per-user across all groups.
+
+```env
+TELEGRAM_GROUP=legacy_single_group
+TELEGRAM_GROUPS=group1,-1001234567890,group3
+```
+
+`TELEGRAM_GROUPS` overrides `TELEGRAM_GROUP` when set. For backward compatibility, a single `TELEGRAM_GROUP` value still works.
 
 ## Using as a library
 
