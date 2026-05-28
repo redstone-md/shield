@@ -156,14 +156,14 @@ func (r *userReports) callbackReportBanReporterAsk(ctx context.Context, query *t
 		}
 		button := tbapi.NewInlineKeyboardButtonData(
 			fmt.Sprintf("Забанить %s", reporterName),
-			fmt.Sprintf("R!%d:%d", report.ReporterUserID, msgID),
+			fmt.Sprintf("R!%d:%d:%d", report.ReporterUserID, msgID, lookupChatID),
 		)
 		keyboard = append(keyboard, []tbapi.InlineKeyboardButton{button})
 	}
 
 	cancelButton := tbapi.NewInlineKeyboardButtonData(
 		"Отмена",
-		fmt.Sprintf("RX%d:%d", reportedUserID, msgID),
+		fmt.Sprintf("RX%d:%d:%d", reportedUserID, msgID, lookupChatID),
 	)
 	keyboard = append(keyboard, []tbapi.InlineKeyboardButton{cancelButton})
 

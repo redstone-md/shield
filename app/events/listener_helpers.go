@@ -192,22 +192,33 @@ func (l *TelegramListener) updateSupers() error {
 		return false
 	}
 
-	admins, err := l.TbAPI.GetChatAdministrators(tbapi.ChatAdministratorsConfig{ChatConfig: tbapi.ChatConfig{ChatID: l.chatID}})
-	if err != nil {
-		return fmt.Errorf("failed to get chat administrators: %w", err)
+	chatIDs := l.chatIDs
+	if len(chatIDs) == 0 {
+		chatIDs = []int64{l.chatID}
 	}
-
-	for _, admin := range admins {
-		if admin.User.UserName == "" && admin.User.ID == 0 {
+	seen := make(map[int64]struct{})
+	for _, chatID := range chatIDs {
+		admins, err := l.TbAPI.GetChatAdministrators(tbapi.ChatAdministratorsConfig{ChatConfig: tbapi.ChatConfig{ChatID: chatID}})
+		if err != nil {
+			log.Printf("[WARN] failed to get chat administrators for %d: %v", chatID, err)
 			continue
 		}
-		if isSuper(admin.User.UserName, admin.User.ID) {
-			continue
+		for _, adm := range admins {
+			if adm.User.UserName == "" && adm.User.ID == 0 {
+				continue
+			}
+			if _, dup := seen[adm.User.ID]; dup {
+				continue
+			}
+			seen[adm.User.ID] = struct{}{}
+			if isSuper(adm.User.UserName, adm.User.ID) {
+				continue
+			}
+			l.SuperUsers = append(l.SuperUsers, fmt.Sprintf("%d", adm.User.ID))
 		}
-		l.SuperUsers = append(l.SuperUsers, fmt.Sprintf("%d", admin.User.ID))
 	}
 
-	log.Printf("[INFO] added admins, full list of supers: {%s}", strings.Join(l.SuperUsers, ", "))
+	log.Printf("[INFO] added admins from %d groups, full list of supers: {%s}", len(l.chatIDs), strings.Join(l.SuperUsers, ", "))
 	return nil
 }
 

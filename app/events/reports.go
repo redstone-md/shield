@@ -237,23 +237,25 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 		}
 	}
 
-	req := banRequest{
-		duration: duration,
-		userID:   origMsg.From.ID,
-		chatID:   r.chatIDOrFallback(origMsg.Chat.ID),
-		dry:      r.dry,
-		training: r.trainingMode,
-		userName: origMsg.From.UserName,
-		restrict: restrict,
-	}
-	if r.actions != nil {
-		if err := r.actions.ApplyBan(ctx, req); err != nil {
-			return fmt.Errorf("failed to ban user %d after LLM-reviewed report: %w", origMsg.From.ID, err)
+	for _, banChatID := range r.primChatIDs {
+		req := banRequest{
+			duration: duration,
+			userID:   origMsg.From.ID,
+			chatID:   banChatID,
+			dry:      r.dry,
+			training: r.trainingMode,
+			userName: origMsg.From.UserName,
+			restrict: restrict,
 		}
-	} else {
-		req.tbAPI = r.tbAPI
-		if err := banUserOrChannel(ctx, req); err != nil {
-			return fmt.Errorf("failed to ban user %d after LLM-reviewed report: %w", origMsg.From.ID, err)
+		if r.actions != nil {
+			if err := r.actions.ApplyBan(ctx, req); err != nil {
+				log.Printf("[WARN] failed to ban user %d in chat %d: %v", origMsg.From.ID, banChatID, err)
+			}
+		} else {
+			req.tbAPI = r.tbAPI
+			if err := banUserOrChannel(ctx, req); err != nil {
+				log.Printf("[WARN] failed to ban user %d in chat %d: %v", origMsg.From.ID, banChatID, err)
+			}
 		}
 	}
 

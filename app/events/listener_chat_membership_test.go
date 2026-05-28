@@ -219,7 +219,7 @@ func TestUpdateSupers(t *testing.T) {
 			chatAdmins:      []tbapi.ChatMember{},
 			adminFetchError: errors.New("fetch error"),
 			expectedResult:  []string{},
-			expectedErr:     true,
+			expectedErr:     false,
 		},
 	}
 
