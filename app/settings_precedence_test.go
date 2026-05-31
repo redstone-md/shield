@@ -21,19 +21,22 @@ func TestConfigured_NonEmptyEnvIsSet(t *testing.T) {
 func TestApplyExplicitOverrides_DetectionFields(t *testing.T) {
 	t.Setenv("MAX_EMOJI", "9")
 	t.Setenv("LLM_MODE", "always")
+	t.Setenv("LLM_HISTORY_CONTEXT_SIZE", "4")
 
 	var opts options
 	opts.MaxEmoji = 9
 	opts.LLM.Mode = "always"
+	opts.LLM.HistoryContextSize = 4
 
 	rs := rules.RuleSet{
 		Detection: rules.DetectionRules{MaxEmoji: 2},
-		LLM:       rules.LLMCommonRules{Mode: "flagged"},
+		LLM:       rules.LLMCommonRules{Mode: "flagged", HistoryContextSize: 9},
 	}
 	applyExplicitRuleSetOverrides(&rs, opts)
 
 	assert.Equal(t, 9, rs.Detection.MaxEmoji, "MAX_EMOJI env must override the ruleset")
 	assert.Equal(t, "always", rs.LLM.Mode, "LLM_MODE env must override the ruleset")
+	assert.Equal(t, 4, rs.LLM.HistoryContextSize, "LLM_HISTORY_CONTEXT_SIZE env must override the ruleset")
 }
 
 func TestApplyExplicitOverrides_DetectionFieldsUntouchedWithoutEnv(t *testing.T) {

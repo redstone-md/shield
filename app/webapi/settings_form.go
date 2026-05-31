@@ -77,6 +77,7 @@ func ruleSetFromForm(base rules.RuleSet, form url.Values) (rs rules.RuleSet, err
 	// llm
 	enumField("llm.mode", []string{"", "missed", "flagged", "always"}, &rs.LLM.Mode)
 	enumField("llm.consensus", []string{"any", "all"}, &rs.LLM.Consensus)
+	intField("llm.history_context_size", 0, 1000, &rs.LLM.HistoryContextSize)
 	rs.LLM.VisionPrompt = form.Get("llm.vision_prompt")
 
 	// openai

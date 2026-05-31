@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -72,8 +71,8 @@ const (
 )
 
 const (
-	llmChatContextSize = 5
-	llmUserContextSize = 5
+	defaultLLMHistoryContextSize = 0
+	llmUserContextSize           = 5
 )
 
 // detectorLLMCheck describes how a single LLM provider participates in Detector.Check.
@@ -94,24 +93,25 @@ type detectorLLMResult struct {
 
 // Config is a set of parameters for Detector.
 type Config struct {
-	SimilarityThreshold float64          // threshold for spam similarity, 0.0 - 1.0
-	MinMsgLen           int              // minimum message length to check
-	MaxAllowedEmoji     int              // maximum number of emojis allowed in a message
-	CasAPI              string           // CAS API URL
-	CasUserAgent        string           // CAS API User-Agent header value, set only if non-empty
-	FirstMessageOnly    bool             // if true, only the first message from a user is checked
-	FirstMessagesCount  int              // number of first messages to check for spam
-	HTTPClient          HTTPClient       // http client to use for requests
-	MinSpamProbability  float64          // minimum spam probability to consider a message spam with classifier, if 0 - ignored
-	OpenAIVeto          bool             // if true, openai vetos spam, otherwise vetos ham
-	OpenAIHistorySize   int              // history size for openai
-	GeminiVeto          bool             // if true, gemini vetos spam, otherwise vetos ham
-	GeminiHistorySize   int              // history size for gemini
-	LLMMode             LLMMode          // which base detector outcomes are sent to LLM checks
-	LLMConsensus        LLMConsensusMode // how eligible LLM checks flip the base decision
-	LLMRequestTimeout   time.Duration    // timeout for individual LLM requests, if not set - 30s default
-	MultiLangWords      int              // if true, check for number of multi-lingual words
-	StorageTimeout      time.Duration    // timeout for storage operations, if not set - no timeout
+	SimilarityThreshold   float64          // threshold for spam similarity, 0.0 - 1.0
+	MinMsgLen             int              // minimum message length to check
+	MaxAllowedEmoji       int              // maximum number of emojis allowed in a message
+	CasAPI                string           // CAS API URL
+	CasUserAgent          string           // CAS API User-Agent header value, set only if non-empty
+	FirstMessageOnly      bool             // if true, only the first message from a user is checked
+	FirstMessagesCount    int              // number of first messages to check for spam
+	HTTPClient            HTTPClient       // http client to use for requests
+	MinSpamProbability    float64          // minimum spam probability to consider a message spam with classifier, if 0 - ignored
+	OpenAIVeto            bool             // if true, openai vetos spam, otherwise vetos ham
+	OpenAIHistorySize     int              // history size for openai
+	GeminiVeto            bool             // if true, gemini vetos spam, otherwise vetos ham
+	GeminiHistorySize     int              // history size for gemini
+	LLMMode               LLMMode          // which base detector outcomes are sent to LLM checks
+	LLMConsensus          LLMConsensusMode // how eligible LLM checks flip the base decision
+	LLMHistoryContextSize int              // recent chat messages to include in LLM context, 0 disables
+	LLMRequestTimeout     time.Duration    // timeout for individual LLM requests, if not set - 30s default
+	MultiLangWords        int              // if true, check for number of multi-lingual words
+	StorageTimeout        time.Duration    // timeout for storage operations, if not set - no timeout
 
 	LuaPlugins struct {
 		Enabled        bool     // if true, enable Lua plugins
@@ -186,12 +186,15 @@ func NewDetector(p Config) *Detector {
 		luaChecks:         []plugin.Check{},
 		hamHistory:        spamcheck.NewLastRequests(p.HistorySize),
 		spamHistory:       spamcheck.NewLastRequests(p.HistorySize),
-		llmHistory:        spamcheck.NewLastRequests(max(p.HistorySize, llmChatContextSize)),
+		llmHistory:        spamcheck.NewLastRequests(max(p.HistorySize, p.LLMHistoryContextSize)),
 		userHistory:       make(map[string]*spamcheck.LastRequests),
 		duplicateDetector: newDuplicateDetector(p.DuplicateDetection.Threshold, p.DuplicateDetection.Window),
 		luaEngine:         nil, // will be set with WithLuaEngine if needed
 	}
 	res.LLMConsensus = res.normalizeLLMConsensusMode(p.LLMConsensus)
+	if res.LLMHistoryContextSize < 0 {
+		res.LLMHistoryContextSize = defaultLLMHistoryContextSize
+	}
 	// if FirstMessagesCount is set, FirstMessageOnly enforced to true.
 	// this is to avoid confusion when FirstMessagesCount is set but FirstMessageOnly is false.
 	// the reason for the redundant FirstMessageOnly flag is to avoid breaking api compatibility.
@@ -461,10 +464,6 @@ func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []
 	return detectorLLMResult{details: details, flip: flip}, true
 }
 
-func shouldSkipTextLLM(msg string) bool {
-	return strings.TrimSpace(msg) == ""
-}
-
 // casFlaggedSpam reports whether the CAS check flagged the message as spam.
 func casFlaggedSpam(cr []spamcheck.Response) bool {
 	for _, r := range cr {
@@ -473,55 +472,6 @@ func casFlaggedSpam(cr []spamcheck.Response) bool {
 		}
 	}
 	return false
-}
-
-func (d *Detector) llmContextForRequest(req spamcheck.Request) llmContext {
-	ctx := llmContext{
-		RequestContext:     req.LLMContext,
-		RecentChatMessages: d.llmHistory.Last(llmChatContextSize),
-	}
-	return ctx
-}
-
-func (d *Detector) addToLLMHistory(req spamcheck.Request) {
-	if req.CheckOnly || req.Msg == "" {
-		return
-	}
-
-	d.llmHistory.Push(req)
-	if req.UserID == "" {
-		return
-	}
-
-	h, ok := d.userHistory[req.UserID]
-	if !ok {
-		h = spamcheck.NewLastRequests(llmUserContextSize)
-		d.userHistory[req.UserID] = h
-	}
-	h.Push(req)
-}
-
-func (d *Detector) applyLLMConsensus(baseSpam bool, results []detectorLLMResult, mode LLMConsensusMode) bool {
-	if len(results) == 0 {
-		return baseSpam
-	}
-
-	switch d.normalizeLLMConsensusMode(mode) {
-	case LLMConsensusAll:
-		for _, result := range results {
-			if !result.flip {
-				return baseSpam
-			}
-		}
-		return !baseSpam
-	default:
-		for _, result := range results {
-			if result.flip {
-				return !baseSpam
-			}
-		}
-		return baseSpam
-	}
 }
 
 // Reset resets spam samples/classifier, excluded tokens, stop words and approved users.
@@ -534,7 +484,7 @@ func (d *Detector) Reset() {
 	d.classifier.reset()
 	d.approvedUsers = make(map[string]approved.UserInfo)
 	d.stopWords = []string{}
-	d.llmHistory = spamcheck.NewLastRequests(max(d.HistorySize, llmChatContextSize))
+	d.llmHistory = spamcheck.NewLastRequests(max(d.HistorySize, d.LLMHistoryContextSize))
 	d.userHistory = make(map[string]*spamcheck.LastRequests)
 
 	// close the Lua engine and reset Lua checks if it exists

@@ -39,6 +39,7 @@
                 <div class="card-body">
                     {{template "settings_enum" dict "Key" "llm.mode" "Label" "LLM mode" "Val" .RuleSet.LLM.Mode "Options" .LLMModes "Pinned" $pinned}}
                     {{template "settings_enum" dict "Key" "llm.consensus" "Label" "LLM consensus" "Val" .RuleSet.LLM.Consensus "Options" .LLMConsensus "Pinned" $pinned}}
+                    {{template "settings_int" dict "Key" "llm.history_context_size" "Label" "History context size" "Val" .RuleSet.LLM.HistoryContextSize "Pinned" $pinned}}
                     {{template "settings_text" dict "Key" "llm.vision_prompt" "Label" "Vision prompt" "Val" .RuleSet.LLM.VisionPrompt "Pinned" $pinned}}
                 </div>
             </div>

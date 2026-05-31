@@ -18,6 +18,7 @@ func TestRuleSetFromForm_AppliesValues(t *testing.T) {
 		"detection.cas_enabled":          {"on"},
 		"llm.mode":                       {"flagged"},
 		"llm.consensus":                  {"any"},
+		"llm.history_context_size":       {"5"},
 		"llm.vision_prompt":              {"scan image"},
 		"openai.veto":                    {"on"},
 		"openai.model":                   {"gpt-4o-mini"},
@@ -34,6 +35,7 @@ func TestRuleSetFromForm_AppliesValues(t *testing.T) {
 	assert.InEpsilon(t, 0.6, rs.Detection.SimilarityThreshold, 0.0001)
 	assert.True(t, rs.Detection.CasEnabled)
 	assert.Equal(t, "flagged", rs.LLM.Mode)
+	assert.Equal(t, 5, rs.LLM.HistoryContextSize)
 	assert.Equal(t, "scan image", rs.LLM.VisionPrompt)
 	assert.True(t, rs.OpenAI.Veto)
 	assert.Equal(t, "be strict", rs.OpenAI.Prompt)

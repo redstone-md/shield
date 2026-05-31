@@ -229,8 +229,30 @@ func TestDetector_CheckWithLLMInParanoidMode(t *testing.T) {
 	assert.NotNil(t, findResponseByName(cr, "openai"))
 }
 
-func TestDetector_LLMContextIncludesLastFiveChatMessages(t *testing.T) {
+func TestDetector_LLMContextOmitsRecentChatMessagesByDefault(t *testing.T) {
 	d := NewDetector(Config{MaxAllowedEmoji: -1, MinMsgLen: 5})
+	var captured string
+	openAIMock := &mocks.OpenAIClientMock{
+		CreateChatCompletionFunc: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+			captured = req.Messages[1].Content
+			return openai.ChatCompletionResponse{
+				Choices: []openai.ChatCompletionChoice{{
+					Message: openai.ChatCompletionMessage{Content: `{"spam": false, "reason":"ok", "confidence":20}`},
+				}},
+			}, nil
+		},
+	}
+	d.WithOpenAIChecker(openAIMock, OpenAIConfig{Model: "gpt4"})
+
+	_, _ = d.Check(spamcheck.Request{Msg: "previous message", UserID: "1", UserName: "alice"})
+	_, _ = d.Check(spamcheck.Request{Msg: "trigger message", UserID: "42", UserName: "u42"})
+
+	assert.NotContains(t, captured, "Recent chat messages:")
+	assert.NotContains(t, captured, "previous message")
+}
+
+func TestDetector_LLMContextIncludesConfiguredRecentChatMessages(t *testing.T) {
+	d := NewDetector(Config{MaxAllowedEmoji: -1, MinMsgLen: 5, LLMHistoryContextSize: 5})
 	var captured string
 	openAIMock := &mocks.OpenAIClientMock{
 		CreateChatCompletionFunc: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
@@ -270,7 +292,7 @@ func TestDetector_LLMContextIncludesLastFiveChatMessages(t *testing.T) {
 }
 
 func TestDetector_LLMContextExcludesSpamMessages(t *testing.T) {
-	d := NewDetector(Config{HistorySize: 5, MaxAllowedEmoji: -1, MinMsgLen: 5})
+	d := NewDetector(Config{HistorySize: 5, LLMHistoryContextSize: 5, MaxAllowedEmoji: -1, MinMsgLen: 5})
 	replies := []string{
 		`{"spam": true, "reason":"first is spam", "confidence":95}`,
 		`{"spam": false, "reason":"second is ham", "confidence":20}`,
@@ -301,7 +323,7 @@ func TestDetector_LLMContextExcludesSpamMessages(t *testing.T) {
 }
 
 func TestDetector_LLMContextExcludesEarlyShortSpamMessages(t *testing.T) {
-	d := NewDetector(Config{HistorySize: 5, MaxAllowedEmoji: 1, MinMsgLen: 10})
+	d := NewDetector(Config{HistorySize: 5, LLMHistoryContextSize: 5, MaxAllowedEmoji: 1, MinMsgLen: 10})
 	var captured string
 	openAIMock := &mocks.OpenAIClientMock{
 		CreateChatCompletionFunc: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {

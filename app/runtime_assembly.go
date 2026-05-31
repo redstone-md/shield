@@ -379,8 +379,9 @@ func bootstrapRuleSet(opts options) rules.RuleSet {
 			ParanoidMode:        opts.ParanoidMode,
 		},
 		LLM: rules.LLMCommonRules{
-			Mode:      opts.LLM.Mode,
-			Consensus: opts.LLM.Consensus,
+			Mode:               opts.LLM.Mode,
+			Consensus:          opts.LLM.Consensus,
+			HistoryContextSize: opts.LLM.HistoryContextSize,
 		},
 		OpenAI: rules.LLMRules{
 			Enabled:            opts.OpenAI.Token != "" || opts.OpenAI.APIBase != "",
@@ -416,12 +417,28 @@ func backfillRuleSetSchema(rs rules.RuleSet, opts options) (rules.RuleSet, bool)
 	seed := bootstrapRuleSet(opts)
 	rs.SchemaVersion = rules.CurrentSchemaVersion
 	rs.Detection = seed.Detection
-	rs.LLM = seed.LLM
+	rs.LLM = backfillLLMCommonRules(rs.LLM, seed.LLM)
 	rs.OpenAI.Prompt = seed.OpenAI.Prompt
 	rs.OpenAI.VisionModel = seed.OpenAI.VisionModel
 	rs.Gemini.Prompt = seed.Gemini.Prompt
 	rs.Gemini.VisionModel = seed.Gemini.VisionModel
 	return rs, true
+}
+
+func backfillLLMCommonRules(current, seed rules.LLMCommonRules) rules.LLMCommonRules {
+	if current.Mode == "" {
+		current.Mode = seed.Mode
+	}
+	if current.Consensus == "" {
+		current.Consensus = seed.Consensus
+	}
+	if current.HistoryContextSize == 0 {
+		current.HistoryContextSize = seed.HistoryContextSize
+	}
+	if current.VisionPrompt == "" {
+		current.VisionPrompt = seed.VisionPrompt
+	}
+	return current
 }
 
 func makeApprovedUsersStore(

@@ -109,9 +109,10 @@ type options struct {
 	} `group:"gemini" namespace:"gemini" env-namespace:"GEMINI"`
 
 	LLM struct {
-		Consensus      string        `long:"consensus" env:"CONSENSUS" choice:"any" choice:"all" default:"any" description:"how eligible LLMs flip the base decision"`
-		Mode           string        `long:"mode" env:"MODE" choice:"" choice:"missed" choice:"flagged" choice:"always" default:"" description:"which messages LLM checks: missed, flagged, or always; empty preserves provider veto flags"`
-		RequestTimeout time.Duration `long:"request-timeout" env:"REQUEST_TIMEOUT" default:"30s" description:"timeout for individual LLM requests"`
+		Consensus          string        `long:"consensus" env:"CONSENSUS" choice:"any" choice:"all" default:"any" description:"how eligible LLMs flip the base decision"`
+		Mode               string        `long:"mode" env:"MODE" choice:"" choice:"missed" choice:"flagged" choice:"always" default:"" description:"which messages LLM checks: missed, flagged, or always; empty preserves provider veto flags"`
+		HistoryContextSize int           `long:"history-context-size" env:"HISTORY_CONTEXT_SIZE" default:"0" description:"recent chat messages to include in LLM context, 0 disables"`
+		RequestTimeout     time.Duration `long:"request-timeout" env:"REQUEST_TIMEOUT" default:"30s" description:"timeout for individual LLM requests"`
 	} `group:"llm" namespace:"llm" env-namespace:"LLM"`
 
 	LuaPlugins struct {

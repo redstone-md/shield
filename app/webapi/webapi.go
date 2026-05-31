@@ -163,6 +163,7 @@ type Settings struct {
 	MetaGiveaway             bool          `json:"meta_giveaway"`
 	MultiLangLimit           int           `json:"multi_lang_limit"`
 	LLMConsensus             string        `json:"llm_consensus"`
+	LLMHistoryContextSize    int           `json:"llm_history_context_size"`
 	OpenAIEnabled            bool          `json:"openai_enabled"`
 	OpenAIVeto               bool          `json:"openai_veto"`
 	OpenAIHistorySize        int           `json:"openai_history_size"`

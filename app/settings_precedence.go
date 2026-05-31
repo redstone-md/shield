@@ -199,6 +199,9 @@ func applyExplicitDetectionOverrides(rs *rules.RuleSet, opts options) {
 	if configured("llm.consensus", "LLM_CONSENSUS") {
 		rs.LLM.Consensus = opts.LLM.Consensus
 	}
+	if configured("llm.history-context-size", "LLM_HISTORY_CONTEXT_SIZE") {
+		rs.LLM.HistoryContextSize = opts.LLM.HistoryContextSize
+	}
 }
 
 // envPinnedKey maps a RuleSet JSON path to its CLI flag and env var.
@@ -219,6 +222,7 @@ var envPinnedRegistry = map[string]envPinnedKey{
 	"detection.cas_enabled":          {"cas.api", "CAS_API"},
 	"llm.mode":                       {"llm.mode", "LLM_MODE"},
 	"llm.consensus":                  {"llm.consensus", "LLM_CONSENSUS"},
+	"llm.history_context_size":       {"llm.history-context-size", "LLM_HISTORY_CONTEXT_SIZE"},
 	"openai.veto":                    {"openai.veto", "OPENAI_VETO"},
 	"openai.model":                   {"openai.model", "OPENAI_MODEL"},
 	"openai.history_size":            {"openai.history-size", "OPENAI_HISTORY_SIZE"},

@@ -253,6 +253,7 @@ func Test_makeDetector(t *testing.T) {
 				HistorySize:        5,
 				CheckShortMessages: true,
 			},
+			LLM: rules.LLMCommonRules{HistoryContextSize: 3},
 		}
 
 		res := makeDetectorWithRuleSet(opts, ruleSet)
@@ -268,6 +269,7 @@ func Test_makeDetector(t *testing.T) {
 		assert.Equal(t, 4, res.OpenAIHistorySize)
 		assert.True(t, res.GeminiVeto)
 		assert.Equal(t, 5, res.GeminiHistorySize)
+		assert.Equal(t, 3, res.LLMHistoryContextSize)
 		assert.Empty(t, res.LLMMode)
 	})
 }
@@ -437,7 +439,7 @@ func TestAssembleRuntimeUsesActiveRuleSet(t *testing.T) {
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx,
 		"INSERT INTO rule_set_versions (workspace_id, gid, tenant_id, version, source, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		"gr1", opts.InstanceID, opts.InstanceID, 2, "test", `{"workspace_id":"gr1","version":2,"source":"test","meta":{"links_limit":5,"mentions_limit":4},"duplicates":{"threshold":4,"window":60000000000},"abnormal_spacing":{"enabled":true,"space_ratio_threshold":0.25,"short_word_ratio_threshold":0.6,"short_word_len":5,"min_words":8},"moderation":{"first_strike":900000000000,"second_strike":21600000000000,"soft_ban":true,"dry_run":true},"reports":{"enabled":true,"threshold":5,"auto_ban_threshold":6,"rate_limit":2,"rate_period":120000000000},"openai":{"enabled":false,"veto":true,"model":"gpt-active","history_size":3,"check_short_messages":true},"gemini":{"enabled":false,"veto":false,"model":"gemini-active","history_size":7,"check_short_messages":false}}`,
+		"gr1", opts.InstanceID, opts.InstanceID, 2, "test", `{"workspace_id":"gr1","version":2,"source":"test","meta":{"links_limit":5,"mentions_limit":4},"duplicates":{"threshold":4,"window":60000000000},"abnormal_spacing":{"enabled":true,"space_ratio_threshold":0.25,"short_word_ratio_threshold":0.6,"short_word_len":5,"min_words":8},"moderation":{"first_strike":900000000000,"second_strike":21600000000000,"soft_ban":true,"dry_run":true},"reports":{"enabled":true,"threshold":5,"auto_ban_threshold":6,"rate_limit":2,"rate_period":120000000000},"llm":{"history_context_size":6},"openai":{"enabled":false,"veto":true,"model":"gpt-active","history_size":3,"check_short_messages":true},"gemini":{"enabled":false,"veto":false,"model":"gemini-active","history_size":7,"check_short_messages":false}}`,
 		time.Now().UTC(),
 	)
 	require.NoError(t, err)
@@ -457,6 +459,7 @@ func TestAssembleRuntimeUsesActiveRuleSet(t *testing.T) {
 	assert.Equal(t, 4, assembly.Detector.DuplicateDetection.Threshold)
 	assert.True(t, assembly.Detector.AbnormalSpacing.Enabled)
 	assert.Equal(t, 3, assembly.Detector.OpenAIHistorySize)
+	assert.Equal(t, 6, assembly.Detector.LLMHistoryContextSize)
 
 	tbAPI := &tbapi.BotAPI{Self: tbapi.User{UserName: "bot"}}
 	listener := assembly.makeTelegramListener(opts, tbAPI)
@@ -607,7 +610,7 @@ func TestBuildDetectorConfig_ReadsDetectionFromRuleSet(t *testing.T) {
 			FirstMessagesCount:  1,
 			ParanoidMode:        false,
 		},
-		LLM: rules.LLMCommonRules{Mode: "flagged", Consensus: "any"},
+		LLM: rules.LLMCommonRules{Mode: "flagged", Consensus: "any", HistoryContextSize: 4},
 	}
 
 	cfg := buildDetectorConfig(opts, rs)
@@ -620,6 +623,7 @@ func TestBuildDetectorConfig_ReadsDetectionFromRuleSet(t *testing.T) {
 	assert.Equal(t, 1, cfg.FirstMessagesCount)
 	assert.Equal(t, tgspam.LLMMode("flagged"), cfg.LLMMode)
 	assert.Equal(t, tgspam.LLMConsensusMode("any"), cfg.LLMConsensus)
+	assert.Equal(t, 4, cfg.LLMHistoryContextSize)
 	assert.Equal(t, "https://api.cas.chat", cfg.CasAPI)
 }
 

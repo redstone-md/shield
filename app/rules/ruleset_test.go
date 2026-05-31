@@ -53,16 +53,17 @@ func TestRuleSet_LegacyPayloadDecodesNewFieldsAsZero(t *testing.T) {
 }
 
 func TestCurrentSchemaVersion(t *testing.T) {
-	assert.Equal(t, 2, CurrentSchemaVersion)
+	assert.Equal(t, 3, CurrentSchemaVersion)
 }
 
-func TestRuleSet_VisionPromptJSONRoundTrip(t *testing.T) {
-	rs := RuleSet{LLM: LLMCommonRules{Mode: "flagged", VisionPrompt: "scan this image"}}
+func TestRuleSet_LLMCommonJSONRoundTrip(t *testing.T) {
+	rs := RuleSet{LLM: LLMCommonRules{Mode: "flagged", HistoryContextSize: 5, VisionPrompt: "scan this image"}}
 
 	data, err := json.Marshal(rs)
 	require.NoError(t, err)
 
 	var got RuleSet
 	require.NoError(t, json.Unmarshal(data, &got))
+	assert.Equal(t, 5, got.LLM.HistoryContextSize)
 	assert.Equal(t, "scan this image", got.LLM.VisionPrompt)
 }
