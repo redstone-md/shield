@@ -431,15 +431,6 @@ func sleepContext(ctx context.Context, sleep func(time.Duration), delay time.Dur
 	}
 }
 
-func slowpathReason(checks []spamcheck.Response) string {
-	for _, check := range checks {
-		if check.Spam && check.Name == "slowpath" {
-			return strings.TrimSpace(check.Details)
-		}
-	}
-	return ""
-}
-
 func appendReasonHTML(text, reason string) string {
 	reason = strings.TrimSpace(reason)
 	if reason == "" {

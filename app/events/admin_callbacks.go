@@ -350,22 +350,13 @@ func (a *admin) unbanChannelInChat(channelID, chatID int64) error {
 func (a *admin) callbackShowInfo(ctx context.Context, query *tbapi.CallbackQuery) error {
 	callbackData := query.Data
 	spamInfoText := "**can't get spam info**"
-	spamInfo := []string{}
 	userID, _, err := parseCallbackData(callbackData)
 	if err != nil {
-		spamInfo = append(spamInfo, fmt.Sprintf("**failed to parse userID from %q: %v**", callbackData[1:], err))
+		spamInfoText = fmt.Sprintf("**failed to parse userID from %q: %v**", callbackData[1:], err)
 	}
 
 	if userID != 0 {
-		info, found := a.locator.Spam(ctx, userID)
-		if found {
-			for _, check := range info.Checks {
-				spamInfo = append(spamInfo, "- "+escapeMarkDownV1Text(check.String()))
-			}
-		}
-		if len(spamInfo) > 0 {
-			spamInfoText = strings.Join(spamInfo, "\n")
-		}
+		spamInfoText = a.spamInfoForCallback(ctx, userID, query.Message.Text)
 	}
 
 	escapedMessage := escapeMarkDownV1Text(query.Message.Text) + "\n\n**spam detection results**\n" + spamInfoText
