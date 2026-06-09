@@ -333,6 +333,9 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 				return nil
 			}
 		}
+		if l.procSuperCommand(ctx, update) {
+			return nil
+		}
 		if err := l.adminHandler.MsgHandler(ctx, update); err != nil {
 			l.incMetric("admin_errors")
 			log.Printf("[WARN] failed to process admin chat message: %v", err)
@@ -493,6 +496,13 @@ func (l *TelegramListener) procSuperCommand(ctx context.Context, update tbapi.Up
 		}
 		return true
 	}
+	if isClearCommand(cmd) {
+		log.Printf("[DEBUG] superuser %s requested message cleanup for %q", update.Message.From.UserName, arg)
+		if err := l.adminHandler.DirectClearTarget(ctx, update, arg); err != nil {
+			log.Printf("[WARN] failed to process direct clear target: %v", err)
+		}
+		return true
+	}
 	if isBanCommand(cmd) {
 		log.Printf("[DEBUG] superuser %s requested ban for %q", update.Message.From.UserName, arg)
 		if err := l.adminHandler.DirectBanTarget(ctx, update, arg); err != nil {
@@ -503,8 +513,9 @@ func (l *TelegramListener) procSuperCommand(ctx context.Context, update tbapi.Up
 	return false
 }
 
-// procSuperReply processes superuser reply commands: /spam, /ban, /warn, /unwarn.
+// procSuperReply processes superuser reply commands: /spam, /ban, /warn, /clear, /unwarn.
 func (l *TelegramListener) procSuperReply(ctx context.Context, update tbapi.Update) (handled bool) {
+	cmd, arg := splitCommand(update.Message.Text)
 	switch {
 	case strings.EqualFold(update.Message.Text, "/spam") ||
 		strings.EqualFold(update.Message.Text, "spam") ||
@@ -534,6 +545,22 @@ func (l *TelegramListener) procSuperReply(ctx context.Context, update tbapi.Upda
 		log.Printf("[DEBUG] superuser %s requested message deletion", update.Message.From.UserName)
 		if err := l.adminHandler.DirectDeleteReply(ctx, update); err != nil {
 			log.Printf("[WARN] failed to process direct delete request: %v", err)
+		}
+		return true
+	case isClearCommand(cmd):
+		if !l.SuperUsers.IsSuper(update.Message.From.UserName, update.Message.From.ID) {
+			log.Printf("[WARN] non-superuser %s attempted direct clear", update.Message.From.UserName)
+			return false
+		}
+		log.Printf("[DEBUG] superuser %s requested message cleanup", update.Message.From.UserName)
+		var err error
+		if arg != "" {
+			err = l.adminHandler.DirectClearTarget(ctx, update, arg)
+		} else {
+			err = l.adminHandler.DirectClearReply(ctx, update)
+		}
+		if err != nil {
+			log.Printf("[WARN] failed to process direct clear request: %v", err)
 		}
 		return true
 	case strings.EqualFold(update.Message.Text, "/unwarn") || strings.EqualFold(update.Message.Text, "unwarn"):
@@ -566,6 +593,11 @@ func isBanCommand(cmd string) bool {
 func isDeleteCommand(cmd string) bool {
 	cmd = strings.TrimSpace(cmd)
 	return strings.EqualFold(cmd, "/del") || strings.EqualFold(cmd, "del")
+}
+
+func isClearCommand(cmd string) bool {
+	cmd = strings.TrimSpace(cmd)
+	return strings.EqualFold(cmd, "/clear") || strings.EqualFold(cmd, "clear")
 }
 
 // isReportCommand checks if message text is a /report command variant

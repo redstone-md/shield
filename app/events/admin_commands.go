@@ -29,7 +29,7 @@ func (a *admin) DirectBanReport(ctx context.Context, update tbapi.Update) error 
 }
 
 func (a *admin) DirectBanTarget(ctx context.Context, update tbapi.Update, target string) error {
-	userID, userName, err := a.resolveBanTarget(ctx, target)
+	userID, userName, err := a.resolveUserTarget(ctx, target, "ban")
 	if err != nil {
 		return err
 	}
@@ -69,9 +69,13 @@ func markdownBanTarget(userName string, userID int64) string {
 }
 
 func (a *admin) resolveBanTarget(ctx context.Context, target string) (userID int64, userName string, err error) {
+	return a.resolveUserTarget(ctx, target, "ban")
+}
+
+func (a *admin) resolveUserTarget(ctx context.Context, target, label string) (userID int64, userName string, err error) {
 	target = strings.TrimSpace(target)
 	if target == "" {
-		return 0, "", fmt.Errorf("ban target is empty")
+		return 0, "", fmt.Errorf("%s target is empty", label)
 	}
 	if id, parseErr := strconv.ParseInt(target, 10, 64); parseErr == nil {
 		if a.locator != nil {
@@ -82,7 +86,7 @@ func (a *admin) resolveBanTarget(ctx context.Context, target string) (userID int
 
 	userName = strings.TrimPrefix(target, "@")
 	if userName == "" {
-		return 0, "", fmt.Errorf("ban target username is empty")
+		return 0, "", fmt.Errorf("%s target username is empty", label)
 	}
 	if a.locator == nil {
 		return 0, userName, fmt.Errorf("can't resolve username %q: locator is not configured", userName)
