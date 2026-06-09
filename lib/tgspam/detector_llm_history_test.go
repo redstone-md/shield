@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDetector_RemoveSpamHam(t *testing.T) {
@@ -164,6 +165,30 @@ func TestDetector_CheckHistory_ShortMessagesNotAddedToHam(t *testing.T) {
 func TestNewDetector_DefaultLLMConsensus(t *testing.T) {
 	d := NewDetector(Config{})
 	assert.Equal(t, LLMConsensusAny, d.LLMConsensus)
+}
+
+func TestDetector_UpdateConfigAppliesLLMRuntimeFields(t *testing.T) {
+	d := NewDetector(Config{LLMConsensus: LLMConsensusAny})
+
+	d.UpdateConfig(Config{
+		OpenAIVeto:        true,
+		OpenAIHistorySize: 4,
+		GeminiVeto:        true,
+		GeminiHistorySize: 5,
+		LLMMode:           LLMModeAlways,
+		LLMConsensus:      LLMConsensusAll,
+		LLMRequestTimeout: 3 * time.Second,
+		LLMMinInputChars:  7,
+	})
+
+	assert.True(t, d.OpenAIVeto)
+	assert.Equal(t, 4, d.OpenAIHistorySize)
+	assert.True(t, d.GeminiVeto)
+	assert.Equal(t, 5, d.GeminiHistorySize)
+	assert.Equal(t, LLMModeAlways, d.LLMMode)
+	assert.Equal(t, LLMConsensusAll, d.LLMConsensus)
+	assert.Equal(t, 3*time.Second, d.LLMRequestTimeout)
+	assert.Equal(t, 7, d.LLMMinInputChars)
 }
 
 func TestDetector_LLMModeAlwaysChecksHamAndSpamBase(t *testing.T) {

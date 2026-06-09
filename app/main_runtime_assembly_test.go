@@ -455,6 +455,7 @@ func TestAssembleRuntimeUsesActiveRuleSet(t *testing.T) {
 	defer assembly.close()
 
 	assert.Equal(t, 2, assembly.ActiveRuleSet.Version)
+	require.NotNil(t, assembly.ReportsStore)
 	require.NotNil(t, assembly.Detector)
 	assert.Equal(t, 4, assembly.Detector.DuplicateDetection.Threshold)
 	assert.True(t, assembly.Detector.AbnormalSpacing.Enabled)
@@ -468,6 +469,7 @@ func TestAssembleRuntimeUsesActiveRuleSet(t *testing.T) {
 	assert.False(t, listener.Dry)
 	assert.Equal(t, 5, listener.ReportConfig.Threshold)
 	assert.Equal(t, 6, listener.ReportConfig.AutoBanThreshold)
+	assert.NotNil(t, listener.ReportConfig.Storage)
 }
 
 func TestRuleSetServiceUpdateAppliesRuntimeWithoutRestart(t *testing.T) {
@@ -634,6 +636,15 @@ func TestBuildDetectorConfig_CasDisabledClearsAPI(t *testing.T) {
 
 	cfg := buildDetectorConfig(opts, rs)
 	assert.Empty(t, cfg.CasAPI, "CAS API must be cleared when CasEnabled is false")
+}
+
+func TestBuildDetectorConfig_ReadsLLMMinInputCharsFromOptions(t *testing.T) {
+	var opts options
+	opts.LLM.MinInputChars = 7
+
+	cfg := buildDetectorConfig(opts, rules.RuleSet{})
+
+	assert.Equal(t, 7, cfg.LLMMinInputChars)
 }
 
 func TestApplyLLMCheckers_NoLLMConfigured(t *testing.T) {

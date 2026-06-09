@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/redstone-md/shield/app/rules"
 	"github.com/redstone-md/shield/app/slowpath"
 	"github.com/redstone-md/shield/lib/tgspam"
@@ -104,4 +105,19 @@ func TestWireLiveReload_AppliesLLMAndSlowPathPrompts(t *testing.T) {
 	applyLiveReload(a, opts, rs)
 
 	assert.Equal(t, "live vision prompt", slowpath.ExportVisionPrompt(a.SlowPathEngine))
+}
+
+func TestMakeTelegramListener_UsesActiveRuleSetSlowPathFlag(t *testing.T) {
+	tbAPI := &tbapi.BotAPI{Self: tbapi.User{UserName: "bot"}}
+	a := &runtimeAssembly{
+		SlowPathEngine: slowpath.NewEngine(slowpath.EngineConfig{}),
+		ActiveRuleSet:  rules.RuleSet{SlowPathEnabled: false},
+	}
+
+	listener := a.makeTelegramListener(options{}, tbAPI)
+	assert.False(t, listener.SlowPathEnabled)
+
+	a.ActiveRuleSet.SlowPathEnabled = true
+	listener = a.makeTelegramListener(options{}, tbAPI)
+	assert.True(t, listener.SlowPathEnabled)
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -110,6 +111,7 @@ type Config struct {
 	LLMConsensus          LLMConsensusMode // how eligible LLM checks flip the base decision
 	LLMHistoryContextSize int              // recent chat messages to include in LLM context, 0 disables
 	LLMRequestTimeout     time.Duration    // timeout for individual LLM requests, if not set - 30s default
+	LLMMinInputChars      int              // minimum trimmed rune length for automatic LLM checks, force checks bypass it
 	MultiLangWords        int              // if true, check for number of multi-lingual words
 	StorageTimeout        time.Duration    // timeout for storage operations, if not set - no timeout
 
@@ -283,7 +285,7 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 		geminiChecksShort := d.geminiChecker != nil && d.geminiChecker.params.CheckShortMessages
 		llmEligible := d.hasLLMEnabled()
 		forceLLM := req.ForceLLM && llmEligible
-		if isSpamDetected(cr) || !llmEligible || (!forceLLM && !openaiChecksShort && !geminiChecksShort) {
+		if !llmEligible || (!isSpamDetected(cr) && !forceLLM && !openaiChecksShort && !geminiChecksShort) {
 			if isSpamDetected(cr) {
 				d.spamHistory.Push(req)
 				return true, cr // spam from the checks above
@@ -310,6 +312,7 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 
 	baseSpam := d.scoreSignals(cr, isSpamDetected)
 	spamDetected := baseSpam
+	llmChecksRan := 0
 
 	// we hit eligible LLMs in three cases:
 	// - short message with short-message checking enabled (ignores veto mode since there's no decision to veto)
@@ -342,10 +345,16 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 			if res, ok := d.collectLLMCheck(req, cleanMsg, cr, baseSpam, isShortMessage, llmCheck); ok {
 				cr = append(cr, res.details)
 				llmResults = append(llmResults, res)
+				llmChecksRan++
 			}
 		}
 
 		spamDetected = d.applyLLMConsensus(baseSpam, llmResults, d.LLMConsensus)
+	}
+
+	if isShortMessage && !baseSpam && llmChecksRan == 0 {
+		// don't add short messages to hamHistory unless they were actually reviewed
+		return false, cr
 	}
 
 	// CAS is a curated global ban list, so an LLM ham verdict must not veto a CAS hit
@@ -406,7 +415,7 @@ func (d *Detector) shouldApplyLLMCheck(baseSpam, isShortMessage, forceLLM bool, 
 	if forceLLM {
 		return true
 	}
-	if isShortMessage {
+	if isShortMessage && !baseSpam {
 		return cfg.checkShortMessages
 	}
 	switch cfg.mode {
@@ -432,6 +441,10 @@ func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []
 
 	if shouldSkipTextLLM(cleanMsg) {
 		log.Printf("[DEBUG] %s skipped: empty message has no text content for LLM", cfg.name)
+		return detectorLLMResult{}, false
+	}
+	if !req.ForceLLM && d.LLMMinInputChars > 0 && len([]rune(strings.TrimSpace(cleanMsg))) < d.LLMMinInputChars {
+		log.Printf("[DEBUG] %s skipped: message shorter than llm min input chars (%d)", cfg.name, d.LLMMinInputChars)
 		return detectorLLMResult{}, false
 	}
 

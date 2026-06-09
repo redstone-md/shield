@@ -350,6 +350,7 @@ func buildDetectorConfig(opts options, ruleSet rules.RuleSet) tgspam.Config {
 		LLMConsensus:          tgspam.LLMConsensusMode(ruleSet.LLM.Consensus),
 		LLMHistoryContextSize: ruleSet.LLM.HistoryContextSize,
 		LLMRequestTimeout:     opts.LLM.RequestTimeout,
+		LLMMinInputChars:      opts.LLM.MinInputChars,
 		MultiLangWords:        ruleSet.Detection.MultiLangWords,
 		HistorySize:           ruleSet.Detection.HistorySize,
 	}

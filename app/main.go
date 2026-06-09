@@ -113,6 +113,7 @@ type options struct {
 		Mode               string        `long:"mode" env:"MODE" choice:"" choice:"missed" choice:"flagged" choice:"always" default:"" description:"which messages LLM checks: missed, flagged, or always; empty preserves provider veto flags"`
 		HistoryContextSize int           `long:"history-context-size" env:"HISTORY_CONTEXT_SIZE" default:"0" description:"recent chat messages to include in LLM context, 0 disables"`
 		RequestTimeout     time.Duration `long:"request-timeout" env:"REQUEST_TIMEOUT" default:"30s" description:"timeout for individual LLM requests"`
+		MinInputChars      int           `long:"min-input-chars" env:"MIN_INPUT_CHARS" default:"5" description:"minimum trimmed characters for automatic LLM checks; force checks bypass this"`
 	} `group:"llm" namespace:"llm" env-namespace:"LLM"`
 
 	LuaPlugins struct {
@@ -230,6 +231,9 @@ func main() {
 		fmt.Printf("tg-spam %s\n", revision)
 	}
 	var opts options
+	restoreEmptyEnv := unsetEmptyOptionEnv(opts)
+	defer restoreEmptyEnv()
+
 	p := flags.NewParser(&opts, flags.PrintErrors|flags.PassDoubleDash|flags.HelpFlag)
 	p.SubcommandsOptional = true
 	if _, err := p.Parse(); err != nil {

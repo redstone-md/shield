@@ -203,7 +203,7 @@ func (d *Detector) ReplaceMetaChecks(mc ...MetaCheck) {
 }
 
 // UpdateConfig updates mutable detector configuration fields under write lock.
-// Fields that cannot change after construction (CAS API, HTTP client, LLM checkers, Lua, history size)
+// Fields that cannot change after construction (CAS API, HTTP client, LLM checkers, Lua, history buffers)
 // are left untouched. DuplicateDetection causes the duplicateDetector to be recreated.
 func (d *Detector) UpdateConfig(cfg Config) {
 	d.lock.Lock()
@@ -214,6 +214,15 @@ func (d *Detector) UpdateConfig(cfg Config) {
 	d.MinSpamProbability = cfg.MinSpamProbability
 	d.MultiLangWords = cfg.MultiLangWords
 	d.AbnormalSpacing = cfg.AbnormalSpacing
+	d.OpenAIVeto = cfg.OpenAIVeto
+	d.OpenAIHistorySize = cfg.OpenAIHistorySize
+	d.GeminiVeto = cfg.GeminiVeto
+	d.GeminiHistorySize = cfg.GeminiHistorySize
+	d.LLMMode = cfg.LLMMode
+	d.LLMConsensus = d.normalizeLLMConsensusMode(cfg.LLMConsensus)
+	d.LLMHistoryContextSize = cfg.LLMHistoryContextSize
+	d.LLMRequestTimeout = cfg.LLMRequestTimeout
+	d.LLMMinInputChars = cfg.LLMMinInputChars
 	if cfg.DuplicateDetection.Threshold != d.DuplicateDetection.Threshold ||
 		cfg.DuplicateDetection.Window != d.DuplicateDetection.Window {
 		d.duplicateDetector = newDuplicateDetector(cfg.DuplicateDetection.Threshold, cfg.DuplicateDetection.Window)

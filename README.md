@@ -72,6 +72,7 @@ The bot is configured through command-line flags or environment variables. Out o
 | `GEMINI_TOKEN` | `--gemini.token` | Enable Gemini text and vision checks |
 | `FILES_DYNAMIC` | `--files.dynamic` | Dynamic data directory; put `prompt-override.md` here to override the slow-path system prompt |
 | `LLM_CONSENSUS` | `--llm.consensus` | `any` or `all` when multiple LLMs are eligible |
+| `LLM_MIN_INPUT_CHARS` | `--llm.min-input-chars` | Minimum text length for automatic LLM checks; default `5` |
 | `REPORT_ENABLED` | `--report.enabled` | Enable user `/report` flow |
 | `SERVER_ENABLED` | `--server.enabled` | Enable HTTP server/API/UI |
 | `SERVER_LISTEN` | `--server.listen` | HTTP listen address, default `:8080` |
@@ -141,6 +142,7 @@ When multiple LLM providers are eligible for the same message, Shield resolves t
 - `any` (default): if any eligible LLM disagrees with the base decision, the base decision flips.
 - `all`: all eligible LLMs must agree before the base decision flips.
 - Each request is subject to `--llm.request-timeout` (default 30s).
+- Automatic LLM checks skip text shorter than `--llm.min-input-chars` (default 5). Use `--openai.check-short-messages=false` and `--gemini.check-short-messages=false` to avoid LLM checks for short messages that the base detector allowed; short flagged spam can still be veto-checked above the minimum length. Forced report reviews bypass the minimum length.
 
 ### Custom slow-path system prompt
 

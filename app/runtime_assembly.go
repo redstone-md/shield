@@ -165,12 +165,9 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		return nil, fmt.Errorf("can't make moderation actions store, %w", err)
 	}
 
-	var reportsStore *storage.Reports
-	if opts.Report.Enabled {
-		reportsStore, err = storage.NewReports(ctx, dataDB)
-		if err != nil {
-			return nil, fmt.Errorf("can't make reports store, %w", err)
-		}
+	reportsStore, err := storage.NewReports(ctx, dataDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't make reports store, %w", err)
 	}
 
 	detectedSpamStore, err := storage.NewDetectedSpam(ctx, dataDB)
@@ -283,6 +280,7 @@ func assembleRuntime(ctx context.Context, opts options) (*runtimeAssembly, error
 		AutoLearner:            autoLearner,
 		UsageMetering:          usageMetering,
 		RetentionSvc: storage.NewRetentionService(dataDB, storage.RetentionConfig{
+			Enabled:              opts.Retention.Enabled,
 			IncidentsTTL:         opts.Retention.IncidentsTTL,
 			AppealsTTL:           opts.Retention.AppealsTTL,
 			DetectedSpamTTL:      opts.Retention.DetectedSpamTTL,
@@ -519,7 +517,7 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 	}
 	if a.SlowPathEngine != nil {
 		listener.SlowPathEngine = a.SlowPathEngine
-		listener.SlowPathEnabled = true
+		listener.SlowPathEnabled = a.ActiveRuleSet.SlowPathEnabled
 	}
 	if a.SlowPathChatEngine != nil {
 		listener.SlowPathChatEngine = a.SlowPathChatEngine

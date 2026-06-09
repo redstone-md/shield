@@ -460,6 +460,68 @@ func TestDetector_CheckOpenAI(t *testing.T) {
 		assert.Len(t, mockOpenAIClient.CreateChatCompletionCalls(), 1)
 	})
 
+	t.Run("short spam with veto mode runs openai", func(t *testing.T) {
+		d := NewDetector(Config{
+			MaxAllowedEmoji:  -1,
+			FirstMessageOnly: true,
+			MinMsgLen:        50,
+			OpenAIVeto:       true,
+		})
+		mockOpenAIClient := &mocks.OpenAIClientMock{
+			CreateChatCompletionFunc: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+				return openai.ChatCompletionResponse{
+					Choices: []openai.ChatCompletionChoice{{
+						Message: openai.ChatCompletionMessage{Content: `{"spam": false, "reason":"looks clean", "confidence":85}`},
+					}},
+				}, nil
+			},
+		}
+		d.WithOpenAIChecker(mockOpenAIClient, OpenAIConfig{Model: "gpt4"})
+		_, err := d.LoadStopWords(strings.NewReader("bad"))
+		require.NoError(t, err)
+
+		spam, cr := d.Check(spamcheck.Request{Msg: "bad text"})
+
+		assert.False(t, spam)
+		require.Len(t, cr, 3)
+		assert.Equal(t, "stopword", cr[0].Name)
+		assert.True(t, cr[0].Spam)
+		assert.Equal(t, "message length", cr[1].Name)
+		assert.Equal(t, "openai", cr[2].Name)
+		assert.False(t, cr[2].Spam)
+		assert.Len(t, mockOpenAIClient.CreateChatCompletionCalls(), 1)
+	})
+
+	t.Run("llm min input chars skips tiny automatic veto checks", func(t *testing.T) {
+		d := NewDetector(Config{
+			MaxAllowedEmoji:  -1,
+			FirstMessageOnly: true,
+			MinMsgLen:        50,
+			OpenAIVeto:       true,
+			LLMMinInputChars: 5,
+		})
+		mockOpenAIClient := &mocks.OpenAIClientMock{
+			CreateChatCompletionFunc: func(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+				return openai.ChatCompletionResponse{
+					Choices: []openai.ChatCompletionChoice{{
+						Message: openai.ChatCompletionMessage{Content: `{"spam": false, "reason":"looks clean", "confidence":85}`},
+					}},
+				}, nil
+			},
+		}
+		d.WithOpenAIChecker(mockOpenAIClient, OpenAIConfig{Model: "gpt4"})
+		_, err := d.LoadStopWords(strings.NewReader("bad"))
+		require.NoError(t, err)
+
+		spam, cr := d.Check(spamcheck.Request{Msg: "bad"})
+
+		assert.True(t, spam)
+		require.Len(t, cr, 2)
+		assert.Equal(t, "stopword", cr[0].Name)
+		assert.Equal(t, "message length", cr[1].Name)
+		assert.Empty(t, mockOpenAIClient.CreateChatCompletionCalls())
+	})
+
 	t.Run("with openai and image-only empty text skips text llm", func(t *testing.T) {
 		d := NewDetector(Config{MaxAllowedEmoji: -1, FirstMessageOnly: true, MinMsgLen: 50})
 		mockOpenAIClient := &mocks.OpenAIClientMock{

@@ -10,6 +10,7 @@ import (
 )
 
 type RetentionConfig struct {
+	Enabled              bool
 	IncidentsTTL         time.Duration
 	AppealsTTL           time.Duration
 	DetectedSpamTTL      time.Duration
@@ -32,6 +33,10 @@ func NewRetentionService(db *engine.SQL, config RetentionConfig) *RetentionServi
 }
 
 func (s *RetentionService) Run(ctx context.Context) {
+	if !s.config.Enabled {
+		log.Printf("[INFO] retention service disabled")
+		return
+	}
 	if s.config.Interval <= 0 {
 		log.Printf("[INFO] retention service disabled (no interval)")
 		return

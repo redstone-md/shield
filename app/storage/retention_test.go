@@ -99,6 +99,26 @@ func TestRetentionService_ZeroTTL_NoDelete(t *testing.T) {
 	assert.False(t, exists)
 }
 
+func TestRetentionService_RunDisabledReturns(t *testing.T) {
+	db := newRetentionDB(t)
+	svc := NewRetentionService(db, RetentionConfig{
+		Enabled:  false,
+		Interval: time.Millisecond,
+	})
+
+	done := make(chan struct{})
+	go func() {
+		svc.Run(t.Context())
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("disabled retention service did not return")
+	}
+}
+
 func newRetentionDB(t *testing.T) *engine.SQL {
 	t.Helper()
 	ctx := t.Context()
