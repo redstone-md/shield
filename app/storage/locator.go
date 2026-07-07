@@ -27,6 +27,7 @@ const (
 	CmdAddLocatorSpam
 	CmdAddLocatorMessagesTenantIDColumn
 	CmdAddLocatorSpamTenantIDColumn
+	CmdAddLocatorUserMessage
 )
 
 // locatorQueries holds all locator-related queries
@@ -48,6 +49,15 @@ var locatorQueries = engine.NewQueryMap().
             tenant_id TEXT NOT NULL DEFAULT '',
             time TIMESTAMP,
             checks TEXT
+        );
+        CREATE TABLE IF NOT EXISTS user_messages (
+            tenant_id TEXT NOT NULL DEFAULT '',
+            chat_id INTEGER,
+            user_id INTEGER,
+            user_name TEXT,
+            msg_id INTEGER,
+            time TIMESTAMP,
+            PRIMARY KEY (tenant_id, chat_id, msg_id)
         )`,
 		Postgres: `CREATE TABLE IF NOT EXISTS messages (
             hash TEXT PRIMARY KEY,
@@ -65,6 +75,15 @@ var locatorQueries = engine.NewQueryMap().
             tenant_id TEXT NOT NULL DEFAULT '',
             time TIMESTAMP,
             checks TEXT
+        );
+        CREATE TABLE IF NOT EXISTS user_messages (
+            tenant_id TEXT NOT NULL DEFAULT '',
+            chat_id BIGINT,
+            user_id BIGINT,
+            user_name TEXT,
+            msg_id INTEGER,
+            time TIMESTAMP,
+            PRIMARY KEY (tenant_id, chat_id, msg_id)
         )`,
 	}).
 	Add(CmdCreateLocatorIndexes, engine.Query{
@@ -76,7 +95,9 @@ var locatorQueries = engine.NewQueryMap().
 			CREATE INDEX IF NOT EXISTS idx_messages_gid_user_id_time ON messages(gid, user_id, time DESC);
 			CREATE INDEX IF NOT EXISTS idx_spam_gid ON spam(gid);
 			CREATE INDEX IF NOT EXISTS idx_messages_tenant_id ON messages(tenant_id);
-			CREATE INDEX IF NOT EXISTS idx_spam_tenant_id ON spam(tenant_id) `,
+			CREATE INDEX IF NOT EXISTS idx_spam_tenant_id ON spam(tenant_id);
+			CREATE INDEX IF NOT EXISTS idx_user_messages_lookup ON user_messages(tenant_id, user_id, time DESC);
+			CREATE INDEX IF NOT EXISTS idx_user_messages_time ON user_messages(time) `,
 		Postgres: `
 			CREATE INDEX IF NOT EXISTS idx_messages_gid_user_id ON messages(gid, user_id);
 			CREATE INDEX IF NOT EXISTS idx_messages_gid_user_id_time ON messages(gid, user_id, time DESC);
@@ -126,6 +147,16 @@ var locatorQueries = engine.NewQueryMap().
 	Add(CmdAddLocatorSpamTenantIDColumn, engine.Query{
 		Sqlite:   "ALTER TABLE spam ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''",
 		Postgres: "ALTER TABLE spam ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT ''",
+	}).
+	Add(CmdAddLocatorUserMessage, engine.Query{
+		Sqlite: `INSERT OR REPLACE INTO user_messages (tenant_id, chat_id, user_id, user_name, msg_id, time)
+            VALUES (:tenant_id, :chat_id, :user_id, :user_name, :msg_id, :time)`,
+		Postgres: `INSERT INTO user_messages (tenant_id, chat_id, user_id, user_name, msg_id, time)
+            VALUES (:tenant_id, :chat_id, :user_id, :user_name, :msg_id, :time)
+            ON CONFLICT (tenant_id, chat_id, msg_id) DO UPDATE SET
+            user_id = :user_id,
+            user_name = :user_name,
+            time = :time`,
 	})
 
 // Locator stores messages metadata and spam results for a given ttl period.
@@ -258,7 +289,33 @@ func (l *Locator) AddMessage(ctx context.Context, msg string, chatID, userID int
 	if err != nil {
 		return fmt.Errorf("failed to insert message: %w", err)
 	}
-	return l.cleanupMessages(ctx)
+
+	// user_messages keeps one row per message (keyed by chat_id+msg_id) so all
+	// messages of a user can be located for bulk deletion; messages above is
+	// keyed by text hash and holds only the latest sender per unique text
+	if userID != 0 && msgID != 0 {
+		userMsgQuery, pickErr := locatorQueries.Pick(l.Type(), CmdAddLocatorUserMessage)
+		if pickErr != nil {
+			return fmt.Errorf("failed to get add user message query: %w", pickErr)
+		}
+		_, err = l.NamedExecContext(ctx, userMsgQuery,
+			map[string]any{
+				"tenant_id": l.TenantID(),
+				"chat_id":   chatID,
+				"user_id":   userID,
+				"user_name": userName,
+				"msg_id":    msgID,
+				"time":      time.Now(),
+			})
+		if err != nil {
+			return fmt.Errorf("failed to insert user message: %w", err)
+		}
+	}
+
+	if err = l.cleanupMessages(ctx); err != nil {
+		return err
+	}
+	return l.cleanupUserMessages(ctx)
 }
 
 // AddSpam adds spam data to the locator and also cleans up old spam data.
@@ -363,7 +420,7 @@ func (l *Locator) MsgHash(msg string) string {
 
 // GetUserMessageIDs returns message IDs from a user for bulk deletion
 func (l *Locator) GetUserMessageIDs(ctx context.Context, userID int64, limit int) ([]int, error) {
-	query := l.Adopt(`SELECT msg_id FROM messages WHERE user_id = ? AND tenant_id = ? ORDER BY time DESC LIMIT ?`)
+	query := l.Adopt(`SELECT msg_id FROM user_messages WHERE user_id = ? AND tenant_id = ? ORDER BY time DESC LIMIT ?`)
 	var msgIDs []int
 	err := l.SelectContext(ctx, &msgIDs, query, userID, l.TenantID(), limit)
 	if err != nil {
@@ -378,6 +435,16 @@ func (l *Locator) cleanupMessages(ctx context.Context) error {
 	_, err := l.ExecContext(ctx, query, time.Now().Add(-l.ttl), l.TenantID(), l.TenantID(), l.minSize)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup messages: %w", err)
+	}
+	return nil
+}
+
+// cleanupUserMessages removes old per-user message rows. Rows with expired ttl are removed if the total number exceeds minSize.
+func (l *Locator) cleanupUserMessages(ctx context.Context) error {
+	query := l.Adopt(`DELETE FROM user_messages WHERE time < ? AND tenant_id = ? AND (SELECT COUNT(*) FROM user_messages WHERE tenant_id = ?) > ?`)
+	_, err := l.ExecContext(ctx, query, time.Now().Add(-l.ttl), l.TenantID(), l.TenantID(), l.minSize)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup user messages: %w", err)
 	}
 	return nil
 }
