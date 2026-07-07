@@ -312,7 +312,7 @@ func (l *Locator) AddMessage(ctx context.Context, msg string, chatID, userID int
 		}
 	}
 
-	if err = l.cleanupMessages(ctx); err != nil {
+	if err := l.cleanupMessages(ctx); err != nil {
 		return err
 	}
 	return l.cleanupUserMessages(ctx)

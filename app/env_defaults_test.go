@@ -41,7 +41,7 @@ func TestUnsetEmptyOptionEnv(t *testing.T) {
 
 func TestCollectOptionEnvKeys(t *testing.T) {
 	keys := make(map[string]struct{})
-	collectOptionEnvKeys(reflect.TypeOf(options{}), "", keys)
+	collectOptionEnvKeys(reflect.TypeFor[options](), "", keys)
 
 	_, hasTopLevel := keys["MAX_EMOJI"]
 	_, hasNested := keys["OPENAI_VETO"]

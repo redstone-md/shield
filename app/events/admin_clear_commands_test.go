@@ -230,8 +230,8 @@ func newClearListenerMocks(t *testing.T, messageIDs []int, wantLimit int) (*mock
 	return mockAPI, locator
 }
 
-func newClearListener(mockAPI *mocks.TbAPIMock, locator Locator) TelegramListener {
-	return TelegramListener{
+func newClearListener(mockAPI *mocks.TbAPIMock, locator Locator) *TelegramListener {
+	return &TelegramListener{
 		SpamLogger:             &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}},
 		TbAPI:                  mockAPI,
 		Bot:                    &mocks.BotMock{},
@@ -243,7 +243,7 @@ func newClearListener(mockAPI *mocks.TbAPIMock, locator Locator) TelegramListene
 	}
 }
 
-func runClearListener(t *testing.T, l TelegramListener, update tbapi.Update) error {
+func runClearListener(t *testing.T, l *TelegramListener, update tbapi.Update) error {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)

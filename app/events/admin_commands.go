@@ -68,10 +68,6 @@ func markdownBanTarget(userName string, userID int64) string {
 	return fmt.Sprintf("%s (%d)", link, userID)
 }
 
-func (a *admin) resolveBanTarget(ctx context.Context, target string) (userID int64, userName string, err error) {
-	return a.resolveUserTarget(ctx, target, "ban")
-}
-
 func (a *admin) resolveUserTarget(ctx context.Context, target, label string) (userID int64, userName string, err error) {
 	target = strings.TrimSpace(target)
 	if target == "" {
