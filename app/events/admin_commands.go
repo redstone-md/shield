@@ -527,7 +527,7 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 	}
 	newMsgText := fmt.Sprintf("**исходная диагностика для %s (%d)**\n\n%s\n\n%s\n\n\n"+
 		"пользователь забанен администратором %s, сообщение удалено",
-		escapeMarkDownV1Text(displayName), displayID, msgTxt, escapeMarkDownV1Text(spamInfoText),
+		escapeMarkDownV1Text(displayName), displayID, escapeMarkDownV1Text(msgTxt), spamInfoText,
 		markdownUserLink(update.Message.From.UserName, update.Message.From.ID))
 	if err := send(tbapi.NewMessage(a.adminChatID, newMsgText), a.tbAPI); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to send spam detection results to admin chat: %w", err))

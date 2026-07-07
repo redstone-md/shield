@@ -138,6 +138,23 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		assert.Empty(t, botMock.UpdateSpamCalls())
 	})
 
+	t.Run("DirectBanReport_EscapesMarkdownInBody", func(t *testing.T) {
+		mockAPI, _, adm, teardown := setupTest()
+		defer teardown()
+
+		// spam body with an unmatched underscore (e.g. a @handle) must be escaped,
+		// otherwise MarkdownV1 parsing fails and the whole notification renders raw
+		update := createReplyUpdate("admin", 111, "spammer", 222, "job offer, details: @pr1me_work")
+
+		err := adm.DirectBanReport(context.Background(), update)
+		require.NoError(t, err)
+
+		require.Len(t, mockAPI.SendCalls(), 1)
+		text := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
+		assert.Contains(t, text, `@pr1me\_work`, "underscore in spam body must be markdown-escaped")
+		assert.NotContains(t, text, "@pr1me_work", "raw unescaped underscore would break markdown")
+	})
+
 	t.Run("DirectBanTarget_ByID", func(t *testing.T) {
 		mockAPI, botMock, adm, teardown := setupTest()
 		defer teardown()
