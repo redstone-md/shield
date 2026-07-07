@@ -472,7 +472,7 @@ func (a *admin) channelDisplayName(ch *tbapi.Chat) string {
 }
 
 func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted int, err error) {
-	msgIDs, err := a.locator.GetUserMessageIDs(ctx, userID, a.aggressiveCleanupLimit)
+	msgs, err := a.locator.GetUserMessages(ctx, userID, a.aggressiveCleanupLimit)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get user messages: %w", err)
 	}
@@ -484,7 +484,7 @@ func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted i
 	consecutiveFailures := 0
 	failed := 0
 
-	for _, msgID := range msgIDs {
+	for _, m := range msgs {
 		<-rateLimiter.C
 
 		if consecutiveFailures >= maxConsecutiveFailures {
@@ -492,10 +492,14 @@ func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted i
 				maxConsecutiveFailures, deleted, failed)
 		}
 
+		chatID := m.ChatID
+		if chatID == 0 {
+			chatID = a.firstChatID()
+		}
 		_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
 			BaseChatMessage: tbapi.BaseChatMessage{
-				MessageID:  msgID,
-				ChatConfig: tbapi.ChatConfig{ChatID: a.firstChatID()},
+				MessageID:  m.MsgID,
+				ChatConfig: tbapi.ChatConfig{ChatID: chatID},
 			},
 		})
 		if err == nil {

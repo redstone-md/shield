@@ -56,7 +56,7 @@ type Locator interface {
 	MsgHash(msg string) string
 	UserNameByID(ctx context.Context, userID int64) string
 	UserIDByName(ctx context.Context, userName string) int64
-	GetUserMessageIDs(ctx context.Context, userID int64, limit int) ([]int, error)
+	GetUserMessages(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error)
 }
 
 // DetectedSpamCounter provides spam strike count for escalation.

@@ -6,6 +6,7 @@ import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/redstone-md/shield/app/bot"
 	"github.com/redstone-md/shield/app/events/mocks"
+	"github.com/redstone-md/shield/app/storage"
 	"github.com/redstone-md/shield/lib/spamcheck"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,6 +14,16 @@ import (
 	"testing"
 	"time"
 )
+
+// userMsgs builds locator UserMessage results from bare msg IDs (ChatID 0 falls
+// back to the primary chat in deleteUserMessages).
+func userMsgs(ids ...int) []storage.UserMessage {
+	msgs := make([]storage.UserMessage, len(ids))
+	for i, id := range ids {
+		msgs[i] = storage.UserMessage{MsgID: id}
+	}
+	return msgs
+}
 
 func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 
@@ -45,8 +56,8 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 		}
 
 		locatorMock := &mocks.LocatorMock{
-			GetUserMessageIDsFunc: func(ctx context.Context, userID int64, limit int) ([]int, error) {
-				return messageIDs, nil
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
+				return userMsgs(messageIDs...), nil
 			},
 		}
 
@@ -90,9 +101,9 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		assert.Len(t, locatorMock.GetUserMessageIDsCalls(), 1)
-		assert.Equal(t, int64(666), locatorMock.GetUserMessageIDsCalls()[0].UserID)
-		assert.Equal(t, 100, locatorMock.GetUserMessageIDsCalls()[0].Limit)
+		assert.Len(t, locatorMock.GetUserMessagesCalls(), 1)
+		assert.Equal(t, int64(666), locatorMock.GetUserMessagesCalls()[0].UserID)
+		assert.Equal(t, 100, locatorMock.GetUserMessagesCalls()[0].Limit)
 
 		requestCalls := mockAPI.RequestCalls()
 		deleteCount := 0
@@ -126,7 +137,7 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 		err := adm.directReport(context.Background(), update, true)
 		require.NoError(t, err)
 
-		assert.Empty(t, locatorMock.GetUserMessageIDsCalls())
+		assert.Empty(t, locatorMock.GetUserMessagesCalls())
 
 		requestCalls := mockAPI.RequestCalls()
 		deleteCount := 0
@@ -145,7 +156,7 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 		err := adm.directReport(context.Background(), update, false)
 		require.NoError(t, err)
 
-		assert.Empty(t, locatorMock.GetUserMessageIDsCalls())
+		assert.Empty(t, locatorMock.GetUserMessagesCalls())
 	})
 }
 
@@ -159,10 +170,10 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 		}
 
 		locatorMock := &mocks.LocatorMock{
-			GetUserMessageIDsFunc: func(ctx context.Context, userID int64, limit int) ([]int, error) {
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 				assert.Equal(t, int64(666), userID)
 				assert.Equal(t, 100, limit)
-				return []int{101, 102, 103}, nil
+				return userMsgs(101, 102, 103), nil
 			},
 		}
 
@@ -189,7 +200,7 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 
 	t.Run("locator error", func(t *testing.T) {
 		locatorMock := &mocks.LocatorMock{
-			GetUserMessageIDsFunc: func(ctx context.Context, userID int64, limit int) ([]int, error) {
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 				return nil, fmt.Errorf("database error")
 			},
 		}
@@ -219,8 +230,8 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 		}
 
 		locatorMock := &mocks.LocatorMock{
-			GetUserMessageIDsFunc: func(ctx context.Context, userID int64, limit int) ([]int, error) {
-				return []int{201, 202, 203}, nil
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
+				return userMsgs(201, 202, 203), nil
 			},
 		}
 
@@ -248,8 +259,8 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 		}
 
 		locatorMock := &mocks.LocatorMock{
-			GetUserMessageIDsFunc: func(ctx context.Context, userID int64, limit int) ([]int, error) {
-				return []int{301, 302, 303, 304, 305, 306, 307}, nil
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
+				return userMsgs(301, 302, 303, 304, 305, 306, 307), nil
 			},
 		}
 
@@ -269,8 +280,8 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 
 	t.Run("empty message list", func(t *testing.T) {
 		locatorMock := &mocks.LocatorMock{
-			GetUserMessageIDsFunc: func(ctx context.Context, userID int64, limit int) ([]int, error) {
-				return []int{}, nil
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
+				return userMsgs(), nil
 			},
 		}
 
@@ -282,6 +293,39 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 		deleted, err := adm.deleteUserMessages(context.Background(), 666)
 		require.NoError(t, err)
 		assert.Equal(t, 0, deleted)
+	})
+
+	t.Run("deletes each message in its own chat", func(t *testing.T) {
+		mockAPI := &mocks.TbAPIMock{
+			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+				return &tbapi.APIResponse{Ok: true}, nil
+			},
+		}
+		locatorMock := &mocks.LocatorMock{
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
+				return []storage.UserMessage{
+					{ChatID: 111, MsgID: 501},
+					{ChatID: 222, MsgID: 502},
+					{ChatID: 0, MsgID: 503}, // legacy row without chat_id falls back to primary chat
+				}, nil
+			},
+		}
+		adm := &admin{
+			tbAPI:                  mockAPI,
+			locator:                locatorMock,
+			primChatIDs:            []int64{999},
+			aggressiveCleanupLimit: 100,
+		}
+
+		deleted, err := adm.deleteUserMessages(context.Background(), 666)
+		require.NoError(t, err)
+		assert.Equal(t, 3, deleted)
+
+		calls := mockAPI.RequestCalls()
+		require.Len(t, calls, 3)
+		assert.Equal(t, int64(111), calls[0].C.(tbapi.DeleteMessageConfig).ChatID)
+		assert.Equal(t, int64(222), calls[1].C.(tbapi.DeleteMessageConfig).ChatID)
+		assert.Equal(t, int64(999), calls[2].C.(tbapi.DeleteMessageConfig).ChatID)
 	})
 }
 

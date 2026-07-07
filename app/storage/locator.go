@@ -418,15 +418,23 @@ func (l *Locator) MsgHash(msg string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(msg)))
 }
 
-// GetUserMessageIDs returns message IDs from a user for bulk deletion
-func (l *Locator) GetUserMessageIDs(ctx context.Context, userID int64, limit int) ([]int, error) {
-	query := l.Adopt(`SELECT msg_id FROM user_messages WHERE user_id = ? AND tenant_id = ? ORDER BY time DESC LIMIT ?`)
-	var msgIDs []int
-	err := l.SelectContext(ctx, &msgIDs, query, userID, l.TenantID(), limit)
+// UserMessage identifies a single message for bulk deletion. ChatID is required
+// because Telegram message IDs are unique only within a chat, so multi-group
+// setups must delete each message in its own chat.
+type UserMessage struct {
+	ChatID int64 `db:"chat_id"`
+	MsgID  int   `db:"msg_id"`
+}
+
+// GetUserMessages returns messages from a user (chat_id + msg_id) for bulk deletion
+func (l *Locator) GetUserMessages(ctx context.Context, userID int64, limit int) ([]UserMessage, error) {
+	query := l.Adopt(`SELECT chat_id, msg_id FROM user_messages WHERE user_id = ? AND tenant_id = ? ORDER BY time DESC LIMIT ?`)
+	var msgs []UserMessage
+	err := l.SelectContext(ctx, &msgs, query, userID, l.TenantID(), limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user message IDs: %w", err)
+		return nil, fmt.Errorf("failed to get user messages: %w", err)
 	}
-	return msgIDs, nil
+	return msgs, nil
 }
 
 // cleanupMessages removes old messages. Messages with expired ttl are removed if the total number of messages exceeds minSize.

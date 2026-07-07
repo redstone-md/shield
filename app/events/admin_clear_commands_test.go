@@ -8,6 +8,7 @@ import (
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/redstone-md/shield/app/bot"
 	"github.com/redstone-md/shield/app/events/mocks"
+	"github.com/redstone-md/shield/app/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -54,10 +55,10 @@ func TestAdmin_DirectClearCommands(t *testing.T) {
 				return "spammer"
 			},
 			UserIDByNameFunc: func(ctx context.Context, userName string) int64 { return 0 },
-			GetUserMessageIDsFunc: func(ctx context.Context, userID int64, limit int) ([]int, error) {
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 				assert.Equal(t, int64(222), userID)
 				assert.Equal(t, 2, limit)
-				return []int{301, 302}, nil
+				return userMsgs(301, 302), nil
 			},
 		}
 		adm := newAdmin(mockAPI, locator)
@@ -65,7 +66,7 @@ func TestAdmin_DirectClearCommands(t *testing.T) {
 		err := adm.DirectClearTarget(context.Background(), newCommandUpdate("/clear 222"), "222")
 		require.NoError(t, err)
 
-		require.Len(t, locator.GetUserMessageIDsCalls(), 1)
+		require.Len(t, locator.GetUserMessagesCalls(), 1)
 		require.Len(t, mockAPI.RequestCalls(), 3)
 		assert.Equal(t, 301, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
 		assert.Equal(t, int64(123), mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).ChatID)
@@ -83,10 +84,10 @@ func TestAdmin_DirectClearCommands(t *testing.T) {
 	t.Run("reply target", func(t *testing.T) {
 		mockAPI := newAPI()
 		locator := &mocks.LocatorMock{
-			GetUserMessageIDsFunc: func(ctx context.Context, userID int64, limit int) ([]int, error) {
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 				assert.Equal(t, int64(222), userID)
 				assert.Equal(t, 2, limit)
-				return []int{401}, nil
+				return userMsgs(401), nil
 			},
 		}
 		adm := newAdmin(mockAPI, locator)
@@ -101,7 +102,7 @@ func TestAdmin_DirectClearCommands(t *testing.T) {
 		err := adm.DirectClearReply(context.Background(), update)
 		require.NoError(t, err)
 
-		require.Len(t, locator.GetUserMessageIDsCalls(), 1)
+		require.Len(t, locator.GetUserMessagesCalls(), 1)
 		require.Len(t, mockAPI.RequestCalls(), 2)
 		assert.Equal(t, 401, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
 		assert.Equal(t, int64(123), mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).ChatID)
@@ -116,8 +117,8 @@ func TestAdmin_DirectClearCommands(t *testing.T) {
 	t.Run("skips superuser target", func(t *testing.T) {
 		mockAPI := newAPI()
 		locator := &mocks.LocatorMock{
-			GetUserMessageIDsFunc: func(ctx context.Context, userID int64, limit int) ([]int, error) {
-				return []int{401}, nil
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
+				return userMsgs(401), nil
 			},
 		}
 		adm := newAdmin(mockAPI, locator)
@@ -131,7 +132,7 @@ func TestAdmin_DirectClearCommands(t *testing.T) {
 		err := adm.DirectClearReply(context.Background(), update)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "clear target is super-user")
-		assert.Empty(t, locator.GetUserMessageIDsCalls())
+		assert.Empty(t, locator.GetUserMessagesCalls())
 		assert.Empty(t, mockAPI.RequestCalls())
 		assert.Empty(t, mockAPI.SendCalls())
 	})
@@ -151,7 +152,7 @@ func TestTelegramListener_DoWithDirectClearByID(t *testing.T) {
 	err := runClearListener(t, l, updMsg)
 	require.EqualError(t, err, "telegram update chan closed")
 
-	require.Len(t, locator.GetUserMessageIDsCalls(), 1)
+	require.Len(t, locator.GetUserMessagesCalls(), 1)
 	require.Len(t, mockAPI.RequestCalls(), 3)
 	assert.Equal(t, 301, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
 	assert.Equal(t, int64(123), mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).ChatID)
@@ -184,7 +185,7 @@ func TestTelegramListener_DoWithDirectClearReply(t *testing.T) {
 	err := runClearListener(t, l, updMsg)
 	require.EqualError(t, err, "telegram update chan closed")
 
-	require.Len(t, locator.GetUserMessageIDsCalls(), 1)
+	require.Len(t, locator.GetUserMessagesCalls(), 1)
 	require.Len(t, mockAPI.RequestCalls(), 2)
 	assert.Equal(t, 401, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
 	assert.Equal(t, int64(123), mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).ChatID)
@@ -220,10 +221,10 @@ func newClearListenerMocks(t *testing.T, messageIDs []int, wantLimit int) (*mock
 			return "spammer"
 		},
 		UserIDByNameFunc: func(ctx context.Context, userName string) int64 { return 0 },
-		GetUserMessageIDsFunc: func(ctx context.Context, userID int64, limit int) ([]int, error) {
+		GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 			assert.Equal(t, int64(222), userID)
 			assert.Equal(t, wantLimit, limit)
-			return messageIDs, nil
+			return userMsgs(messageIDs...), nil
 		},
 	}
 	return mockAPI, locator

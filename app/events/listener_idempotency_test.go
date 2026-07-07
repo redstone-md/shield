@@ -326,7 +326,7 @@ func (s *locatorContextSpy) UserNameByID(context.Context, int64) string { return
 
 func (s *locatorContextSpy) UserIDByName(context.Context, string) int64 { return 0 }
 
-func (s *locatorContextSpy) GetUserMessageIDs(context.Context, int64, int) ([]int, error) {
+func (s *locatorContextSpy) GetUserMessages(context.Context, int64, int) ([]storage.UserMessage, error) {
 	return nil, nil
 }
 

@@ -48,34 +48,35 @@ func (s *StorageTestSuite) TestLocator_GetUserMessageIDs() {
 			// add message for different user
 			s.Require().NoError(locator.AddMessage(ctx, "other message", 123, 200, "user2", 60))
 
-			// get all message IDs for user
-			ids, err := locator.GetUserMessageIDs(ctx, userID, 100)
+			// get all messages for user
+			ids, err := locator.GetUserMessages(ctx, userID, 100)
 			s.Require().NoError(err)
 			s.Require().Len(ids, 5)
 
 			// should be in reverse chronological order (newest first)
-			s.Equal(50, ids[0])
-			s.Equal(40, ids[1])
-			s.Equal(30, ids[2])
-			s.Equal(20, ids[3])
-			s.Equal(10, ids[4])
+			s.Equal(50, ids[0].MsgID)
+			s.Equal(40, ids[1].MsgID)
+			s.Equal(30, ids[2].MsgID)
+			s.Equal(20, ids[3].MsgID)
+			s.Equal(10, ids[4].MsgID)
+			s.Equal(int64(123), ids[0].ChatID)
 
 			// test with limit
-			ids, err = locator.GetUserMessageIDs(ctx, userID, 3)
+			ids, err = locator.GetUserMessages(ctx, userID, 3)
 			s.Require().NoError(err)
 			s.Require().Len(ids, 3)
-			s.Equal(50, ids[0])
-			s.Equal(40, ids[1])
-			s.Equal(30, ids[2])
+			s.Equal(50, ids[0].MsgID)
+			s.Equal(40, ids[1].MsgID)
+			s.Equal(30, ids[2].MsgID)
 
 			// test different user
-			ids, err = locator.GetUserMessageIDs(ctx, 200, 100)
+			ids, err = locator.GetUserMessages(ctx, 200, 100)
 			s.Require().NoError(err)
 			s.Require().Len(ids, 1)
-			s.Equal(60, ids[0])
+			s.Equal(60, ids[0].MsgID)
 
 			// test non-existent user
-			ids, err = locator.GetUserMessageIDs(ctx, 999, 100)
+			ids, err = locator.GetUserMessages(ctx, 999, 100)
 			s.Require().NoError(err)
 			s.Empty(ids)
 		})
