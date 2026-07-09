@@ -15,7 +15,6 @@ race_test:
 
 prep_site:
 	cp -fv README.md site/docs/index.md
-	sed -i '' 's|https:\/\/github.com\/redstone-md\/shield\/raw\/master\/site\/tg-spam-bg.png|logo.png|' site/docs/index.md
 	sed -i '' 's|^.*/workflows/ci.yml.*$$||' site/docs/index.md
 
 release:
@@ -25,8 +24,8 @@ release:
 
 build:
 	mkdir -p .bin
-	cd app && go build -ldflags "-X main.revision=$(REV) -s -w" -o ../.bin/tg-spam.$(BRANCH)
-	cp .bin/tg-spam.$(BRANCH) .bin/tg-spam
+	cd app && go build -ldflags "-X main.revision=$(REV) -s -w" -o ../.bin/shield.$(BRANCH)
+	cp .bin/shield.$(BRANCH) .bin/shield
 
 test:
 	go clean -testcache

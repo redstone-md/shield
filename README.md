@@ -2,11 +2,7 @@
 
 Shield is a self-hosted Telegram moderation and anti-spam bot. It watches group messages, scores them through fast local checks, optionally escalates harder cases to LLM or vision providers, and applies moderation policy such as allow, delete, restrict, warn, or ban.
 
-> Note: the runtime package, binary, and some internal paths still use the legacy `tg-spam` name. This README uses **Shield** for the repository/product and `tg-spam` where it is the current executable name.
-
-<div align="center">
-  <img class="logo" src="https://github.com/redstone-md/shield/raw/master/site/tg-spam-bg.png" width="400px" alt="TG-Spam | Spam Hunter"/>
-</div>
+> Note: internal Go package paths (`lib/tgspam`) and data defaults (`tg-spam.db`, instance id `tg-spam`, basic-auth user `tg-spam`) keep the legacy name for compatibility with existing deployments.
 
 <div align="center">
 
@@ -37,7 +33,7 @@ $EDITOR .env
 docker compose up -d
 ```
 
-The default `docker-compose.yml` starts `tg-spam` with persistent data in `./var/tg-spam`, logs in `./logs`, and a `cloudflared-tgadmin` tunnel sidecar. If you do not use Cloudflare Tunnel, remove or disable the `cloudflared-tgadmin` service before starting.
+The default `docker-compose.yml` starts `shield` with persistent data in `./var/tg-spam`, logs in `./logs`, and a `cloudflared-tgadmin` tunnel sidecar. If you do not use Cloudflare Tunnel, remove or disable the `cloudflared-tgadmin` service before starting.
 
 For non-technical setup instructions, see [INSTALL.md](/INSTALL.md).
 
@@ -45,8 +41,8 @@ For non-technical setup instructions, see [INSTALL.md](/INSTALL.md).
 
 - **Docker** (primary method): image available at [ghcr.io/redstone-md/shield](https://github.com/redstone-md/shield/pkgs/container/shield).
 - **Binary releases**: [releases page](https://github.com/redstone-md/shield/releases/latest).
-- **From source**: `make build` produces `.bin/tg-spam`.
-- **macOS**: `brew tap redstone-md/apps && brew install redstone-md/apps/tg-spam`.
+- **From source**: `make build` produces `.bin/shield`.
+- **macOS**: `brew tap redstone-md/apps && brew install redstone-md/apps/shield`.
 
 ## Configuration
 
@@ -350,7 +346,7 @@ Set at least `TELEGRAM_TOKEN`, `TELEGRAM_GROUP` (or `TELEGRAM_GROUPS`), and `SER
 
 ```yaml
 services:
-  tg-spam:
+  shield:
     image: ghcr.io/redstone-md/shield:latest
     restart: always
     environment:
@@ -364,11 +360,11 @@ services:
 
 ```yaml
 services:
-  tg-spam:
+  shield:
     image: ghcr.io/redstone-md/shield:latest
-    hostname: tg-spam
+    hostname: shield
     restart: always
-    container_name: tg-spam
+    container_name: shield
     user: "1000:1000"
     logging:
       driver: json-file
@@ -381,7 +377,7 @@ services:
       - TELEGRAM_GROUP=example_chat
       - ADMIN_GROUP=-403767890
       - LOGGER_ENABLED=true
-      - LOGGER_FILE=/srv/log/tg-spam.log
+      - LOGGER_FILE=/srv/log/shield.log
       - LOGGER_MAX_SIZE=5M
       - NO_SPAM_REPLY=true
       - REPORT_ENABLED=true
@@ -402,7 +398,7 @@ See [docker-compose-with-psql.yml](docker-compose-with-psql.yml).
 
 ## Railway
 
-Railway deploys this repository as a single `tg-spam` service built from [`Dockerfile`](Dockerfile). The checked-in [`railway.toml`](railway.toml) pins that behavior explicitly.
+Railway deploys this repository as a single `shield` service built from [`Dockerfile`](Dockerfile). The checked-in [`railway.toml`](railway.toml) pins that behavior explicitly.
 
 Dokploy/Railpack deployments use [`railpack.json`](railpack.json), which pins the Go entrypoint to `./app`. This is required because the repository root has `go.mod`, while the executable package lives under `app/` rather than the root or `cmd/`.
 
@@ -498,7 +494,7 @@ A utility container is provided for automated sample updates from git. See [upda
 ## Development
 
 ```bash
-make build          # build .bin/tg-spam
+make build          # build .bin/shield
 make test           # race-enabled tests with coverage summary
 make race_test      # race test suite
 make docker         # build local Docker image

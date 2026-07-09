@@ -83,7 +83,7 @@ func Test_activateServerOnly(t *testing.T) {
 
 func Test_checkVolumeMount(t *testing.T) {
 	prepEnvAndFileSystem := func(opts *options, envValue string, dynamicDataPath string, notMountedExists bool) func() {
-		os.Setenv("TGSPAM_IN_DOCKER", envValue)
+		os.Setenv("SHIELD_IN_DOCKER", envValue)
 
 		tempDir, _ := os.MkdirTemp("", "test")
 		if dynamicDataPath != "" {

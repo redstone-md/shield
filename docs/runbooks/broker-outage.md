@@ -15,14 +15,14 @@ curl -s http://localhost:8080/api/metrics | jq '.counters'
 ## Resolution
 
 ### In-Memory Queue (current default)
-1. Restart the tg-spam process: `docker-compose restart tg-spam`
+1. Restart the shield process: `docker-compose restart shield`
 2. In-flight messages are lost — acceptable for non-critical moderation
 3. Verify recovery: `curl http://localhost:8080/api/metrics | jq '.counters.spam_checks'`
 
 ### External Broker (future)
 1. Check broker health: `redis-cli ping` or `nats-server --healthz`
 2. If broker is down, fall back to in-memory: set `--queue.backend=memory`
-3. Restore broker, drain backlog: `tg-spam queue-drain --from=dead-letter`
+3. Restore broker, drain backlog: `shield queue-drain --from=dead-letter`
 4. Verify no message loss via idempotency keys
 
 ## Prevention
@@ -34,7 +34,7 @@ curl -s http://localhost:8080/api/metrics | jq '.counters'
 If new broker config causes issues:
 ```bash
 # Revert to in-memory queue
-tg-spam --queue.backend=memory
+shield --queue.backend=memory
 ```
 
 ## Affected Components

@@ -1,6 +1,6 @@
-# Lua Plugins for tg-spam
+# Lua Plugins for shield
 
-This directory contains examples of Lua plugins for tg-spam. These plugins demonstrate how to create custom spam checkers using Lua.
+This directory contains examples of Lua plugins for shield. These plugins demonstrate how to create custom spam checkers using Lua.
 
 ## How Lua Plugins Work
 
@@ -74,10 +74,10 @@ This directory contains the following example plugins:
 
 ## Using Lua Plugins
 
-To enable Lua plugins in tg-spam:
+To enable Lua plugins in shield:
 
 1. Place your Lua scripts in a directory
-2. Configure tg-spam to use Lua plugins by setting:
+2. Configure shield to use Lua plugins by setting:
    ```
    --lua-plugins.enabled
    --lua-plugins.plugins-dir=/path/to/plugins
@@ -113,4 +113,4 @@ function check(request)
 end
 ```
 
-Save this as a `.lua` file in your plugins directory and tg-spam will load it automatically if Lua plugins are enabled.
+Save this as a `.lua` file in your plugins directory and shield will load it automatically if Lua plugins are enabled.

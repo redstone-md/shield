@@ -1,6 +1,6 @@
 #!/bin/sh
 
-echo "start tg-spam"
+echo "start shield"
 
 # check if FILES_DYNAMIC is set
 if [ -z "$FILES_DYNAMIC" ]; then
@@ -19,4 +19,4 @@ fi
 echo "content of $FILES_DYNAMIC"
 ls -la "$FILES_DYNAMIC"
 
-exec /srv/tg-spam "$@"
+exec /srv/shield "$@"

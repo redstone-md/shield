@@ -34,14 +34,19 @@ site/public/
 _examples/simplechat/messages.db
 *.loaded
 var/
-tg-spam
-tg-spam-*
+shield
+shield-*
 _examples/lua_plugins/example
 docs/prompts/
-.env.tg-spam.local
+.env.shield.local
 
 # ralphex progress logs
 .ralphex/progress/
 
 # codex skills and config
 .codex/
+
+# local ai-tool state
+.aislop/
+.continuum/
+.serena/

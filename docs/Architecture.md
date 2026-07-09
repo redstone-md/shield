@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Goal: in ~5 minutes, understand the tg-spam runtime, all module boundaries, and where to start for any task.
+Goal: in ~5 minutes, understand the shield runtime, all module boundaries, and where to start for any task.
 
 This file is the primary start-here card for humans and AI agents. Detailed decisions belong in `docs/ADR/`; detailed roadmap execution lives in `docs/plans/`.
 

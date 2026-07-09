@@ -44,7 +44,7 @@ func TestServer_Run(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "pong", string(body))
 
-	assert.Contains(t, resp.Header.Get("App-Name"), "tg-spam")
+	assert.Contains(t, resp.Header.Get("App-Name"), "shield")
 	assert.Contains(t, resp.Header.Get("App-Version"), "dev")
 
 	cancel()

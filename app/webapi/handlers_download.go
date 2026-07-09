@@ -87,7 +87,7 @@ func (s *Server) downloadBackupHandler(w http.ResponseWriter, r *http.Request) {
 	timestamp := time.Now().Format("20060102-150405")
 
 	// always use a .gz extension as the content is always compressed
-	filename := fmt.Sprintf("tg-spam-backup-%s-%s.sql.gz", dbType, timestamp)
+	filename := fmt.Sprintf("shield-backup-%s-%s.sql.gz", dbType, timestamp)
 
 	// set headers for file download - note we're using application/octet-stream
 	// instead of application/sql to prevent browsers from trying to interpret the file
@@ -133,7 +133,7 @@ func (s *Server) downloadExportToPostgresHandler(w http.ResponseWriter, r *http.
 
 	// set filename based on timestamp
 	timestamp := time.Now().Format("20060102-150405")
-	filename := fmt.Sprintf("tg-spam-sqlite-to-postgres-%s.sql.gz", timestamp)
+	filename := fmt.Sprintf("shield-sqlite-to-postgres-%s.sql.gz", timestamp)
 
 	// set headers for file download
 	w.Header().Set("Content-Type", "application/octet-stream")

@@ -1,7 +1,7 @@
 # simplechat - Toy Chat Server with Spam Protection
 
 This is a toy chat server with spam protection.  
-It is a simple example of how to use the tg-spam library.
+It is a simple example of how to use the shield library.
 
 All the preparation steps are done in the main.go file, and the actual spam check and spam report are implemented in the `web.go` file, specifically in the `postMessageHandler` function.
 

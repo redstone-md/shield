@@ -1,11 +1,11 @@
-# example of docker-compose.yml file to run tg-spam with updater
-# updater gets samples from github repo "https://github.com/radio-t/tg-spam-samples.git and updates tg-spam samples
+# example of docker-compose.yml file to run shield with updater
+# updater gets samples from github repo "https://github.com/radio-t/tg-spam-samples.git and updates shield samples
 services:
-  tg-spam:
+  shield:
     image: ghcr.io/redstone-md/shield:latest # use :master tag for latest (unstable) version
-    hostname: tg-spam
+    hostname: shield
     restart: always
-    container_name: tg-spam
+    container_name: shield
     user: "1000:1000" # run with the same user as the host machine to avoid permission issues
     logging: &default_logging
       driver: json-file
@@ -20,15 +20,15 @@ services:
       - TELEGRAM_GROUP
       - ADMIN_GROUP=-403777777777 # admin group id
       - LOGGER_ENABLED=true
-      - LOGGER_FILE=/srv/log/tg-spam.log
+      - LOGGER_FILE=/srv/log/shield.log
       - LOGGER_MAX_SIZE=5M
       - FILES_SAMPLES=/srv/samples
       - FILES_DYNAMIC=/srv/dynamic
       - NO_SPAM_REPLY=true
     volumes:
-      - ./tg-spam-samples:/srv/samples  # map user-provided samples to /srv/samples
-      - ./tg-spam-dynamic:/srv/dynamic  # map user-provided dynamic location to /srv/dynamic
-      - ./log:/srv/log                  # map log folder to /srv/log
+      - ./shield-samples:/srv/samples  # map user-provided samples to /srv/samples
+      - ./shield-dynamic:/srv/dynamic  # map user-provided dynamic location to /srv/dynamic
+      - ./log:/srv/log                 # map log folder to /srv/log
     command: --super=name1 --super=name2
 
   shield-updater:
@@ -39,5 +39,5 @@ services:
     logging: *default_logging
     user: "1000:1000" # run with the same user as the host machine to avoid permission issues
     volumes:
-      - ./tg-spam-samples:/samples
+      - ./shield-samples:/samples
     command: ["https://github.com/radio-t/tg-spam-samples.git", "/samples"]

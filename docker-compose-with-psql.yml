@@ -1,12 +1,12 @@
 # production compose with postgres storage, cloudflared tunnel and logging
 services:
-  tg-spam:
+  shield:
     build:
       context: ..
       dockerfile: Dockerfile
-    image: tg-spam:local
-    hostname: tg-spam
-    container_name: tg-spam
+    image: shield:local
+    hostname: shield
+    container_name: shield
     restart: always
     logging: &default_logging
       driver: json-file
@@ -38,9 +38,9 @@ services:
     container_name: cloudflared
     restart: unless-stopped
     depends_on:
-      - tg-spam
+      - shield
     env_file:
-      - .env.tg-spam.local
+      - .env.shield.local
     command:
       - tunnel
       - --no-autoupdate

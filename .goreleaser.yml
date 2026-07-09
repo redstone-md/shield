@@ -1,8 +1,8 @@
-project_name: tg-spam
+project_name: shield
 dist: .bin
 builds:
-  - id: tg-spam
-    binary: "tg-spam"
+  - id: shield
+    binary: "shield"
     env:
       - CGO_ENABLED=0
     goos:
@@ -26,7 +26,7 @@ builds:
     ldflags: "-s -w -X main.revision={{.Tag}}-{{.ShortCommit}}-{{.CommitDate}}"
 
 archives:
-  - id: tg-spam
+  - id: shield
     name_template: >-
      {{.ProjectName}}_
      {{- .Tag}}_
@@ -48,7 +48,7 @@ archives:
 
 brews:
   -
-    name: tg-spam
+    name: shield
     tap:
       owner: redstone-md
       name: homebrew-apps
@@ -59,21 +59,21 @@ brews:
       email: noreply@redstone.md
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
     homepage: "https://github.com/redstone-md/shield"
-    description: "tg-spam is a self-hosted Telegram bot fighting spam like no tomorrow."
+    description: "Shield is a self-hosted Telegram bot fighting spam like no tomorrow."
     license: "MIT"
     extra_install: |
-      bash_completion.install "completions/tg-spam.bash" => "tg-spam"
-      zsh_completion.install "completions/tg-spam.zsh" => "_tg-spam"
-      fish_completion.install "completions/tg-spam.fish" => "tg-spam.fish"
+      bash_completion.install "completions/shield.bash" => "shield"
+      zsh_completion.install "completions/shield.zsh" => "_shield"
+      fish_completion.install "completions/shield.fish" => "shield.fish"
 
 nfpms:
-  - id: tg-spam
-    package_name: tg-spam
+  - id: shield
+    package_name: shield
     file_name_template: "{{.ProjectName}}_{{.Tag}}_{{.Os}}_{{.Arch}}"
     vendor: Redstone MD
     homepage: https://github.com/redstone-md/shield
     maintainer: Redstone MD <noreply@redstone.md>
-    description: tg-spam is a self-hosted Telegram bot fighting spam like no tomorrow
+    description: Shield is a self-hosted Telegram bot fighting spam like no tomorrow
     license: MIT
     formats:
       - deb
@@ -83,9 +83,9 @@ nfpms:
     epoch: 1
     release: 1
     contents:
-      - src: completions/tg-spam.bash
-        dst: /usr/share/bash-completion/completions/tg-spam
-      - src: completions/tg-spam.zsh
-        dst: /usr/share/zsh/vendor-completions/_tg-spam
-      - src: completions/tg-spam.fish
-        dst: /usr/share/fish/vendor_completions.d/tg-spam.fish
+      - src: completions/shield.bash
+        dst: /usr/share/bash-completion/completions/shield
+      - src: completions/shield.zsh
+        dst: /usr/share/zsh/vendor-completions/_shield
+      - src: completions/shield.fish
+        dst: /usr/share/fish/vendor_completions.d/shield.fish

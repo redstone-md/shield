@@ -1,7 +1,7 @@
-#compdef tg-spam
+#compdef shield
 
-# zsh completion for tg-spam (generated via go-flags)
-_tg_spam() {
+# zsh completion for shield (generated via go-flags)
+_shield() {
     local -a lines
     lines=(${(f)"$(GO_FLAGS_COMPLETION=verbose "${words[1]}" "${(@)words[2,$CURRENT]}" 2>/dev/null)"})
     if (( ${#lines} )); then
@@ -25,4 +25,4 @@ _tg_spam() {
     fi
 }
 
-_tg_spam "$@"
+_shield "$@"

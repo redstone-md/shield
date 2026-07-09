@@ -1,7 +1,7 @@
-# tg-spam Development Guidelines
+# shield Development Guidelines
 
 ## Build & Test Commands
-- Build: `go build -o tg-spam ./app`
+- Build: `go build -o shield ./app`
 - Run tests: `go test -race ./...`
 - Run single test: `go test -v -race ./path/to/package -run TestName`
 - Lint: `golangci-lint run`

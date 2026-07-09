@@ -66,7 +66,7 @@ func makeDB(ctx context.Context, opts options) (*engine.SQL, error) {
 // checkVolumeMount checks if dynamic files location mounted in docker and shows warning if not
 // returns true if running not in docker or dynamic files dir mounted
 func checkVolumeMount(opts options) (ok bool) {
-	if os.Getenv("TGSPAM_IN_DOCKER") != "1" {
+	if os.Getenv("SHIELD_IN_DOCKER") != "1" {
 		return true
 	}
 	log.Printf("[DEBUG] running in docker")

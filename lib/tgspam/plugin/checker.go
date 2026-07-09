@@ -1,4 +1,4 @@
-// Package plugin provides a plugin system for spam detection in tg-spam.
+// Package plugin provides a plugin system for spam detection in shield.
 // It loads and executes Lua scripts that implement custom spam checking logic.
 // Scripts should provide a "check" function that takes a message context and returns
 // a boolean (is spam) and a string (details).

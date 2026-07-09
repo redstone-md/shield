@@ -1,6 +1,6 @@
-# Easy Installation Guide for TG-Spam
+# Easy Installation Guide for Shield
 
-This guide is designed for users who want to set up TG-Spam but don't have technical experience. We'll walk through the process step by step in plain language.
+This guide is designed for users who want to set up Shield but don't have technical experience. We'll walk through the process step by step in plain language.
 
 ## What You'll Need Before Starting
 
@@ -22,13 +22,13 @@ First, we need to create a bot with Telegram:
 
 Remember: Never share your bot token with anyone - it's like a password for your bot!
 
-## Step 2: Setting Up Docker (The Program That Runs TG-Spam)
+## Step 2: Setting Up Docker (The Program That Runs Shield)
 
 *Please note: using an instance, droplet, virtual machine, VPS, or whatever it is called within the provider of your choice with preinstalled Docker and Docker Compose is usually a better and simpler choice. In this case, you can skip this step. To make sure you have Docker installed, run `docker --version` and `docker compose --version` in your terminal.*
 
 **See the [official Docker Desktop documentation](https://docs.docker.com/desktop/) for more detailed instructions.**
 
-Docker Desktop is a program that helps run TG-Spam on your computer. Here's how to install it:
+Docker Desktop is a program that helps run Shield on your computer. Here's how to install it:
 
 ### For Windows:
 1. Go to [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/)
@@ -103,7 +103,7 @@ sudo systemctl enable docker
 
 ## Step 3: Getting the Standard Compose Setup
 
-1. Download or clone this repository to a folder called `tg-spam`.
+1. Download or clone this repository to a folder called `shield`.
 2. Open Terminal (Mac and Linux) or Command Prompt (Windows).
 3. Go into the repository folder.
 4. Copy the example environment file:
@@ -122,7 +122,7 @@ SERVER_ENABLED=true
 
 Replace `YOUR_BOT_TOKEN_HERE` with the token you got from BotFather. Replace `YOUR_GROUP_NAME_HERE` with your Telegram group's username without `@`, or with the numeric group ID.
 
-The repository already includes the standard `docker-compose.yml`. It starts TG-Spam with persistent data in `./var/tg-spam`, logs in `./logs`, and an optional Cloudflare Tunnel sidecar named `cloudflared-tgadmin`.
+The repository already includes the standard `docker-compose.yml`. It starts Shield with persistent data in `./var/tg-spam`, logs in `./logs`, and an optional Cloudflare Tunnel sidecar named `cloudflared-tgadmin`.
 
 If you use Cloudflare Tunnel, add this to `.env`:
 
@@ -132,10 +132,10 @@ CLOUDFLARED_TOKEN=YOUR_CLOUDFLARE_TUNNEL_TOKEN
 
 If you do not use Cloudflare Tunnel, remove or disable the `cloudflared-tgadmin` service in `docker-compose.yml` before starting.
 
-## Step 4: Starting TG-Spam
+## Step 4: Starting Shield
 
 1. Open Terminal (Mac and Linux) or Command Prompt (Windows)
-2. Type `cd ` (with a space after cd) and drag your tg-spam folder into the window
+2. Type `cd ` (with a space after cd) and drag your shield folder into the window
 3. Press Enter
 4. Type this command and press Enter:
 ```
@@ -162,13 +162,13 @@ docker compose up -d
 ## Common Questions
 
 **Q: How do I know if it's working?**
-A: The bot will automatically start monitoring messages. Try sending a test message in your group - the bot should be active and monitoring. You can inspect the bot's logs by running `docker compose logs -f tg-spam` in your tg-spam folder.
+A: The bot will automatically start monitoring messages. Try sending a test message in your group - the bot should be active and monitoring. You can inspect the bot's logs by running `docker compose logs -f shield` in your shield folder.
 
 **Q: How do I stop the bot?**
-A: In Terminal/Command Prompt, go to your tg-spam folder and type: `docker compose down`
+A: In Terminal/Command Prompt, go to your shield folder and type: `docker compose down`
 
 **Q: How do I update the bot?**
-A: In Terminal/Command Prompt, go to your tg-spam folder and type:
+A: In Terminal/Command Prompt, go to your shield folder and type:
 ```
 docker compose pull
 docker compose up -d

@@ -1,6 +1,6 @@
 //go:build e2e
 
-// Package e2e contains end-to-end tests for the tg-spam web UI.
+// Package e2e contains end-to-end tests for the shield web UI.
 // tests verify that pages load correctly and basic HTMX interactions work.
 package e2e
 
@@ -19,8 +19,8 @@ import (
 
 const (
 	baseURL      = "http://localhost:18090"
-	testDBPath   = "/tmp/tg-spam-e2e.db"
-	testDataPath = "/tmp/tg-spam-e2e-data"
+	testDBPath   = "/tmp/shield-e2e.db"
+	testDataPath = "/tmp/shield-e2e-data"
 	testPassword = "e2e-test-password"
 )
 
@@ -47,7 +47,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// build test binary from project root
-	build := exec.Command("go", "build", "-o", "/tmp/tg-spam-e2e", "./app")
+	build := exec.Command("go", "build", "-o", "/tmp/shield-e2e", "./app")
 	build.Dir = ".." // run from project root
 	build.Stdout = os.Stdout
 	build.Stderr = os.Stderr
@@ -57,7 +57,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// start server in web-only mode (no telegram token needed)
-	serverCmd = exec.Command("/tmp/tg-spam-e2e",
+	serverCmd = exec.Command("/tmp/shield-e2e",
 		"--server.enabled",
 		"--server.listen=:18090",
 		"--server.auth="+testPassword,
@@ -123,7 +123,7 @@ func TestMain(m *testing.M) {
 	_ = pw.Stop()
 	_ = serverCmd.Process.Kill()
 	_ = os.Remove(testDBPath)
-	_ = os.RemoveAll("/tmp/tg-spam-e2e-data")
+	_ = os.RemoveAll(testDataPath)
 
 	os.Exit(code)
 }

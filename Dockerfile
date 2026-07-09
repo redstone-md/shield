@@ -29,16 +29,16 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       fi; \
     else version=${GIT_BRANCH}-${GITHUB_SHA:0:7}-$(date +%Y%m%dT%H:%M:%S); fi && \
     echo "version=$version" && \
-    cd app && go build -o /build/tg-spam -ldflags "-X main.revision=${version} -s -w"
+    cd app && go build -o /build/shield -ldflags "-X main.revision=${version} -s -w"
 
 
 FROM alpine:3.23
 # enables automatic changelog generation by tools like Dependabot
 LABEL org.opencontainers.image.source="https://github.com/redstone-md/shield" \
       org.opencontainers.image.licenses="MIT"
-ENV TGSPAM_IN_DOCKER=1
+ENV SHIELD_IN_DOCKER=1
 RUN apk add --no-cache tzdata ffmpeg
-COPY --from=build /build/tg-spam /srv/tg-spam
+COPY --from=build /build/shield /srv/shield
 COPY LICENSE /srv/LICENSE
 
 COPY data /srv/preset
@@ -57,7 +57,7 @@ USER app
 WORKDIR /srv
 
 RUN \
- /srv/tg-spam --convert=only --files.dynamic=/srv/preset --files.samples=/srv/preset && \
+ /srv/shield --convert=only --files.dynamic=/srv/preset --files.samples=/srv/preset && \
  sh -c 'for f in /srv/preset/*.txt.loaded; do mv -vf "$f" "${f%.loaded}"; done' && \
  echo "preset files converted" && \
  ls -la /srv/preset && \

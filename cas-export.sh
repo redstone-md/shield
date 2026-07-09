@@ -4,7 +4,7 @@
 # The file will be saved in the same directory as this script and will be named 'messages.txt'.
 # The script requires jq to be installed (https://stedolan.github.io/jq/).
 # Loading all messages from CAS will take a long time, hours or even days, depending on the number of messages.
-# The resulting file can be used as a generic spam sample file fot tg-spam bot.
+# The resulting file can be used as a generic spam sample file for the shield bot.
 
 DEST_FILE="messages.txt"
 rm -fv "$DEST_FILE"

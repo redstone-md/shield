@@ -229,7 +229,7 @@ func TestServer_downloadExportToPostgresHandler(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, "application/octet-stream", resp.Header.Get("Content-Type"), "content type should be binary")
 		assert.Contains(t, resp.Header.Get("Content-Disposition"), "attachment; filename=")
-		assert.Contains(t, resp.Header.Get("Content-Disposition"), "tg-spam-sqlite-to-postgres")
+		assert.Contains(t, resp.Header.Get("Content-Disposition"), "shield-sqlite-to-postgres")
 		assert.Contains(t, resp.Header.Get("Content-Disposition"), ".sql.gz")
 
 		body, err := io.ReadAll(resp.Body)

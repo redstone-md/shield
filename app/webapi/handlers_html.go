@@ -235,7 +235,7 @@ func (s *Server) htmlSettingsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// get backup information
 	backupURL := "/download/backup"
-	backupFilename := fmt.Sprintf("tg-spam-backup-%s-%s.sql.gz", dbInfo.DatabaseType, time.Now().Format("20060102-150405"))
+	backupFilename := fmt.Sprintf("shield-backup-%s-%s.sql.gz", dbInfo.DatabaseType, time.Now().Format("20060102-150405"))
 
 	// get system info - uptime since server start
 	uptime := time.Since(startTime)

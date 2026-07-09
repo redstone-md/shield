@@ -1,12 +1,12 @@
-# production: tg-spam with web UI, cloudflare tunnel, logging, named volume
+# production: shield with web UI, cloudflare tunnel, logging, named volume
 # copy .env.example to .env and fill in values before starting
 services:
-  tg-spam:
+  shield:
     build:
       context: .
-    image: tg-spam:local
-    hostname: tg-spam
-    container_name: tg-spam
+    image: shield:local
+    hostname: shield
+    container_name: shield
     restart: always
     logging: &default_logging
       driver: json-file
@@ -24,7 +24,7 @@ services:
     container_name: cloudflared
     restart: always
     depends_on:
-      - tg-spam
+      - shield
     env_file:
       - .env
     command:

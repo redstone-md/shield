@@ -1,6 +1,6 @@
 # updater
 
-A small utility to update tg-spam samples from remote git repository
+A small utility to update shield samples from remote git repository
 
 ## Usage
 
@@ -16,9 +16,9 @@ The docker image is available from [GitHub Packages](https://github.com/redstone
 **Example of running the utility as a docker container:**
 
 ```bash
-docker run -d --name shield-updater -v $(pwd)/tg-spam-samples:/samples ghcr.io/redstone-md/shield-updater https://github.com/radio-t/tg-spam-samples.git /samples
+docker run -d --name shield-updater -v $(pwd)/shield-samples:/samples ghcr.io/redstone-md/shield-updater https://github.com/radio-t/tg-spam-samples.git /samples
 ```
-The command above will run the updater as a docker container and mount the local directory `./tg-spam-samples` to the container's `/samples` directory. The updater will clone the remote repository to the local directory and then update it every minute.
+The command above will run the updater as a docker container and mount the local directory `./shield-samples` to the container's `/samples` directory. The updater will clone the remote repository to the local directory and then update it every minute.
 
 **Example of running the utility from the docker-compose:**
 
@@ -30,7 +30,7 @@ services:
     user: "1000:1000" # run with the same user as the host machine to avoid permission issues
     command: ["https://github.com/radio-t/tg-spam-samples.git", "/samples"]
     volumes:
-      - ./tg-spam-samples:/samples
+      - ./shield-samples:/samples
 ```
 
 **permission issues**

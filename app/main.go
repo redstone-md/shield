@@ -228,7 +228,7 @@ var revision = "local"
 
 func main() {
 	if os.Getenv("GO_FLAGS_COMPLETION") == "" {
-		fmt.Printf("tg-spam %s\n", revision)
+		fmt.Printf("shield %s\n", revision)
 	}
 	var opts options
 	restoreEmptyEnv := unsetEmptyOptionEnv(opts)

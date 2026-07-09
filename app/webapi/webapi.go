@@ -297,7 +297,7 @@ func (s *Server) Run(ctx context.Context) error {
 	router.Use(s.requestMetadataMiddleware)
 	router.Use(logger.New(logger.Log(log.Default()), logger.Prefix("[DEBUG]")).Handler)
 	router.Use(rest.Throttle(1000))
-	router.Use(rest.AppInfo("tg-spam", "redstone-md", s.Version), rest.Ping)
+	router.Use(rest.AppInfo("shield", "redstone-md", s.Version), rest.Ping)
 	router.Use(s.tenantRateLimitMiddleware())
 	router.Use(s.tenantAuthzMiddleware())
 	router.Use(rest.SizeLimit(1024 * 1024))

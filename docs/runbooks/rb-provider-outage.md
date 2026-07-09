@@ -11,7 +11,7 @@
 curl -s http://localhost:8080/api/metrics | jq '.counters'
 
 # Check recent provider errors
-grep -c "provider.*error" /var/log/tg-spam/app.log
+grep -c "provider.*error" /var/log/shield/app.log
 ```
 
 ## Recovery Steps

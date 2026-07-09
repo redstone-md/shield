@@ -21,7 +21,7 @@
 ## Resolution
 1. **Hot reload** — restart the service to rebuild cache from DB:
    ```bash
-   docker-compose restart tg-spam
+   docker-compose restart shield
    ```
 2. **Targeted invalidation** — call offboard/onboard cycle:
    ```bash

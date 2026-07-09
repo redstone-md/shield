@@ -1,10 +1,10 @@
 services:
-  tg-spam:
+  shield:
     build:
       context: .
-    image: tg-spam:local
-    container_name: tg-spam
-    hostname: tg-spam
+    image: shield:local
+    container_name: shield
+    hostname: shield
     restart: unless-stopped
     env_file:
       - .env
@@ -19,7 +19,7 @@ services:
     container_name: cloudflared-tgadmin
     restart: unless-stopped
     depends_on:
-      - tg-spam
+      - shield
     command:
       - tunnel
       - --no-autoupdate

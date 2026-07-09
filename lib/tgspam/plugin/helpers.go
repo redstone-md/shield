@@ -230,7 +230,7 @@ func httpRequest(l *lua.LState) int {
 
 	// add default User-Agent header if not already set
 	if req.Header.Get("User-Agent") == "" {
-		req.Header.Set("User-Agent", "TG-Spam-Lua-Plugin")
+		req.Header.Set("User-Agent", "Shield-Lua-Plugin")
 	}
 
 	// execute the request

@@ -14,8 +14,8 @@ CLAUDE.md
 
 # local binaries and build artifacts
 .bin/
-tg-spam
-tg-spam-*
+shield
+shield-*
 *.exe
 *.test
 *.out
