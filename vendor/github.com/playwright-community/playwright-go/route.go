@@ -3,7 +3,6 @@ package playwright
 import (
 	"encoding/base64"
 	"errors"
-	"net/http"
 	"os"
 	"reflect"
 	"strconv"
@@ -48,7 +47,7 @@ func (r *routeImpl) Request() Request {
 	return fromChannel(r.initializer["request"]).(*requestImpl)
 }
 
-func unpackOptionalArgument(input interface{}) interface{} {
+func unpackOptionalArgument(input any) any {
 	inputValue := reflect.ValueOf(input)
 	if inputValue.Kind() != reflect.Slice {
 		panic("Needs to be a slice")
@@ -62,7 +61,7 @@ func unpackOptionalArgument(input interface{}) interface{} {
 func (r *routeImpl) Abort(errorCode ...string) error {
 	return r.handleRoute(func() error {
 		return r.raceWithPageClose(func() error {
-			_, err := r.channel.Send("abort", map[string]interface{}{
+			_, err := r.channel.Send("abort", map[string]any{
 				"errorCode": unpackOptionalArgument(errorCode),
 			})
 			return err
@@ -113,7 +112,7 @@ func (r *routeImpl) innerFulfill(options ...RouteFulfillOptions) error {
 	if len(options) == 1 {
 		option = options[0]
 	}
-	overrides := map[string]interface{}{
+	overrides := map[string]any{
 		"status": 200,
 	}
 	headers := make(map[string]string)
@@ -121,11 +120,19 @@ func (r *routeImpl) innerFulfill(options ...RouteFulfillOptions) error {
 	if option.Response != nil {
 		overrides["status"] = option.Response.Status()
 		headers = option.Response.Headers()
-		response, ok := option.Response.(*apiResponseImpl)
-		if option.Body == nil && option.Path == nil && ok && response.request.connection == r.connection {
-			overrides["fetchResponseUid"] = response.fetchUid()
-		} else {
-			option.Body, _ = option.Response.Body()
+		// Only derive the body from the response when the caller did not supply
+		// their own body/path (those are explicit overrides), matching upstream.
+		if option.Body == nil && option.Path == nil {
+			response, ok := option.Response.(*apiResponseImpl)
+			if ok && response.request.connection == r.connection {
+				overrides["fetchResponseUid"] = response.fetchUid()
+			} else {
+				body, err := option.Response.Body()
+				if err != nil {
+					return err
+				}
+				option.Body = body
+			}
 		}
 		option.Response = nil
 	}
@@ -136,22 +143,21 @@ func (r *routeImpl) innerFulfill(options ...RouteFulfillOptions) error {
 
 	length := 0
 	isBase64 := false
-	var fileContentType string
-	if _, ok := option.Body.(string); ok {
-		isBase64 = false
-	} else if body, ok := option.Body.([]byte); ok {
-		option.Body = base64.StdEncoding.EncodeToString(body)
-		length = len(body)
-		isBase64 = true
-	} else if option.Path != nil {
+	if option.Path != nil {
 		content, err := os.ReadFile(*option.Path)
 		if err != nil {
 			return err
 		}
-		fileContentType = http.DetectContentType(content)
 		option.Body = base64.StdEncoding.EncodeToString(content)
 		isBase64 = true
 		length = len(content)
+	} else if body, ok := option.Body.(string); ok {
+		isBase64 = false
+		length = len(body)
+	} else if body, ok := option.Body.([]byte); ok {
+		option.Body = base64.StdEncoding.EncodeToString(body)
+		length = len(body)
+		isBase64 = true
 	}
 
 	if option.Headers != nil {
@@ -165,7 +171,12 @@ func (r *routeImpl) innerFulfill(options ...RouteFulfillOptions) error {
 		headers["content-type"] = *option.ContentType
 		option.ContentType = nil
 	} else if option.Path != nil {
-		headers["content-type"] = fileContentType
+		// Content type is inferred from the file extension, matching upstream.
+		if contentType := getMimeTypeForPath(*option.Path); contentType != "" {
+			headers["content-type"] = contentType
+		} else {
+			headers["content-type"] = "application/octet-stream"
+		}
 	}
 	if _, ok := headers["content-length"]; !ok && length > 0 {
 		headers["content-length"] = strconv.Itoa(length)
@@ -208,7 +219,7 @@ func (r *routeImpl) Fetch(options ...RouteFetchOptions) (APIResponse, error) {
 			url = *options[0].URL
 		}
 	}
-	ret, err := r.connection.WrapAPICall(func() (interface{}, error) {
+	ret, err := r.connection.WrapAPICall(func() (any, error) {
 		return r.context.request.innerFetch(url, r.Request(), *opt)
 	}, false)
 	if ret == nil {
@@ -233,7 +244,7 @@ func (r *routeImpl) Continue(options ...RouteContinueOptions) error {
 }
 
 func (r *routeImpl) internalContinue(isFallback bool) error {
-	overrides := make(map[string]interface{})
+	overrides := make(map[string]any)
 	overrides["url"] = r.Request().(*requestImpl).fallbackOverrides.URL
 	overrides["method"] = r.Request().(*requestImpl).fallbackOverrides.Method
 	headers := r.Request().(*requestImpl).fallbackOverrides.Headers
@@ -254,7 +265,7 @@ func (r *routeImpl) internalContinue(isFallback bool) error {
 func (r *routeImpl) redirectedNavigationRequest(url string) error {
 	return r.handleRoute(func() error {
 		return r.raceWithPageClose(func() error {
-			_, err := r.channel.Send("redirectNavigationRequest", map[string]interface{}{
+			_, err := r.channel.Send("redirectNavigationRequest", map[string]any{
 				"url": url,
 			})
 			return err
@@ -262,7 +273,7 @@ func (r *routeImpl) redirectedNavigationRequest(url string) error {
 	})
 }
 
-func newRoute(parent *channelOwner, objectType string, guid string, initializer map[string]interface{}) *routeImpl {
+func newRoute(parent *channelOwner, objectType string, guid string, initializer map[string]any) *routeImpl {
 	bt := &routeImpl{}
 	bt.createChannelOwner(bt, parent, objectType, guid, initializer)
 	bt.markAsInternalType()

@@ -1,13 +1,24 @@
 package playwright
 
-func createObjectFactory(parent *channelOwner, objectType string, guid string, initializer map[string]interface{}) interface{} {
+// dummyObject is a placeholder for unimplemented protocol objects (Android, Electron, etc.)
+type dummyObject struct {
+	channelOwner
+}
+
+func newDummyObject(parent *channelOwner, objectType string, guid string, initializer map[string]any) *dummyObject {
+	d := &dummyObject{}
+	d.createChannelOwner(d, parent, objectType, guid, initializer)
+	return d
+}
+
+func createObjectFactory(parent *channelOwner, objectType string, guid string, initializer map[string]any) any {
 	switch objectType {
 	case "Android":
-		return nil
+		return newDummyObject(parent, objectType, guid, initializer)
 	case "AndroidSocket":
-		return nil
+		return newDummyObject(parent, objectType, guid, initializer)
 	case "AndroidDevice":
-		return nil
+		return newDummyObject(parent, objectType, guid, initializer)
 	case "APIRequestContext":
 		return newAPIRequestContext(parent, objectType, guid, initializer)
 	case "Artifact":
@@ -20,14 +31,16 @@ func createObjectFactory(parent *channelOwner, objectType string, guid string, i
 		return newBrowserType(parent, objectType, guid, initializer)
 	case "BrowserContext":
 		return newBrowserContext(parent, objectType, guid, initializer)
+	case "Debugger":
+		return newDebugger(parent, objectType, guid, initializer)
 	case "CDPSession":
 		return newCDPSession(parent, objectType, guid, initializer)
 	case "Dialog":
 		return newDialog(parent, objectType, guid, initializer)
 	case "Electron":
-		return nil
+		return newDummyObject(parent, objectType, guid, initializer)
 	case "ElectronApplication":
-		return nil
+		return newDummyObject(parent, objectType, guid, initializer)
 	case "ElementHandle":
 		return newElementHandle(parent, objectType, guid, initializer)
 	case "Frame":
@@ -68,6 +81,10 @@ func createObjectFactory(parent *channelOwner, objectType string, guid string, i
 		return newWorker(parent, objectType, guid, initializer)
 	case "WritableStream":
 		return newWritableStream(parent, objectType, guid, initializer)
+	// Disposable objects are sent by the driver but not exposed in Go API.
+	// Methods returning Disposable in JS return only error in Go.
+	case "Disposable":
+		return newDisposable(parent, objectType, guid, initializer)
 	default:
 		panic(objectType)
 	}

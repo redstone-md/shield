@@ -3,6 +3,7 @@ package playwright
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strings"
@@ -18,15 +19,16 @@ type (
 
 func skipFieldSerialization(val reflect.Value) bool {
 	typ := val.Type()
-	return (typ.Kind() == reflect.Ptr ||
+	return (typ.Kind() == reflect.Pointer ||
 		typ.Kind() == reflect.Interface ||
 		typ.Kind() == reflect.Map ||
-		typ.Kind() == reflect.Slice) && val.IsNil() || (val.Kind() == reflect.Interface && val.Elem().Kind() == reflect.Ptr && val.Elem().IsNil())
+		typ.Kind() == reflect.Slice ||
+		typ.Kind() == reflect.Func) && val.IsNil() || (val.Kind() == reflect.Interface && val.Elem().Kind() == reflect.Pointer && val.Elem().IsNil())
 }
 
-func transformStructValues(in interface{}) interface{} {
+func transformStructValues(in any) any {
 	v := reflect.ValueOf(in)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 	if _, ok := in.(*channel); ok {
@@ -36,7 +38,7 @@ func transformStructValues(in interface{}) interface{} {
 		return transformStructIntoMapIfNeeded(in)
 	}
 	if v.Kind() == reflect.Slice {
-		outSlice := []interface{}{}
+		outSlice := []any{}
 		for i := 0; i < v.Len(); i++ {
 			if !skipFieldSerialization(v.Index(i)) {
 				outSlice = append(outSlice, transformStructValues(v.Index(i).Interface()))
@@ -50,10 +52,10 @@ func transformStructValues(in interface{}) interface{} {
 	return in
 }
 
-func transformStructIntoMapIfNeeded(inStruct interface{}) map[string]interface{} {
-	out := make(map[string]interface{})
+func transformStructIntoMapIfNeeded(inStruct any) map[string]any {
+	out := make(map[string]any)
 	v := reflect.ValueOf(inStruct)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 	typ := v.Type()
@@ -61,15 +63,21 @@ func transformStructIntoMapIfNeeded(inStruct interface{}) map[string]interface{}
 		// Merge into the base map by the JSON struct tag
 		for i := 0; i < v.NumField(); i++ {
 			fi := typ.Field(i)
+			tagv := fi.Tag.Get("json")
+			key := strings.Split(tagv, ",")[0]
+			if key == "" {
+				key = fi.Name
+			}
+			// Special handling for timeout field: provide default value when nil
+			// This is required in Playwright v1.57+ protocol where timeout is no longer optional
+			if key == "timeout" && skipFieldSerialization(v.Field(i)) {
+				out[key] = float64(30000) // default 30s
+				continue
+			}
 			// Skip the values when the field is a pointer (like *string) and nil.
 			if fi.IsExported() && !skipFieldSerialization(v.Field(i)) {
 				// We use the JSON struct fields for getting the original names
 				// out of the field.
-				tagv := fi.Tag.Get("json")
-				key := strings.Split(tagv, ",")[0]
-				if key == "" {
-					key = fi.Name
-				}
 				out[key] = transformStructValues(v.Field(i).Interface())
 			}
 		}
@@ -85,16 +93,16 @@ func transformStructIntoMapIfNeeded(inStruct interface{}) map[string]interface{}
 }
 
 // transformOptions handles the parameter data transformation
-func transformOptions(options ...interface{}) map[string]interface{} {
-	var base map[string]interface{}
-	var option interface{}
+func transformOptions(options ...any) map[string]any {
+	var base map[string]any
+	var option any
 	// Case 1: No options are given
 	if len(options) == 0 {
-		return make(map[string]interface{})
+		return make(map[string]any)
 	}
 	if len(options) == 1 {
 		// Case 2: a single value (either struct or map) is given.
-		base = make(map[string]interface{})
+		base = make(map[string]any)
 		option = options[0]
 	} else if len(options) == 2 {
 		// Case 3: two values are given. The first one needs to be transformed
@@ -110,6 +118,16 @@ func transformOptions(options ...interface{}) map[string]interface{} {
 	v := reflect.ValueOf(option)
 	if v.Kind() == reflect.Slice {
 		if v.Len() == 0 {
+			// Check if the slice element type has a Timeout field and add default if so
+			// This is required in Playwright v1.57+ protocol where timeout is no longer optional
+			elemType := v.Type().Elem()
+			if elemType.Kind() == reflect.Struct {
+				if _, hasTimeout := elemType.FieldByName("Timeout"); hasTimeout {
+					if base["timeout"] == nil {
+						base["timeout"] = float64(30000) // default 30s
+					}
+				}
+			}
 			return base
 		}
 		option = v.Index(0).Interface()
@@ -120,7 +138,7 @@ func transformOptions(options ...interface{}) map[string]interface{} {
 	}
 	v = reflect.ValueOf(option)
 
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 
@@ -152,34 +170,39 @@ func remapValue(inMapValue reflect.Value, outStructValue reflect.Value) {
 			fi := structTyp.Field(i)
 			key := strings.Split(fi.Tag.Get("json"), ",")[0]
 			structField := outStructValue.Field(i)
-			structFieldDeref := outStructValue.Field(i)
-			if structField.Type().Kind() == reflect.Ptr {
+			value := inMapValue.MapIndex(reflect.ValueOf(key))
+			if !value.IsValid() {
+				continue
+			}
+			if value.Kind() == reflect.Interface {
+				if value.IsNil() {
+					continue
+				}
+				value = value.Elem()
+			}
+			structFieldDeref := structField
+			if structField.Type().Kind() == reflect.Pointer {
 				structField.Set(reflect.New(structField.Type().Elem()))
 				structFieldDeref = structField.Elem()
 			}
-			for _, e := range inMapValue.MapKeys() {
-				if key == e.String() {
-					value := inMapValue.MapIndex(e)
-					remapValue(value.Elem(), structFieldDeref)
-				}
-			}
+			remapValue(value, structFieldDeref)
 		}
 	default:
 		panic(inMapValue.Interface())
 	}
 }
 
-func remapMapToStruct(inputMap interface{}, outStruct interface{}) {
+func remapMapToStruct(inputMap any, outStruct any) {
 	remapValue(reflect.ValueOf(inputMap), reflect.ValueOf(outStruct).Elem())
 }
 
 type urlMatcher struct {
-	raw     interface{}
+	raw     any
 	pattern *regexp.Regexp
 	matchFn func(url string) bool
 }
 
-func newURLMatcher(urlOrPredicate interface{}, baseURL *string, isWsUrl ...bool) *urlMatcher {
+func newURLMatcher(urlOrPredicate any, baseURL *string, isWsUrl ...bool) *urlMatcher {
 	switch v := urlOrPredicate.(type) {
 	case *regexp.Regexp:
 		return &urlMatcher{pattern: v, raw: urlOrPredicate}
@@ -210,7 +233,7 @@ func (u *urlMatcher) Matches(url string) bool {
 }
 
 // SameWith compares String() if urlOrPredicate is *regexp.Regexp
-func (u *urlMatcher) SameWith(urlOrPredicate interface{}) bool {
+func (u *urlMatcher) SameWith(urlOrPredicate any) bool {
 	switch v := urlOrPredicate.(type) {
 	case *regexp.Regexp:
 		return u.pattern.String() == v.String()
@@ -320,19 +343,19 @@ func newRouteHandlerEntry(matcher *urlMatcher, handler routeHandler, times ...in
 	}
 }
 
-func prepareInterceptionPatterns(handlers []*routeHandlerEntry) []map[string]interface{} {
-	patterns := []map[string]interface{}{}
+func prepareInterceptionPatterns(handlers []*routeHandlerEntry) []map[string]any {
+	patterns := []map[string]any{}
 	all := false
 	for _, h := range handlers {
 		switch h.matcher.raw.(type) {
 		case *regexp.Regexp:
 			pattern, flags := convertRegexp(h.matcher.raw.(*regexp.Regexp))
-			patterns = append(patterns, map[string]interface{}{
+			patterns = append(patterns, map[string]any{
 				"regexSource": pattern,
 				"regexFlags":  flags,
 			})
 		case string:
-			patterns = append(patterns, map[string]interface{}{
+			patterns = append(patterns, map[string]any{
 				"glob": h.matcher.raw.(string),
 			})
 		default:
@@ -340,7 +363,7 @@ func prepareInterceptionPatterns(handlers []*routeHandlerEntry) []map[string]int
 		}
 	}
 	if all {
-		return []map[string]interface{}{
+		return []map[string]any{
 			{
 				"glob": "**/*",
 			},
@@ -426,34 +449,34 @@ type SelectOptionValues struct {
 	Elements       *[]ElementHandle
 }
 
-func convertSelectOptionSet(values SelectOptionValues) map[string]interface{} {
-	out := make(map[string]interface{})
+func convertSelectOptionSet(values SelectOptionValues) map[string]any {
+	out := make(map[string]any)
 	if values == (SelectOptionValues{}) {
 		return out
 	}
 
-	var o []map[string]interface{}
+	var o []map[string]any
 	if values.ValuesOrLabels != nil {
 		for _, v := range *values.ValuesOrLabels {
-			m := map[string]interface{}{"valueOrLabel": v}
+			m := map[string]any{"valueOrLabel": v}
 			o = append(o, m)
 		}
 	}
 	if values.Values != nil {
 		for _, v := range *values.Values {
-			m := map[string]interface{}{"value": v}
+			m := map[string]any{"value": v}
 			o = append(o, m)
 		}
 	}
 	if values.Indexes != nil {
 		for _, i := range *values.Indexes {
-			m := map[string]interface{}{"index": i}
+			m := map[string]any{"index": i}
 			o = append(o, m)
 		}
 	}
 	if values.Labels != nil {
 		for _, l := range *values.Labels {
-			m := map[string]interface{}{"label": l}
+			m := map[string]any{"label": l}
 			o = append(o, m)
 		}
 	}
@@ -474,7 +497,7 @@ func convertSelectOptionSet(values SelectOptionValues) map[string]interface{} {
 	return out
 }
 
-func unroute(inRoutes []*routeHandlerEntry, url interface{}, handlers ...routeHandler) ([]*routeHandlerEntry, []*routeHandlerEntry, error) {
+func unroute(inRoutes []*routeHandlerEntry, url any, handlers ...routeHandler) ([]*routeHandlerEntry, []*routeHandlerEntry, error) {
 	var handler routeHandler
 	if len(handlers) == 1 {
 		handler = handlers[0]
@@ -498,12 +521,12 @@ func unroute(inRoutes []*routeHandlerEntry, url interface{}, handlers ...routeHa
 	return removed, remaining, nil
 }
 
-func serializeMapToNameAndValue(headers map[string]string) []map[string]string {
-	serialized := make([]map[string]string, 0)
+func serializeMapToNameAndValue(headers map[string]string) []NameValue {
+	serialized := make([]NameValue, 0)
 	for name, value := range headers {
-		serialized = append(serialized, map[string]string{
-			"name":  name,
-			"value": value,
+		serialized = append(serialized, NameValue{
+			Name:  name,
+			Value: value,
 		})
 	}
 	return serialized
@@ -512,9 +535,9 @@ func serializeMapToNameAndValue(headers map[string]string) []map[string]string {
 // assignStructFields assigns fields from src to dest,
 //
 //	omitExtra determines whether to omit src's extra fields
-func assignStructFields(dest, src interface{}, omitExtra bool) error {
+func assignStructFields(dest, src any, omitExtra bool) error {
 	destValue := reflect.ValueOf(dest)
-	if destValue.Kind() != reflect.Ptr || destValue.IsNil() {
+	if destValue.Kind() != reflect.Pointer || destValue.IsNil() {
 		return fmt.Errorf("dest must be a non-nil pointer")
 	}
 	destValue = destValue.Elem()
@@ -523,7 +546,7 @@ func assignStructFields(dest, src interface{}, omitExtra bool) error {
 	}
 
 	srcValue := reflect.ValueOf(src)
-	if srcValue.Kind() == reflect.Ptr {
+	if srcValue.Kind() == reflect.Pointer {
 		srcValue = srcValue.Elem()
 	}
 	if srcValue.Kind() != reflect.Struct {
@@ -555,39 +578,96 @@ func assignStructFields(dest, src interface{}, omitExtra bool) error {
 	return nil
 }
 
-func deserializeNameAndValueToMap(headersArray []map[string]string) map[string]string {
-	unserialized := make(map[string]string)
-	for _, item := range headersArray {
-		unserialized[item["name"]] = item["value"]
+// addSourceURLToScript appends a sourceURL comment so scripts loaded from a file
+// path are attributed to that path in stack traces and DevTools, mirroring
+// upstream addSourceUrlToScript.
+func addSourceURLToScript(source string, path string) string {
+	return source + "\n//# sourceURL=" + strings.ReplaceAll(path, "\n", "")
+}
+
+// formatCallLog renders the server-provided call log appended to command error
+// messages, mirroring upstream formatCallLog. Returns an empty string when the
+// log is absent or contains only empty entries.
+func formatCallLog(log []string) string {
+	hasContent := false
+	for _, l := range log {
+		if l != "" {
+			hasContent = true
+			break
+		}
 	}
-	return unserialized
+	if !hasContent {
+		return ""
+	}
+	return "\nCall log:\n" + strings.Join(log, "\n")
+}
+
+// mergeHeaders converts a name/value header array into a map, merging multiple
+// set-cookie headers into a single newline-separated value (route.Fulfill does
+// not support multiple set-cookie headers).
+func mergeHeaders(headersArray []map[string]string) map[string]string {
+	headers := make(map[string]string)
+	for _, item := range headersArray {
+		name := item["name"]
+		value := item["value"]
+		if strings.ToLower(name) == "set-cookie" {
+			if existing, ok := headers["set-cookie"]; ok {
+				headers["set-cookie"] = existing + "\n" + value
+			} else {
+				headers["set-cookie"] = value
+			}
+		} else {
+			headers[name] = value
+		}
+	}
+	return headers
 }
 
 type recordHarOptions struct {
-	Path           string            `json:"path"`
+	Path           string            `json:"harPath,omitempty"`
 	Content        *HarContentPolicy `json:"content,omitempty"`
 	Mode           *HarMode          `json:"mode,omitempty"`
 	UrlGlob        *string           `json:"urlGlob,omitempty"`
 	UrlRegexSource *string           `json:"urlRegexSource,omitempty"`
 	UrlRegexFlags  *string           `json:"urlRegexFlags,omitempty"`
+	ResourcesDir   *string           `json:"resourcesDir,omitempty"`
 }
 
 type recordHarInputOptions struct {
-	Path        string
-	URL         interface{}
-	Mode        *HarMode
-	Content     *HarContentPolicy
-	OmitContent *bool
+	Path         string
+	URL          any
+	Mode         *HarMode
+	Content      *HarContentPolicy
+	OmitContent  *bool
+	ResourcesDir *string
 }
 
 type harRecordingMetadata struct {
-	Path    string
-	Content *HarContentPolicy
+	Path         string
+	Content      *HarContentPolicy
+	ResourcesDir *string
+}
+
+// resolveRecordVideoDir resolves a relative recordVideo.dir to an absolute path,
+// mirroring the upstream JS/Python clients (path.resolve). Without this the driver
+// receives a relative directory and Video().Path() returns a path relative to the
+// process working directory, which breaks if the cwd changes before the file is read.
+func resolveRecordVideoDir(recordVideo *RecordVideo) error {
+	if recordVideo == nil || recordVideo.Dir == nil {
+		return nil
+	}
+	abs, err := filepath.Abs(*recordVideo.Dir)
+	if err != nil {
+		return err
+	}
+	recordVideo.Dir = String(abs)
+	return nil
 }
 
 func prepareRecordHarOptions(option recordHarInputOptions) recordHarOptions {
-	out := recordHarOptions{
-		Path: option.Path,
+	out := recordHarOptions{}
+	if !strings.HasSuffix(strings.ToLower(option.Path), ".zip") {
+		out.Path = option.Path
 	}
 	if option.URL != nil {
 		switch option.URL.(type) {
@@ -607,6 +687,7 @@ func prepareRecordHarOptions(option recordHarInputOptions) recordHarOptions {
 	} else if option.OmitContent != nil && *option.OmitContent {
 		out.Content = HarContentPolicyOmit
 	}
+	out.ResourcesDir = option.ResourcesDir
 	return out
 }
 

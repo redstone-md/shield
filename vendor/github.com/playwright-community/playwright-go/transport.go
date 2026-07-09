@@ -11,7 +11,7 @@ import (
 )
 
 type transport interface {
-	Send(msg map[string]interface{}) error
+	Send(msg map[string]any) error
 	Poll() (*message, error)
 	Close() error
 }
@@ -21,6 +21,7 @@ type pipeTransport struct {
 	bufReader *bufio.Reader
 	closed    chan struct{}
 	onClose   func() error
+	process   *os.Process
 }
 
 func (t *pipeTransport) Poll() (*message, error) {
@@ -45,23 +46,24 @@ func (t *pipeTransport) Poll() (*message, error) {
 		return nil, fmt.Errorf("could not decode json: %w", err)
 	}
 	if os.Getenv("DEBUGP") != "" {
-		fmt.Fprintf(os.Stdout, "\x1b[33mRECV>\x1b[0m\n%s\n", data)
+		fmt.Fprintf(os.Stdout, "\x1b[33mRECV>\x1b[0m\n%s\n", data) //nolint:errcheck
 	}
 	return msg, nil
 }
 
 type message struct {
-	ID     int                    `json:"id"`
-	GUID   string                 `json:"guid"`
-	Method string                 `json:"method,omitempty"`
-	Params map[string]interface{} `json:"params,omitempty"`
-	Result map[string]interface{} `json:"result,omitempty"`
+	ID     int            `json:"id"`
+	GUID   string         `json:"guid"`
+	Method string         `json:"method,omitempty"`
+	Params map[string]any `json:"params,omitempty"`
+	Result map[string]any `json:"result,omitempty"`
 	Error  *struct {
 		Error Error `json:"error"`
 	} `json:"error,omitempty"`
+	Log []string `json:"log,omitempty"`
 }
 
-func (t *pipeTransport) Send(msg map[string]interface{}) error {
+func (t *pipeTransport) Send(msg map[string]any) error {
 	if t.isClosed() {
 		return fmt.Errorf("transport closed")
 	}
@@ -70,7 +72,7 @@ func (t *pipeTransport) Send(msg map[string]interface{}) error {
 		return fmt.Errorf("pipeTransport: could not marshal json: %w", err)
 	}
 	if os.Getenv("DEBUGP") != "" {
-		fmt.Fprintf(os.Stdout, "\x1b[32mSEND>\x1b[0m\n%s\n", msgBytes)
+		fmt.Fprintf(os.Stdout, "\x1b[32mSEND>\x1b[0m\n%s\n", msgBytes) //nolint:errcheck
 	}
 
 	lengthPadding := make([]byte, 4)
@@ -136,6 +138,8 @@ func newPipeTransport(driver *PlaywrightDriver, stderr io.Writer) (transport, er
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("could not start driver: %w", err)
 	}
+
+	t.process = cmd.Process
 
 	return t, nil
 }

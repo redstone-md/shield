@@ -30,7 +30,7 @@ func (b *browserImpl) IsConnected() bool {
 }
 
 func (b *browserImpl) NewContext(options ...BrowserNewContextOptions) (BrowserContext, error) {
-	overrides := map[string]interface{}{}
+	overrides := map[string]any{}
 	option := BrowserNewContextOptions{}
 	if len(options) == 1 {
 		option = options[0]
@@ -72,6 +72,11 @@ func (b *browserImpl) NewContext(options ...BrowserNewContextOptions) (BrowserCo
 		overrides["noDefaultViewport"] = true
 		options[0].NoViewport = nil
 	}
+	if option.RecordVideo != nil {
+		if err := resolveRecordVideoDir(options[0].RecordVideo); err != nil {
+			return nil, err
+		}
+	}
 	if option.RecordHarPath != nil {
 		overrides["recordHar"] = prepareRecordHarOptions(recordHarInputOptions{
 			Path:        *options[0].RecordHarPath,
@@ -93,6 +98,9 @@ func (b *browserImpl) NewContext(options ...BrowserNewContextOptions) (BrowserCo
 	context := fromChannel(channel).(*browserContextImpl)
 	context.browser = b
 	b.browserType.(*browserTypeImpl).didCreateContext(context, &option, nil)
+	if err := context.initializeHarFromOptions(); err != nil {
+		return nil, err
+	}
 	return context, nil
 }
 
@@ -131,6 +139,20 @@ func (b *browserImpl) Contexts() []BrowserContext {
 	return b.contexts
 }
 
+func (b *browserImpl) Bind(title string, options ...BrowserBindOptions) (*Bind, error) {
+	overrides := map[string]any{"title": title}
+	result, err := b.channel.SendReturnAsDict("startServer", options, overrides)
+	if err != nil {
+		return nil, err
+	}
+	return &Bind{Endpoint: result["endpoint"].(string)}, nil
+}
+
+func (b *browserImpl) Unbind() error {
+	_, err := b.channel.Send("stopServer")
+	return err
+}
+
 func (b *browserImpl) Close(options ...BrowserCloseOptions) (err error) {
 	if len(options) == 1 {
 		b.closeReason = options[0].Reason
@@ -139,7 +161,7 @@ func (b *browserImpl) Close(options ...BrowserCloseOptions) (err error) {
 	if b.shouldCloseConnectionOnClose {
 		err = b.connection.Stop()
 	} else if b.closeReason != nil {
-		_, err = b.channel.Send("close", map[string]interface{}{
+		_, err = b.channel.Send("close", map[string]any{
 			"reason": b.closeReason,
 		})
 	} else {
@@ -156,7 +178,7 @@ func (b *browserImpl) Version() string {
 }
 
 func (b *browserImpl) StartTracing(options ...BrowserStartTracingOptions) error {
-	overrides := map[string]interface{}{}
+	overrides := map[string]any{}
 	option := BrowserStartTracingOptions{}
 	if len(options) == 1 {
 		option = options[0]
@@ -165,10 +187,11 @@ func (b *browserImpl) StartTracing(options ...BrowserStartTracingOptions) error 
 		overrides["page"] = option.Page.(*pageImpl).channel
 		option.Page = nil
 	}
-	if option.Path != nil {
-		b.chromiumTracingPath = option.Path
-		option.Path = nil
-	}
+	// Set the path unconditionally (to nil when not provided), matching upstream
+	// `this._path = options.path`, so a later StopTracing doesn't reuse a stale
+	// path from an earlier StartTracing.
+	b.chromiumTracingPath = option.Path
+	option.Path = nil
 	_, err := b.channel.Send("startTracing", option, overrides)
 	return err
 }
@@ -196,6 +219,8 @@ func (b *browserImpl) StopTracing() ([]byte, error) {
 		if err != nil {
 			return binary, err
 		}
+		// Reset so a later pathless StartTracing/StopTracing doesn't reuse it.
+		b.chromiumTracingPath = nil
 	}
 	return binary, nil
 }
@@ -215,7 +240,11 @@ func (b *browserImpl) OnDisconnected(fn func(Browser)) {
 	b.On("disconnected", fn)
 }
 
-func newBrowser(parent *channelOwner, objectType string, guid string, initializer map[string]interface{}) *browserImpl {
+func (b *browserImpl) OnContext(fn func(BrowserContext)) {
+	b.On("context", fn)
+}
+
+func newBrowser(parent *channelOwner, objectType string, guid string, initializer map[string]any) *browserImpl {
 	b := &browserImpl{
 		isConnected: true,
 		contexts:    make([]BrowserContext, 0),
@@ -224,14 +253,30 @@ func newBrowser(parent *channelOwner, objectType string, guid string, initialize
 	// convert parent to *browserTypeImpl
 	b.browserType = newBrowserType(parent.parent, parent.objectType, parent.guid, parent.initializer)
 	b.channel.On("close", b.onClose)
+	b.channel.On("context", func(params map[string]any) {
+		context := fromChannel(params["context"]).(*browserContextImpl)
+		b.Lock()
+		found := false
+		for _, c := range b.contexts {
+			if c == context {
+				found = true
+				break
+			}
+		}
+		if !found {
+			b.contexts = append(b.contexts, context)
+		}
+		b.Unlock()
+		b.Emit("context", context)
+	})
 	return b
 }
 
-func transformClientCertificate(clientCertificates []ClientCertificate) ([]map[string]interface{}, error) {
-	results := make([]map[string]interface{}, 0)
+func transformClientCertificate(clientCertificates []ClientCertificate) ([]map[string]any, error) {
+	results := make([]map[string]any, 0)
 
 	for _, cert := range clientCertificates {
-		data := map[string]interface{}{
+		data := map[string]any{
 			"origin":     cert.Origin,
 			"passphrase": cert.Passphrase,
 		}

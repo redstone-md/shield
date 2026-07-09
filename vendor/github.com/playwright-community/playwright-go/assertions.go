@@ -45,20 +45,21 @@ type expectedTextValue struct {
 }
 
 type frameExpectOptions struct {
-	ExpressionArg  interface{}         `json:"expressionArg,omitempty"`
+	ExpressionArg  any                 `json:"expressionArg,omitempty"`
 	ExpectedText   []expectedTextValue `json:"expectedText,omitempty"`
 	ExpectedNumber *float64            `json:"expectedNumber,omitempty"`
-	ExpectedValue  interface{}         `json:"expectedValue,omitempty"`
+	ExpectedValue  any                 `json:"expectedValue,omitempty"`
 	UseInnerText   *bool               `json:"useInnerText,omitempty"`
 	IsNot          bool                `json:"isNot"`
 	Timeout        *float64            `json:"timeout"`
+	Pseudo         *PseudoElement      `json:"pseudo,omitempty"`
 }
 
 type frameExpectResult struct {
-	Matches  bool        `json:"matches"`
-	Received interface{} `json:"received,omitempty"`
-	TimedOut *bool       `json:"timedOut,omitempty"`
-	Log      []string    `json:"log,omitempty"`
+	Matches  bool     `json:"matches"`
+	Received any      `json:"received,omitempty"`
+	TimedOut *bool    `json:"timedOut,omitempty"`
+	Log      []string `json:"log,omitempty"`
 }
 
 type assertionsBase struct {
@@ -70,7 +71,7 @@ type assertionsBase struct {
 func (b *assertionsBase) expect(
 	expression string,
 	options frameExpectOptions,
-	expected interface{},
+	expected any,
 	message string,
 ) error {
 	options.IsNot = b.isNot
@@ -100,8 +101,27 @@ func (b *assertionsBase) expect(
 	return nil
 }
 
+// parseExpectReceived unwraps the `received` object returned by the `expect`
+// channel call. The server emits `received` as `{ value?: SerializedValue,
+// ariaSnapshot?: string }` (see server frameDispatcher), so we must descend into
+// the nested `value` before parsing it, falling back to `ariaSnapshot`. This
+// mirrors upstream frame._expect (client/frame.ts).
+func parseExpectReceived(received any) any {
+	recv, ok := received.(map[string]any)
+	if !ok {
+		return nil
+	}
+	if value, ok := recv["value"]; ok {
+		return parseResult(value)
+	}
+	if ariaSnapshot, ok := recv["ariaSnapshot"]; ok {
+		return ariaSnapshot
+	}
+	return nil
+}
+
 func toExpectedTextValues(
-	items []interface{},
+	items []any,
 	matchSubstring bool,
 	normalizeWhiteSpace bool,
 	ignoreCase *bool,
@@ -132,13 +152,13 @@ func toExpectedTextValues(
 	return out, nil
 }
 
-func convertToInterfaceList(v interface{}) []interface{} {
+func convertToInterfaceList(v any) []any {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Slice {
-		return []interface{}{v}
+		return []any{v}
 	}
 
-	list := make([]interface{}, rv.Len())
+	list := make([]any, rv.Len())
 	for i := 0; i < rv.Len(); i++ {
 		list[i] = rv.Index(i).Interface()
 	}

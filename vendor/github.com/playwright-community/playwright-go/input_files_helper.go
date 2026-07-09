@@ -30,22 +30,26 @@ type fileItem struct {
 //
 //   - files should be one of: string, []string, InputFile, []InputFile,
 //     string: local file path
-func convertInputFiles(files interface{}, context *browserContextImpl) (*inputFiles, error) {
+func convertInputFiles(files any, context *browserContextImpl) (*inputFiles, error) {
 	var (
 		converted = &inputFiles{}
 		paths     []string
 	)
 	switch items := files.(type) {
 	case InputFile:
-		if sizeOfInputFiles([]InputFile{items}) > fileSizeLimitInBytes {
+		if sizeOfInputFiles([]InputFile{items}) >= fileSizeLimitInBytes {
 			return nil, ErrInputFilesSizeExceeded
 		}
+		// Buffers are passed as payloads regardless of local/remote connection,
+		// matching upstream which returns { payloads } without calling createTempFiles.
 		converted.Payloads = normalizeFilePayloads([]InputFile{items})
+		return converted, nil
 	case []InputFile:
-		if sizeOfInputFiles(items) > fileSizeLimitInBytes {
+		if sizeOfInputFiles(items) >= fileSizeLimitInBytes {
 			return nil, ErrInputFilesSizeExceeded
 		}
 		converted.Payloads = normalizeFilePayloads(items)
+		return converted, nil
 	case string: // local file path
 		paths = []string{items}
 	case []string:
@@ -66,7 +70,7 @@ func convertInputFiles(files interface{}, context *browserContextImpl) (*inputFi
 	}
 
 	// remote
-	params := map[string]interface{}{
+	params := map[string]any{
 		"items": []fileItem{},
 	}
 	allFiles := localPaths
@@ -96,16 +100,16 @@ func convertInputFiles(files interface{}, context *browserContextImpl) (*inputFi
 		})
 	}
 
-	ret, err := context.connection.WrapAPICall(func() (interface{}, error) {
+	ret, err := context.connection.WrapAPICall(func() (any, error) {
 		return context.channel.SendReturnAsDict("createTempFiles", params)
 	}, true)
 	if err != nil {
 		return nil, err
 	}
-	result := ret.(map[string]interface{})
+	result := ret.(map[string]any)
 
 	streams := make([]*channel, 0)
-	items := result["writableStreams"].([]interface{})
+	items := result["writableStreams"].([]any)
 	for i := 0; i < len(allFiles); i++ {
 		stream := fromChannel(items[i]).(*writableStream)
 		if err := stream.Copy(allFiles[i]); err != nil {
@@ -115,7 +119,11 @@ func convertInputFiles(files interface{}, context *browserContextImpl) (*inputFi
 	}
 
 	if result["rootDir"] != nil {
-		converted.DirectoryStream = result["rootDir"].(*channel)
+		if ch, ok := result["rootDir"].(*channel); ok {
+			converted.DirectoryStream = ch
+		} else {
+			converted.DirectoryStream = fromChannel(result["rootDir"]).(*writableStream).channel
+		}
 	} else {
 		converted.Streams = streams
 	}

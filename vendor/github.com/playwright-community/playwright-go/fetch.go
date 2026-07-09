@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -14,7 +15,7 @@ type apiRequestImpl struct {
 }
 
 func (r *apiRequestImpl) NewContext(options ...APIRequestNewContextOptions) (APIRequestContext, error) {
-	overrides := map[string]interface{}{}
+	overrides := map[string]any{}
 	if len(options) == 1 {
 		if options[0].ClientCertificates != nil {
 			certs, err := transformClientCertificate(options[0].ClientCertificates)
@@ -41,13 +42,20 @@ func (r *apiRequestImpl) NewContext(options ...APIRequestNewContextOptions) (API
 			options[0].StorageState = storageState
 			options[0].StorageStatePath = nil
 		}
+		if options[0].Timeout != nil {
+			overrides["timeout"] = options[0].Timeout
+		}
 	}
 
 	channel, err := r.channel.Send("newRequest", options, overrides)
 	if err != nil {
 		return nil, err
 	}
-	return fromChannel(channel).(*apiRequestContextImpl), nil
+	ctx := fromChannel(channel).(*apiRequestContextImpl)
+	if len(options) == 1 && options[0].Timeout != nil {
+		ctx.defaultTimeout = options[0].Timeout
+	}
+	return ctx, nil
 }
 
 func newApiRequestImpl(pw *Playwright) *apiRequestImpl {
@@ -56,15 +64,24 @@ func newApiRequestImpl(pw *Playwright) *apiRequestImpl {
 
 type apiRequestContextImpl struct {
 	channelOwner
-	tracing     *tracingImpl
-	closeReason *string
+	tracing         *tracingImpl
+	closeReason     *string
+	defaultTimeout  *float64
+	timeoutSettings *timeoutSettings
 }
 
 func (r *apiRequestContextImpl) Dispose(options ...APIRequestContextDisposeOptions) error {
 	if len(options) == 1 {
 		r.closeReason = options[0].Reason
 	}
-	_, err := r.channel.Send("dispose", map[string]interface{}{
+	// Flush any HARs recorded via this request context before disposing,
+	// matching upstream dispose() which calls _exportAllHars().
+	if r.tracing != nil && len(r.tracing.harRecorders) > 0 {
+		if err := r.tracing.exportAllHars(); err != nil {
+			return err
+		}
+	}
+	_, err := r.channel.Send("dispose", map[string]any{
 		"reason": r.closeReason,
 	})
 	if errors.Is(err, ErrTargetClosed) {
@@ -87,7 +104,7 @@ func (r *apiRequestContextImpl) Delete(url string, options ...APIRequestContextD
 	return r.Fetch(url, opts)
 }
 
-func (r *apiRequestContextImpl) Fetch(urlOrRequest interface{}, options ...APIRequestContextFetchOptions) (APIResponse, error) {
+func (r *apiRequestContextImpl) Fetch(urlOrRequest any, options ...APIRequestContextFetchOptions) (APIResponse, error) {
 	switch v := urlOrRequest.(type) {
 	case string:
 		return r.innerFetch(v, nil, options...)
@@ -102,14 +119,19 @@ func (r *apiRequestContextImpl) innerFetch(url string, request Request, options 
 	if r.closeReason != nil {
 		return nil, fmt.Errorf("%w: %s", ErrTargetClosed, *r.closeReason)
 	}
-	overrides := map[string]interface{}{}
+	overrides := map[string]any{}
 	if url != "" {
 		overrides["url"] = url
 	} else if request != nil {
 		overrides["url"] = request.URL()
 	}
 
-	if len(options) == 1 {
+	// Always operate on a single options value so method/headers/body are derived
+	// from the request even when Fetch(request) is called with no options.
+	if len(options) == 0 {
+		options = []APIRequestContextFetchOptions{{}}
+	}
+	{
 		if options[0].MaxRedirects != nil && *options[0].MaxRedirects < 0 {
 			return nil, errors.New("maxRedirects must be non-negative")
 		}
@@ -129,10 +151,18 @@ func (r *apiRequestContextImpl) innerFetch(url string, request Request, options 
 		}
 		if options[0].Headers == nil {
 			if request != nil {
-				overrides["headers"] = serializeMapToNameAndValue(request.Headers())
+				headers := make(map[string]any)
+				for k, v := range request.Headers() {
+					headers[k] = v
+				}
+				overrides["headers"] = serializeMapToNameValue(headers)
 			}
 		} else {
-			overrides["headers"] = serializeMapToNameAndValue(options[0].Headers)
+			headers := make(map[string]any)
+			for k, v := range options[0].Headers {
+				headers[k] = v
+			}
+			overrides["headers"] = serializeMapToNameValue(headers)
 			options[0].Headers = nil
 		}
 		if options[0].Data != nil {
@@ -154,7 +184,7 @@ func (r *apiRequestContextImpl) innerFetch(url string, request Request, options 
 				}
 			case []byte:
 				overrides["postData"] = base64.StdEncoding.EncodeToString(v)
-			case interface{}:
+			case any:
 				data, err := json.Marshal(v)
 				if err != nil {
 					return nil, fmt.Errorf("could not marshal data: %w", err)
@@ -165,22 +195,22 @@ func (r *apiRequestContextImpl) innerFetch(url string, request Request, options 
 			}
 			options[0].Data = nil
 		} else if options[0].Form != nil {
-			form, ok := options[0].Form.(map[string]interface{})
+			form, ok := options[0].Form.(map[string]any)
 			if !ok {
 				return nil, errors.New("form must be a map")
 			}
 			overrides["formData"] = serializeMapToNameValue(form)
 			options[0].Form = nil
 		} else if options[0].Multipart != nil {
-			_, ok := options[0].Multipart.(map[string]interface{})
+			_, ok := options[0].Multipart.(map[string]any)
 			if !ok {
 				return nil, errors.New("multipart must be a map")
 			}
-			multipartData := []map[string]interface{}{}
-			for name, value := range options[0].Multipart.(map[string]interface{}) {
+			multipartData := []map[string]any{}
+			for name, value := range options[0].Multipart.(map[string]any) {
 				switch v := value.(type) {
 				case InputFile:
-					multipartData = append(multipartData, map[string]interface{}{
+					multipartData = append(multipartData, map[string]any{
 						"name": name,
 						"file": map[string]string{
 							"name":     v.Name,
@@ -189,7 +219,7 @@ func (r *apiRequestContextImpl) innerFetch(url string, request Request, options 
 						},
 					})
 				default:
-					multipartData = append(multipartData, map[string]interface{}{
+					multipartData = append(multipartData, map[string]any{
 						"name":  name,
 						"value": String(fmt.Sprintf("%v", v)),
 					})
@@ -198,14 +228,31 @@ func (r *apiRequestContextImpl) innerFetch(url string, request Request, options 
 			overrides["multipartData"] = multipartData
 			options[0].Multipart = nil
 		} else if request != nil {
+			// Only forward post data when the request actually has a body; an empty
+			// buffer would otherwise be sent as "" and add a spurious
+			// content-length: 0 header (upstream omits postData for body-less requests).
 			postDataBuf, err := request.PostDataBuffer()
-			if err == nil {
+			if err == nil && len(postDataBuf) > 0 {
 				overrides["postData"] = base64.StdEncoding.EncodeToString(postDataBuf)
 			}
 		}
 		if options[0].Params != nil {
 			overrides["params"] = serializeMapToNameValue(options[0].Params)
 			options[0].Params = nil
+		}
+		// Use the context-level default timeout when no per-request timeout is
+		// given. A standalone request context seeds r.defaultTimeout directly; a
+		// browser-context-owned request shares the context's timeoutSettings
+		// (mirroring upstream, where context.request._timeoutSettings is the
+		// context's instance), so SetDefaultTimeout reaches these fetches too.
+		if options[0].Timeout == nil {
+			if r.defaultTimeout != nil {
+				overrides["timeout"] = *r.defaultTimeout
+			} else if r.timeoutSettings != nil {
+				if dt := r.timeoutSettings.DefaultTimeout(); dt != nil {
+					overrides["timeout"] = *dt
+				}
+			}
 		}
 	}
 
@@ -214,7 +261,7 @@ func (r *apiRequestContextImpl) innerFetch(url string, request Request, options 
 		return nil, err
 	}
 
-	return newAPIResponse(r, response.(map[string]interface{})), nil
+	return newAPIResponse(r, response.(map[string]any)), nil
 }
 
 func (r *apiRequestContextImpl) Get(url string, options ...APIRequestContextGetOptions) (APIResponse, error) {
@@ -287,13 +334,22 @@ func (r *apiRequestContextImpl) Post(url string, options ...APIRequestContextPos
 	return r.Fetch(url, opts)
 }
 
-func (r *apiRequestContextImpl) StorageState(path ...string) (*StorageState, error) {
-	result, err := r.channel.SendReturnAsDict("storageState")
+func (r *apiRequestContextImpl) StorageState(options ...APIRequestContextStorageStateOptions) (*StorageState, error) {
+	params := map[string]any{}
+	var path *string
+	if len(options) == 1 {
+		params["indexedDB"] = options[0].IndexedDB
+		path = options[0].Path
+	}
+	result, err := r.channel.SendReturnAsDict("storageState", params)
 	if err != nil {
 		return nil, err
 	}
-	if len(path) == 1 {
-		file, err := os.Create(path[0])
+	if path != nil {
+		if err := os.MkdirAll(filepath.Dir(*path), 0o777); err != nil {
+			return nil, err
+		}
+		file, err := os.Create(*path)
 		if err != nil {
 			return nil, err
 		}
@@ -309,21 +365,27 @@ func (r *apiRequestContextImpl) StorageState(path ...string) (*StorageState, err
 	return &storageState, nil
 }
 
-func newAPIRequestContext(parent *channelOwner, objectType string, guid string, initializer map[string]interface{}) *apiRequestContextImpl {
+func (r *apiRequestContextImpl) Tracing() Tracing {
+	return r.tracing
+}
+
+func newAPIRequestContext(parent *channelOwner, objectType string, guid string, initializer map[string]any) *apiRequestContextImpl {
 	rc := &apiRequestContextImpl{}
 	rc.createChannelOwner(rc, parent, objectType, guid, initializer)
-	rc.tracing = fromChannel(initializer["tracing"]).(*tracingImpl)
+	if tracingValue := initializer["tracing"]; tracingValue != nil {
+		rc.tracing = fromNullableChannel(tracingValue).(*tracingImpl)
+	}
 	return rc
 }
 
 type apiResponseImpl struct {
 	request     *apiRequestContextImpl
-	initializer map[string]interface{}
+	initializer map[string]any
 	headers     *rawHeaders
 }
 
 func (r *apiResponseImpl) Body() ([]byte, error) {
-	result, err := r.request.channel.SendReturnAsDict("fetchResponseBody", []map[string]interface{}{
+	result, err := r.request.channel.SendReturnAsDict("fetchResponseBody", []map[string]any{
 		{
 			"fetchUid": r.fetchUid(),
 		},
@@ -342,7 +404,7 @@ func (r *apiResponseImpl) Body() ([]byte, error) {
 }
 
 func (r *apiResponseImpl) Dispose() error {
-	_, err := r.request.channel.Send("disposeAPIResponse", []map[string]interface{}{
+	_, err := r.request.channel.Send("disposeAPIResponse", []map[string]any{
 		{
 			"fetchUid": r.fetchUid(),
 		},
@@ -358,7 +420,7 @@ func (r *apiResponseImpl) HeadersArray() []NameValue {
 	return r.headers.HeadersArray()
 }
 
-func (r *apiResponseImpl) JSON(v interface{}) error {
+func (r *apiResponseImpl) JSON(v any) error {
 	body, err := r.Body()
 	if err != nil {
 		return err
@@ -367,7 +429,7 @@ func (r *apiResponseImpl) JSON(v interface{}) error {
 }
 
 func (r *apiResponseImpl) Ok() bool {
-	return r.Status() == 0 || (r.Status() >= 200 && r.Status() <= 299)
+	return r.Status() >= 200 && r.Status() <= 299
 }
 
 func (r *apiResponseImpl) Status() int {
@@ -395,20 +457,20 @@ func (r *apiResponseImpl) fetchUid() string {
 }
 
 func (r *apiResponseImpl) fetchLog() ([]string, error) {
-	ret, err := r.request.channel.Send("fetchLog", map[string]interface{}{
+	ret, err := r.request.channel.Send("fetchLog", map[string]any{
 		"fetchUid": r.fetchUid(),
 	})
 	if err != nil {
 		return nil, err
 	}
-	result := make([]string, len(ret.([]interface{})))
-	for i, v := range ret.([]interface{}) {
+	result := make([]string, len(ret.([]any)))
+	for i, v := range ret.([]any) {
 		result[i] = v.(string)
 	}
 	return result, nil
 }
 
-func newAPIResponse(context *apiRequestContextImpl, initializer map[string]interface{}) *apiResponseImpl {
+func newAPIResponse(context *apiRequestContextImpl, initializer map[string]any) *apiResponseImpl {
 	return &apiResponseImpl{
 		request:     context,
 		initializer: initializer,
@@ -416,7 +478,7 @@ func newAPIResponse(context *apiRequestContextImpl, initializer map[string]inter
 	}
 }
 
-func countNonNil(args ...interface{}) int {
+func countNonNil(args ...any) int {
 	count := 0
 	for _, v := range args {
 		if v != nil {
@@ -439,7 +501,7 @@ func isJsonContentType(headers []map[string]string) bool {
 	return false
 }
 
-func serializeMapToNameValue(data map[string]interface{}) []map[string]string {
+func serializeMapToNameValue(data map[string]any) []map[string]string {
 	serialized := make([]map[string]string, 0, len(data))
 	for k, v := range data {
 		serialized = append(serialized, map[string]string{
@@ -448,4 +510,19 @@ func serializeMapToNameValue(data map[string]interface{}) []map[string]string {
 		})
 	}
 	return serialized
+}
+
+func (r *requestImpl) ExistingResponse() (Response, error) {
+	if r.response == nil {
+		return nil, nil
+	}
+	return r.response, nil
+}
+
+func (r *responseImpl) HttpVersion() (string, error) {
+	result, err := r.channel.Send("httpVersion")
+	if err != nil {
+		return "", err
+	}
+	return result.(string), nil
 }

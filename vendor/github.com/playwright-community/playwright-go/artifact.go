@@ -18,12 +18,16 @@ func (a *artifactImpl) PathAfterFinished() (string, error) {
 		return "", errors.New("Path is not available when connecting remotely. Use SaveAs() to save a local copy")
 	}
 	path, err := a.channel.Send("pathAfterFinished")
-	return path.(string), err
+	if err != nil {
+		return "", err
+	}
+	s, _ := path.(string)
+	return s, nil
 }
 
 func (a *artifactImpl) SaveAs(path string) error {
 	if !a.connection.isRemote {
-		_, err := a.channel.Send("saveAs", map[string]interface{}{
+		_, err := a.channel.Send("saveAs", map[string]any{
 			"path": path,
 		})
 		return err
@@ -63,7 +67,7 @@ func (a *artifactImpl) ReadIntoBuffer() ([]byte, error) {
 	return stream.(*streamImpl).ReadAll()
 }
 
-func newArtifact(parent *channelOwner, objectType string, guid string, initializer map[string]interface{}) *artifactImpl {
+func newArtifact(parent *channelOwner, objectType string, guid string, initializer map[string]any) *artifactImpl {
 	artifact := &artifactImpl{}
 	artifact.createChannelOwner(artifact, parent, objectType, guid, initializer)
 	return artifact
