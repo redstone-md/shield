@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/redstone-md/shield v0.0.0
-	modernc.org/sqlite v1.50.1
+	modernc.org/sqlite v1.55.0
 )
 
 replace github.com/redstone-md/shield => ../..
@@ -36,13 +36,13 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/crypto v0.51.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/genai v1.52.1 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/grpc v1.79.3 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
-	modernc.org/libc v1.72.3 // indirect
+	modernc.org/libc v1.74.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
