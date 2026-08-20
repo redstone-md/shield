@@ -22,6 +22,9 @@ import (
 //			AddSpamFunc: func(ctx context.Context, userID int64, checks []spamcheck.Response) error {
 //				panic("mock out the AddSpam method")
 //			},
+//			GetUserDCFunc: func(ctx context.Context, userID int64) (int, bool) {
+//				panic("mock out the GetUserDC method")
+//			},
 //			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 //				panic("mock out the GetUserMessages method")
 //			},
@@ -30,6 +33,9 @@ import (
 //			},
 //			MsgHashFunc: func(msg string) string {
 //				panic("mock out the MsgHash method")
+//			},
+//			SetUserDCFunc: func(ctx context.Context, userID int64, dc int) error {
+//				panic("mock out the SetUserDC method")
 //			},
 //			SpamFunc: func(ctx context.Context, userID int64) (storage.SpamData, bool) {
 //				panic("mock out the Spam method")
@@ -53,6 +59,9 @@ type LocatorMock struct {
 	// AddSpamFunc mocks the AddSpam method.
 	AddSpamFunc func(ctx context.Context, userID int64, checks []spamcheck.Response) error
 
+	// GetUserDCFunc mocks the GetUserDC method.
+	GetUserDCFunc func(ctx context.Context, userID int64) (int, bool)
+
 	// GetUserMessagesFunc mocks the GetUserMessages method.
 	GetUserMessagesFunc func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error)
 
@@ -61,6 +70,9 @@ type LocatorMock struct {
 
 	// MsgHashFunc mocks the MsgHash method.
 	MsgHashFunc func(msg string) string
+
+	// SetUserDCFunc mocks the SetUserDC method.
+	SetUserDCFunc func(ctx context.Context, userID int64, dc int) error
 
 	// SpamFunc mocks the Spam method.
 	SpamFunc func(ctx context.Context, userID int64) (storage.SpamData, bool)
@@ -97,6 +109,13 @@ type LocatorMock struct {
 			// Checks is the checks argument value.
 			Checks []spamcheck.Response
 		}
+		// GetUserDC holds details about calls to the GetUserDC method.
+		GetUserDC []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID int64
+		}
 		// GetUserMessages holds details about calls to the GetUserMessages method.
 		GetUserMessages []struct {
 			// Ctx is the ctx argument value.
@@ -117,6 +136,15 @@ type LocatorMock struct {
 		MsgHash []struct {
 			// Msg is the msg argument value.
 			Msg string
+		}
+		// SetUserDC holds details about calls to the SetUserDC method.
+		SetUserDC []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID int64
+			// Dc is the dc argument value.
+			Dc int
 		}
 		// Spam holds details about calls to the Spam method.
 		Spam []struct {
@@ -142,9 +170,11 @@ type LocatorMock struct {
 	}
 	lockAddMessage      sync.RWMutex
 	lockAddSpam         sync.RWMutex
+	lockGetUserDC       sync.RWMutex
 	lockGetUserMessages sync.RWMutex
 	lockMessage         sync.RWMutex
 	lockMsgHash         sync.RWMutex
+	lockSetUserDC       sync.RWMutex
 	lockSpam            sync.RWMutex
 	lockUserIDByName    sync.RWMutex
 	lockUserNameByID    sync.RWMutex
@@ -254,6 +284,49 @@ func (mock *LocatorMock) ResetAddSpamCalls() {
 	mock.lockAddSpam.Lock()
 	mock.calls.AddSpam = nil
 	mock.lockAddSpam.Unlock()
+}
+
+// GetUserDC calls GetUserDCFunc.
+func (mock *LocatorMock) GetUserDC(ctx context.Context, userID int64) (int, bool) {
+	if mock.GetUserDCFunc == nil {
+		panic("LocatorMock.GetUserDCFunc: method is nil but Locator.GetUserDC was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID int64
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+	}
+	mock.lockGetUserDC.Lock()
+	mock.calls.GetUserDC = append(mock.calls.GetUserDC, callInfo)
+	mock.lockGetUserDC.Unlock()
+	return mock.GetUserDCFunc(ctx, userID)
+}
+
+// GetUserDCCalls gets all the calls that were made to GetUserDC.
+// Check the length with:
+//
+//	len(mockedLocator.GetUserDCCalls())
+func (mock *LocatorMock) GetUserDCCalls() []struct {
+	Ctx    context.Context
+	UserID int64
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID int64
+	}
+	mock.lockGetUserDC.RLock()
+	calls = mock.calls.GetUserDC
+	mock.lockGetUserDC.RUnlock()
+	return calls
+}
+
+// ResetGetUserDCCalls reset all the calls that were made to GetUserDC.
+func (mock *LocatorMock) ResetGetUserDCCalls() {
+	mock.lockGetUserDC.Lock()
+	mock.calls.GetUserDC = nil
+	mock.lockGetUserDC.Unlock()
 }
 
 // GetUserMessages calls GetUserMessagesFunc.
@@ -383,6 +456,53 @@ func (mock *LocatorMock) ResetMsgHashCalls() {
 	mock.lockMsgHash.Lock()
 	mock.calls.MsgHash = nil
 	mock.lockMsgHash.Unlock()
+}
+
+// SetUserDC calls SetUserDCFunc.
+func (mock *LocatorMock) SetUserDC(ctx context.Context, userID int64, dc int) error {
+	if mock.SetUserDCFunc == nil {
+		panic("LocatorMock.SetUserDCFunc: method is nil but Locator.SetUserDC was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID int64
+		Dc     int
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+		Dc:     dc,
+	}
+	mock.lockSetUserDC.Lock()
+	mock.calls.SetUserDC = append(mock.calls.SetUserDC, callInfo)
+	mock.lockSetUserDC.Unlock()
+	return mock.SetUserDCFunc(ctx, userID, dc)
+}
+
+// SetUserDCCalls gets all the calls that were made to SetUserDC.
+// Check the length with:
+//
+//	len(mockedLocator.SetUserDCCalls())
+func (mock *LocatorMock) SetUserDCCalls() []struct {
+	Ctx    context.Context
+	UserID int64
+	Dc     int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID int64
+		Dc     int
+	}
+	mock.lockSetUserDC.RLock()
+	calls = mock.calls.SetUserDC
+	mock.lockSetUserDC.RUnlock()
+	return calls
+}
+
+// ResetSetUserDCCalls reset all the calls that were made to SetUserDC.
+func (mock *LocatorMock) ResetSetUserDCCalls() {
+	mock.lockSetUserDC.Lock()
+	mock.calls.SetUserDC = nil
+	mock.lockSetUserDC.Unlock()
 }
 
 // Spam calls SpamFunc.
@@ -524,6 +644,10 @@ func (mock *LocatorMock) ResetCalls() {
 	mock.calls.AddSpam = nil
 	mock.lockAddSpam.Unlock()
 
+	mock.lockGetUserDC.Lock()
+	mock.calls.GetUserDC = nil
+	mock.lockGetUserDC.Unlock()
+
 	mock.lockGetUserMessages.Lock()
 	mock.calls.GetUserMessages = nil
 	mock.lockGetUserMessages.Unlock()
@@ -535,6 +659,10 @@ func (mock *LocatorMock) ResetCalls() {
 	mock.lockMsgHash.Lock()
 	mock.calls.MsgHash = nil
 	mock.lockMsgHash.Unlock()
+
+	mock.lockSetUserDC.Lock()
+	mock.calls.SetUserDC = nil
+	mock.lockSetUserDC.Unlock()
 
 	mock.lockSpam.Lock()
 	mock.calls.Spam = nil

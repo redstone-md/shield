@@ -4,7 +4,7 @@ import "time"
 
 // CurrentSchemaVersion is the RuleSet payload schema version. Bump it whenever new
 // fields are added so older persisted rulesets can be detected and backfilled.
-const CurrentSchemaVersion = 3
+const CurrentSchemaVersion = 4
 
 // RuleSet is the single-tenant moderation configuration snapshot.
 type RuleSet struct {
@@ -25,6 +25,15 @@ type RuleSet struct {
 	Gemini          LLMRules             `json:"gemini"`
 	PolicyProfile   string               `json:"policy_profile"`
 	SlowPathEnabled bool                 `json:"slow_path_enabled"`
+	JoinGate        JoinGateRules        `json:"join_gate"`
+}
+
+// JoinGateRules configures the join-time datacenter gate: when a user joins a
+// monitored chat and their profile-photo datacenter is in BannedDCs, the user
+// is banned preemptively across all primary chats. An empty list disables the
+// gate. DC values are Telegram datacenter ids (1-5).
+type JoinGateRules struct {
+	BannedDCs []int `json:"banned_dcs"`
 }
 
 type MetaRules struct {

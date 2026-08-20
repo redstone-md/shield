@@ -401,6 +401,7 @@ func bootstrapRuleSet(opts options) rules.RuleSet {
 			CheckShortMessages: opts.Gemini.CheckShortMessages,
 			CustomPrompts:      opts.Gemini.CustomPrompts,
 		},
+		JoinGate: rules.JoinGateRules{},
 	}
 }
 
@@ -420,6 +421,7 @@ func backfillRuleSetSchema(rs rules.RuleSet, opts options) (rules.RuleSet, bool)
 	rs.OpenAI.VisionModel = seed.OpenAI.VisionModel
 	rs.Gemini.Prompt = seed.Gemini.Prompt
 	rs.Gemini.VisionModel = seed.Gemini.VisionModel
+	rs.JoinGate = seed.JoinGate
 	return rs, true
 }
 
@@ -478,6 +480,7 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 		ModerationActions:   a.ModerationActionsStore,
 		DetectedSpamCounter: a.DetectedSpamStore,
 		RuleSetVersion:      a.ActiveRuleSet.Version,
+		BannedDCs:           a.ActiveRuleSet.JoinGate.BannedDCs,
 		ModerationConfig: events.ModerationConfig{
 			FirstStrike:        a.ActiveRuleSet.Moderation.FirstStrike,
 			SecondStrike:       a.ActiveRuleSet.Moderation.SecondStrike,

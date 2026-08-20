@@ -32,6 +32,9 @@ import (
 //			GetUpdatesChanFunc: func(config tbapi.UpdateConfig) tbapi.UpdatesChannel {
 //				panic("mock out the GetUpdatesChan method")
 //			},
+//			GetUserProfilePhotosFunc: func(config tbapi.UserProfilePhotosConfig) (tbapi.UserProfilePhotos, error) {
+//				panic("mock out the GetUserProfilePhotos method")
+//			},
 //			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 //				panic("mock out the Request method")
 //			},
@@ -62,6 +65,9 @@ type TbAPIMock struct {
 
 	// GetUpdatesChanFunc mocks the GetUpdatesChan method.
 	GetUpdatesChanFunc func(config tbapi.UpdateConfig) tbapi.UpdatesChannel
+
+	// GetUserProfilePhotosFunc mocks the GetUserProfilePhotos method.
+	GetUserProfilePhotosFunc func(config tbapi.UserProfilePhotosConfig) (tbapi.UserProfilePhotos, error)
 
 	// RequestFunc mocks the Request method.
 	RequestFunc func(c tbapi.Chattable) (*tbapi.APIResponse, error)
@@ -101,6 +107,11 @@ type TbAPIMock struct {
 			// Config is the config argument value.
 			Config tbapi.UpdateConfig
 		}
+		// GetUserProfilePhotos holds details about calls to the GetUserProfilePhotos method.
+		GetUserProfilePhotos []struct {
+			// Config is the config argument value.
+			Config tbapi.UserProfilePhotosConfig
+		}
 		// Request holds details about calls to the Request method.
 		Request []struct {
 			// C is the c argument value.
@@ -118,6 +129,7 @@ type TbAPIMock struct {
 	lockGetCustomEmojiStickers sync.RWMutex
 	lockGetFileDirectURL       sync.RWMutex
 	lockGetUpdatesChan         sync.RWMutex
+	lockGetUserProfilePhotos   sync.RWMutex
 	lockRequest                sync.RWMutex
 	lockSend                   sync.RWMutex
 }
@@ -356,6 +368,45 @@ func (mock *TbAPIMock) ResetGetUpdatesChanCalls() {
 	mock.lockGetUpdatesChan.Unlock()
 }
 
+// GetUserProfilePhotos calls GetUserProfilePhotosFunc.
+func (mock *TbAPIMock) GetUserProfilePhotos(config tbapi.UserProfilePhotosConfig) (tbapi.UserProfilePhotos, error) {
+	if mock.GetUserProfilePhotosFunc == nil {
+		panic("TbAPIMock.GetUserProfilePhotosFunc: method is nil but TbAPI.GetUserProfilePhotos was just called")
+	}
+	callInfo := struct {
+		Config tbapi.UserProfilePhotosConfig
+	}{
+		Config: config,
+	}
+	mock.lockGetUserProfilePhotos.Lock()
+	mock.calls.GetUserProfilePhotos = append(mock.calls.GetUserProfilePhotos, callInfo)
+	mock.lockGetUserProfilePhotos.Unlock()
+	return mock.GetUserProfilePhotosFunc(config)
+}
+
+// GetUserProfilePhotosCalls gets all the calls that were made to GetUserProfilePhotos.
+// Check the length with:
+//
+//	len(mockedTbAPI.GetUserProfilePhotosCalls())
+func (mock *TbAPIMock) GetUserProfilePhotosCalls() []struct {
+	Config tbapi.UserProfilePhotosConfig
+} {
+	var calls []struct {
+		Config tbapi.UserProfilePhotosConfig
+	}
+	mock.lockGetUserProfilePhotos.RLock()
+	calls = mock.calls.GetUserProfilePhotos
+	mock.lockGetUserProfilePhotos.RUnlock()
+	return calls
+}
+
+// ResetGetUserProfilePhotosCalls reset all the calls that were made to GetUserProfilePhotos.
+func (mock *TbAPIMock) ResetGetUserProfilePhotosCalls() {
+	mock.lockGetUserProfilePhotos.Lock()
+	mock.calls.GetUserProfilePhotos = nil
+	mock.lockGetUserProfilePhotos.Unlock()
+}
+
 // Request calls RequestFunc.
 func (mock *TbAPIMock) Request(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 	if mock.RequestFunc == nil {
@@ -459,6 +510,10 @@ func (mock *TbAPIMock) ResetCalls() {
 	mock.lockGetUpdatesChan.Lock()
 	mock.calls.GetUpdatesChan = nil
 	mock.lockGetUpdatesChan.Unlock()
+
+	mock.lockGetUserProfilePhotos.Lock()
+	mock.calls.GetUserProfilePhotos = nil
+	mock.lockGetUserProfilePhotos.Unlock()
 
 	mock.lockRequest.Lock()
 	mock.calls.Request = nil

@@ -32,6 +32,7 @@ type TbAPI interface {
 	GetChatMember(config tbapi.GetChatMemberConfig) (tbapi.ChatMember, error)
 	GetFileDirectURL(fileID string) (string, error)
 	GetCustomEmojiStickers(config tbapi.GetCustomEmojiStickersConfig) ([]tbapi.Sticker, error)
+	GetUserProfilePhotos(config tbapi.UserProfilePhotosConfig) (tbapi.UserProfilePhotos, error)
 }
 
 // SpamLogger is an interface for spam logger
@@ -57,6 +58,8 @@ type Locator interface {
 	UserNameByID(ctx context.Context, userID int64) string
 	UserIDByName(ctx context.Context, userName string) int64
 	GetUserMessages(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error)
+	SetUserDC(ctx context.Context, userID int64, dc int) error
+	GetUserDC(ctx context.Context, userID int64) (int, bool)
 }
 
 // DetectedSpamCounter provides spam strike count for escalation.

@@ -28,6 +28,7 @@ const (
 	CmdAddLocatorMessagesTenantIDColumn
 	CmdAddLocatorSpamTenantIDColumn
 	CmdAddLocatorUserMessage
+	CmdSetUserDC
 )
 
 // locatorQueries holds all locator-related queries
@@ -58,6 +59,11 @@ var locatorQueries = engine.NewQueryMap().
             msg_id INTEGER,
             time TIMESTAMP,
             PRIMARY KEY (tenant_id, chat_id, msg_id)
+        );
+        CREATE TABLE IF NOT EXISTS user_dc (
+            user_id INTEGER PRIMARY KEY,
+            dc INTEGER NOT NULL,
+            time TIMESTAMP
         )`,
 		Postgres: `CREATE TABLE IF NOT EXISTS messages (
             hash TEXT PRIMARY KEY,
@@ -84,6 +90,11 @@ var locatorQueries = engine.NewQueryMap().
             msg_id INTEGER,
             time TIMESTAMP,
             PRIMARY KEY (tenant_id, chat_id, msg_id)
+        );
+        CREATE TABLE IF NOT EXISTS user_dc (
+            user_id BIGINT PRIMARY KEY,
+            dc INTEGER NOT NULL,
+            time TIMESTAMP
         )`,
 	}).
 	Add(CmdCreateLocatorIndexes, engine.Query{
@@ -157,6 +168,11 @@ var locatorQueries = engine.NewQueryMap().
             user_id = :user_id,
             user_name = :user_name,
             time = :time`,
+	}).
+	Add(CmdSetUserDC, engine.Query{
+		Sqlite: `INSERT OR REPLACE INTO user_dc (user_id, dc, time) VALUES (:user_id, :dc, :time)`,
+		Postgres: `INSERT INTO user_dc (user_id, dc, time) VALUES (:user_id, :dc, :time)
+            ON CONFLICT (user_id) DO UPDATE SET dc = :dc, time = :time`,
 	})
 
 // Locator stores messages metadata and spam results for a given ttl period.
@@ -435,6 +451,51 @@ func (l *Locator) GetUserMessages(ctx context.Context, userID int64, limit int) 
 		return nil, fmt.Errorf("failed to get user messages: %w", err)
 	}
 	return msgs, nil
+}
+
+// dcRow maps a user_dc table row for sqlx.
+type dcRow struct {
+	DC   int       `db:"dc"`
+	Time time.Time `db:"time"`
+}
+
+// SetUserDC persists a user's avatar datacenter so a rejoin does not need to
+// re-fetch the profile photo. DC is a Telegram-global property of a user, so the
+// table is keyed by user_id only (no tenant scope).
+func (l *Locator) SetUserDC(ctx context.Context, userID int64, dc int) error {
+	l.Lock()
+	defer l.Unlock()
+
+	query, err := locatorQueries.Pick(l.Type(), CmdSetUserDC)
+	if err != nil {
+		return fmt.Errorf("failed to get set user dc query: %w", err)
+	}
+	_, err = l.NamedExecContext(ctx, query, map[string]any{
+		"user_id": userID,
+		"dc":      dc,
+		"time":    time.Now(),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to upsert user dc: %w", err)
+	}
+	return nil
+}
+
+// GetUserDC returns the cached datacenter for a user. The boolean is false when no
+// row exists or the lookup fails; callers treat that as a cache miss and
+// re-fetch the profile photo, mirroring Locator.Message.
+func (l *Locator) GetUserDC(ctx context.Context, userID int64) (int, bool) {
+	l.RLock()
+	defer l.RUnlock()
+
+	var row dcRow
+	query := l.Adopt(`SELECT dc, time FROM user_dc WHERE user_id = ?`)
+	err := l.GetContext(ctx, &row, query, userID)
+	if err != nil {
+		observability.Logf(ctx, "[DEBUG] failed to find dc for user %d: %v", userID, err)
+		return 0, false
+	}
+	return row.DC, true
 }
 
 // cleanupMessages removes old messages. Messages with expired ttl are removed if the total number of messages exceeds minSize.

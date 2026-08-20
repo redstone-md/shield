@@ -53,7 +53,27 @@ func TestRuleSet_LegacyPayloadDecodesNewFieldsAsZero(t *testing.T) {
 }
 
 func TestCurrentSchemaVersion(t *testing.T) {
-	assert.Equal(t, 3, CurrentSchemaVersion)
+	assert.Equal(t, 4, CurrentSchemaVersion)
+}
+
+func TestRuleSet_JoinGateJSONRoundTrip(t *testing.T) {
+	rs := RuleSet{JoinGate: JoinGateRules{BannedDCs: []int{2, 4}}}
+
+	data, err := json.Marshal(rs)
+	require.NoError(t, err)
+
+	var got RuleSet
+	require.NoError(t, json.Unmarshal(data, &got))
+	assert.Equal(t, []int{2, 4}, got.JoinGate.BannedDCs)
+}
+
+func TestRuleSet_JoinGateLegacyDecodesAsEmpty(t *testing.T) {
+	// payload written before JoinGate existed.
+	legacy := `{"workspace_id":"tg-spam","version":1,"join_gate":null}`
+
+	var got RuleSet
+	require.NoError(t, json.Unmarshal([]byte(legacy), &got))
+	assert.Empty(t, got.JoinGate.BannedDCs)
 }
 
 func TestRuleSet_LLMCommonJSONRoundTrip(t *testing.T) {

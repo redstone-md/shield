@@ -212,6 +212,12 @@ Each plugin exposes a `check(request)` function returning `(isSpam bool, details
 
 Example plugins: [_examples/lua_plugins](https://github.com/redstone-md/shield/tree/master/_examples/lua_plugins).
 
+### Join-time datacenter gate
+
+Shield can ban users preemptively based on their Telegram datacenter the moment they join a monitored chat. Telegram does not expose a user's datacenter through the Bot API, so Shield derives it from the `file_id` of the user's profile photo (the DC where the avatar is stored). When that DC is in the `join_gate.banned_dcs` list of the active rule set, the joining user is banned across all primary chats before they can post.
+
+Configuration is live-reloadable through the rule set (web UI / API); an empty `banned_dcs` list disables the gate. The bot must be an administrator in a chat to receive its join events. Users without a profile photo, bots, chat administrators/creators, and super-users are exempt; pre-existing members are not checked (no join event fires for them). Detected DCs are cached per user so a rejoin does not re-fetch the photo.
+
 ## Persistence and migration
 
 By default, Shield uses SQLite and stores data in the dynamic data directory. In Docker, mount `/srv/data` so the database, learned samples, user approvals, incidents, reports, and moderation history survive restarts.

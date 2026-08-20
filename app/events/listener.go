@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
@@ -71,6 +72,7 @@ type TelegramListener struct {
 	ModerationActions       ModerationActions
 	DetectedSpamCounter     DetectedSpamCounter
 	RuleSetVersion          int
+	BannedDCs               []int // construction-time seed for the join-gate dc set; live config is bannedDCs
 	ModerationConfig        ModerationConfig
 	ReportConfig            ReportConfig // user spam reporting configuration
 	DisableAdminSpamForward bool         // disable forwarding spam reports to admin chat support
@@ -98,11 +100,12 @@ type TelegramListener struct {
 	reportsHandler   *userReports
 	appealHandler    *appealHandler
 	processor        incomingEventProcessor
+	bannedDCs        atomic.Pointer[dcSet] // join-gate lookup set, rebuilt on rule-set reload
 	pipeline         listenerPipeline
 	dmUsers          dmUsers            // recent DM senders, stored in memory for admin UI
 	Groups           []string           // list of group names/ids to monitor
 	chatIDs          []int64            // resolved chat IDs for all groups
-	chatIDsSet       map[int64]struct{} // O(1) lookup for isChatAllowed
+	chatIDsSet       map[int64]struct{} // o(1) lookup for isChatAllowed
 	linkedChannelIDs map[int64]int64    // chatID - per group
 	primChatIDs      []int64            // all group chatIDs for banning everywhere
 	chatID           int64              // first group chatID (backward compat)
@@ -164,8 +167,11 @@ func (l *TelegramListener) ApplyRuleSet(rs rules.RuleSet) {
 
 	l.SlowPathEnabled = rs.SlowPathEnabled
 
-	log.Printf("[INFO] listener config updated from rule set: version=%d, soft_ban=%v, dry=%v, policy=%s, slow_path=%v",
-		rs.Version, rs.Moderation.SoftBan, rs.Moderation.DryRun, profileName, rs.SlowPathEnabled)
+	l.bannedDCs.Store(newDCSet(rs.JoinGate.BannedDCs))
+
+	log.Printf("[INFO] listener config updated from rule set: version=%d, soft_ban=%v, dry=%v, policy=%s, "+
+		"slow_path=%v, banned_dcs=%v",
+		rs.Version, rs.Moderation.SoftBan, rs.Moderation.DryRun, profileName, rs.SlowPathEnabled, rs.JoinGate.BannedDCs)
 }
 
 // Do process all events, blocked call
@@ -223,6 +229,12 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 	}
 	l.primChatIDs = make([]int64, len(l.chatIDs))
 	copy(l.primChatIDs, l.chatIDs)
+
+	// seed the join-gate dc set from the construction-time config; later
+	// rule-set reloads swap it atomically via ApplyRuleSet.
+	if l.bannedDCs.Load() == nil {
+		l.bannedDCs.Store(newDCSet(l.BannedDCs))
+	}
 
 	l.updateSupers()
 
@@ -362,6 +374,13 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 		}
 		if err := l.procEventsWithContext(ctx, editedUpdate); err != nil {
 			log.Printf("[WARN] failed to process edited message update: %v", err)
+		}
+		return nil
+	}
+
+	if update.ChatMember != nil {
+		if err := l.procChatMemberUpdated(ctx, *update.ChatMember); err != nil {
+			log.Printf("[WARN] failed to process chat member update: %v", err)
 		}
 		return nil
 	}
