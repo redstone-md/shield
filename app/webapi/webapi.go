@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -39,8 +40,19 @@ import (
 
 //go:embed assets/* assets/components/*
 var templateFS embed.FS
-var tmpl = template.Must(template.New("").Funcs(template.FuncMap{"dict": templateDict}).
-	ParseFS(templateFS, "assets/*.html", "assets/components/*.html"))
+var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
+	"dict": templateDict,
+	"join": joinInts,
+}).ParseFS(templateFS, "assets/*.html", "assets/components/*.html"))
+
+// joinInts renders an int slice as a sep-delimited string, used to pre-fill list inputs.
+func joinInts(xs []int, sep string) string {
+	s := make([]string, len(xs))
+	for i, v := range xs {
+		s[i] = strconv.Itoa(v)
+	}
+	return strings.Join(s, sep)
+}
 
 // templateDict builds a map from alternating key/value pairs, for use as a
 // html/template FuncMap function so templates can pass named arguments to sub-templates.

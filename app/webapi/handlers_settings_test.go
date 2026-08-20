@@ -101,3 +101,52 @@ func TestSettingsEditRoute_Registered(t *testing.T) {
 	router.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/settings/edit", http.NoBody))
 	assert.NotEqual(t, http.StatusNotFound, rr.Code, "GET /settings/edit must be routed")
 }
+
+func TestHTMLSettingsEditHandler_RendersJoinGate(t *testing.T) {
+	prov := &settingsRuleSetStub{get: rules.RuleSet{
+		JoinGate: rules.JoinGateRules{BannedDCs: []int{2, 4}},
+	}}
+	srv := &Server{Config: Config{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}}
+
+	rr := httptest.NewRecorder()
+	srv.htmlSettingsEditHandler(rr, httptest.NewRequest(http.MethodGet, "/settings/edit", http.NoBody))
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	body := rr.Body.String()
+	assert.Contains(t, body, `name="join_gate.banned_dcs"`)
+	assert.Contains(t, body, `value="2,4"`)
+	assert.Contains(t, body, "Banned avatar datacenters")
+}
+
+func TestSaveSettingsHandler_JoinGate(t *testing.T) {
+	prov := &settingsRuleSetStub{get: rules.RuleSet{WorkspaceID: "tg-spam"}}
+	srv := &Server{Config: Config{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}}
+
+	form := url.Values{"join_gate.banned_dcs": {"2,4"}}
+	req := httptest.NewRequest(http.MethodPost, "/settings/save", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	srv.saveSettingsHandler(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, []int{2, 4}, prov.updated.JoinGate.BannedDCs)
+	assert.Equal(t, "web", prov.source)
+}
+
+func TestSaveSettingsHandler_JoinGateEmptyDisables(t *testing.T) {
+	prov := &settingsRuleSetStub{get: rules.RuleSet{
+		JoinGate: rules.JoinGateRules{BannedDCs: []int{2}},
+	}}
+	srv := &Server{Config: Config{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}}
+
+	form := url.Values{"join_gate.banned_dcs": {""}}
+	req := httptest.NewRequest(http.MethodPost, "/settings/save", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	srv.saveSettingsHandler(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Nil(t, prov.updated.JoinGate.BannedDCs)
+}

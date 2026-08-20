@@ -67,6 +67,13 @@
             </div>
 
             <div class="card">
+                <div class="card-header">Join gate</div>
+                <div class="card-body">
+                    {{template "settings_int_list" dict "Key" "join_gate.banned_dcs" "Label" "Banned avatar datacenters" "Val" (join .RuleSet.JoinGate.BannedDCs ",") "Pinned" $pinned "Hint" "Comma-separated Telegram DC IDs, e.g. 2,4. Users whose profile photo lives in a listed DC are banned when they join. Leave empty to disable."}}
+                </div>
+            </div>
+
+            <div class="card">
                 <div class="card-body">
                     {{template "settings_bool" dict "Key" "slow_path_enabled" "Label" "Slow-path enabled" "Val" .RuleSet.SlowPathEnabled "Pinned" $pinned}}
                 </div>
@@ -106,6 +113,16 @@
     <label>{{.Label}} {{template "settings_pinned_badge" .}}</label>
     <div class="form-row__control">
         <input type="text" class="input" name="{{.Key}}" value="{{.Val}}">
+    </div>
+</div>
+{{end}}
+
+{{define "settings_int_list"}}
+<div class="form-row">
+    <label>{{.Label}} {{template "settings_pinned_badge" .}}</label>
+    <div class="form-row__control">
+        <input type="text" class="input" name="{{.Key}}" value="{{.Val}}" placeholder="e.g. 2,4">
+        {{if .Hint}}<small class="muted">{{.Hint}}</small>{{end}}
     </div>
 </div>
 {{end}}

@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/redstone-md/shield/app/rules"
 )
@@ -62,6 +63,27 @@ func ruleSetFromForm(base rules.RuleSet, form url.Values) (rs rules.RuleSet, err
 		}
 		errs = append(errs, fmt.Sprintf("%s: must be one of %v", key, allowed))
 	}
+	dcListField := func(key string, target *[]int) {
+		if !form.Has(key) {
+			return // field absent: preserve base value
+		}
+		raw := strings.TrimSpace(form.Get(key))
+		if raw == "" {
+			*target = nil // empty submission disables the gate
+			return
+		}
+		parts := strings.Split(raw, ",")
+		out := make([]int, 0, len(parts))
+		for _, p := range parts {
+			v, err := strconv.Atoi(strings.TrimSpace(p))
+			if err != nil || v < 1 || v > 10 {
+				errs = append(errs, fmt.Sprintf("%s: %q must be a whole number 1-10", key, strings.TrimSpace(p)))
+				return
+			}
+			out = append(out, v)
+		}
+		*target = out
+	}
 
 	// detection
 	intField("detection.max_emoji", -1, 1000, &rs.Detection.MaxEmoji)
@@ -93,6 +115,9 @@ func ruleSetFromForm(base rules.RuleSet, form url.Values) (rs rules.RuleSet, err
 	rs.Gemini.Model = form.Get("gemini.model")
 	rs.Gemini.Prompt = form.Get("gemini.prompt")
 	intField("gemini.history_size", 0, 1000000, &rs.Gemini.HistorySize)
+
+	// join gate
+	dcListField("join_gate.banned_dcs", &rs.JoinGate.BannedDCs)
 
 	rs.SlowPathEnabled = boolField("slow_path_enabled")
 

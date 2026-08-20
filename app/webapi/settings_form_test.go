@@ -66,3 +66,38 @@ func TestRuleSetFromForm_InvalidLLMModeRejected(t *testing.T) {
 	require.Len(t, errs, 1)
 	assert.Contains(t, errs[0], "llm.mode")
 }
+
+func TestRuleSetFromForm_DCList(t *testing.T) {
+	t.Run("parses comma list", func(t *testing.T) {
+		rs, errs := ruleSetFromForm(rules.RuleSet{}, url.Values{"join_gate.banned_dcs": {"2,4"}})
+		require.Empty(t, errs)
+		assert.Equal(t, []int{2, 4}, rs.JoinGate.BannedDCs)
+	})
+	t.Run("trims surrounding spaces", func(t *testing.T) {
+		rs, errs := ruleSetFromForm(rules.RuleSet{}, url.Values{"join_gate.banned_dcs": {" 2 , 4 "}})
+		require.Empty(t, errs)
+		assert.Equal(t, []int{2, 4}, rs.JoinGate.BannedDCs)
+	})
+	t.Run("empty disables gate", func(t *testing.T) {
+		base := rules.RuleSet{JoinGate: rules.JoinGateRules{BannedDCs: []int{2}}}
+		rs, errs := ruleSetFromForm(base, url.Values{"join_gate.banned_dcs": {""}})
+		require.Empty(t, errs)
+		assert.Nil(t, rs.JoinGate.BannedDCs)
+	})
+	t.Run("absent preserves base", func(t *testing.T) {
+		base := rules.RuleSet{JoinGate: rules.JoinGateRules{BannedDCs: []int{3}}}
+		rs, errs := ruleSetFromForm(base, url.Values{})
+		require.Empty(t, errs)
+		assert.Equal(t, []int{3}, rs.JoinGate.BannedDCs)
+	})
+	t.Run("out of range rejected", func(t *testing.T) {
+		_, errs := ruleSetFromForm(rules.RuleSet{}, url.Values{"join_gate.banned_dcs": {"2,99"}})
+		require.Len(t, errs, 1)
+		assert.Contains(t, errs[0], "join_gate.banned_dcs")
+	})
+	t.Run("non-numeric rejected", func(t *testing.T) {
+		_, errs := ruleSetFromForm(rules.RuleSet{}, url.Values{"join_gate.banned_dcs": {"2,x"}})
+		require.Len(t, errs, 1)
+		assert.Contains(t, errs[0], "join_gate.banned_dcs")
+	})
+}
