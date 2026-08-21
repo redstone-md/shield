@@ -307,11 +307,26 @@ func (l *TelegramListener) initHandlers() {
 	}
 }
 
-func (l *TelegramListener) eventLoop(ctx context.Context) error {
+// updateConfig builds the long-poll update request. AllowedUpdates lists the
+// update types the listener dispatches, plus chat_member — which Telegram
+// excludes from the default subscription, so without it the join-time DC ban
+// gate never receives member transitions. Other default types (reactions,
+// boosts, business, inline, polls, channel posts) are omitted because the
+// listener does not handle them and they would only add long-poll traffic.
+func (l *TelegramListener) updateConfig() tbapi.UpdateConfig {
 	u := tbapi.NewUpdate(0)
 	u.Timeout = 60
+	u.AllowedUpdates = []string{
+		tbapi.UpdateTypeMessage,
+		tbapi.UpdateTypeEditedMessage,
+		tbapi.UpdateTypeCallbackQuery,
+		tbapi.UpdateTypeChatMember,
+	}
+	return u
+}
 
-	updates := l.TbAPI.GetUpdatesChan(u)
+func (l *TelegramListener) eventLoop(ctx context.Context) error {
+	updates := l.TbAPI.GetUpdatesChan(l.updateConfig())
 	log.Printf("[DEBUG] start listening for updates")
 	for {
 		select {
