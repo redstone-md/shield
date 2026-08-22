@@ -37,13 +37,25 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: "1.25"
+        id: go
 
+      - name: go build cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-go-build-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            ${{ runner.os }}-go-build-
+
+      # browser binaries depend on the playwright-go version pinned in the
+      # install step below, not on go.sum; keying on go.sum reinstalled
+      # chromium on every dependency bump
       - name: cache playwright browsers
         uses: actions/cache@v6
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('.github/workflows/e2e-ui.yml') }}
 
       - name: install playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
