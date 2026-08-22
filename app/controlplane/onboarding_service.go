@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/redstone-md/shield/app/rules"
 	"github.com/redstone-md/shield/app/storage"
@@ -14,6 +15,11 @@ type OnboardingService struct {
 	workspaces WorkspaceStore
 	ruleSets   RuleSetBootstrapper
 	cache      RuleSetCache
+
+	// onboardMu makes the exist-check and tenant Add atomic: without it two
+	// concurrent Onboard calls for the same tenant can both pass the Get miss
+	// and both Add, double-onboarding the tenant.
+	onboardMu sync.Mutex
 }
 
 type RuleSetBootstrapper interface {
@@ -53,18 +59,22 @@ func (s *OnboardingService) Onboard(ctx context.Context, req OnboardRequest) (*O
 		return nil, fmt.Errorf("tenant_id, name and owner_id are required")
 	}
 
+	s.onboardMu.Lock()
 	_, err := s.tenants.Get(ctx, req.TenantID)
 	if err == nil {
+		s.onboardMu.Unlock()
 		return nil, fmt.Errorf("tenant %s already exists", req.TenantID)
 	}
 
-	if addErr := s.tenants.Add(ctx, storage.TenantRecord{
+	addErr := s.tenants.Add(ctx, storage.TenantRecord{
 		ID:      req.TenantID,
 		GID:     req.GID,
 		Name:    req.Name,
 		Status:  "active",
 		OwnerID: req.OwnerID,
-	}); addErr != nil {
+	})
+	s.onboardMu.Unlock()
+	if addErr != nil {
 		return nil, fmt.Errorf("failed to create tenant: %w", addErr)
 	}
 	log.Printf("[INFO] tenant onboarded: id=%s name=%s", req.TenantID, req.Name)
