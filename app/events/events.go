@@ -126,29 +126,21 @@ type Bot interface {
 	IsApprovedUser(userID int64) bool
 }
 
-// escapeMarkDownV1Text escapes special characters used in Telegram's MarkdownV1 parse mode.
-// It escapes: _ (underscore), * (asterisk), ` (backtick), [ (left bracket)
-// This is used when re-parsing already rendered text to prevent markdown parsing errors.
-func escapeMarkDownV1Text(text string) string {
-	escSymbols := []string{"_", "*", "`", "["}
-	for _, esc := range escSymbols {
-		text = strings.ReplaceAll(text, esc, "\\"+esc)
-	}
-	return text
-}
-
-func markdownUserLink(userName string, userID int64) string {
+// htmlUserLink renders a clickable Telegram user mention for the HTML parse
+// mode. Unlike the legacy Markdown link, underscores in usernames need no
+// escaping here, so names like gpig_stepan render and stay clickable.
+func htmlUserLink(userName string, userID int64) string {
 	userName = strings.TrimPrefix(strings.TrimSpace(userName), "@")
 	display := userName
 	if display == "" {
 		display = fmt.Sprintf("%d", userID)
 	}
-	display = escapeMarkDownV1Text(display)
+	display = htmlEscape(display)
 	if userID != 0 {
-		return fmt.Sprintf("[%s](tg://user?id=%d)", display, userID)
+		return fmt.Sprintf(`<a href="tg://user?id=%d">%s</a>`, userID, display)
 	}
 	if userName != "" {
-		return fmt.Sprintf("[%s](https://t.me/%s)", display, userName)
+		return fmt.Sprintf(`<a href="https://t.me/%s">%s</a>`, htmlEscape(userName), display)
 	}
 	return display
 }
@@ -175,7 +167,7 @@ func truncateString(s string, maxRunes int, suffix string) string {
 	return string(runes[:maxRunes]) + suffix
 }
 
-// send a message to the telegram as markdown first and if failed - as plain text
+// send a message to telegram as HTML first and if failed - as plain text
 func send(tbMsg tbapi.Chattable, tbAPI TbAPI) error {
 	withParseMode := func(tbMsg tbapi.Chattable, parseMode string) tbapi.Chattable {
 		switch msg := tbMsg.(type) {
@@ -193,37 +185,9 @@ func send(tbMsg tbapi.Chattable, tbAPI TbAPI) error {
 		return tbMsg // don't touch other types
 	}
 
-	// for issue #223: Special handling for messages containing profile links with usernames that have underscores
-	// these often fail in markdown mode because underscores are used for formatting, but we need to preserve the links
-	hasTelegramProfileLink := false
-	switch v := tbMsg.(type) {
-	case tbapi.EditMessageTextConfig:
-		// check if this message contains a Telegram user link, which we want to preserve
-		hasTelegramProfileLink = strings.Contains(v.Text, "tg://user?id=")
-	}
-
-	// try markdown first, as it's the nicer rendering
-	msg := withParseMode(tbMsg, tbapi.ModeMarkdown)
+	msg := withParseMode(tbMsg, tbapi.ModeHTML)
 	if _, err := tbAPI.Send(msg); err != nil {
-		log.Printf("[WARN] failed to send message as markdown, %v", err)
-
-		// for messages with Telegram profile links, we need to ensure the links are preserved
-		// when falling back to plain text, even if markdown fails
-		if hasTelegramProfileLink {
-			// use HTML mode as a fallback, which better handles usernames with special characters
-			htmlMsg := withParseMode(tbMsg, tbapi.ModeHTML)
-			if _, err := tbAPI.Send(htmlMsg); err != nil {
-				// if HTML also fails, fall back to plain text
-				log.Printf("[WARN] failed to send message as HTML, %v", err)
-				plainMsg := withParseMode(tbMsg, "") // plain text
-				if _, err := tbAPI.Send(plainMsg); err != nil {
-					return fmt.Errorf("can't send message to telegram: %w", err)
-				}
-			}
-			return nil
-		}
-
-		// for regular messages, just fall back to plain text
+		log.Printf("[WARN] failed to send message as HTML, %v", err)
 		msg = withParseMode(tbMsg, "")
 		if _, err := tbAPI.Send(msg); err != nil {
 			return fmt.Errorf("can't send message to telegram: %w", err)

@@ -11,7 +11,7 @@ func (a *admin) spamInfoForCallback(ctx context.Context, userID int64, messageTe
 		info, found := a.locator.Spam(ctx, userID)
 		if found {
 			for _, check := range info.Checks {
-				spamInfo = append(spamInfo, "- "+escapeMarkDownV1Text(check.String()))
+				spamInfo = append(spamInfo, "- "+htmlEscape(check.String()))
 			}
 		}
 	}
@@ -19,9 +19,9 @@ func (a *admin) spamInfoForCallback(ctx context.Context, userID int64, messageTe
 		return strings.Join(spamInfo, "\n")
 	}
 	if existing := existingSpamInfoFromMessage(messageText); existing != "" {
-		return escapeMarkDownV1Text(existing)
+		return htmlEscape(existing)
 	}
-	return "**can't get spam info**"
+	return "<b>can't get spam info</b>"
 }
 
 func existingSpamInfoFromMessage(messageText string) string {
@@ -30,7 +30,8 @@ func existingSpamInfoFromMessage(messageText string) string {
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "spam detection results") ||
-			strings.HasPrefix(trimmed, "**spam detection results**") {
+			strings.HasPrefix(trimmed, "**spam detection results**") ||
+			strings.HasPrefix(trimmed, "<b>spam detection results</b>") {
 			start = i + 1
 			break
 		}

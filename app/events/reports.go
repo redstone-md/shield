@@ -275,14 +275,12 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 		}
 
 		notificationText := fmt.Sprintf(
-			"**LLM auto-moderated reported message**\n\n[%s](tg://user?id=%d)\n\n%s\n\n"+
-				"**Reporter:** [%s](tg://user?id=%d)\n**Reason:** %s",
-			escapeMarkDownV1Text(origMsg.From.UserName),
-			origMsg.From.ID,
-			truncateString(strings.ReplaceAll(escapeMarkDownV1Text(msgTxt), "\n", " "), 300, "..."),
-			escapeMarkDownV1Text(reporterName),
-			update.Message.From.ID,
-			escapeMarkDownV1Text(details),
+			"<b>LLM auto-moderated reported message</b>\n\n%s\n\n%s\n\n"+
+				"<b>Reporter:</b> %s\n<b>Reason:</b> %s",
+			htmlUserLink(origMsg.From.UserName, origMsg.From.ID),
+			htmlEscape(truncateString(strings.ReplaceAll(msgTxt, "\n", " "), 300, "...")),
+			htmlUserLink(reporterName, update.Message.From.ID),
+			htmlEscape(details),
 		)
 		if err := send(tbapi.NewMessage(r.adminChatID, notificationText), r.tbAPI); err != nil {
 			log.Printf("[WARN] failed to send LLM auto-moderation notification: %v", err)

@@ -58,7 +58,7 @@ func TestUserReports_CallbackReportBanReporterConfirm(t *testing.T) {
 		assert.Len(t, mockReports.GetByMessageCalls(), 2)
 		assert.Len(t, mockReports.DeleteReporterCalls(), 1)
 		require.Len(t, mockAPI.SendCalls(), 1)
-		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "репортер [reporter\\_1](tg://user?id=111) забанен администратором [admin](tg://user?id=333)")
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, `репортер <a href="tg://user?id=111">reporter_1</a> забанен администратором <a href="tg://user?id=333">admin</a>`)
 	})
 
 	t.Run("ban last reporter", func(t *testing.T) {

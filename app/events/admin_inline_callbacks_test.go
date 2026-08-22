@@ -8,7 +8,6 @@ import (
 	"github.com/redstone-md/shield/lib/spamcheck"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"strings"
 	"testing"
 )
 
@@ -87,7 +86,7 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 		editMsg := mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig)
 		assert.Equal(t, query.Message.Chat.ID, editMsg.ChatID)
 		assert.Equal(t, query.Message.MessageID, editMsg.MessageID)
-		assert.Contains(t, editMsg.Text, "бан подтвержден администратором [admin](tg://user?id=111)")
+		assert.Contains(t, editMsg.Text, `бан подтвержден администратором <a href="tg://user?id=111">admin</a>`)
 		assert.Empty(t, editMsg.ReplyMarkup.InlineKeyboard)
 
 		require.Len(t, botMock.UpdateSpamCalls(), 1)
@@ -247,47 +246,28 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 	})
 }
 
-func TestAdmin_CallbackShowInfo_PreservesUserLinks(t *testing.T) {
+func TestAdmin_CallbackShowInfo_HTMLMode(t *testing.T) {
 
-	var markdownErrorCount, htmlSuccessCount int
-
-	mockAPI := &mocks.TbAPIMock{
-		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
-			switch msg := c.(type) {
-			case tbapi.EditMessageTextConfig:
-				switch msg.ParseMode {
-				case tbapi.ModeMarkdown:
-
-					if strings.Contains(msg.Text, "user\\_name\\_with\\_underscore") {
-
-						return tbapi.Message{Text: msg.Text}, nil
-					}
-				case tbapi.ModeHTML:
-
-					if strings.Contains(msg.Text, "user_name_with_underscore") {
-						htmlSuccessCount++
-
-						assert.Contains(t, msg.Text, "tg://user?id=12345", "Link URL should be preserved in HTML mode")
-						return tbapi.Message{Text: msg.Text}, nil
-					}
-				case "":
-
-					assert.Contains(t, msg.Text, "tg://user?id=12345", "Link URL should be preserved")
+	t.Run("Preserve underscores for usernames, single HTML attempt", func(t *testing.T) {
+		var sendAttempts int
+		var usedParseMode string
+		mockAPI := &mocks.TbAPIMock{
+			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
+				sendAttempts++
+				if msg, ok := c.(tbapi.EditMessageTextConfig); ok {
+					usedParseMode = msg.ParseMode
+					assert.Contains(t, msg.Text, "user_name_with_underscore",
+						"underscore in username should pass through unescaped")
+					assert.Contains(t, msg.Text, "<b>spam detection results</b>")
 				}
-			}
-			return tbapi.Message{}, nil
-		},
-	}
+				return tbapi.Message{}, nil
+			},
+		}
 
-	adm := &admin{
-		tbAPI:       mockAPI,
-		adminChatID: 456,
-	}
-
-	t.Run("Preserve links for usernames with underscores", func(t *testing.T) {
-		mockAPI.ResetCalls()
-		markdownErrorCount = 0
-		htmlSuccessCount = 0
+		adm := &admin{
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+		}
 
 		query := &tbapi.CallbackQuery{
 			ID:   "test-callback-id",
@@ -317,12 +297,11 @@ func TestAdmin_CallbackShowInfo_PreservesUserLinks(t *testing.T) {
 		err := adm.callbackShowInfo(context.Background(), query)
 		require.NoError(t, err)
 
-		assert.Len(t, mockAPI.SendCalls(), 1, "Should succeed on first attempt with markdown")
-		assert.Equal(t, 0, markdownErrorCount, "Should not fail with markdown")
-		assert.Equal(t, 0, htmlSuccessCount, "Should not need HTML fallback")
+		assert.Equal(t, 1, sendAttempts, "Should succeed on first HTML attempt")
+		assert.Equal(t, tbapi.ModeHTML, usedParseMode, "Should use HTML parse mode")
 	})
 
-	t.Run("info button preserves link for normal username", func(t *testing.T) {
+	t.Run("info button preserves text for normal username", func(t *testing.T) {
 		sendAttempts := 0
 		mockAPI := &mocks.TbAPIMock{
 			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
@@ -331,7 +310,7 @@ func TestAdmin_CallbackShowInfo_PreservesUserLinks(t *testing.T) {
 					assert.Contains(t, editMsg.Text, "permanently banned")
 					assert.Contains(t, editMsg.Text, "spam detection results")
 
-					assert.Equal(t, tbapi.ModeMarkdown, editMsg.ParseMode)
+					assert.Equal(t, tbapi.ModeHTML, editMsg.ParseMode)
 				}
 				return tbapi.Message{}, nil
 			},
@@ -366,10 +345,10 @@ func TestAdmin_CallbackShowInfo_PreservesUserLinks(t *testing.T) {
 
 		err := adm.callbackShowInfo(context.Background(), query)
 		require.NoError(t, err)
-		assert.Equal(t, 1, sendAttempts, "Should succeed on first attempt with markdown")
+		assert.Equal(t, 1, sendAttempts, "Should succeed on first HTML attempt")
 	})
 
-	t.Run("info button preserves link for username with underscore after fix", func(t *testing.T) {
+	t.Run("info button keeps username with underscore raw", func(t *testing.T) {
 		sendAttempts := 0
 		var usedParseMode string
 		mockAPI := &mocks.TbAPIMock{
@@ -378,8 +357,7 @@ func TestAdmin_CallbackShowInfo_PreservesUserLinks(t *testing.T) {
 				if editMsg, ok := c.(tbapi.EditMessageTextConfig); ok {
 					usedParseMode = editMsg.ParseMode
 
-					assert.Contains(t, editMsg.Text, "surkova\\_vlada", "Underscore should be escaped")
-					assert.Equal(t, tbapi.ModeMarkdown, editMsg.ParseMode)
+					assert.Contains(t, editMsg.Text, "surkova_vlada", "Underscore should stay raw in HTML mode")
 
 					return tbapi.Message{}, nil
 				}
@@ -417,7 +395,7 @@ func TestAdmin_CallbackShowInfo_PreservesUserLinks(t *testing.T) {
 		err := adm.callbackShowInfo(context.Background(), query)
 		require.NoError(t, err)
 
-		assert.Equal(t, 1, sendAttempts, "Should succeed on first attempt with markdown")
-		assert.Equal(t, tbapi.ModeMarkdown, usedParseMode, "Should use markdown mode successfully")
+		assert.Equal(t, 1, sendAttempts, "Should succeed on first HTML attempt")
+		assert.Equal(t, tbapi.ModeHTML, usedParseMode, "Should use HTML parse mode")
 	})
 }

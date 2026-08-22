@@ -39,7 +39,7 @@ func TestUserReports_UpdateReportNotification(t *testing.T) {
 		assert.Len(t, mockAPI.SendCalls(), 1, "should edit message")
 		assert.Equal(t, int64(456), editedMsg.ChatID, "should edit in admin chat")
 		assert.Equal(t, 888, editedMsg.MessageID, "should edit correct message")
-		assert.Equal(t, tbapi.ModeMarkdown, editedMsg.ParseMode, "should use markdown")
+		assert.Equal(t, tbapi.ModeHTML, editedMsg.ParseMode, "should use HTML")
 		assert.Contains(t, editedMsg.Text, "Жалобы на спам (3)", "should contain updated report count")
 		assert.Contains(t, editedMsg.Text, "spammer", "should contain reported user name")
 		assert.Contains(t, editedMsg.Text, "spam message", "should contain message text")
@@ -109,7 +109,7 @@ func TestUserReports_UpdateReportNotification(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, editedMsg.Text, "...", "should truncate long message")
 		msgStart := strings.Index(editedMsg.Text, "spam")
-		msgEnd := strings.Index(editedMsg.Text[msgStart:], "**Кто пожаловался:**")
+		msgEnd := strings.Index(editedMsg.Text[msgStart:], "<b>Кто пожаловался:</b>")
 		msgTextInNotif := editedMsg.Text[msgStart : msgStart+msgEnd]
 		assert.Less(t, len(msgTextInNotif), len(longMsg), "message should be shorter than original")
 	})
@@ -191,7 +191,7 @@ func TestUserReports_UpdateReportNotification(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to edit admin notification")
 	})
 
-	t.Run("names with markdown special characters should be escaped", func(t *testing.T) {
+	t.Run("names with html special characters should be escaped", func(t *testing.T) {
 		var editedMsg tbapi.EditMessageTextConfig
 		mockAPI := &mocks.TbAPIMock{
 			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
@@ -207,19 +207,17 @@ func TestUserReports_UpdateReportNotification(t *testing.T) {
 		}
 
 		reports := []storage.Report{
-			{MsgID: 100, ChatID: 200, ReportedUserID: 666, ReportedUserName: "spam_user*bot", ReporterUserID: 111, ReporterUserName: "test_reporter", MsgText: "spam", AdminMsgID: 888},
-			{MsgID: 100, ChatID: 200, ReportedUserID: 666, ReportedUserName: "spam_user*bot", ReporterUserID: 222, ReporterUserName: "admin[test]", MsgText: "spam", AdminMsgID: 888},
+			{MsgID: 100, ChatID: 200, ReportedUserID: 666, ReportedUserName: "spam<user>&bot", ReporterUserID: 111, ReporterUserName: "test_reporter", MsgText: "spam", AdminMsgID: 888},
+			{MsgID: 100, ChatID: 200, ReportedUserID: 666, ReportedUserName: "spam<user>&bot", ReporterUserID: 222, ReporterUserName: "admin\"test\"", MsgText: "spam", AdminMsgID: 888},
 		}
 
 		err := rep.updateReportNotification(context.Background(), reports)
 		require.NoError(t, err)
 
-		assert.Contains(t, editedMsg.Text, "spam\\_user\\*bot", "reported user name should be escaped")
-		assert.NotContains(t, editedMsg.Text, "spam_user*bot", "reported user name should not contain unescaped characters")
+		assert.Contains(t, editedMsg.Text, "spam&lt;user&gt;&amp;bot", "reported user name should be escaped")
+		assert.NotContains(t, editedMsg.Text, "spam<user>&bot", "reported user name should not contain raw html specials")
 
-		assert.Contains(t, editedMsg.Text, "test\\_reporter", "first reporter name should be escaped")
-		assert.Contains(t, editedMsg.Text, "admin\\[test]", "second reporter name should have escaped bracket")
-		assert.NotContains(t, editedMsg.Text, "test_reporter](tg://", "first reporter name should not contain unescaped underscore in link")
-		assert.NotContains(t, editedMsg.Text, "admin[test]](tg://", "second reporter name should not contain unescaped opening bracket in link")
+		assert.Contains(t, editedMsg.Text, `<a href="tg://user?id=111">test_reporter</a>`, "first reporter link must stay well-formed")
+		assert.Contains(t, editedMsg.Text, "admin&quot;test&quot;", "second reporter name should have escaped quotes")
 	})
 }

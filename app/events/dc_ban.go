@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/hashicorp/go-multierror"
@@ -56,7 +57,7 @@ func (l *TelegramListener) procChatMemberUpdated(ctx context.Context, u tbapi.Ch
 	}
 	user := member.User
 
-	// exemptions: bots, chat admins/creators, super-users.
+	// exemptions: bots, chat admins/creators, super-users, approved users.
 	if user.IsBot {
 		return nil
 	}
@@ -64,6 +65,10 @@ func (l *TelegramListener) procChatMemberUpdated(ctx context.Context, u tbapi.Ch
 		return nil
 	}
 	if l.SuperUsers.IsSuper(user.UserName, user.ID) {
+		return nil
+	}
+	if l.Bot != nil && l.Bot.IsApprovedUser(user.ID) {
+		log.Printf("[DEBUG] dc-ban: user %d is approved, skipping", user.ID)
 		return nil
 	}
 
@@ -148,18 +153,26 @@ func (l *TelegramListener) classifyUserDC(ctx context.Context, userID int64) (in
 	return dc, nil
 }
 
-// notifyDCBan posts a short audit line to the admin chat, matching the
-// messageless-ban precedent in DirectBanTarget.
+// notifyDCBan posts a short audit line with a two-step unban button to the
+// admin chat, matching the messageless-ban precedent in DirectBanTarget.
 func (l *TelegramListener) notifyDCBan(u tbapi.ChatMemberUpdated, user *tbapi.User, dc int) {
 	if l.adminChatID == 0 {
 		return
 	}
 	text := fmt.Sprintf("[DC GATE] %s забанен по DC %d при входе в чат %d",
-		markdownUserLink(user.UserName, user.ID), dc, u.Chat.ID)
+		htmlBanTarget(user.UserName, user.ID), dc, u.Chat.ID)
 	if l.Dry {
 		text = "[DRY] " + text
+	} else if l.TrainingMode {
+		text = "[TRAINING] " + text
 	}
-	if err := send(tbapi.NewMessage(l.adminChatID, text), l.TbAPI); err != nil {
+	msg := tbapi.NewMessage(l.adminChatID, text)
+	msg.ReplyMarkup = tbapi.NewInlineKeyboardMarkup(
+		tbapi.NewInlineKeyboardRow(
+			tbapi.NewInlineKeyboardButtonData("Разбанить", dcUnbanAskPrefix+strconv.FormatInt(user.ID, 10)),
+		),
+	)
+	if err := send(msg, l.TbAPI); err != nil {
 		log.Printf("[WARN] dc-ban: failed to notify admin chat: %v", err)
 	}
 }

@@ -120,7 +120,7 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		assert.Len(t, mockReports.DeleteByMessageCalls(), 1)
 		assert.Len(t, mockBot.UpdateSpamCalls(), 1)
 		require.Len(t, mockAPI.SendCalls(), 1)
-		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "забанено администратором [admin](tg://user?id=111)")
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, `забанено администратором <a href="tg://user?id=111">admin</a>`)
 	})
 
 	t.Run("no reports found", func(t *testing.T) {

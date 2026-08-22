@@ -42,8 +42,8 @@ func (a *admin) DirectBanTarget(ctx context.Context, update tbapi.Update, target
 	}
 
 	msg := fmt.Sprintf("пользователь %s забанен администратором %s",
-		markdownBanTarget(userName, userID),
-		markdownUserLink(update.Message.From.UserName, update.Message.From.ID))
+		htmlBanTarget(userName, userID),
+		htmlUserLink(update.Message.From.UserName, update.Message.From.ID))
 	if err := send(tbapi.NewMessage(a.adminChatID, msg), a.tbAPI); err != nil {
 		return fmt.Errorf("failed to send direct ban notification: %w", err)
 	}
@@ -60,8 +60,8 @@ func (a *admin) DirectBanTarget(ctx context.Context, update tbapi.Update, target
 	return nil
 }
 
-func markdownBanTarget(userName string, userID int64) string {
-	link := markdownUserLink(userName, userID)
+func htmlBanTarget(userName string, userID int64) string {
+	link := htmlUserLink(userName, userID)
 	if strings.TrimSpace(userName) == "" {
 		return link
 	}
@@ -430,7 +430,8 @@ func (a *admin) sendWarnMessage(ctx context.Context, origMsg *tbapi.Message, war
 		return nil
 	}
 
-	if err := send(tbapi.NewMessage(a.chatIDOrFallback(origMsg.Chat.ID), escapeMarkDownV1Text(warnMsg)), a.tbAPI); err != nil {
+	// buildWarningText already renders HTML, so the message goes out as-is
+	if err := send(tbapi.NewMessage(a.chatIDOrFallback(origMsg.Chat.ID), warnMsg), a.tbAPI); err != nil {
 		return fmt.Errorf("failed to send warning to main chat: %w", err)
 	}
 	return nil
@@ -508,9 +509,9 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 		diagMsg.SenderChat = bot.SenderChat{ID: origMsg.SenderChat.ID, UserName: origMsg.SenderChat.UserName}
 	}
 	resp := a.bot.OnMessage(diagMsg, true)
-	spamInfoText := "**не удалось получить диагностику спама**"
+	spamInfoText := "<b>не удалось получить диагностику спама</b>"
 	for _, check := range resp.CheckResults {
-		spamInfo = append(spamInfo, "- "+escapeMarkDownV1Text(check.String()))
+		spamInfo = append(spamInfo, "- "+htmlEscape(check.String()))
 	}
 	if len(spamInfo) > 0 {
 		spamInfoText = strings.Join(spamInfo, "\n")
@@ -521,10 +522,10 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 		displayName = a.channelDisplayName(origMsg.SenderChat)
 		displayID = channelID
 	}
-	newMsgText := fmt.Sprintf("**исходная диагностика для %s (%d)**\n\n%s\n\n%s\n\n\n"+
+	newMsgText := fmt.Sprintf("<b>исходная диагностика для %s (%d)</b>\n\n%s\n\n%s\n\n\n"+
 		"пользователь забанен администратором %s, сообщение удалено",
-		escapeMarkDownV1Text(displayName), displayID, escapeMarkDownV1Text(msgTxt), spamInfoText,
-		markdownUserLink(update.Message.From.UserName, update.Message.From.ID))
+		htmlEscape(displayName), displayID, htmlEscape(msgTxt), spamInfoText,
+		htmlUserLink(update.Message.From.UserName, update.Message.From.ID))
 	if err := send(tbapi.NewMessage(a.adminChatID, newMsgText), a.tbAPI); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to send spam detection results to admin chat: %w", err))
 	}
@@ -600,8 +601,8 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 					cleanupName = origMsg.SenderChat.UserName
 				}
 				log.Printf("[INFO] aggressive cleanup: deleted %d messages from %d", deleted, cleanupUserID)
-				notifyMsg := fmt.Sprintf("_удалено %d сообщений спамера %q (%d)_",
-					deleted, escapeMarkDownV1Text(cleanupName), cleanupUserID)
+				notifyMsg := fmt.Sprintf("<i>удалено %d сообщений спамера %q (%d)</i>",
+					deleted, htmlEscape(cleanupName), cleanupUserID)
 				if err := send(tbapi.NewMessage(a.adminChatID, notifyMsg), a.tbAPI); err != nil {
 					log.Printf("[WARN] failed to send deletion notification: %v", err)
 				}

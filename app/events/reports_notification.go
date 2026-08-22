@@ -20,8 +20,7 @@ func (r *userReports) sendAutoBanNotification(reports []storage.Report) error {
 	reportedUserID := firstReport.ReportedUserID
 	reportedUserName := firstReport.ReportedUserName
 
-	msgText := strings.ReplaceAll(escapeMarkDownV1Text(firstReport.MsgText), "\n", " ")
-	msgText = truncateString(msgText, 200, "...")
+	msgText := htmlEscape(truncateString(strings.ReplaceAll(firstReport.MsgText, "\n", " "), 200, "..."))
 
 	reporterList := make([]string, 0, len(reports))
 	for _, report := range reports {
@@ -29,8 +28,7 @@ func (r *userReports) sendAutoBanNotification(reports []storage.Report) error {
 		if reporterName == "" {
 			reporterName = fmt.Sprintf("user%d", report.ReporterUserID)
 		}
-		reporterList = append(reporterList, fmt.Sprintf("- [%s](tg://user?id=%d)",
-			escapeMarkDownV1Text(reporterName), report.ReporterUserID))
+		reporterList = append(reporterList, "- "+htmlUserLink(reporterName, report.ReporterUserID))
 	}
 
 	actionType := "забанен"
@@ -39,17 +37,16 @@ func (r *userReports) sendAutoBanNotification(reports []storage.Report) error {
 	}
 
 	notificationText := fmt.Sprintf(
-		"**Пользователь автоматически %s после %d репортов**\n\n[%s](tg://user?id=%d)\n\n"+
-			"%s\n\n**Кто пожаловался:**\n%s",
+		"<b>Пользователь автоматически %s после %d репортов</b>\n\n%s\n\n"+
+			"%s\n\n<b>Кто пожаловался:</b>\n%s",
 		actionType,
 		len(reports),
-		escapeMarkDownV1Text(reportedUserName),
-		reportedUserID,
+		htmlUserLink(reportedUserName, reportedUserID),
 		msgText,
 		strings.Join(reporterList, "\n"))
 
 	tbMsg := tbapi.NewMessage(r.adminChatID, notificationText)
-	tbMsg.ParseMode = tbapi.ModeMarkdown
+	tbMsg.ParseMode = tbapi.ModeHTML
 	tbMsg.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
 
 	if _, err := r.tbAPI.Send(tbMsg); err != nil {
@@ -74,8 +71,7 @@ func (r *userReports) updateNotificationForAutoBan(reports []storage.Report) err
 	reportedUserID := firstReport.ReportedUserID
 	reportedUserName := firstReport.ReportedUserName
 
-	msgText := strings.ReplaceAll(escapeMarkDownV1Text(firstReport.MsgText), "\n", " ")
-	msgText = truncateString(msgText, 200, "...")
+	msgText := htmlEscape(truncateString(strings.ReplaceAll(firstReport.MsgText, "\n", " "), 200, "..."))
 
 	reporterList := make([]string, 0, len(reports))
 	for _, report := range reports {
@@ -83,8 +79,7 @@ func (r *userReports) updateNotificationForAutoBan(reports []storage.Report) err
 		if reporterName == "" {
 			reporterName = fmt.Sprintf("user%d", report.ReporterUserID)
 		}
-		reporterList = append(reporterList, fmt.Sprintf("- [%s](tg://user?id=%d)",
-			escapeMarkDownV1Text(reporterName), report.ReporterUserID))
+		reporterList = append(reporterList, "- "+htmlUserLink(reporterName, report.ReporterUserID))
 	}
 
 	actionType := "забанен"
@@ -92,18 +87,17 @@ func (r *userReports) updateNotificationForAutoBan(reports []storage.Report) err
 		actionType = "ограничен"
 	}
 
-	updatedText := fmt.Sprintf("**Жалобы на спам (%d)**\n\n[%s](tg://user?id=%d)\n\n%s\n\n"+
-		"**Кто пожаловался:**\n%s\n\n_автоматически %s после %d репортов_",
+	updatedText := fmt.Sprintf("<b>Жалобы на спам (%d)</b>\n\n%s\n\n%s\n\n"+
+		"<b>Кто пожаловался:</b>\n%s\n\n<i>автоматически %s после %d репортов</i>",
 		len(reports),
-		escapeMarkDownV1Text(reportedUserName),
-		reportedUserID,
+		htmlUserLink(reportedUserName, reportedUserID),
 		msgText,
 		strings.Join(reporterList, "\n"),
 		actionType,
 		len(reports))
 
 	editMsg := tbapi.NewEditMessageText(r.adminChatID, adminMsgID, updatedText)
-	editMsg.ParseMode = "Markdown"
+	editMsg.ParseMode = tbapi.ModeHTML
 	editMsg.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
 	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
 
@@ -131,8 +125,7 @@ func (r *userReports) sendReportNotification(ctx context.Context, reports []stor
 	reportedUserID := firstReport.ReportedUserID
 	reportedUserName := firstReport.ReportedUserName
 
-	msgText := strings.ReplaceAll(escapeMarkDownV1Text(firstReport.MsgText), "\n", " ")
-	msgText = truncateString(msgText, 200, "...")
+	msgText := htmlEscape(truncateString(strings.ReplaceAll(firstReport.MsgText, "\n", " "), 200, "..."))
 
 	reporterList := make([]string, 0, len(reports))
 	for _, report := range reports {
@@ -140,14 +133,12 @@ func (r *userReports) sendReportNotification(ctx context.Context, reports []stor
 		if reporterName == "" {
 			reporterName = fmt.Sprintf("user%d", report.ReporterUserID)
 		}
-		reporterList = append(reporterList, fmt.Sprintf("- [%s](tg://user?id=%d)",
-			escapeMarkDownV1Text(reporterName), report.ReporterUserID))
+		reporterList = append(reporterList, "- "+htmlUserLink(reporterName, report.ReporterUserID))
 	}
 
-	notificationText := fmt.Sprintf("**Жалобы на спам (%d)**\n\n[%s](tg://user?id=%d)\n\n%s\n\n**Кто пожаловался:**\n%s",
+	notificationText := fmt.Sprintf("<b>Жалобы на спам (%d)</b>\n\n%s\n\n%s\n\n<b>Кто пожаловался:</b>\n%s",
 		len(reports),
-		escapeMarkDownV1Text(reportedUserName),
-		reportedUserID,
+		htmlUserLink(reportedUserName, reportedUserID),
 		msgText,
 		strings.Join(reporterList, "\n"))
 
@@ -163,7 +154,7 @@ func (r *userReports) sendReportNotification(ctx context.Context, reports []stor
 	)
 
 	tbMsg := tbapi.NewMessage(r.adminChatID, notificationText)
-	tbMsg.ParseMode = tbapi.ModeMarkdown
+	tbMsg.ParseMode = tbapi.ModeHTML
 	tbMsg.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
 	tbMsg.ReplyMarkup = keyboard
 
@@ -198,8 +189,7 @@ func (r *userReports) updateReportNotification(_ context.Context, reports []stor
 	reportedUserID := firstReport.ReportedUserID
 	reportedUserName := firstReport.ReportedUserName
 
-	msgText := strings.ReplaceAll(escapeMarkDownV1Text(firstReport.MsgText), "\n", " ")
-	msgText = truncateString(msgText, 200, "...")
+	msgText := htmlEscape(truncateString(strings.ReplaceAll(firstReport.MsgText, "\n", " "), 200, "..."))
 
 	reporterList := make([]string, 0, len(reports))
 	for _, report := range reports {
@@ -207,14 +197,13 @@ func (r *userReports) updateReportNotification(_ context.Context, reports []stor
 		if reporterName == "" {
 			reporterName = fmt.Sprintf("user%d", report.ReporterUserID)
 		}
-		reporterList = append(reporterList, fmt.Sprintf("- [%s](tg://user?id=%d)",
-			escapeMarkDownV1Text(reporterName), report.ReporterUserID))
+		reporterList = append(reporterList, "- "+htmlUserLink(reporterName, report.ReporterUserID))
 	}
 
-	notification := fmt.Sprintf("**Жалобы на спам (%d)**\n\n", len(reports)) +
-		fmt.Sprintf("[%s](tg://user?id=%d)\n\n", escapeMarkDownV1Text(reportedUserName), reportedUserID) +
+	notification := fmt.Sprintf("<b>Жалобы на спам (%d)</b>\n\n", len(reports)) +
+		fmt.Sprintf("%s\n\n", htmlUserLink(reportedUserName, reportedUserID)) +
 		fmt.Sprintf("%s\n\n", msgText) +
-		fmt.Sprintf("**Кто пожаловался:**\n%s", strings.Join(reporterList, "\n"))
+		fmt.Sprintf("<b>Кто пожаловался:</b>\n%s", strings.Join(reporterList, "\n"))
 
 	padding := strings.Repeat("\u2800", 30)
 	notification += "\n\n" + padding
@@ -228,7 +217,7 @@ func (r *userReports) updateReportNotification(_ context.Context, reports []stor
 	)
 
 	editMsg := tbapi.NewEditMessageText(r.adminChatID, adminMsgID, notification)
-	editMsg.ParseMode = "Markdown"
+	editMsg.ParseMode = tbapi.ModeHTML
 	editMsg.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
 	editMsg.ReplyMarkup = &keyboard
 

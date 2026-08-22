@@ -98,7 +98,7 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		adminMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
 		assert.Equal(t, int64(456), adminMsg.ChatID)
 		assert.Contains(t, adminMsg.Text, "исходная диагностика для spammer (222)")
-		assert.Contains(t, adminMsg.Text, "пользователь забанен администратором [admin](tg://user?id=111)")
+		assert.Contains(t, adminMsg.Text, `пользователь забанен администратором <a href="tg://user?id=111">admin</a>`)
 
 		require.Len(t, botMock.RemoveApprovedUserCalls(), 1)
 		assert.Equal(t, int64(222), botMock.RemoveApprovedUserCalls()[0].ID)
@@ -138,12 +138,12 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		assert.Empty(t, botMock.UpdateSpamCalls())
 	})
 
-	t.Run("DirectBanReport_EscapesMarkdownInBody", func(t *testing.T) {
+	t.Run("DirectBanReport_UnderscoreInBodyStaysRaw", func(t *testing.T) {
 		mockAPI, _, adm, teardown := setupTest()
 		defer teardown()
 
-		// spam body with an unmatched underscore (e.g. a @handle) must be escaped,
-		// otherwise MarkdownV1 parsing fails and the whole notification renders raw
+		// in HTML mode an unmatched underscore in the spam body (e.g. a @handle)
+		// needs no escaping, unlike the legacy MarkdownV1 parse mode
 		update := createReplyUpdate("admin", 111, "spammer", 222, "job offer, details: @pr1me_work")
 
 		err := adm.DirectBanReport(context.Background(), update)
@@ -151,8 +151,8 @@ func TestAdmin_DirectCommands(t *testing.T) {
 
 		require.Len(t, mockAPI.SendCalls(), 1)
 		text := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
-		assert.Contains(t, text, `@pr1me\_work`, "underscore in spam body must be markdown-escaped")
-		assert.NotContains(t, text, "@pr1me_work", "raw unescaped underscore would break markdown")
+		assert.Contains(t, text, `@pr1me_work`, "underscore in spam body stays raw in HTML mode")
+		assert.Equal(t, tbapi.ModeHTML, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).ParseMode)
 	})
 
 	t.Run("DirectBanTarget_ByID", func(t *testing.T) {
@@ -167,8 +167,8 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, mockAPI.SendCalls(), 1)
-		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "[testuser](tg://user?id=222) (222)")
-		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "[admin](tg://user?id=111)")
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, `<a href="tg://user?id=222">testuser</a> (222)`)
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, `<a href="tg://user?id=111">admin</a>`)
 		require.Len(t, mockAPI.RequestCalls(), 2)
 		assert.Equal(t, 789, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
 		banCfg := mockAPI.RequestCalls()[1].C.(tbapi.BanChatMemberConfig)
@@ -195,9 +195,9 @@ func TestAdmin_DirectCommands(t *testing.T) {
 
 		require.Len(t, mockAPI.SendCalls(), 1)
 		text := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
-		assert.Contains(t, text, "пользователь [8642668745](tg://user?id=8642668745) забанен")
+		assert.Contains(t, text, `пользователь <a href="tg://user?id=8642668745">8642668745</a> забанен`)
 		assert.NotContains(t, text, "user 8642668745")
-		assert.NotContains(t, text, "](tg://user?id=8642668745) (8642668745)")
+		assert.NotContains(t, text, `</a> (8642668745)`)
 	})
 
 	t.Run("DirectBanTarget_ByUsernameWithAt", func(t *testing.T) {
@@ -212,7 +212,7 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, mockAPI.SendCalls(), 1)
-		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "[spammer](tg://user?id=222) (222)")
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, `<a href="tg://user?id=222">spammer</a> (222)`)
 		require.Len(t, mockAPI.RequestCalls(), 2)
 		banCfg := mockAPI.RequestCalls()[1].C.(tbapi.BanChatMemberConfig)
 		assert.Equal(t, int64(222), banCfg.UserID)
@@ -232,7 +232,7 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, mockAPI.SendCalls(), 1)
-		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "[spammer](tg://user?id=222) (222)")
+		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, `<a href="tg://user?id=222">spammer</a> (222)`)
 		require.Len(t, mockAPI.RequestCalls(), 2)
 		banCfg := mockAPI.RequestCalls()[1].C.(tbapi.BanChatMemberConfig)
 		assert.Equal(t, int64(222), banCfg.UserID)
@@ -495,9 +495,9 @@ func TestAdmin_DirectCommands(t *testing.T) {
 
 		require.Len(t, mockAPI.SendCalls(), 1)
 		adminMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
-		assert.Contains(t, adminMsg.Text, "spam\\_channel")
+		assert.Contains(t, adminMsg.Text, "spam_channel")
 		assert.Contains(t, adminMsg.Text, "12345")
-		assert.NotContains(t, adminMsg.Text, "Channel\\_Bot")
+		assert.NotContains(t, adminMsg.Text, "Channel_Bot")
 		assert.NotContains(t, adminMsg.Text, "136817688")
 	})
 
@@ -554,10 +554,11 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		require.Len(t, mockAPI.SendCalls(), 1)
 		warnMsg := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig)
 		assert.Equal(t, int64(123), warnMsg.ChatID)
-		assert.Contains(t, warnMsg.Text, "spam\\_channel")
-		assert.NotContains(t, warnMsg.Text, "@Channel\\_Bot")
+		assert.Contains(t, warnMsg.Text, "spam_channel")
+		assert.NotContains(t, warnMsg.Text, "@Channel_Bot")
 		assert.Contains(t, warnMsg.Text, "Предупреждение 1/3")
 		assert.Contains(t, warnMsg.Text, "Не нарушайте правила чата")
+		assert.Equal(t, tbapi.ModeHTML, warnMsg.ParseMode, "warn message must be sent in HTML mode")
 	})
 
 	t.Run("DirectWarnReport_ChannelMessage_TitleOnly", func(t *testing.T) {
@@ -706,7 +707,7 @@ func TestAdmin_WarningNotSpamCallback(t *testing.T) {
 		assert.Equal(t, int64(7187750383), detectedSpy.deleteLatestByIDCalls[0])
 		require.Len(t, mockAPI.SendCalls(), 1)
 		edit := mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig)
-		assert.Contains(t, edit.Text, "ham подтвержден администратором [admin](tg://user?id=111)")
+		assert.Contains(t, edit.Text, `ham подтвержден администратором <a href="tg://user?id=111">admin</a>`)
 		require.NotNil(t, edit.ReplyMarkup)
 		assert.Empty(t, edit.ReplyMarkup.InlineKeyboard)
 	})

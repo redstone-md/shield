@@ -47,8 +47,8 @@ func (a *admin) clearUserMessages(ctx context.Context, update tbapi.Update, user
 
 	msg := fmt.Sprintf("удалено %d сообщений пользователя %s администратором %s",
 		deleted,
-		markdownBanTarget(userName, userID),
-		markdownUserLink(update.Message.From.UserName, update.Message.From.ID))
+		htmlBanTarget(userName, userID),
+		htmlUserLink(update.Message.From.UserName, update.Message.From.ID))
 	if err := send(tbapi.NewMessage(a.adminChatID, msg), a.tbAPI); err != nil {
 		return fmt.Errorf("failed to send direct clear notification: %w", err)
 	}

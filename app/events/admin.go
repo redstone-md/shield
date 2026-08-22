@@ -45,6 +45,12 @@ const (
 	warnHamAskPrefix   = "W?"
 	warnHamPrefix      = "W+"
 	warnHamCancel      = "WX"
+
+	// DC-gate unban flow prefixes on [DC GATE] admin notifications:
+	// ask -> confirm/cancel. Data suffix is the plain user ID.
+	dcUnbanAskPrefix     = "DCA"
+	dcUnbanConfirmPrefix = "DCU"
+	dcUnbanCancelPrefix  = "DCX"
 )
 
 // firstChatID returns the first primary chat ID, or 0 if none configured.
@@ -262,15 +268,15 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 
 	spamInfo := []string{}
 	resp := a.bot.OnMessage(bot.Message{Text: update.Message.Text, From: bot.User{ID: info.UserID}}, true)
-	spamInfoText := "**не удалось получить диагностику спама**"
+	spamInfoText := "<b>не удалось получить диагностику спама</b>"
 	for _, check := range resp.CheckResults {
-		spamInfo = append(spamInfo, "- "+escapeMarkDownV1Text(check.String()))
+		spamInfo = append(spamInfo, "- "+htmlEscape(check.String()))
 	}
 	if len(spamInfo) > 0 {
 		spamInfoText = strings.Join(spamInfo, "\n")
 	}
-	newMsgText := fmt.Sprintf("**исходная диагностика для %q (%d)**\n\n%s\n\n\n*пользователь забанен, сообщение удалено*",
-		escapeMarkDownV1Text(info.UserName), info.UserID, spamInfoText)
+	newMsgText := fmt.Sprintf("<b>исходная диагностика для %q (%d)</b>\n\n%s\n\n\n<i>пользователь забанен, сообщение удалено</i>",
+		htmlEscape(info.UserName), info.UserID, spamInfoText)
 	if err := send(tbapi.NewMessage(a.adminChatID, newMsgText), a.tbAPI); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to send spap detection results to admin chat: %w", err))
 	}
@@ -339,7 +345,7 @@ func (a *admin) demoCheck(update tbapi.Update) error {
 
 	checks := make([]string, 0, len(resp.CheckResults))
 	for _, check := range resp.CheckResults {
-		checks = append(checks, "- "+escapeMarkDownV1Text(check.String()))
+		checks = append(checks, "- "+htmlEscape(check.String()))
 	}
 	checksText := "проверки не вернули диагностических сигналов"
 	if len(checks) > 0 {
@@ -350,8 +356,8 @@ func (a *admin) demoCheck(update tbapi.Update) error {
 	if msgText == "" {
 		msgText = adminDemoContentLabel(msg)
 	}
-	text := fmt.Sprintf("**демо-проверка**: %s\n\n%s\n\n%s",
-		escapeMarkDownV1Text(status), escapeMarkDownV1Text(msgText), checksText)
+	text := fmt.Sprintf("<b>демо-проверка</b>: %s\n\n%s\n\n%s",
+		htmlEscape(status), htmlEscape(msgText), checksText)
 	if err := send(tbapi.NewMessage(a.adminChatID, text), a.tbAPI); err != nil {
 		return fmt.Errorf("failed to send demo check results to admin chat: %w", err)
 	}
@@ -391,23 +397,23 @@ func (a *admin) msgHandlerFallback(ctx context.Context, update tbapi.Update, fwd
 
 	spamInfo := []string{}
 	resp := a.bot.OnMessage(bot.Message{Text: update.Message.Text, From: bot.User{ID: fwdID}}, true)
-	spamInfoText := "**не удалось получить диагностику спама**"
+	spamInfoText := "<b>не удалось получить диагностику спама</b>"
 	for _, check := range resp.CheckResults {
-		spamInfo = append(spamInfo, "- "+escapeMarkDownV1Text(check.String()))
+		spamInfo = append(spamInfo, "- "+htmlEscape(check.String()))
 	}
 	if len(spamInfo) > 0 {
 		spamInfoText = strings.Join(spamInfo, "\n")
 	}
 
-	detectionMsg := fmt.Sprintf("**исходная диагностика для %q (%d)**\n\n%s\n\n\n*пользователь забанен*",
-		escapeMarkDownV1Text(username), fwdID, spamInfoText)
+	detectionMsg := fmt.Sprintf("<b>исходная диагностика для %q (%d)</b>\n\n%s\n\n\n<i>пользователь забанен</i>",
+		htmlEscape(username), fwdID, spamInfoText)
 	if err := send(tbapi.NewMessage(a.adminChatID, detectionMsg), a.tbAPI); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to send spam detection results to admin chat: %w", err))
 	}
 
 	if a.dry {
-		warnMsg := fmt.Sprintf("⚠ *резервный режим locator* (dry mode): пользователь %q (%d), исходное сообщение нужно удалить вручную",
-			escapeMarkDownV1Text(username), fwdID)
+		warnMsg := fmt.Sprintf("⚠ <i>резервный режим locator</i> (dry mode): пользователь %q (%d), исходное сообщение нужно удалить вручную",
+			htmlEscape(username), fwdID)
 		if err := send(tbapi.NewMessage(a.adminChatID, warnMsg), a.tbAPI); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to send fallback warning: %w", err))
 		}
@@ -434,8 +440,8 @@ func (a *admin) msgHandlerFallback(ctx context.Context, update tbapi.Update, fwd
 	if len([]rune(snippet)) > 100 {
 		snippet = string([]rune(snippet)[:100]) + "..."
 	}
-	warnMsg := fmt.Sprintf("⚠ *резервный режим locator*: исходное сообщение от %q (%d) нужно удалить вручную\n\n_%s_",
-		escapeMarkDownV1Text(username), fwdID, escapeMarkDownV1Text(snippet))
+	warnMsg := fmt.Sprintf("⚠ <i>резервный режим locator</i>: исходное сообщение от %q (%d) нужно удалить вручную\n\n<i>%s</i>",
+		htmlEscape(username), fwdID, htmlEscape(snippet))
 	if err := send(tbapi.NewMessage(a.adminChatID, warnMsg), a.tbAPI); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to send fallback warning: %w", err))
 	}

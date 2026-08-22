@@ -275,7 +275,7 @@ func TestTelegramListener_DoWithDirectBanTarget(t *testing.T) {
 	require.EqualError(t, err, "telegram update chan closed")
 
 	require.Len(t, mockAPI.SendCalls(), 1)
-	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "[222](tg://user?id=222) забанен")
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, `<a href="tg://user?id=222">222</a> забанен`)
 	require.Len(t, mockAPI.RequestCalls(), 2)
 	assert.Equal(t, 101, mockAPI.RequestCalls()[0].C.(tbapi.DeleteMessageConfig).MessageID)
 	banCfg := mockAPI.RequestCalls()[1].C.(tbapi.BanChatMemberConfig)
@@ -390,7 +390,7 @@ func TestTelegramListener_DoWithAdminUnBan(t *testing.T) {
 	require.EqualError(t, err, "telegram update chan closed")
 	require.Len(t, mockAPI.SendCalls(), 1)
 	assert.Equal(t, 987654, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).MessageID)
-	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "разбанено администратором [admin](tg://user?id=1000)")
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, `разбанено администратором <a href="tg://user?id=1000">admin</a>`)
 	require.Len(t, mockAPI.RequestCalls(), 2)
 	assert.Equal(t, "принято", mockAPI.RequestCalls()[0].C.(tbapi.CallbackConfig).Text)
 
@@ -464,7 +464,7 @@ func TestTelegramListener_DoWithAdminSoftUnBan(t *testing.T) {
 	require.EqualError(t, err, "telegram update chan closed")
 	require.Len(t, mockAPI.SendCalls(), 1)
 	assert.Equal(t, 987654, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).MessageID)
-	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "разбанено администратором [admin](tg://user?id=1000)")
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, `разбанено администратором <a href="tg://user?id=1000">admin</a>`)
 	require.Len(t, mockAPI.RequestCalls(), 2)
 	assert.Equal(t, "принято", mockAPI.RequestCalls()[0].C.(tbapi.CallbackConfig).Text)
 
@@ -540,7 +540,7 @@ func TestTelegramListener_DoWithAdminSoftUnBanEmptyText(t *testing.T) {
 	require.EqualError(t, err, "telegram update chan closed")
 	require.Len(t, mockAPI.SendCalls(), 1)
 	assert.Equal(t, 987654, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).MessageID)
-	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "разбанено администратором [admin](tg://user?id=1000)")
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, `разбанено администратором <a href="tg://user?id=1000">admin</a>`)
 	require.Len(t, mockAPI.RequestCalls(), 2)
 	assert.Equal(t, "принято", mockAPI.RequestCalls()[0].C.(tbapi.CallbackConfig).Text)
 
@@ -615,7 +615,7 @@ func TestTelegramListener_DoWithAdminUnBan_Training(t *testing.T) {
 	require.EqualError(t, err, "telegram update chan closed")
 	require.Len(t, mockAPI.SendCalls(), 1)
 	assert.Equal(t, 987654, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).MessageID)
-	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "разбанено администратором [admin](tg://user?id=1000)")
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, `разбанено администратором <a href="tg://user?id=1000">admin</a>`)
 	require.Len(t, mockAPI.RequestCalls(), 1)
 	assert.Equal(t, "принято", mockAPI.RequestCalls()[0].C.(tbapi.CallbackConfig).Text)
 	require.Len(t, b.UpdateHamCalls(), 1)

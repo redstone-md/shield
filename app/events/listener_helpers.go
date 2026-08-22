@@ -152,8 +152,10 @@ func (l *TelegramListener) sendBotResponse(resp bot.Response, chatID int64, noti
 	}
 
 	log.Printf("[DEBUG] bot response - %+v, reply-to:%d", strings.ReplaceAll(resp.Text, "\n", "\\n"), resp.ReplyTo)
-	tbMsg := tbapi.NewMessage(chatID, resp.Text)
-	tbMsg.ParseMode = tbapi.ModeMarkdown
+	// bot response texts are plain strings; escape them so raw < > & in user
+	// names or quoted text cannot break the HTML parse mode
+	tbMsg := tbapi.NewMessage(chatID, htmlEscape(resp.Text))
+	tbMsg.ParseMode = tbapi.ModeHTML
 	tbMsg.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
 	tbMsg.ReplyParameters = tbapi.ReplyParameters{MessageID: resp.ReplyTo}
 	tbMsg.DisableNotification = notifyType == NotificationSilent

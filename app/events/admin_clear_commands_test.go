@@ -77,8 +77,8 @@ func TestAdmin_DirectClearCommands(t *testing.T) {
 
 		require.Len(t, mockAPI.SendCalls(), 1)
 		notification := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
-		assert.Contains(t, notification, "удалено 2 сообщений пользователя [spammer](tg://user?id=222) (222)")
-		assert.Contains(t, notification, "[admin](tg://user?id=111)")
+		assert.Contains(t, notification, `удалено 2 сообщений пользователя <a href="tg://user?id=222">spammer</a> (222)`)
+		assert.Contains(t, notification, `<a href="tg://user?id=111">admin</a>`)
 	})
 
 	t.Run("reply target", func(t *testing.T) {
@@ -111,7 +111,7 @@ func TestAdmin_DirectClearCommands(t *testing.T) {
 
 		require.Len(t, mockAPI.SendCalls(), 1)
 		assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text,
-			"удалено 1 сообщений пользователя [spammer](tg://user?id=222) (222)")
+			`удалено 1 сообщений пользователя <a href="tg://user?id=222">spammer</a> (222)`)
 	})
 
 	t.Run("skips superuser target", func(t *testing.T) {

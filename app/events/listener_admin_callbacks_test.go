@@ -76,7 +76,7 @@ func TestTelegramListener_DoWithAdminUnbanDecline(t *testing.T) {
 	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "unban user blah")
 	kb := mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).ReplyMarkup.InlineKeyboard
 	assert.Empty(t, kb, "buttons cleared")
-	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "бан подтвержден администратором [admin](tg://user?id=1000)")
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, `бан подтвержден администратором <a href="tg://user?id=1000">admin</a>`)
 	assert.Empty(t, mockAPI.RequestCalls())
 	assert.Len(t, b.UpdateSpamCalls(), 1)
 	assert.Empty(t, b.UpdateHamCalls())
@@ -148,7 +148,7 @@ func TestTelegramListener_DoWithAdminBanConfirmedTraining(t *testing.T) {
 	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "unban user blah")
 	kb := mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).ReplyMarkup.InlineKeyboard
 	assert.Empty(t, kb, "buttons cleared")
-	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "бан подтвержден администратором [admin](tg://user?id=1000)")
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, `бан подтвержден администратором <a href="tg://user?id=1000">admin</a>`)
 	require.Len(t, mockAPI.RequestCalls(), 2)
 	assert.Equal(t, int64(999), mockAPI.RequestCalls()[0].C.(tbapi.BanChatMemberConfig).UserID, "user banned")
 	assert.Equal(t, int64(123), mockAPI.RequestCalls()[0].C.(tbapi.BanChatMemberConfig).ChatID, "chat id")
@@ -222,7 +222,7 @@ func TestTelegramListener_DoWithAdminShowInfo(t *testing.T) {
 	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "unban user blah")
 	kb := mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).ReplyMarkup.InlineKeyboard
 	assert.Empty(t, kb, "buttons cleared")
-	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "results**\n- rule1: spam, details1\n- rule2: spam, details2")
+	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.EditMessageTextConfig).Text, "results</b>\n- rule1: spam, details1\n- rule2: spam, details2")
 	assert.Empty(t, mockAPI.RequestCalls())
 	assert.Empty(t, b.UpdateSpamCalls())
 	assert.Empty(t, b.UpdateHamCalls())

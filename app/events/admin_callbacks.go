@@ -88,6 +88,28 @@ func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.Callback
 		return nil
 	}
 
+	if strings.HasPrefix(callbackData, dcUnbanAskPrefix) {
+		if err := a.callbackDCUnbanAsk(query); err != nil {
+			return fmt.Errorf("failed to make dc-gate unban confirmation: %w", err)
+		}
+		return nil
+	}
+
+	if strings.HasPrefix(callbackData, dcUnbanConfirmPrefix) {
+		if err := a.callbackDCUnbanConfirmed(ctx, query); err != nil {
+			return fmt.Errorf("failed to confirm dc-gate unban: %w", err)
+		}
+		log.Printf("[INFO] dc-gate user unbanned, chatID: %d, data: %s", chatID, callbackData)
+		return nil
+	}
+
+	if strings.HasPrefix(callbackData, dcUnbanCancelPrefix) {
+		if err := a.callbackDCUnbanCancel(query); err != nil {
+			return fmt.Errorf("failed to cancel dc-gate unban: %w", err)
+		}
+		return nil
+	}
+
 	log.Printf("[DEBUG] unban action activated, chatID: %d, userID: %s, orig: %q", chatID, callbackData, query.Message.Text)
 	if err := a.callbackUnbanConfirmed(ctx, query); err != nil {
 		return fmt.Errorf("failed to unban user: %w", err)
@@ -138,8 +160,8 @@ func (a *admin) callbackWarningHamConfirmed(ctx context.Context, query *tbapi.Ca
 		}
 	}
 
-	updText := query.Message.Text + fmt.Sprintf("\n\nham подтвержден администратором %s за %v",
-		markdownUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
+	updText := htmlEscape(query.Message.Text) + fmt.Sprintf("\n\nham подтвержден администратором %s за %v",
+		htmlUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
 	editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, updText)
 	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
 	if err := send(editMsg, a.tbAPI); err != nil {
@@ -187,8 +209,8 @@ func (a *admin) callbackAskBanConfirmation(query *tbapi.CallbackQuery) error {
 }
 
 func (a *admin) callbackBanConfirmed(ctx context.Context, query *tbapi.CallbackQuery) error {
-	updText := query.Message.Text + fmt.Sprintf("\n\nбан подтвержден администратором %s за %v",
-		markdownUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
+	updText := htmlEscape(query.Message.Text) + fmt.Sprintf("\n\nбан подтвержден администратором %s за %v",
+		htmlUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
 	editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, updText)
 	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
 	if err := send(editMsg, a.tbAPI); err != nil {
@@ -274,17 +296,17 @@ func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.Callbac
 		return fmt.Errorf("failed to add user %d to approved list: %w", userID, err)
 	}
 
-	updText := query.Message.Text + fmt.Sprintf("\n\nразбанено администратором %s за %v",
-		markdownUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
+	updText := htmlEscape(query.Message.Text) + fmt.Sprintf("\n\nразбанено администратором %s за %v",
+		htmlUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
 
 	if !strings.Contains(query.Message.Text, "диагностика") &&
 		!strings.Contains(query.Message.Text, "spam detection results") && userID != 0 {
-		spamInfoText := []string{"\n\n**исходная диагностика**\n"}
+		spamInfoText := []string{"\n\n<b>исходная диагностика</b>\n"}
 
 		info, found := a.locator.Spam(ctx, userID)
 		if found {
 			for _, check := range info.Checks {
-				spamInfoText = append(spamInfoText, "- "+escapeMarkDownV1Text(check.String()))
+				spamInfoText = append(spamInfoText, "- "+htmlEscape(check.String()))
 			}
 		}
 
@@ -349,17 +371,17 @@ func (a *admin) unbanChannelInChat(channelID, chatID int64) error {
 
 func (a *admin) callbackShowInfo(ctx context.Context, query *tbapi.CallbackQuery) error {
 	callbackData := query.Data
-	spamInfoText := "**can't get spam info**"
+	spamInfoText := "<b>can't get spam info</b>"
 	userID, _, err := parseCallbackData(callbackData)
 	if err != nil {
-		spamInfoText = fmt.Sprintf("**failed to parse userID from %q: %v**", callbackData[1:], err)
+		spamInfoText = fmt.Sprintf("<b>failed to parse userID from %q: %v</b>", htmlEscape(callbackData[1:]), err)
 	}
 
 	if userID != 0 {
 		spamInfoText = a.spamInfoForCallback(ctx, userID, query.Message.Text)
 	}
 
-	escapedMessage := escapeMarkDownV1Text(query.Message.Text) + "\n\n**spam detection results**\n" + spamInfoText
+	escapedMessage := htmlEscape(query.Message.Text) + "\n\n<b>spam detection results</b>\n" + spamInfoText
 	confirmationKeyboard := [][]tbapi.InlineKeyboardButton{}
 	if query.Message.ReplyMarkup != nil && len(query.Message.ReplyMarkup.InlineKeyboard) > 0 {
 		confirmationKeyboard = query.Message.ReplyMarkup.InlineKeyboard
@@ -367,7 +389,6 @@ func (a *admin) callbackShowInfo(ctx context.Context, query *tbapi.CallbackQuery
 	}
 	editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, escapedMessage)
 	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: confirmationKeyboard}
-	editMsg.ParseMode = tbapi.ModeMarkdown
 	if err := send(editMsg, a.tbAPI); err != nil {
 		return fmt.Errorf("failed to send spam info, chatID:%d, msgID:%d, %w", query.Message.Chat.ID, query.Message.MessageID, err)
 	}
@@ -525,6 +546,150 @@ func (a *admin) extractUsername(text string) (string, error) {
 	return "", errors.New("username not found")
 }
 
+// parseDCUserID extracts the plain user ID carried by DC-gate unban callbacks.
+func parseDCUserID(query *tbapi.CallbackQuery, prefix string) (int64, error) {
+	userID, err := strconv.ParseInt(strings.TrimPrefix(query.Data, prefix), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse user id from %q: %w", query.Data, err)
+	}
+	return userID, nil
+}
+
+// dcUnbanResolved reports whether this DC-gate notification has already been
+// unbanned (terminal state), guarding against double confirmations and stale
+// cancel presses on an edited message.
+func dcUnbanResolved(query *tbapi.CallbackQuery) bool {
+	return strings.Contains(query.Message.Text, "разбанено администратором")
+}
+
+// callbackDCUnbanAsk is step one of the two-step flow: it swaps the «Разбанить»
+// button for an explicit confirmation pair, since confirming also whitelists
+// the user against the DC gate.
+func (a *admin) callbackDCUnbanAsk(query *tbapi.CallbackQuery) error {
+	if _, err := a.tbAPI.Request(tbapi.NewCallback(query.ID, "")); err != nil {
+		return fmt.Errorf("failed to send callback response: %w", err)
+	}
+	userID, err := parseDCUserID(query, dcUnbanAskPrefix)
+	if err != nil {
+		return err
+	}
+	keyboard := tbapi.NewInlineKeyboardMarkup(
+		tbapi.NewInlineKeyboardRow(
+			tbapi.NewInlineKeyboardButtonData("Подтвердить разбан", dcUnbanConfirmPrefix+strconv.FormatInt(userID, 10)),
+			tbapi.NewInlineKeyboardButtonData("Отмена", dcUnbanCancelPrefix+strconv.FormatInt(userID, 10)),
+		),
+	)
+	editMsg := tbapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, keyboard)
+	if err := send(editMsg, a.tbAPI); err != nil {
+		return fmt.Errorf("failed to make dc-gate unban confirmation, chatID:%d, msgID:%d, %w",
+			query.Message.Chat.ID, query.Message.MessageID, err)
+	}
+	return nil
+}
+
+// callbackDCUnbanConfirmed unbans the user in every primary chat and adds them
+// to the approved list, which also exempts them from the DC join gate on
+// rejoin. In dry/training modes no Telegram unban calls are made, but the
+// approval still applies so the flow can be exercised end-to-end.
+func (a *admin) callbackDCUnbanConfirmed(ctx context.Context, query *tbapi.CallbackQuery) error {
+	userID, err := parseDCUserID(query, dcUnbanConfirmPrefix)
+	if err != nil {
+		return err
+	}
+	if dcUnbanResolved(query) {
+		if _, cbErr := a.tbAPI.Request(tbapi.NewCallback(query.ID, "уже разбанено")); cbErr != nil {
+			return fmt.Errorf("failed to send callback response: %w", cbErr)
+		}
+		return nil
+	}
+	if _, err := a.tbAPI.Request(tbapi.NewCallback(query.ID, "принято")); err != nil {
+		return fmt.Errorf("failed to send callback response: %w", err)
+	}
+
+	if !a.trainingMode && !a.dry {
+		// the DC gate always issues hard kicks, so lift them directly instead of
+		// unbanInChat, whose soft-ban branch only lifts restrictions and would
+		// leave a kicked user kicked
+		if uerr := a.unbanHardInAllChats(userID); uerr != nil {
+			return uerr
+		}
+	}
+
+	if err := a.bot.AddApprovedUser(userID, dcGateUserName(query.Message.Text)); err != nil {
+		return fmt.Errorf("failed to add user %d to approved list: %w", userID, err)
+	}
+
+	updText := htmlEscape(query.Message.Text) + fmt.Sprintf("\n\nразбанено администратором %s за %v",
+		htmlUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
+	editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, updText)
+	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
+	if err := send(editMsg, a.tbAPI); err != nil {
+		return fmt.Errorf("failed to edit message, chatID:%d, msgID:%d, %w",
+			query.Message.Chat.ID, query.Message.MessageID, err)
+	}
+	return nil
+}
+
+// unbanHardInAllChats unbans a user in every monitored group with
+// unbanChatMember, bypassing the soft-ban restrict-lifting of unbanInChat.
+func (a *admin) unbanHardInAllChats(userID int64) error {
+	var errs *multierror.Error
+	for _, chatID := range a.primChatIDs {
+		_, err := a.tbAPI.Request(tbapi.UnbanChatMemberConfig{
+			ChatMemberConfig: tbapi.ChatMemberConfig{UserID: userID, ChatConfig: tbapi.ChatConfig{ChatID: chatID}},
+			OnlyIfBanned:     true,
+		})
+		if err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("failed to unban user %d in chat %d: %w", userID, chatID, err))
+		}
+	}
+	return errs.ErrorOrNil()
+}
+
+// dcGateUserName pulls the username out of a plain-text [DC GATE] notification
+// ("[DC GATE] gpig_stepan (123) забанен по DC ..."). Telegram returns
+// message.text entity-stripped, but if the notification ever went out through
+// the plain-text fallback the raw anchor markup stays in the text, so any HTML
+// tags are stripped from the capture. Returns "" when the banned user had no
+// username.
+func dcGateUserName(text string) string {
+	m := dcGateUserRegex.FindStringSubmatch(text)
+	if len(m) < 2 {
+		return ""
+	}
+	return htmlTagRegex.ReplaceAllString(m[1], "")
+}
+
+var (
+	dcGateUserRegex = regexp.MustCompile(`\[DC GATE\] (.*?) \((-?\d+)\) забанен`)
+	htmlTagRegex    = regexp.MustCompile(`<[^>]*>`)
+)
+
+// callbackDCUnbanCancel restores the original «Разбанить» keyboard.
+func (a *admin) callbackDCUnbanCancel(query *tbapi.CallbackQuery) error {
+	if _, err := a.tbAPI.Request(tbapi.NewCallback(query.ID, "")); err != nil {
+		return fmt.Errorf("failed to send callback response: %w", err)
+	}
+	if dcUnbanResolved(query) {
+		return nil // already unbanned, nothing to restore
+	}
+	userID, err := parseDCUserID(query, dcUnbanCancelPrefix)
+	if err != nil {
+		return err
+	}
+	keyboard := tbapi.NewInlineKeyboardMarkup(
+		tbapi.NewInlineKeyboardRow(
+			tbapi.NewInlineKeyboardButtonData("Разбанить", dcUnbanAskPrefix+strconv.FormatInt(userID, 10)),
+		),
+	)
+	editMsg := tbapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, keyboard)
+	if err := send(editMsg, a.tbAPI); err != nil {
+		return fmt.Errorf("failed to restore dc-gate keyboard, chatID:%d, msgID:%d, %w",
+			query.Message.Chat.ID, query.Message.MessageID, err)
+	}
+	return nil
+}
+
 // appealResolver resolves user appeals from the admin-chat inline buttons.
 type appealResolver interface {
 	GetAppeal(ctx context.Context, appealID int64) (audit.Appeal, error)
@@ -585,8 +750,8 @@ func (a *admin) callbackAppealResolve(ctx context.Context, query *tbapi.Callback
 		return fmt.Errorf("failed to resolve appeal %d: %w", appealID, err)
 	}
 
-	updText := query.Message.Text + fmt.Sprintf("\n\n%s администратором %s за %v",
-		outcome, markdownUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
+	updText := htmlEscape(query.Message.Text) + fmt.Sprintf("\n\n%s администратором %s за %v",
+		outcome, htmlUserLink(query.From.UserName, query.From.ID), sinceQuery(query))
 	editMsg := tbapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, updText)
 	editMsg.ReplyMarkup = &tbapi.InlineKeyboardMarkup{InlineKeyboard: [][]tbapi.InlineKeyboardButton{}}
 	if err := send(editMsg, a.tbAPI); err != nil {
