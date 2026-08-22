@@ -412,7 +412,8 @@ func (a *admin) msgHandlerFallback(ctx context.Context, update tbapi.Update, fwd
 	}
 
 	if a.dry {
-		warnMsg := fmt.Sprintf("⚠ <i>резервный режим locator</i> (dry mode): пользователь %q (%d), исходное сообщение нужно удалить вручную",
+		warnMsg := fmt.Sprintf("⚠ <i>резервный режим locator</i> (dry mode): пользователь %q (%d), "+
+			"исходное сообщение нужно удалить вручную",
 			htmlEscape(username), fwdID)
 		if err := send(tbapi.NewMessage(a.adminChatID, warnMsg), a.tbAPI); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to send fallback warning: %w", err))

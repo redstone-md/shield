@@ -591,7 +591,7 @@ func (a *admin) callbackDCUnbanAsk(query *tbapi.CallbackQuery) error {
 // to the approved list, which also exempts them from the DC join gate on
 // rejoin. In dry/training modes no Telegram unban calls are made, but the
 // approval still applies so the flow can be exercised end-to-end.
-func (a *admin) callbackDCUnbanConfirmed(ctx context.Context, query *tbapi.CallbackQuery) error {
+func (a *admin) callbackDCUnbanConfirmed(_ context.Context, query *tbapi.CallbackQuery) error {
 	userID, err := parseDCUserID(query, dcUnbanConfirmPrefix)
 	if err != nil {
 		return err
