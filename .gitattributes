@@ -1,0 +1,19 @@
+# Normalize all text files to LF in the repo and on checkout, independent of
+# core.autocrlf. gofmt rejects CRLF, and shell scripts/Docker builds break on
+# CRLF, so a stable LF worktree keeps local tooling deterministic.
+* text=auto eol=lf
+
+# Binaries: never normalize
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.zip binary
+*.gz binary
+*.exe binary
+*.dll binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
