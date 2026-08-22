@@ -32,7 +32,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     cd app && go build -o /build/shield -ldflags "-X main.revision=${version} -s -w"
 
 
-FROM alpine:3.23
+FROM alpine:3.24
 # enables automatic changelog generation by tools like Dependabot
 LABEL org.opencontainers.image.source="https://github.com/redstone-md/shield" \
       org.opencontainers.image.licenses="MIT"
