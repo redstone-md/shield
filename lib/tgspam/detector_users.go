@@ -213,6 +213,8 @@ func (d *Detector) UpdateConfig(cfg Config) {
 	d.MaxAllowedEmoji = cfg.MaxAllowedEmoji
 	d.MinSpamProbability = cfg.MinSpamProbability
 	d.MultiLangWords = cfg.MultiLangWords
+	d.ChineseMode = cfg.ChineseMode
+	d.ChineseCharRatio = cfg.ChineseCharRatio
 	d.AbnormalSpacing = cfg.AbnormalSpacing
 	d.OpenAIVeto = cfg.OpenAIVeto
 	d.OpenAIHistorySize = cfg.OpenAIHistorySize

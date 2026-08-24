@@ -27,6 +27,8 @@
                     {{template "settings_float" dict "Key" "detection.similarity_threshold" "Label" "Similarity threshold" "Val" .RuleSet.Detection.SimilarityThreshold "Pinned" $pinned}}
                     {{template "settings_float" dict "Key" "detection.min_spam_probability" "Label" "Min spam probability %" "Val" .RuleSet.Detection.MinSpamProbability "Pinned" $pinned}}
                     {{template "settings_int" dict "Key" "detection.multi_lang_words" "Label" "Multi-lang words" "Val" .RuleSet.Detection.MultiLangWords "Pinned" $pinned}}
+                    {{template "settings_bool" dict "Key" "detection.chinese_mode" "Label" "Chinese mode" "Val" .RuleSet.Detection.ChineseMode "Pinned" $pinned "Hint" "Ban messages dominated by chinese characters. Works on short messages that other checks skip."}}
+                    {{template "settings_float" dict "Key" "detection.chinese_char_ratio" "Label" "Chinese chars ratio" "Val" .RuleSet.Detection.ChineseCharRatio "Pinned" $pinned}}
                     {{template "settings_int" dict "Key" "detection.history_size" "Label" "History size" "Val" .RuleSet.Detection.HistorySize "Pinned" $pinned}}
                     {{template "settings_int" dict "Key" "detection.first_messages_count" "Label" "First messages count" "Val" .RuleSet.Detection.FirstMessagesCount "Pinned" $pinned}}
                     {{template "settings_bool" dict "Key" "detection.cas_enabled" "Label" "CAS enabled" "Val" .RuleSet.Detection.CasEnabled "Pinned" $pinned}}
@@ -141,6 +143,7 @@
     <label>{{.Label}} {{template "settings_pinned_badge" .}}</label>
     <div class="form-row__control">
         <input type="checkbox" class="checkbox" name="{{.Key}}" {{if .Val}}checked{{end}}>
+        {{if .Hint}}<small class="muted">{{.Hint}}</small>{{end}}
     </div>
 </div>
 {{end}}

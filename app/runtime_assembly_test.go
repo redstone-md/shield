@@ -92,6 +92,36 @@ func TestBackfillRuleSetSchema_CurrentRuleSetUnchanged(t *testing.T) {
 	assert.Equal(t, current, got)
 }
 
+func TestBackfillRuleSetSchema_Schema4KeepsDetectionSettings(t *testing.T) {
+	var opts options
+	opts.InstanceID = "tg-spam"
+	opts.ChineseMode = true
+	opts.ChineseCharRatio = 0.7
+
+	tuned := rules.RuleSet{
+		WorkspaceID:   "tg-spam",
+		Version:       3,
+		SchemaVersion: 4,
+		Detection: rules.DetectionRules{
+			MaxEmoji:       2,
+			MinMsgLen:      123,
+			MultiLangWords: 3,
+			ParanoidMode:   true,
+		},
+	}
+
+	got, changed := backfillRuleSetSchema(tuned, opts)
+
+	assert.True(t, changed, "schema upgrade must be reported as changed")
+	assert.Equal(t, rules.CurrentSchemaVersion, got.SchemaVersion)
+	assert.Equal(t, 2, got.Detection.MaxEmoji, "user-tuned detection settings must survive the upgrade")
+	assert.Equal(t, 123, got.Detection.MinMsgLen)
+	assert.Equal(t, 3, got.Detection.MultiLangWords)
+	assert.True(t, got.Detection.ParanoidMode)
+	assert.True(t, got.Detection.ChineseMode, "new fields are seeded from env defaults")
+	assert.InDelta(t, 0.7, got.Detection.ChineseCharRatio, 1e-9)
+}
+
 func TestWireLiveReload_AppliesLLMAndSlowPathPrompts(t *testing.T) {
 	var opts options
 	opts.InstanceID = "tg-spam"

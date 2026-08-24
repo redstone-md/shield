@@ -90,6 +90,7 @@ var checkNameToRiskType = map[string]RiskType{
 	"giveaway":         RiskScam,
 	"abnormal-spacing": RiskSpam,
 	"multi-lang":       RiskSpam,
+	"chinese-chars":    RiskSpam,
 	"openai":           RiskSpam,
 	"gemini":           RiskSpam,
 }

@@ -352,6 +352,8 @@ func buildDetectorConfig(opts options, ruleSet rules.RuleSet) tgspam.Config {
 		LLMRequestTimeout:     opts.LLM.RequestTimeout,
 		LLMMinInputChars:      opts.LLM.MinInputChars,
 		MultiLangWords:        ruleSet.Detection.MultiLangWords,
+		ChineseMode:           ruleSet.Detection.ChineseMode,
+		ChineseCharRatio:      ruleSet.Detection.ChineseCharRatio,
 		HistorySize:           ruleSet.Detection.HistorySize,
 	}
 

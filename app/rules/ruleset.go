@@ -4,7 +4,7 @@ import "time"
 
 // CurrentSchemaVersion is the RuleSet payload schema version. Bump it whenever new
 // fields are added so older persisted rulesets can be detected and backfilled.
-const CurrentSchemaVersion = 4
+const CurrentSchemaVersion = 5
 
 // RuleSet is the single-tenant moderation configuration snapshot.
 type RuleSet struct {
@@ -98,6 +98,8 @@ type DetectionRules struct {
 	SimilarityThreshold float64 `json:"similarity_threshold"`
 	MinSpamProbability  float64 `json:"min_spam_probability"`
 	MultiLangWords      int     `json:"multi_lang_words"`
+	ChineseMode         bool    `json:"chinese_mode"`
+	ChineseCharRatio    float64 `json:"chinese_char_ratio"`
 	CasEnabled          bool    `json:"cas_enabled"`
 	HistorySize         int     `json:"history_size"`
 	FirstMessagesCount  int     `json:"first_messages_count"`

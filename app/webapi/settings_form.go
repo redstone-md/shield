@@ -91,6 +91,8 @@ func ruleSetFromForm(base rules.RuleSet, form url.Values) (rs rules.RuleSet, err
 	floatField("detection.similarity_threshold", 0, 1, &rs.Detection.SimilarityThreshold)
 	floatField("detection.min_spam_probability", 0, 100, &rs.Detection.MinSpamProbability)
 	intField("detection.multi_lang_words", 0, 1000, &rs.Detection.MultiLangWords)
+	rs.Detection.ChineseMode = boolField("detection.chinese_mode")
+	floatField("detection.chinese_char_ratio", 0, 1, &rs.Detection.ChineseCharRatio)
 	intField("detection.history_size", 0, 1000000, &rs.Detection.HistorySize)
 	intField("detection.first_messages_count", 0, 10000, &rs.Detection.FirstMessagesCount)
 	rs.Detection.CasEnabled = boolField("detection.cas_enabled")

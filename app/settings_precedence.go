@@ -181,6 +181,12 @@ func applyExplicitDetectionOverrides(rs *rules.RuleSet, opts options) {
 	if configured("multi-lang", "MULTI_LANG") {
 		rs.Detection.MultiLangWords = opts.MultiLangWords
 	}
+	if configured("chinese-mode", "CHINESE_MODE") {
+		rs.Detection.ChineseMode = opts.ChineseMode
+	}
+	if configured("chinese-ratio", "CHINESE_RATIO") {
+		rs.Detection.ChineseCharRatio = opts.ChineseCharRatio
+	}
 	if configured("first-messages-count", "FIRST_MESSAGES_COUNT") {
 		rs.Detection.FirstMessagesCount = opts.FirstMessagesCount
 	}
@@ -216,6 +222,8 @@ var envPinnedRegistry = map[string]envPinnedKey{
 	"detection.similarity_threshold": {"similarity-threshold", "SIMILARITY_THRESHOLD"},
 	"detection.min_spam_probability": {"min-probability", "MIN_PROBABILITY"},
 	"detection.multi_lang_words":     {"multi-lang", "MULTI_LANG"},
+	"detection.chinese_mode":         {"chinese-mode", "CHINESE_MODE"},
+	"detection.chinese_char_ratio":   {"chinese-ratio", "CHINESE_RATIO"},
 	"detection.first_messages_count": {"first-messages-count", "FIRST_MESSAGES_COUNT"},
 	"detection.paranoid_mode":        {"paranoid", "PARANOID"},
 	"detection.history_size":         {"history-min-size", "HISTORY_MIN_SIZE"},

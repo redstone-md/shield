@@ -257,7 +257,7 @@ classDiagram
 | `app/feedback` | Feedback labeling, review candidates, knowledge snapshots |
 | `app/observability` | Context metadata (`event_id`, `correlation_id`, `idempotency_key`), `Metrics` type (sync/atomic counters and histograms) |
 | `app/slowpath` | Slow-path LLM analysis: budget, circuit breaker, OpenAI/Gemini adapters, prompt registry, merge logic |
-| `lib/tgspam` | Core spam `Detector`: sequential checks (duplicates, stop words, emoji, meta, CAS, multi-lang, spacing, similarity/Naive Bayes, LLM, Lua plugins, scoring) |
+| `lib/tgspam` | Core spam `Detector`: sequential checks (duplicates, stop words, emoji, meta, CAS, multi-lang, chinese chars, spacing, similarity/Naive Bayes, LLM, Lua plugins, scoring) |
 | `lib/tgspam/plugin` | Lua plugin system: script loading, dynamic file reload via fsnotify, Arabic script detector |
 | `lib/spamcheck` | Shared request/response types for spam checks, scoring |
 | `lib/textnorm` | Text normalization pipeline: lowercase, trim, invisible chars, NFKC, confusables, script folding |

@@ -45,6 +45,7 @@ const (
 	ReasonMetaLink        ReasonCode = "meta_link"
 	ReasonMetaMention     ReasonCode = "meta_mention"
 	ReasonMultiLang       ReasonCode = "multi_lang"
+	ReasonChineseChars    ReasonCode = "chinese_chars"
 	ReasonAbnormalSpacing ReasonCode = "abnormal_spacing"
 	ReasonEmojiSpam       ReasonCode = "emoji_spam"
 	ReasonLLMOpenAI       ReasonCode = "llm_openai"
@@ -152,18 +153,19 @@ func ClassifySeverity(reason ReasonCode) IncidentSeverity {
 
 func MapCheckNameToReason(name string) ReasonCode {
 	mapping := map[string]ReasonCode{
-		"regex":      ReasonRegexMatch,
-		"stop word":  ReasonStopWord,
-		"similarity": ReasonSimilarity,
-		"cas":        ReasonCAS,
-		"links":      ReasonMetaLink,
-		"mentions":   ReasonMetaMention,
-		"multi-lang": ReasonMultiLang,
-		"spacing":    ReasonAbnormalSpacing,
-		"emoji":      ReasonEmojiSpam,
-		"openai":     ReasonLLMOpenAI,
-		"gemini":     ReasonLLMGemini,
-		"vision":     ReasonVision,
+		"regex":         ReasonRegexMatch,
+		"stop word":     ReasonStopWord,
+		"similarity":    ReasonSimilarity,
+		"cas":           ReasonCAS,
+		"links":         ReasonMetaLink,
+		"mentions":      ReasonMetaMention,
+		"multi-lang":    ReasonMultiLang,
+		"chinese-chars": ReasonChineseChars,
+		"spacing":       ReasonAbnormalSpacing,
+		"emoji":         ReasonEmojiSpam,
+		"openai":        ReasonLLMOpenAI,
+		"gemini":        ReasonLLMGemini,
+		"vision":        ReasonVision,
 	}
 	if rc, ok := mapping[name]; ok {
 		return rc

@@ -113,6 +113,8 @@ type Config struct {
 	LLMRequestTimeout     time.Duration    // timeout for individual LLM requests, if not set - 30s default
 	LLMMinInputChars      int              // minimum trimmed rune length for automatic LLM checks, force checks bypass it
 	MultiLangWords        int              // if true, check for number of multi-lingual words
+	ChineseMode           bool             // if true, treat messages dominated by chinese (han) characters as spam
+	ChineseCharRatio      float64          // min share of han chars among letters to trigger, 0-1; 0 = any single han character
 	StorageTimeout        time.Duration    // timeout for storage operations, if not set - no timeout
 
 	LuaPlugins struct {
@@ -269,6 +271,12 @@ func (d *Detector) Check(req spamcheck.Request) (spam bool, cr []spamcheck.Respo
 
 	if d.AbnormalSpacing.Enabled {
 		cr = append(cr, d.isAbnormalSpacing(req.Msg))
+	}
+
+	// chinese mode is a deterministic check on raw characters, so it runs on short messages too,
+	// before the min length early return can skip them
+	if d.ChineseMode {
+		cr = append(cr, d.isChineseChars(req.Msg))
 	}
 
 	// check for message length exceed the minimum size, if min message length is set.

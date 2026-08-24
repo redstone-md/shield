@@ -162,6 +162,8 @@ type options struct {
 	MaxEmoji            int     `long:"max-emoji" env:"MAX_EMOJI" default:"2" description:"max emoji count in message, -1 to disable check"`
 	MinSpamProbability  float64 `long:"min-probability" env:"MIN_PROBABILITY" default:"50" description:"min spam probability percent to ban"`
 	MultiLangWords      int     `long:"multi-lang" env:"MULTI_LANG" default:"0" description:"number of words in different languages to consider as spam"`
+	ChineseMode         bool    `long:"chinese-mode" env:"CHINESE_MODE" description:"treat messages dominated by chinese characters as spam"`
+	ChineseCharRatio    float64 `long:"chinese-ratio" env:"CHINESE_RATIO" default:"0.5" description:"min share of chinese characters among letters to trigger chinese-mode (0-1, 0 = any single character)"`
 
 	ParanoidMode       bool `long:"paranoid" env:"PARANOID" description:"paranoid mode, check all messages"`
 	FirstMessagesCount int  `long:"first-messages-count" env:"FIRST_MESSAGES_COUNT" default:"1" description:"number of first messages to check"`
@@ -259,6 +261,16 @@ func main() {
 	if opts.Report.AutoBanThreshold > 0 && opts.Report.AutoBanThreshold < opts.Report.Threshold {
 		log.Fatalf("[ERROR] auto-ban-threshold (%d) must be >= threshold (%d) or 0 (disabled)",
 			opts.Report.AutoBanThreshold, opts.Report.Threshold)
+	}
+
+	// clamp chinese ratio to [0, 1]
+	if opts.ChineseCharRatio < 0 {
+		log.Printf("[WARN] chinese-ratio %g is negative, using 0 (any chinese character triggers)", opts.ChineseCharRatio)
+		opts.ChineseCharRatio = 0
+	}
+	if opts.ChineseCharRatio > 1 {
+		log.Printf("[WARN] chinese-ratio %g is above 1, using 1 (only fully chinese messages trigger)", opts.ChineseCharRatio)
+		opts.ChineseCharRatio = 1
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

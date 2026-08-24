@@ -16,6 +16,8 @@ func TestRuleSetFromForm_AppliesValues(t *testing.T) {
 		"detection.max_emoji":            {"5"},
 		"detection.similarity_threshold": {"0.6"},
 		"detection.cas_enabled":          {"on"},
+		"detection.chinese_mode":         {"on"},
+		"detection.chinese_char_ratio":   {"0.5"},
 		"llm.mode":                       {"flagged"},
 		"llm.consensus":                  {"any"},
 		"llm.history_context_size":       {"5"},
@@ -34,6 +36,8 @@ func TestRuleSetFromForm_AppliesValues(t *testing.T) {
 	assert.Equal(t, 5, rs.Detection.MaxEmoji)
 	assert.InEpsilon(t, 0.6, rs.Detection.SimilarityThreshold, 0.0001)
 	assert.True(t, rs.Detection.CasEnabled)
+	assert.True(t, rs.Detection.ChineseMode)
+	assert.InEpsilon(t, 0.5, rs.Detection.ChineseCharRatio, 0.0001)
 	assert.Equal(t, "flagged", rs.LLM.Mode)
 	assert.Equal(t, 5, rs.LLM.HistoryContextSize)
 	assert.Equal(t, "scan image", rs.LLM.VisionPrompt)

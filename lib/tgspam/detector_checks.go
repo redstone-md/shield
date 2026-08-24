@@ -297,6 +297,31 @@ func (d *Detector) isMultiLang(msg string) spamcheck.Response {
 	return spamcheck.Response{Name: "multi-lingual", Spam: false, Details: fmt.Sprintf("%d/%d", count, d.MultiLangWords)}
 }
 
+// isChineseChars checks if a message is dominated by chinese (han) characters.
+// used by chinese mode to ban short spam messages that are too short for other checks.
+// with ChineseCharRatio > 0 only messages where han characters make up at least that share
+// of all letters are flagged; 0 flags any message containing a single han character.
+func (d *Detector) isChineseChars(msg string) spamcheck.Response {
+	var letters, cjk int
+	for _, r := range msg {
+		if !unicode.IsLetter(r) {
+			continue
+		}
+		letters++
+		if unicode.Is(unicode.Han, r) {
+			cjk++
+		}
+	}
+	details := fmt.Sprintf("%d/%d cjk", cjk, letters)
+	if cjk == 0 || (d.ChineseCharRatio > 0 && float64(cjk)/float64(letters) < d.ChineseCharRatio) {
+		return spamcheck.Response{Name: "chinese-chars", Spam: false, Details: details}
+	}
+	return withScoring(spamcheck.Response{
+		Name: "chinese-chars", Spam: true,
+		Details: details,
+	}, msg)
+}
+
 // isAbnormalSpacing detects abnormal spacing patterns used to evade filters
 // things like this: "w o r d s p a c i n g some thing he re blah blah"
 func (d *Detector) isAbnormalSpacing(msg string) spamcheck.Response {

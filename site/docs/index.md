@@ -188,6 +188,14 @@ Messages with more than `--max-emoji` emojis (default 2) are flagged as spam. Se
 
 Detects words mixing characters from multiple languages. Enable with `--multi-lang=N` (default 0 = disabled).
 
+### Chinese characters mode
+
+Bans messages dominated by chinese (han) characters, e.g. `有活`. Enable with `--chinese-mode`.
+
+The check runs on raw characters before the minimum message length filter, so it catches short spam messages that are too short for the classifier and LLM checks. A message counts as dominated when han characters make up at least `--chinese-ratio` (default 0.5) of all letters; set the ratio to 0 to ban any message containing a single han character, so a russian text quoting one hieroglyph still passes at the default. Approved users are not affected; in paranoid mode the check applies to everyone.
+
+Note that japanese shares han characters with chinese: kana-only text passes, but kanji-heavy messages can reach the ratio threshold. Tune `--chinese-ratio` accordingly if your chat expects japanese speakers.
+
 ### Duplicate message detection
 
 Tracks messages per user and flags identical repeats within a time window. Runs for all users including approved users.

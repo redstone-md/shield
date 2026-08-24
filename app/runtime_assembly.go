@@ -371,6 +371,8 @@ func bootstrapRuleSet(opts options) rules.RuleSet {
 			SimilarityThreshold: opts.SimilarityThreshold,
 			MinSpamProbability:  opts.MinSpamProbability,
 			MultiLangWords:      opts.MultiLangWords,
+			ChineseMode:         opts.ChineseMode,
+			ChineseCharRatio:    opts.ChineseCharRatio,
 			CasEnabled:          opts.CAS.API != "",
 			HistorySize:         opts.HistoryMinSize,
 			FirstMessagesCount:  opts.FirstMessagesCount,
@@ -405,17 +407,28 @@ func bootstrapRuleSet(opts options) rules.RuleSet {
 	}
 }
 
+// schemaWithFullDetection is the last schema version before the chinese mode fields were added.
+// rulesets at this version already carry every other detection field.
+const schemaWithFullDetection = 4
+
 // backfillRuleSetSchema seeds new fields into a ruleset persisted before the
-// current schema version. Identity and versioning fields are preserved; only the
-// detection/LLM/prompt fields are seeded from env-derived defaults. The second
-// return value reports whether the ruleset was modified.
+// current schema version. Identity and versioning fields are preserved. Rulesets
+// from schemaWithFullDetection onward keep their detection values and only get the
+// newly introduced fields seeded; older schemas are seeded wholesale from
+// env-derived defaults. The second return value reports whether the ruleset was modified.
 func backfillRuleSetSchema(rs rules.RuleSet, opts options) (rules.RuleSet, bool) {
 	if rs.SchemaVersion >= rules.CurrentSchemaVersion {
 		return rs, false
 	}
 	seed := bootstrapRuleSet(opts)
+	oldSchema := rs.SchemaVersion
 	rs.SchemaVersion = rules.CurrentSchemaVersion
-	rs.Detection = seed.Detection
+	if oldSchema >= schemaWithFullDetection {
+		rs.Detection.ChineseMode = seed.Detection.ChineseMode
+		rs.Detection.ChineseCharRatio = seed.Detection.ChineseCharRatio
+	} else {
+		rs.Detection = seed.Detection
+	}
 	rs.LLM = backfillLLMCommonRules(rs.LLM, seed.LLM)
 	rs.OpenAI.Prompt = seed.OpenAI.Prompt
 	rs.OpenAI.VisionModel = seed.OpenAI.VisionModel
