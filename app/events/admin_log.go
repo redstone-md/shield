@@ -5,26 +5,22 @@ func (a *admin) logConfig() adminLogConfig {
 		return adminLogConfig{}
 	}
 	return adminLogConfig{
-		SuperUsers:             a.superUsers,
-		PrimaryChatID:          a.firstChatID(),
-		AdminChatID:            a.adminChatID,
-		TrainingMode:           a.trainingMode,
-		SoftBan:                a.softBan,
-		Dry:                    a.dry,
-		WarnMessage:            a.warnMsg,
-		AggressiveCleanup:      a.aggressiveCleanup,
-		AggressiveCleanupLimit: a.aggressiveCleanupLimit,
+		SuperUsers:    a.superUsers,
+		PrimaryChatID: a.firstChatID(),
+		AdminChatID:   a.adminChatID,
+		TrainingMode:  a.trainingMode,
+		SoftBan:       a.softBan,
+		Dry:           a.dry,
+		WarnMessage:   a.warnMsg,
 	}
 }
 
 type adminLogConfig struct {
-	SuperUsers             SuperUsers
-	PrimaryChatID          int64
-	AdminChatID            int64
-	TrainingMode           bool
-	SoftBan                bool
-	Dry                    bool
-	WarnMessage            string
-	AggressiveCleanup      bool
-	AggressiveCleanupLimit int
+	SuperUsers    SuperUsers
+	PrimaryChatID int64
+	AdminChatID   int64
+	TrainingMode  bool
+	SoftBan       bool
+	Dry           bool
+	WarnMessage   string
 }

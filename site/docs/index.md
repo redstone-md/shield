@@ -18,7 +18,7 @@ Shield is a self-hosted Telegram moderation and anti-spam bot. It watches group 
 - Uses fast-path checks for sample similarity, Bayesian scoring, stop words, CAS lookups, emoji count, links, mentions, media-only messages, forwarded messages, keyboards, giveaways, duplicate messages, abnormal spacing, and mixed-language words.
 - Supports OpenAI and Gemini checks for LLM-assisted moderation, including veto/consensus modes, history-aware checks, custom prompts, and short-message handling.
 - Supports a slow-path moderation layer for image/LLM review. When OpenAI or Gemini tokens are configured, the bot automatically registers them as both text and vision providers. Image messages not already flagged by the fast path are downloaded and sent for vision analysis. No additional flags required.
-- Provides admin workflows for reporting spam, confirming or reversing actions, warning users, soft bans, dry runs, training mode, and aggressive cleanup.
+- Provides admin workflows for reporting spam, confirming or reversing actions, warning users, soft bans, dry runs, training mode, and full message cleanup of banned users.
 - Stores moderation data in SQLite by default, with PostgreSQL support for larger deployments.
 - Can run a web server/API for administration, settings, review flows, and operational visibility.
 - Supports custom Lua plugins for project-specific spam patterns without changing Go code.
@@ -243,7 +243,7 @@ Setting `--admin.group` enables an admin chat where the bot reports detected spa
 - **`/ban`** or **`ban`** reply: ban without adding to samples.
 - **`/warn`** or **`warn`** reply: delete the message and send a warning.
 
-**Aggressive cleanup** (`--aggressive-cleanup`): when admins use `/spam` or `/ban`, delete all recent messages from the banned user (up to `--aggressive-cleanup-limit`, default 100).
+**Full message cleanup**: when admins use `/spam` or `/ban` (or `/clear`), the bot deletes every message of the banned user it has seen, across all monitored groups. `/ban` accepts several targets at once, separated by spaces: `/ban 123456789 @username`.
 
 **Linked channel**: if the group is linked to a Telegram channel, the channel automatically receives superuser privileges without extra configuration.
 

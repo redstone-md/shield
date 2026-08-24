@@ -499,8 +499,6 @@ func (a *runtimeAssembly) makeTelegramListener(opts options, tbAPI *tbapi.BotAPI
 		SoftBanMode:             a.ActiveRuleSet.Moderation.SoftBan,
 		DisableAdminSpamForward: opts.DisableAdminSpamForward,
 		Dry:                     a.ActiveRuleSet.Moderation.DryRun,
-		AggressiveCleanup:       opts.AggressiveCleanup,
-		AggressiveCleanupLimit:  opts.AggressiveCleanupLimit,
 		DeleteGuestBots:         opts.DeleteGuestBots,
 		BotWhitelist:            opts.BotWhitelist,
 	}

@@ -330,6 +330,8 @@ func (s *locatorContextSpy) GetUserMessages(context.Context, int64, int) ([]stor
 	return nil, nil
 }
 
+func (s *locatorContextSpy) DeleteUserMessage(context.Context, int64, int) error { return nil }
+
 func (s *locatorContextSpy) SetUserDC(context.Context, int64, int) error { return nil }
 
 func (s *locatorContextSpy) GetUserDC(context.Context, int64) (int, bool) { return 0, false }

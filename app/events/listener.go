@@ -77,8 +77,6 @@ type TelegramListener struct {
 	ReportConfig            ReportConfig // user spam reporting configuration
 	DisableAdminSpamForward bool         // disable forwarding spam reports to admin chat support
 	Dry                     bool         // dry run, do not ban or send messages
-	AggressiveCleanup       bool         // delete all messages from user when banned via /spam command
-	AggressiveCleanupLimit  int          // max messages to delete in aggressive cleanup mode
 	DeleteGuestBots         bool         // auto-delete messages from non-admin, non-whitelisted bot accounts
 	BotWhitelist            []string     // allowed bot usernames or numeric user IDs (raw strings from config)
 	Queue                   moderation.Queue
@@ -271,11 +269,6 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 	log.Printf("[DEBUG] admin handler created, spam forwarding %s:\n%s",
 		adminForwardStatus, observability.FormatFields(l.adminHandler.logConfig()))
 
-	if l.AggressiveCleanup {
-		log.Printf("[INFO] aggressive cleanup enabled, messages from user will be deleted on ban, limit %d",
-			l.AggressiveCleanupLimit)
-	}
-
 	return l.eventLoop(ctx)
 }
 
@@ -287,7 +280,6 @@ func (l *TelegramListener) initHandlers() {
 		primChatIDs:   l.primChatIDs, adminChatID: l.adminChatID,
 		trainingMode: l.TrainingMode, softBan: l.SoftBanMode, dry: l.Dry, warnMsg: l.WarnMsg,
 		moderation: l.ModerationConfig, warnDeleteDuration: l.ModerationConfig.WarnDeleteDuration,
-		aggressiveCleanup: l.AggressiveCleanup, aggressiveCleanupLimit: l.AggressiveCleanupLimit,
 	}
 
 	if l.AppealService != nil {
@@ -538,8 +530,9 @@ func (l *TelegramListener) procSuperCommand(ctx context.Context, update tbapi.Up
 		return true
 	}
 	if isBanCommand(cmd) {
-		log.Printf("[DEBUG] superuser %s requested ban for %q", update.Message.From.UserName, arg)
-		if err := l.adminHandler.DirectBanTarget(ctx, update, arg); err != nil {
+		args := commandArgs(update.Message.Text)
+		log.Printf("[DEBUG] superuser %s requested ban for %q", update.Message.From.UserName, args)
+		if err := l.adminHandler.DirectBanTarget(ctx, update, strings.Join(args, " ")); err != nil {
 			log.Printf("[WARN] failed to process direct ban target: %v", err)
 		}
 		return true
@@ -617,6 +610,15 @@ func splitCommand(text string) (cmd, arg string) {
 		arg = fields[1]
 	}
 	return cmd, arg
+}
+
+// commandArgs returns the whitespace-separated arguments following the command word.
+func commandArgs(text string) []string {
+	fields := strings.Fields(strings.TrimSpace(text))
+	if len(fields) <= 1 {
+		return nil
+	}
+	return fields[1:]
 }
 
 func isBanCommand(cmd string) bool {

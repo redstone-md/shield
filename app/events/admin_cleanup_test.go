@@ -3,6 +3,11 @@ package events
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/redstone-md/shield/app/bot"
 	"github.com/redstone-md/shield/app/events/mocks"
@@ -10,9 +15,6 @@ import (
 	"github.com/redstone-md/shield/lib/spamcheck"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"strings"
-	"testing"
-	"time"
 )
 
 // userMsgs builds locator UserMessage results from bare msg IDs (ChatID 0 falls
@@ -25,9 +27,9 @@ func userMsgs(ids ...int) []storage.UserMessage {
 	return msgs
 }
 
-func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
+func TestAdmin_DirectReportCleansUpUserMessages(t *testing.T) {
 
-	setupAggressiveCleanupTest := func(aggressiveCleanup bool, dry bool, messageIDs []int) (*mocks.TbAPIMock, *mocks.LocatorMock, *admin) {
+	setupCleanupTest := func(dry bool, messageIDs []int) (*mocks.TbAPIMock, *mocks.LocatorMock, *admin) {
 		mockAPI := &mocks.TbAPIMock{
 			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 				return tbapi.Message{}, nil
@@ -59,18 +61,19 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 				return userMsgs(messageIDs...), nil
 			},
+			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+				return nil
+			},
 		}
 
 		adm := &admin{
-			tbAPI:                  mockAPI,
-			bot:                    botMock,
-			primChatIDs:            []int64{123},
-			adminChatID:            456,
-			locator:                locatorMock,
-			superUsers:             SuperUsers{},
-			aggressiveCleanup:      aggressiveCleanup,
-			aggressiveCleanupLimit: 100,
-			dry:                    dry,
+			tbAPI:       mockAPI,
+			bot:         botMock,
+			primChatIDs: []int64{123},
+			adminChatID: 456,
+			locator:     locatorMock,
+			superUsers:  SuperUsers{},
+			dry:         dry,
 		}
 
 		return mockAPI, locatorMock, adm
@@ -92,18 +95,27 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 		}
 	}
 
-	t.Run("aggressive cleanup enabled", func(t *testing.T) {
-		mockAPI, locatorMock, adm := setupAggressiveCleanupTest(true, false, []int{100, 101, 102})
+	t.Run("cleans up all seen user messages", func(t *testing.T) {
+		mockAPI, locatorMock, adm := setupCleanupTest(false, []int{100, 101, 102})
 		update := createSpamReportUpdate()
 
 		err := adm.directReport(context.Background(), update, true)
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		// the cleanup notification is the final side effect of the async worker:
+		// waiting for it makes every earlier assertion race-free
+		require.Eventually(t, func() bool {
+			for _, call := range mockAPI.SendCalls() {
+				if msg, ok := call.C.(tbapi.MessageConfig); ok &&
+					strings.Contains(msg.Text, "удалено 3 сообщений спамера") {
+					return true
+				}
+			}
+			return false
+		}, time.Second, 10*time.Millisecond)
 
-		assert.Len(t, locatorMock.GetUserMessagesCalls(), 1)
 		assert.Equal(t, int64(666), locatorMock.GetUserMessagesCalls()[0].UserID)
-		assert.Equal(t, 100, locatorMock.GetUserMessagesCalls()[0].Limit)
+		assert.Equal(t, cleanupBatchSize, locatorMock.GetUserMessagesCalls()[0].Limit)
 
 		requestCalls := mockAPI.RequestCalls()
 		deleteCount := 0
@@ -130,14 +142,16 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 		assert.Contains(t, notificationMsg, "удалено 3 сообщений спамера \"spammer\" (666)", "Notification should include username and ID")
 	})
 
-	t.Run("aggressive cleanup disabled", func(t *testing.T) {
-		mockAPI, locatorMock, adm := setupAggressiveCleanupTest(false, false, []int{})
+	t.Run("no stored messages to clean", func(t *testing.T) {
+		mockAPI, locatorMock, adm := setupCleanupTest(false, []int{})
 		update := createSpamReportUpdate()
 
 		err := adm.directReport(context.Background(), update, true)
 		require.NoError(t, err)
 
-		assert.Empty(t, locatorMock.GetUserMessagesCalls())
+		require.Eventually(t, func() bool {
+			return len(locatorMock.GetUserMessagesCalls()) == 1
+		}, time.Second, 10*time.Millisecond)
 
 		requestCalls := mockAPI.RequestCalls()
 		deleteCount := 0
@@ -149,8 +163,8 @@ func TestAdmin_DirectReportWithAggressiveCleanup(t *testing.T) {
 		assert.Equal(t, 2, deleteCount, "Should only delete original and admin messages")
 	})
 
-	t.Run("aggressive cleanup in dry mode", func(t *testing.T) {
-		_, locatorMock, adm := setupAggressiveCleanupTest(true, true, []int{})
+	t.Run("skips cleanup in dry mode", func(t *testing.T) {
+		_, locatorMock, adm := setupCleanupTest(true, []int{})
 		update := createSpamReportUpdate()
 
 		err := adm.directReport(context.Background(), update, false)
@@ -172,16 +186,19 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 		locatorMock := &mocks.LocatorMock{
 			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 				assert.Equal(t, int64(666), userID)
-				assert.Equal(t, 100, limit)
+				assert.Equal(t, cleanupBatchSize, limit)
 				return userMsgs(101, 102, 103), nil
+			},
+			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+				assert.Equal(t, int64(123456789), chatID)
+				return nil
 			},
 		}
 
 		adm := &admin{
-			tbAPI:                  mockAPI,
-			locator:                locatorMock,
-			primChatIDs:            []int64{123456789},
-			aggressiveCleanupLimit: 100,
+			tbAPI:       mockAPI,
+			locator:     locatorMock,
+			primChatIDs: []int64{123456789},
 		}
 
 		deleted, err := adm.deleteUserMessages(context.Background(), 666)
@@ -196,6 +213,61 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 			assert.Equal(t, 101+i, deleteConfig.MessageID)
 			assert.Equal(t, int64(123456789), deleteConfig.ChatID)
 		}
+		require.Len(t, locatorMock.DeleteUserMessageCalls(), 3)
+	})
+
+	t.Run("pages through more than one batch", func(t *testing.T) {
+		oldInterval := cleanupRateInterval
+		cleanupRateInterval = time.Millisecond
+		defer func() { cleanupRateInterval = oldInterval }()
+
+		// pool models the user_messages table: GetUserMessages serves the newest
+		// rows up to the batch size, DeleteUserMessage drops them once deleted
+		var poolMu sync.Mutex
+		pool := make([]storage.UserMessage, 0, cleanupBatchSize+7)
+		for i := range cleanupBatchSize + 7 {
+			pool = append(pool, storage.UserMessage{MsgID: 1000 + i})
+		}
+		mockAPI := &mocks.TbAPIMock{
+			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+				return &tbapi.APIResponse{Ok: true}, nil
+			},
+		}
+		locatorMock := &mocks.LocatorMock{
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
+				assert.Equal(t, int64(666), userID)
+				assert.Equal(t, cleanupBatchSize, limit)
+				poolMu.Lock()
+				defer poolMu.Unlock()
+				n := min(limit, len(pool))
+				return append([]storage.UserMessage(nil), pool[:n]...), nil
+			},
+			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+				poolMu.Lock()
+				defer poolMu.Unlock()
+				for i, m := range pool {
+					if m.MsgID == msgID {
+						pool = append(pool[:i], pool[i+1:]...)
+						break
+					}
+				}
+				return nil
+			},
+		}
+
+		adm := &admin{
+			tbAPI:       mockAPI,
+			locator:     locatorMock,
+			primChatIDs: []int64{123456789},
+		}
+
+		deleted, err := adm.deleteUserMessages(context.Background(), 666)
+		require.NoError(t, err)
+		assert.Equal(t, cleanupBatchSize+7, deleted)
+
+		poolMu.Lock()
+		defer poolMu.Unlock()
+		assert.Empty(t, pool, "every stored message row should be consumed")
 	})
 
 	t.Run("locator error", func(t *testing.T) {
@@ -206,8 +278,7 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 		}
 
 		adm := &admin{
-			locator:                locatorMock,
-			aggressiveCleanupLimit: 100,
+			locator: locatorMock,
 		}
 
 		deleted, err := adm.deleteUserMessages(context.Background(), 666)
@@ -233,13 +304,15 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 				return userMsgs(201, 202, 203), nil
 			},
+			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+				return nil
+			},
 		}
 
 		adm := &admin{
-			tbAPI:                  mockAPI,
-			locator:                locatorMock,
-			primChatIDs:            []int64{123456789},
-			aggressiveCleanupLimit: 100,
+			tbAPI:       mockAPI,
+			locator:     locatorMock,
+			primChatIDs: []int64{123456789},
 		}
 
 		deleted, err := adm.deleteUserMessages(context.Background(), 666)
@@ -262,13 +335,15 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 				return userMsgs(301, 302, 303, 304, 305, 306, 307), nil
 			},
+			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+				return nil
+			},
 		}
 
 		adm := &admin{
-			tbAPI:                  mockAPI,
-			locator:                locatorMock,
-			primChatIDs:            []int64{123456789},
-			aggressiveCleanupLimit: 100,
+			tbAPI:       mockAPI,
+			locator:     locatorMock,
+			primChatIDs: []int64{123456789},
 		}
 
 		deleted, err := adm.deleteUserMessages(context.Background(), 666)
@@ -286,8 +361,7 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 		}
 
 		adm := &admin{
-			locator:                locatorMock,
-			aggressiveCleanupLimit: 100,
+			locator: locatorMock,
 		}
 
 		deleted, err := adm.deleteUserMessages(context.Background(), 666)
@@ -309,12 +383,14 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 					{ChatID: 0, MsgID: 503}, // legacy row without chat_id falls back to primary chat
 				}, nil
 			},
+			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+				return nil
+			},
 		}
 		adm := &admin{
-			tbAPI:                  mockAPI,
-			locator:                locatorMock,
-			primChatIDs:            []int64{999},
-			aggressiveCleanupLimit: 100,
+			tbAPI:       mockAPI,
+			locator:     locatorMock,
+			primChatIDs: []int64{999},
 		}
 
 		deleted, err := adm.deleteUserMessages(context.Background(), 666)

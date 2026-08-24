@@ -68,6 +68,12 @@ func TestAdmin_DirectCommands(t *testing.T) {
 				}
 				return 0
 			},
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
+				return nil, nil
+			},
+			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+				return nil
+			},
 		}
 
 		adm := &admin{
@@ -185,6 +191,12 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		adm.locator = &mocks.LocatorMock{
 			UserNameByIDFunc: func(ctx context.Context, userID int64) string { return "" },
 			UserIDByNameFunc: func(ctx context.Context, userName string) int64 { return 0 },
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
+				return nil, nil
+			},
+			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+				return nil
+			},
 		}
 		update := createReplyUpdate("admin", 111, "", 0, "")
 		update.Message.Text = "/ban 8642668745"
@@ -236,6 +248,32 @@ func TestAdmin_DirectCommands(t *testing.T) {
 		require.Len(t, mockAPI.RequestCalls(), 2)
 		banCfg := mockAPI.RequestCalls()[1].C.(tbapi.BanChatMemberConfig)
 		assert.Equal(t, int64(222), banCfg.UserID)
+	})
+
+	t.Run("DirectBanTarget_MultipleTargets", func(t *testing.T) {
+		mockAPI, botMock, adm, teardown := setupTest()
+		defer teardown()
+
+		update := createReplyUpdate("admin", 111, "", 0, "")
+		update.Message.Text = "/ban 333 @spammer"
+		update.Message.ReplyToMessage = nil
+
+		err := adm.DirectBanTarget(context.Background(), update, "333 @spammer")
+		require.NoError(t, err)
+
+		text := mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text
+		assert.Contains(t, text, "пользователи")
+		assert.Contains(t, text, `<a href="tg://user?id=333">testuser</a> (333)`)
+		assert.Contains(t, text, `<a href="tg://user?id=222">spammer</a> (222)`)
+
+		bannedIDs := []int64{}
+		for _, call := range mockAPI.RequestCalls() {
+			if cfg, ok := call.C.(tbapi.BanChatMemberConfig); ok {
+				bannedIDs = append(bannedIDs, cfg.UserID)
+			}
+		}
+		assert.ElementsMatch(t, []int64{222, 333}, bannedIDs)
+		require.Len(t, botMock.RemoveApprovedUserCalls(), 2)
 	})
 
 	t.Run("DirectBanTarget_UnknownUsername", func(t *testing.T) {

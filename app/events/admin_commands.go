@@ -28,22 +28,69 @@ func (a *admin) DirectBanReport(ctx context.Context, update tbapi.Update) error 
 	return a.directReport(ctx, update, false)
 }
 
+// resolvedBanTarget is a /ban target with its ID and name already resolved.
+type resolvedBanTarget struct {
+	userID   int64
+	userName string
+}
+
+// banTargets splits the raw /ban argument into individual targets. Targets are
+// whitespace-separated user IDs or @usernames.
+func banTargets(raw string) []string {
+	return strings.Fields(raw)
+}
+
+// resolveBanTargets resolves every target up front so the command fails as a
+// whole if any target is unknown or a super-user.
+func (a *admin) resolveBanTargets(ctx context.Context, rawTargets []string) ([]resolvedBanTarget, error) {
+	if len(rawTargets) == 0 {
+		return nil, fmt.Errorf("ban target is empty")
+	}
+	targets := make([]resolvedBanTarget, 0, len(rawTargets))
+	for _, raw := range rawTargets {
+		userID, userName, err := a.resolveUserTarget(ctx, raw, "ban")
+		if err != nil {
+			return nil, err
+		}
+		if a.superUsers.IsSuper(userName, userID) {
+			return nil, fmt.Errorf("ban target is super-user %s (%d), ignored", userName, userID)
+		}
+		targets = append(targets, resolvedBanTarget{userID: userID, userName: userName})
+	}
+	return targets, nil
+}
+
+// banNotificationText renders the admin-chat notification for a /ban command.
+func banNotificationText(targets []resolvedBanTarget, admin *tbapi.User) string {
+	parts := make([]string, len(targets))
+	for i, t := range targets {
+		parts[i] = htmlBanTarget(t.userName, t.userID)
+	}
+	adminLink := htmlUserLink(admin.UserName, admin.ID)
+	if len(parts) == 1 {
+		return fmt.Sprintf("пользователь %s забанен администратором %s", parts[0], adminLink)
+	}
+	return fmt.Sprintf("пользователи %s забанены администратором %s", strings.Join(parts, ", "), adminLink)
+}
+
+// DirectBanTarget bans one or more whitespace-separated users/channels (numeric
+// IDs or @usernames), removes them from the approved list and deletes every
+// message of theirs the bot has seen.
 func (a *admin) DirectBanTarget(ctx context.Context, update tbapi.Update, target string) error {
-	userID, userName, err := a.resolveUserTarget(ctx, target, "ban")
+	targets, err := a.resolveBanTargets(ctx, banTargets(target))
 	if err != nil {
 		return err
 	}
-	if a.superUsers.IsSuper(userName, userID) {
-		return fmt.Errorf("ban target is super-user %s (%d), ignored", userName, userID)
+
+	errs := new(multierror.Error)
+
+	for _, t := range targets {
+		if err := a.bot.RemoveApprovedUser(t.userID); err != nil {
+			log.Printf("[DEBUG] can't remove user %d from approved list: %v", t.userID, err)
+		}
 	}
 
-	if err := a.bot.RemoveApprovedUser(userID); err != nil {
-		log.Printf("[DEBUG] can't remove user %d from approved list: %v", userID, err)
-	}
-
-	msg := fmt.Sprintf("пользователь %s забанен администратором %s",
-		htmlBanTarget(userName, userID),
-		htmlUserLink(update.Message.From.UserName, update.Message.From.ID))
+	msg := banNotificationText(targets, update.Message.From)
 	if err := send(tbapi.NewMessage(a.adminChatID, msg), a.tbAPI); err != nil {
 		return fmt.Errorf("failed to send direct ban notification: %w", err)
 	}
@@ -52,12 +99,17 @@ func (a *admin) DirectBanTarget(ctx context.Context, update tbapi.Update, target
 		return fmt.Errorf("direct ban target failed: %w", err)
 	}
 
-	banReq := banRequest{duration: bot.PermanentBanDuration, userID: userID,
-		tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: userName}
-	if err := a.banInAllChats(ctx, banReq); err != nil {
-		return fmt.Errorf("failed to ban user %d: %w", userID, err)
+	for _, t := range targets {
+		banReq := banRequest{duration: bot.PermanentBanDuration, userID: t.userID,
+			tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: t.userName}
+		if err := a.banInAllChats(ctx, banReq); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", t.userID, err))
+		}
 	}
-	return nil
+
+	a.cleanupUsersMessagesAsync(ctx, targets)
+
+	return errs.ErrorOrNil()
 }
 
 func htmlBanTarget(userName string, userID int64) string {
@@ -587,27 +639,12 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 	if channelID != 0 {
 		cleanupUserID = channelID
 	}
-	if a.aggressiveCleanup && !a.dry && (origMsg.SenderChat == nil || origMsg.SenderChat.ID != a.chatIDOrFallback(origMsg.Chat.ID)) {
-		go func() {
-			cleanupCtx := context.WithoutCancel(ctx)
-			deleted, err := a.deleteUserMessages(cleanupCtx, cleanupUserID)
-			if err != nil {
-				log.Printf("[WARN] aggressive cleanup failed: %v", err)
-				return
-			}
-			if deleted > 0 {
-				cleanupName := origMsg.From.UserName
-				if origMsg.SenderChat != nil && origMsg.SenderChat.UserName != "" {
-					cleanupName = origMsg.SenderChat.UserName
-				}
-				log.Printf("[INFO] aggressive cleanup: deleted %d messages from %d", deleted, cleanupUserID)
-				notifyMsg := fmt.Sprintf("<i>удалено %d сообщений спамера %q (%d)</i>",
-					deleted, htmlEscape(cleanupName), cleanupUserID)
-				if err := send(tbapi.NewMessage(a.adminChatID, notifyMsg), a.tbAPI); err != nil {
-					log.Printf("[WARN] failed to send deletion notification: %v", err)
-				}
-			}
-		}()
+	cleanupName := origMsg.From.UserName
+	if origMsg.SenderChat != nil && origMsg.SenderChat.UserName != "" {
+		cleanupName = origMsg.SenderChat.UserName
+	}
+	if !a.dry && (origMsg.SenderChat == nil || origMsg.SenderChat.ID != a.chatIDOrFallback(origMsg.Chat.ID)) {
+		a.cleanupUserMessagesAsync(ctx, cleanupUserID, cleanupName)
 	}
 
 	if err := errs.ErrorOrNil(); err != nil {

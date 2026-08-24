@@ -14,28 +14,27 @@ import (
 
 	"github.com/redstone-md/shield/app/bot"
 	"github.com/redstone-md/shield/app/moderation"
+	"github.com/redstone-md/shield/app/storage"
 )
 
 type admin struct {
-	tbAPI                  TbAPI
-	bot                    Bot
-	locator                Locator
-	superUsers             SuperUsers
-	actions                ActionExecutor
-	autoLearner            AutoLearner
-	detectedSpam           DetectedSpamCounter
-	mediaSlowPath          mediaSlowPathConfig
-	primChatIDs            []int64
-	adminChatID            int64
-	trainingMode           bool
-	softBan                bool
-	dry                    bool
-	warnMsg                string
-	moderation             ModerationConfig
-	warnDeleteDuration     time.Duration
-	aggressiveCleanup      bool
-	aggressiveCleanupLimit int
-	appeals                appealResolver
+	tbAPI              TbAPI
+	bot                Bot
+	locator            Locator
+	superUsers         SuperUsers
+	actions            ActionExecutor
+	autoLearner        AutoLearner
+	detectedSpam       DetectedSpamCounter
+	mediaSlowPath      mediaSlowPathConfig
+	primChatIDs        []int64
+	adminChatID        int64
+	trainingMode       bool
+	softBan            bool
+	dry                bool
+	warnMsg            string
+	moderation         ModerationConfig
+	warnDeleteDuration time.Duration
+	appeals            appealResolver
 }
 
 const (
@@ -478,48 +477,113 @@ func (a *admin) channelDisplayName(ch *tbapi.Chat) string {
 	return fmt.Sprintf("channel_%d", ch.ID)
 }
 
-func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted int, err error) {
-	msgs, err := a.locator.GetUserMessages(ctx, userID, a.aggressiveCleanupLimit)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get user messages: %w", err)
-	}
+// cleanupBatchSize caps a single GetUserMessages fetch; deleteUserMessages
+// pages through the locator until every stored message of the user is seen.
+const cleanupBatchSize = 100
 
-	rateLimiter := time.NewTicker(35 * time.Millisecond)
+// cleanupRateInterval paces Telegram deletions to respect API limits.
+var cleanupRateInterval = 35 * time.Millisecond
+
+// deleteUserMessages deletes every message of the user known to the locator,
+// across all monitored chats, until the stored history is exhausted.
+func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted int, err error) {
+	rateLimiter := time.NewTicker(cleanupRateInterval)
 	defer rateLimiter.Stop()
 
 	const maxConsecutiveFailures = 5
 	consecutiveFailures := 0
 	failed := 0
+	seen := make(map[storage.UserMessage]struct{})
 
-	for _, m := range msgs {
-		<-rateLimiter.C
-
-		if consecutiveFailures >= maxConsecutiveFailures {
-			return deleted, fmt.Errorf("stopped after %d consecutive failures (deleted %d, failed %d)",
-				maxConsecutiveFailures, deleted, failed)
+	for {
+		msgs, err := a.locator.GetUserMessages(ctx, userID, cleanupBatchSize)
+		if err != nil {
+			return deleted, fmt.Errorf("failed to get user messages: %w", err)
 		}
 
-		chatID := m.ChatID
-		if chatID == 0 {
-			chatID = a.firstChatID()
+		unseen := make([]storage.UserMessage, 0, len(msgs))
+		for _, m := range msgs {
+			if _, ok := seen[m]; !ok {
+				unseen = append(unseen, m)
+				seen[m] = struct{}{}
+			}
 		}
-		_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
-			BaseChatMessage: tbapi.BaseChatMessage{
-				MessageID:  m.MsgID,
-				ChatConfig: tbapi.ChatConfig{ChatID: chatID},
-			},
-		})
-		if err == nil {
-			deleted++
-			consecutiveFailures = 0
-		} else {
-			failed++
-			consecutiveFailures++
+		if len(unseen) == 0 {
+			break
+		}
+
+		for _, m := range unseen {
+			<-rateLimiter.C
+
+			if consecutiveFailures >= maxConsecutiveFailures {
+				return deleted, fmt.Errorf("stopped after %d consecutive failures (deleted %d, failed %d)",
+					maxConsecutiveFailures, deleted, failed)
+			}
+
+			chatID := m.ChatID
+			if chatID == 0 {
+				chatID = a.firstChatID()
+			}
+			_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
+				BaseChatMessage: tbapi.BaseChatMessage{
+					MessageID:  m.MsgID,
+					ChatConfig: tbapi.ChatConfig{ChatID: chatID},
+				},
+			})
+			if err == nil {
+				deleted++
+				consecutiveFailures = 0
+				// drop the locator row too, so the next page returns older messages
+				// instead of re-serving this one; failure here only costs a retry later
+				if delErr := a.locator.DeleteUserMessage(ctx, chatID, m.MsgID); delErr != nil {
+					log.Printf("[WARN] failed to remove user message %d from locator: %v", m.MsgID, delErr)
+				}
+			} else {
+				failed++
+				consecutiveFailures++
+			}
+		}
+
+		if len(msgs) < cleanupBatchSize {
+			break
 		}
 	}
 
 	if failed > 0 {
-		log.Printf("[INFO] aggressive cleanup completed: deleted %d messages, failed %d", deleted, failed)
+		log.Printf("[INFO] message cleanup completed: deleted %d messages, failed %d", deleted, failed)
 	}
 	return deleted, nil
+}
+
+// cleanupUserMessagesAsync deletes all stored messages of a banned user in the
+// background and reports the result to the admin chat.
+func (a *admin) cleanupUserMessagesAsync(ctx context.Context, userID int64, userName string) {
+	a.cleanupUsersMessagesAsync(ctx, []resolvedBanTarget{{userID: userID, userName: userName}})
+}
+
+// cleanupUsersMessagesAsync deletes all stored messages of every given user in
+// one background worker, so the overall Telegram delete rate stays constant
+// no matter how many targets a single command names.
+func (a *admin) cleanupUsersMessagesAsync(ctx context.Context, targets []resolvedBanTarget) {
+	if len(targets) == 0 || a.locator == nil {
+		return
+	}
+	go func() {
+		cleanupCtx := context.WithoutCancel(ctx)
+		for _, t := range targets {
+			deleted, err := a.deleteUserMessages(cleanupCtx, t.userID)
+			if err != nil {
+				log.Printf("[WARN] message cleanup failed for user %d: %v", t.userID, err)
+				continue
+			}
+			if deleted > 0 {
+				log.Printf("[INFO] message cleanup: deleted %d messages from %d", deleted, t.userID)
+				notifyMsg := fmt.Sprintf("<i>удалено %d сообщений спамера %q (%d)</i>",
+					deleted, htmlEscape(t.userName), t.userID)
+				if err := send(tbapi.NewMessage(a.adminChatID, notifyMsg), a.tbAPI); err != nil {
+					log.Printf("[WARN] failed to send deletion notification: %v", err)
+				}
+			}
+		}
+	}()
 }

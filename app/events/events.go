@@ -58,6 +58,7 @@ type Locator interface {
 	UserNameByID(ctx context.Context, userID int64) string
 	UserIDByName(ctx context.Context, userName string) int64
 	GetUserMessages(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error)
+	DeleteUserMessage(ctx context.Context, chatID int64, msgID int) error
 	SetUserDC(ctx context.Context, userID int64, dc int) error
 	GetUserDC(ctx context.Context, userID int64) (int, bool)
 }

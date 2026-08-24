@@ -16,12 +16,11 @@ import (
 func TestAdmin_DirectClearCommands(t *testing.T) {
 	newAdmin := func(mockAPI *mocks.TbAPIMock, locator Locator) *admin {
 		return &admin{
-			tbAPI:                  mockAPI,
-			primChatIDs:            []int64{123},
-			adminChatID:            456,
-			locator:                locator,
-			superUsers:             SuperUsers{"superuser"},
-			aggressiveCleanupLimit: 2,
+			tbAPI:       mockAPI,
+			primChatIDs: []int64{123},
+			adminChatID: 456,
+			locator:     locator,
+			superUsers:  SuperUsers{"superuser"},
 		}
 	}
 
@@ -57,8 +56,11 @@ func TestAdmin_DirectClearCommands(t *testing.T) {
 			UserIDByNameFunc: func(ctx context.Context, userName string) int64 { return 0 },
 			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 				assert.Equal(t, int64(222), userID)
-				assert.Equal(t, 2, limit)
+				assert.Equal(t, cleanupBatchSize, limit)
 				return userMsgs(301, 302), nil
+			},
+			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+				return nil
 			},
 		}
 		adm := newAdmin(mockAPI, locator)
@@ -86,8 +88,11 @@ func TestAdmin_DirectClearCommands(t *testing.T) {
 		locator := &mocks.LocatorMock{
 			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 				assert.Equal(t, int64(222), userID)
-				assert.Equal(t, 2, limit)
+				assert.Equal(t, cleanupBatchSize, limit)
 				return userMsgs(401), nil
+			},
+			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+				return nil
 			},
 		}
 		adm := newAdmin(mockAPI, locator)
@@ -139,7 +144,7 @@ func TestAdmin_DirectClearCommands(t *testing.T) {
 }
 
 func TestTelegramListener_DoWithDirectClearByID(t *testing.T) {
-	mockAPI, locator := newClearListenerMocks(t, []int{301, 302}, 2)
+	mockAPI, locator := newClearListenerMocks(t, []int{301, 302})
 	l := newClearListener(mockAPI, locator)
 
 	updMsg := tbapi.Update{Message: &tbapi.Message{
@@ -165,9 +170,8 @@ func TestTelegramListener_DoWithDirectClearByID(t *testing.T) {
 }
 
 func TestTelegramListener_DoWithDirectClearReply(t *testing.T) {
-	mockAPI, locator := newClearListenerMocks(t, []int{401}, 1)
+	mockAPI, locator := newClearListenerMocks(t, []int{401})
 	l := newClearListener(mockAPI, locator)
-	l.AggressiveCleanupLimit = 1
 
 	updMsg := tbapi.Update{Message: &tbapi.Message{
 		MessageID: 101,
@@ -195,7 +199,7 @@ func TestTelegramListener_DoWithDirectClearReply(t *testing.T) {
 	assert.Contains(t, mockAPI.SendCalls()[0].C.(tbapi.MessageConfig).Text, "удалено 1 сообщений пользователя")
 }
 
-func newClearListenerMocks(t *testing.T, messageIDs []int, wantLimit int) (*mocks.TbAPIMock, *mocks.LocatorMock) {
+func newClearListenerMocks(t *testing.T, messageIDs []int) (*mocks.TbAPIMock, *mocks.LocatorMock) {
 	t.Helper()
 
 	mockAPI := &mocks.TbAPIMock{
@@ -223,8 +227,11 @@ func newClearListenerMocks(t *testing.T, messageIDs []int, wantLimit int) (*mock
 		UserIDByNameFunc: func(ctx context.Context, userName string) int64 { return 0 },
 		GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
 			assert.Equal(t, int64(222), userID)
-			assert.Equal(t, wantLimit, limit)
+			assert.Equal(t, cleanupBatchSize, limit)
 			return userMsgs(messageIDs...), nil
+		},
+		DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+			return nil
 		},
 	}
 	return mockAPI, locator
@@ -232,14 +239,13 @@ func newClearListenerMocks(t *testing.T, messageIDs []int, wantLimit int) (*mock
 
 func newClearListener(mockAPI *mocks.TbAPIMock, locator Locator) *TelegramListener {
 	return &TelegramListener{
-		SpamLogger:             &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}},
-		TbAPI:                  mockAPI,
-		Bot:                    &mocks.BotMock{},
-		Group:                  "gr",
-		AdminGroup:             "admin",
-		SuperUsers:             SuperUsers{"superuser1"},
-		Locator:                locator,
-		AggressiveCleanupLimit: 2,
+		SpamLogger: &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}},
+		TbAPI:      mockAPI,
+		Bot:        &mocks.BotMock{},
+		Group:      "gr",
+		AdminGroup: "admin",
+		SuperUsers: SuperUsers{"superuser1"},
+		Locator:    locator,
 	}
 }
 

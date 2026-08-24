@@ -453,6 +453,16 @@ func (l *Locator) GetUserMessages(ctx context.Context, userID int64, limit int) 
 	return msgs, nil
 }
 
+// DeleteUserMessage removes one user_messages row after its Telegram message
+// was deleted, so repeated cleanup passes don't retry already-deleted messages.
+func (l *Locator) DeleteUserMessage(ctx context.Context, chatID int64, msgID int) error {
+	query := l.Adopt(`DELETE FROM user_messages WHERE tenant_id = ? AND chat_id = ? AND msg_id = ?`)
+	if _, err := l.ExecContext(ctx, query, l.TenantID(), chatID, msgID); err != nil {
+		return fmt.Errorf("failed to delete user message %d from chat %d: %w", msgID, chatID, err)
+	}
+	return nil
+}
+
 // dcRow maps a user_dc table row for sqlx.
 type dcRow struct {
 	DC   int       `db:"dc"`

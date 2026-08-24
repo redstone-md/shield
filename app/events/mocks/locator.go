@@ -22,6 +22,9 @@ import (
 //			AddSpamFunc: func(ctx context.Context, userID int64, checks []spamcheck.Response) error {
 //				panic("mock out the AddSpam method")
 //			},
+//			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+//				panic("mock out the DeleteUserMessage method")
+//			},
 //			GetUserDCFunc: func(ctx context.Context, userID int64) (int, bool) {
 //				panic("mock out the GetUserDC method")
 //			},
@@ -58,6 +61,9 @@ type LocatorMock struct {
 
 	// AddSpamFunc mocks the AddSpam method.
 	AddSpamFunc func(ctx context.Context, userID int64, checks []spamcheck.Response) error
+
+	// DeleteUserMessageFunc mocks the DeleteUserMessage method.
+	DeleteUserMessageFunc func(ctx context.Context, chatID int64, msgID int) error
 
 	// GetUserDCFunc mocks the GetUserDC method.
 	GetUserDCFunc func(ctx context.Context, userID int64) (int, bool)
@@ -108,6 +114,15 @@ type LocatorMock struct {
 			UserID int64
 			// Checks is the checks argument value.
 			Checks []spamcheck.Response
+		}
+		// DeleteUserMessage holds details about calls to the DeleteUserMessage method.
+		DeleteUserMessage []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ChatID is the chatID argument value.
+			ChatID int64
+			// MsgID is the msgID argument value.
+			MsgID int
 		}
 		// GetUserDC holds details about calls to the GetUserDC method.
 		GetUserDC []struct {
@@ -168,16 +183,17 @@ type LocatorMock struct {
 			UserID int64
 		}
 	}
-	lockAddMessage      sync.RWMutex
-	lockAddSpam         sync.RWMutex
-	lockGetUserDC       sync.RWMutex
-	lockGetUserMessages sync.RWMutex
-	lockMessage         sync.RWMutex
-	lockMsgHash         sync.RWMutex
-	lockSetUserDC       sync.RWMutex
-	lockSpam            sync.RWMutex
-	lockUserIDByName    sync.RWMutex
-	lockUserNameByID    sync.RWMutex
+	lockAddMessage        sync.RWMutex
+	lockAddSpam           sync.RWMutex
+	lockDeleteUserMessage sync.RWMutex
+	lockGetUserDC         sync.RWMutex
+	lockGetUserMessages   sync.RWMutex
+	lockMessage           sync.RWMutex
+	lockMsgHash           sync.RWMutex
+	lockSetUserDC         sync.RWMutex
+	lockSpam              sync.RWMutex
+	lockUserIDByName      sync.RWMutex
+	lockUserNameByID      sync.RWMutex
 }
 
 // AddMessage calls AddMessageFunc.
@@ -284,6 +300,53 @@ func (mock *LocatorMock) ResetAddSpamCalls() {
 	mock.lockAddSpam.Lock()
 	mock.calls.AddSpam = nil
 	mock.lockAddSpam.Unlock()
+}
+
+// DeleteUserMessage calls DeleteUserMessageFunc.
+func (mock *LocatorMock) DeleteUserMessage(ctx context.Context, chatID int64, msgID int) error {
+	if mock.DeleteUserMessageFunc == nil {
+		panic("LocatorMock.DeleteUserMessageFunc: method is nil but Locator.DeleteUserMessage was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		ChatID int64
+		MsgID  int
+	}{
+		Ctx:    ctx,
+		ChatID: chatID,
+		MsgID:  msgID,
+	}
+	mock.lockDeleteUserMessage.Lock()
+	mock.calls.DeleteUserMessage = append(mock.calls.DeleteUserMessage, callInfo)
+	mock.lockDeleteUserMessage.Unlock()
+	return mock.DeleteUserMessageFunc(ctx, chatID, msgID)
+}
+
+// DeleteUserMessageCalls gets all the calls that were made to DeleteUserMessage.
+// Check the length with:
+//
+//	len(mockedLocator.DeleteUserMessageCalls())
+func (mock *LocatorMock) DeleteUserMessageCalls() []struct {
+	Ctx    context.Context
+	ChatID int64
+	MsgID  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		ChatID int64
+		MsgID  int
+	}
+	mock.lockDeleteUserMessage.RLock()
+	calls = mock.calls.DeleteUserMessage
+	mock.lockDeleteUserMessage.RUnlock()
+	return calls
+}
+
+// ResetDeleteUserMessageCalls reset all the calls that were made to DeleteUserMessage.
+func (mock *LocatorMock) ResetDeleteUserMessageCalls() {
+	mock.lockDeleteUserMessage.Lock()
+	mock.calls.DeleteUserMessage = nil
+	mock.lockDeleteUserMessage.Unlock()
 }
 
 // GetUserDC calls GetUserDCFunc.
@@ -643,6 +706,10 @@ func (mock *LocatorMock) ResetCalls() {
 	mock.lockAddSpam.Lock()
 	mock.calls.AddSpam = nil
 	mock.lockAddSpam.Unlock()
+
+	mock.lockDeleteUserMessage.Lock()
+	mock.calls.DeleteUserMessage = nil
+	mock.lockDeleteUserMessage.Unlock()
 
 	mock.lockGetUserDC.Lock()
 	mock.calls.GetUserDC = nil

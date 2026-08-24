@@ -67,4 +67,21 @@ func TestLocator_GetUserMessageIDs_SqliteUserMessages(t *testing.T) {
 		bobIDs[i] = m.MsgID
 	}
 	require.ElementsMatch(t, []int{201, 202, 203}, bobIDs)
+
+	// deleting a row removes exactly one (chat,msg) pair and keeps the rest
+	require.NoError(t, loc.DeleteUserMessage(ctx, chat, 103))
+	msgs, err = loc.GetUserMessages(ctx, user, 50)
+	require.NoError(t, err)
+	gotIDs = gotIDs[:0]
+	for _, m := range msgs {
+		gotIDs = append(gotIDs, m.MsgID)
+	}
+	require.ElementsMatch(t, []int{101, 102, 104, 105, 501}, gotIDs)
+
+	// deletion is scoped by chat: same msg_id in another chat must survive
+	require.NoError(t, loc.AddMessage(ctx, "другая группа", chat2, user, "alice", 501))
+	require.NoError(t, loc.DeleteUserMessage(ctx, chat, 501)) // no such row in chat
+	msgs, err = loc.GetUserMessages(ctx, user, 50)
+	require.NoError(t, err)
+	require.Len(t, msgs, 5)
 }

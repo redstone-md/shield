@@ -330,7 +330,14 @@ func TestAdmin_DirectSpamReport_ImageOnly(t *testing.T) {
 		},
 	}
 
-	locatorMock := &mocks.LocatorMock{}
+	locatorMock := &mocks.LocatorMock{
+		GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
+			return nil, nil
+		},
+		DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+			return nil
+		},
+	}
 
 	adm := &admin{
 		tbAPI:       mockAPI,
@@ -384,7 +391,14 @@ func TestAdmin_DirectSpamReport_QuoteHandling(t *testing.T) {
 		}
 		adm := &admin{
 			tbAPI: mockAPI, bot: botMock, primChatIDs: []int64{123}, adminChatID: 456,
-			locator: &mocks.LocatorMock{}, superUsers: SuperUsers{},
+			locator: &mocks.LocatorMock{
+				GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
+					return nil, nil
+				},
+				DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+					return nil
+				},
+			}, superUsers: SuperUsers{},
 		}
 		return mockAPI, botMock, adm
 	}
