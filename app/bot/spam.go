@@ -283,7 +283,7 @@ func (s *SpamFilter) AddApprovedUser(id int64, name string) error {
 
 // RemoveApprovedUser removes users from the list of approved users in both the detector and the storage
 func (s *SpamFilter) RemoveApprovedUser(id int64) error {
-	log.Printf("[INFO] remove aproved user: %d", id)
+	log.Printf("[INFO] remove approved user: %d", id)
 	if s.approved == nil {
 		return fmt.Errorf("approved users store not configured")
 	}

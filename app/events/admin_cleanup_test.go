@@ -353,6 +353,37 @@ func TestAdmin_DeleteUserMessages(t *testing.T) {
 		assert.Len(t, mockAPI.RequestCalls(), 5)
 	})
 
+	t.Run("permanent telegram errors are skipped and purged from locator", func(t *testing.T) {
+		mockAPI := &mocks.TbAPIMock{
+			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
+				return nil, fmt.Errorf("Bad Request: message to delete not found")
+			},
+		}
+		var purgedIDs []int
+		locatorMock := &mocks.LocatorMock{
+			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {
+				return userMsgs(401, 402, 403, 404, 405, 406, 407), nil
+			},
+			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
+				purgedIDs = append(purgedIDs, msgID)
+				return nil
+			},
+		}
+
+		adm := &admin{
+			tbAPI:       mockAPI,
+			locator:     locatorMock,
+			primChatIDs: []int64{123456789},
+		}
+
+		// more than maxConsecutiveFailures rows: permanent errors must not trip the guard
+		deleted, err := adm.deleteUserMessages(context.Background(), 666)
+		require.NoError(t, err)
+		assert.Equal(t, 0, deleted)
+		assert.Len(t, mockAPI.RequestCalls(), 7)
+		assert.ElementsMatch(t, []int{401, 402, 403, 404, 405, 406, 407}, purgedIDs)
+	})
+
 	t.Run("empty message list", func(t *testing.T) {
 		locatorMock := &mocks.LocatorMock{
 			GetUserMessagesFunc: func(ctx context.Context, userID int64, limit int) ([]storage.UserMessage, error) {

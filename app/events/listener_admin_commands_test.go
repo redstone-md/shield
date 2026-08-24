@@ -2,13 +2,15 @@ package events
 
 import (
 	"context"
+	"fmt"
+	"testing"
+	"time"
+
 	tbapi "github.com/OvyFlash/telegram-bot-api"
 	"github.com/redstone-md/shield/app/bot"
 	"github.com/redstone-md/shield/app/events/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestTelegramListener_DoWithDirectWarnReportUsesActionExecutor(t *testing.T) {
@@ -234,6 +236,9 @@ func TestTelegramListener_DoWithDirectBanTarget(t *testing.T) {
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
 			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+		},
+		GetChatMemberFunc: func(config tbapi.GetChatMemberConfig) (tbapi.ChatMember, error) {
+			return tbapi.ChatMember{}, fmt.Errorf("Bad Request: user not found")
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{}, nil

@@ -2,6 +2,8 @@ package storage
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -157,10 +159,15 @@ func (au *ApprovedUsers) Delete(ctx context.Context, id string) error {
 	au.Lock()
 	defer au.Unlock()
 
-	// check if user exists first
+	// check if user exists first; deleting a missing user is a no-op
 	var user approvedUsersInfo
 	query := au.Adopt("SELECT uid, gid, name, timestamp FROM approved_users WHERE uid = ? AND tenant_id = ?")
-	if err := au.GetContext(ctx, &user, query, id, au.TenantID()); err != nil {
+	err := au.GetContext(ctx, &user, query, id, au.TenantID())
+	if errors.Is(err, sql.ErrNoRows) {
+		log.Printf("[DEBUG] approved user %s not found, nothing to delete", id)
+		return nil
+	}
+	if err != nil {
 		return fmt.Errorf("failed to get approved user for id %s: %w", id, err)
 	}
 

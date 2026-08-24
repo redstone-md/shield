@@ -120,6 +120,37 @@ func htmlBanTarget(userName string, userID int64) string {
 	return fmt.Sprintf("%s (%d)", link, userID)
 }
 
+// userNameFromTelegram resolves a display name via the Telegram API, which
+// knows the user even when this bot instance never saw them in messages.
+func (a *admin) userNameFromTelegram(userID int64) string {
+	if a.tbAPI == nil {
+		return ""
+	}
+	for _, chatID := range a.primChatIDs {
+		member, err := a.tbAPI.GetChatMember(tbapi.GetChatMemberConfig{
+			ChatConfigWithUser: tbapi.ChatConfigWithUser{
+				ChatConfig: tbapi.ChatConfig{ChatID: chatID},
+				UserID:     userID,
+			},
+		})
+		if err != nil {
+			log.Printf("[DEBUG] can't resolve name for %d in chat %d via telegram api: %v", userID, chatID, err)
+			continue
+		}
+		if member.User == nil {
+			log.Printf("[DEBUG] telegram returned no user for %d in chat %d", userID, chatID)
+			continue
+		}
+		switch {
+		case member.User.UserName != "":
+			return member.User.UserName
+		case member.User.FirstName != "" || member.User.LastName != "":
+			return strings.TrimSpace(member.User.FirstName + " " + member.User.LastName)
+		}
+	}
+	return ""
+}
+
 func (a *admin) resolveUserTarget(ctx context.Context, target, label string) (userID int64, userName string, err error) {
 	target = strings.TrimSpace(target)
 	if target == "" {
@@ -128,6 +159,9 @@ func (a *admin) resolveUserTarget(ctx context.Context, target, label string) (us
 	if id, parseErr := strconv.ParseInt(target, 10, 64); parseErr == nil {
 		if a.locator != nil {
 			userName = a.locator.UserNameByID(ctx, id)
+		}
+		if userName == "" {
+			userName = a.userNameFromTelegram(id)
 		}
 		return id, userName, nil
 	}

@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -197,6 +198,9 @@ func TestAdmin_DirectCommands(t *testing.T) {
 			DeleteUserMessageFunc: func(ctx context.Context, chatID int64, msgID int) error {
 				return nil
 			},
+		}
+		mockAPI.GetChatMemberFunc = func(config tbapi.GetChatMemberConfig) (tbapi.ChatMember, error) {
+			return tbapi.ChatMember{}, fmt.Errorf("Bad Request: user not found")
 		}
 		update := createReplyUpdate("admin", 111, "", 0, "")
 		update.Message.Text = "/ban 8642668745"

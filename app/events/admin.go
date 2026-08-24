@@ -493,6 +493,7 @@ func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted i
 	const maxConsecutiveFailures = 5
 	consecutiveFailures := 0
 	failed := 0
+	skipped := 0
 	seen := make(map[storage.UserMessage]struct{})
 
 	for {
@@ -515,11 +516,6 @@ func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted i
 		for _, m := range unseen {
 			<-rateLimiter.C
 
-			if consecutiveFailures >= maxConsecutiveFailures {
-				return deleted, fmt.Errorf("stopped after %d consecutive failures (deleted %d, failed %d)",
-					maxConsecutiveFailures, deleted, failed)
-			}
-
 			chatID := m.ChatID
 			if chatID == 0 {
 				chatID = a.firstChatID()
@@ -533,14 +529,26 @@ func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted i
 			if err == nil {
 				deleted++
 				consecutiveFailures = 0
-				// drop the locator row too, so the next page returns older messages
-				// instead of re-serving this one; failure here only costs a retry later
-				if delErr := a.locator.DeleteUserMessage(ctx, chatID, m.MsgID); delErr != nil {
-					log.Printf("[WARN] failed to remove user message %d from locator: %v", m.MsgID, delErr)
-				}
-			} else {
-				failed++
-				consecutiveFailures++
+				a.forgetUserMessage(ctx, chatID, m.MsgID)
+				continue
+			}
+
+			if isPermanentDeleteFailure(err) {
+				// the message is already gone or Telegram will never allow its
+				// deletion: drop the locator row so future passes skip it;
+				// neutral for the failure guard — only successes reset it
+				log.Printf("[DEBUG] message %d in chat %d not deletable, skipping: %v", m.MsgID, chatID, err)
+				skipped++
+				a.forgetUserMessage(ctx, chatID, m.MsgID)
+				continue
+			}
+
+			log.Printf("[DEBUG] failed to delete message %d in chat %d: %v", m.MsgID, chatID, err)
+			failed++
+			consecutiveFailures++
+			if consecutiveFailures >= maxConsecutiveFailures {
+				return deleted, fmt.Errorf("stopped after %d consecutive failures (deleted %d, failed %d)",
+					maxConsecutiveFailures, deleted, failed)
 			}
 		}
 
@@ -549,10 +557,26 @@ func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted i
 		}
 	}
 
-	if failed > 0 {
-		log.Printf("[INFO] message cleanup completed: deleted %d messages, failed %d", deleted, failed)
+	if failed > 0 || skipped > 0 {
+		log.Printf("[INFO] message cleanup completed: deleted %d messages, skipped %d, failed %d", deleted, skipped, failed)
 	}
 	return deleted, nil
+}
+
+// forgetUserMessage drops one row from the locator; failure only costs a retry later.
+func (a *admin) forgetUserMessage(ctx context.Context, chatID int64, msgID int) {
+	if err := a.locator.DeleteUserMessage(ctx, chatID, msgID); err != nil {
+		log.Printf("[WARN] failed to remove user message %d from locator: %v", msgID, err)
+	}
+}
+
+// isPermanentDeleteFailure reports whether Telegram refused the deletion for a
+// reason that will never change on retry: the message is already gone or older
+// than the 48h delete window.
+func isPermanentDeleteFailure(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "message to delete not found") ||
+		strings.Contains(msg, "message can't be deleted")
 }
 
 // cleanupUserMessagesAsync deletes all stored messages of a banned user in the
@@ -578,12 +602,20 @@ func (a *admin) cleanupUsersMessagesAsync(ctx context.Context, targets []resolve
 			}
 			if deleted > 0 {
 				log.Printf("[INFO] message cleanup: deleted %d messages from %d", deleted, t.userID)
-				notifyMsg := fmt.Sprintf("<i>удалено %d сообщений спамера %q (%d)</i>",
-					deleted, htmlEscape(t.userName), t.userID)
+				notifyMsg := spammerCleanupNotice(deleted, t.userName, t.userID)
 				if err := send(tbapi.NewMessage(a.adminChatID, notifyMsg), a.tbAPI); err != nil {
 					log.Printf("[WARN] failed to send deletion notification: %v", err)
 				}
 			}
 		}
 	}()
+}
+
+// spammerCleanupNotice renders the admin-chat notice about a finished cleanup;
+// the spammer name is omitted when it could not be resolved.
+func spammerCleanupNotice(deleted int, userName string, userID int64) string {
+	if strings.TrimSpace(userName) == "" {
+		return fmt.Sprintf("<i>удалено %d сообщений спамера (%d)</i>", deleted, userID)
+	}
+	return fmt.Sprintf("<i>удалено %d сообщений спамера %q (%d)</i>", deleted, htmlEscape(userName), userID)
 }
