@@ -6,7 +6,7 @@ toolchain go1.25.13
 
 require (
 	github.com/redstone-md/shield v0.0.0
-	modernc.org/sqlite v1.56.0
+	modernc.org/sqlite v1.57.0
 )
 
 replace github.com/redstone-md/shield => ../..
