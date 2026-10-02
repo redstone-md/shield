@@ -1,12 +1,10 @@
 module github.com/redstone-md/shield/_examples/simplechat
 
-go 1.25.0
-
-toolchain go1.25.13
+go 1.26.0
 
 require (
 	github.com/redstone-md/shield v0.0.0
-	modernc.org/sqlite v1.56.0
+	modernc.org/sqlite v1.60.1
 )
 
 replace github.com/redstone-md/shield => ../..
@@ -38,13 +36,13 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	google.golang.org/genai v1.52.1 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
 	google.golang.org/grpc v1.82.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
-	modernc.org/libc v1.74.4 // indirect
+	modernc.org/libc v1.77.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
-	modernc.org/memory v1.11.0 // indirect
+	modernc.org/memory v1.12.1 // indirect
 )
