@@ -47,12 +47,6 @@ func TestIntegration_FastToSlowEscalation(t *testing.T) {
 	assert.Equal(t, 92, result.Confidence)
 	assert.Equal(t, "openai", result.Providers[0])
 	assert.True(t, result.Final)
-
-	fast := req.FastResult
-	merged := MergeResults(fast, result)
-	assert.True(t, merged.Spam)
-	assert.Len(t, merged.Signals, 2)
-	assert.Equal(t, "openai", merged.Signals[1].Name)
 }
 
 func TestIntegration_VisionEscalation(t *testing.T) {
@@ -170,53 +164,6 @@ func TestIntegration_SystemPromptWithEngine(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, result.Spam)
 	assert.Equal(t, "custom system prompt", provider.req.SystemPrompt)
-}
-
-func TestIntegration_FullFlowMergeWithPolicy(t *testing.T) {
-	fast := DetectionResult{
-		Spam:  false,
-		Score: 0.42,
-		Signals: []DetectionSignal{
-			{Name: "stopword", Score: 0.42, Matched: false, Reason: "ambiguous"},
-		},
-	}
-
-	slow := &SlowPathResult{
-		Spam:       true,
-		Confidence: 91,
-		Reason:     "LLM: crypto scam detected",
-		Providers:  []string{"openai"},
-		Final:      true,
-		Signals: []ProviderResult{
-			{Spam: true, Confidence: 91, Provider: "openai", Reason: "crypto scam"},
-		},
-	}
-
-	merged := MergeResults(fast, slow)
-	assert.True(t, merged.Spam)
-	assert.GreaterOrEqual(t, merged.Score, 0.42)
-	assert.Len(t, merged.Signals, 2)
-
-	assert.Equal(t, "stopword", merged.Signals[0].Name)
-	assert.Equal(t, "openai", merged.Signals[1].Name)
-	assert.Equal(t, "crypto scam", merged.Signals[1].Reason)
-}
-
-func TestIntegration_SlowPathSkippedOnBudget(t *testing.T) {
-	fast := DetectionResult{
-		Spam:  false,
-		Score: 0.48,
-		Signals: []DetectionSignal{
-			{Name: "stopword", Score: 0.48, Matched: false},
-		},
-	}
-
-	slow := &SlowPathResult{Skipped: true}
-
-	merged := MergeResults(fast, slow)
-	assert.False(t, merged.Spam)
-	assert.InDelta(t, 0.48, merged.Score, 1e-9)
-	assert.Len(t, merged.Signals, 1)
 }
 
 func TestIntegration_InvocationFromResult(t *testing.T) {

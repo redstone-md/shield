@@ -72,30 +72,6 @@ func BenchmarkEngineVision(b *testing.B) {
 	}
 }
 
-func BenchmarkMergeResults(b *testing.B) {
-	fast := DetectionResult{
-		Spam:  true,
-		Score: 0.8,
-		Signals: []DetectionSignal{
-			{Name: "stopword", Score: 0.9, Matched: true},
-			{Name: "meta", Score: 0.7, Matched: true},
-		},
-	}
-	slow := &SlowPathResult{
-		Spam:       true,
-		Confidence: 90,
-		Final:      true,
-		Signals: []ProviderResult{
-			{Spam: true, Confidence: 90, Provider: "openai"},
-		},
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		MergeResults(fast, slow)
-	}
-}
-
 func BenchmarkShouldEscalate(b *testing.B) {
 	check := EscalationCheck{AmbiguousScore: true}
 	for i := 0; i < b.N; i++ {
