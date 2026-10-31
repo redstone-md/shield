@@ -39,19 +39,18 @@ func NewInMemoryQueue(buffer int) *InMemoryQueue {
 
 // Publish enqueues an event or returns when the context or queue closes.
 func (q *InMemoryQueue) Publish(ctx context.Context, event IncomingEvent) error {
+	// the read lock stays held across the send so Close cannot close the channel under a blocked publisher
 	q.mu.RLock()
-	closed := q.closed
-	done := q.done
-	q.mu.RUnlock()
+	defer q.mu.RUnlock()
 
-	if closed {
+	if q.closed {
 		return ErrQueueClosed
 	}
 
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-done:
+	case <-q.done:
 		return ErrQueueClosed
 	case q.ch <- event:
 		return nil
@@ -66,10 +65,11 @@ func (q *InMemoryQueue) Consume() <-chan IncomingEvent {
 // Close stops the queue and closes the consumer stream.
 func (q *InMemoryQueue) Close() {
 	q.once.Do(func() {
-		q.mu.Lock()
-		q.closed = true
+		// done closes first to wake blocked publishers, so they release the read lock Lock waits for
 		close(q.done)
+		q.mu.Lock()
+		defer q.mu.Unlock()
+		q.closed = true
 		close(q.ch)
-		q.mu.Unlock()
 	})
 }
