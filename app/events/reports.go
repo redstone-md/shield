@@ -119,7 +119,7 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 
 	if r.tryLLMReportModeration(ctx, update, origMsg, msgTxt) {
 		duration, restrict := r.reportPenalty(ctx, origMsg.From.ID)
-		r.notifyPrimaryChat(reportOutcomeBanned, duration, restrict, r.chatIDOrFallback(origMsg.Chat.ID))
+		r.notifyPrimaryChat(reportOutcomeBanned, duration, restrict, r.chatIDOrFallback(origMsg.Chat.ID), topicThreadID(origMsg))
 		return nil
 	}
 
@@ -145,7 +145,7 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 	if err != nil {
 		log.Printf("[WARN] failed to check report threshold: %v", err)
 	} else {
-		r.notifyPrimaryChat(outcome, 0, false, r.chatIDOrFallback(origMsg.Chat.ID))
+		r.notifyPrimaryChat(outcome, 0, false, r.chatIDOrFallback(origMsg.Chat.ID), topicThreadID(origMsg))
 	}
 
 	return nil
@@ -168,7 +168,8 @@ func (r *userReports) deleteReportCommand(msgID int, chatID int64) {
 	log.Printf("[INFO] report message %d deleted", msgID)
 }
 
-func (r *userReports) notifyPrimaryChat(outcome reportOutcome, duration time.Duration, restrict bool, chatID int64) {
+func (r *userReports) notifyPrimaryChat(outcome reportOutcome, duration time.Duration, restrict bool,
+	chatID int64, threadID int) {
 	if r.groupReadOnly() {
 		log.Printf("[INFO] dry/training run: would send report status to the primary chat")
 		return
@@ -192,7 +193,9 @@ func (r *userReports) notifyPrimaryChat(outcome reportOutcome, duration time.Dur
 		return
 	}
 
-	if err := send(tbapi.NewMessage(chatID, text), r.tbAPI); err != nil {
+	msg := tbapi.NewMessage(chatID, text)
+	msg.MessageThreadID = threadID
+	if err := send(msg, r.tbAPI); err != nil {
 		log.Printf("[WARN] failed to send report status to primary chat: %v", err)
 	}
 }

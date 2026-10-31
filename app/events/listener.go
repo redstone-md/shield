@@ -836,6 +836,7 @@ func (l *TelegramListener) handleChatReply(ctx context.Context, update tbapi.Upd
 	}
 	if !l.chatLimiter.allow(update.Message.From.ID, time.Now().UTC()) {
 		msg := tbapi.NewMessage(update.Message.Chat.ID, chatLimitWarningText)
+		msg.MessageThreadID = topicThreadID(update.Message)
 		if sent, err := l.TbAPI.Send(msg); err == nil {
 			_, _ = l.TbAPI.Request(tbapi.DeleteMessageConfig{
 				ChatID:    update.Message.Chat.ID,
@@ -884,7 +885,7 @@ func (l *TelegramListener) sendChatReply(ctx context.Context, update tbapi.Updat
 	if text == "" {
 		return
 	}
-	resp := bot.Response{Send: true, Text: text, ReplyTo: msg.MessageID}
+	resp := bot.Response{Send: true, Text: text, ReplyTo: msg.MessageID, MessageThreadID: topicThreadID(msg)}
 	if err := l.sendBotResponse(resp, msg.Chat.ID, NotificationDefault); err != nil {
 		log.Printf("[WARN] failed to send chat reply: %v", err)
 	}

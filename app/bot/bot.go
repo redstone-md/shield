@@ -15,14 +15,15 @@ var PermanentBanDuration = time.Hour * 24 * 400
 
 // Response describes bot's reaction on particular message
 type Response struct {
-	Text          string
-	Send          bool                 // status
-	BanInterval   time.Duration        // bots banning user set the interval
-	User          User                 // user to ban
-	ChannelID     int64                // channel to ban via BanChatSenderChatConfig, if set then User is ignored
-	ReplyTo       int                  // message to reply to, if 0 then no reply but common message
-	DeleteReplyTo bool                 // delete message what bot replays to
-	CheckResults  []spamcheck.Response // check results for the message
+	Text            string
+	Send            bool                 // status
+	BanInterval     time.Duration        // bots banning user set the interval
+	User            User                 // user to ban
+	ChannelID       int64                // channel to ban via BanChatSenderChatConfig, if set then User is ignored
+	ReplyTo         int                  // message to reply to, if 0 then no reply but common message
+	DeleteReplyTo   bool                 // delete message what bot replays to
+	CheckResults    []spamcheck.Response // check results for the message
+	MessageThreadID int                  // forum topic to send to, 0 for the main chat or General
 }
 
 // SenderChat is the sender of the message, sent on behalf of a chat. The
@@ -57,6 +58,8 @@ type Message struct {
 		SenderChat SenderChat `json:"sender_chat,omitzero"`
 	} `json:",omitzero"`
 	Quote string `json:",omitempty"` // quoted text from TextQuote
+
+	MessageThreadID int `json:",omitempty"` // forum topic the message was sent to, 0 outside topics
 
 	WithVideo     bool         `json:",omitempty"`
 	WithVideoNote bool         `json:",omitempty"`

@@ -425,6 +425,7 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 
 	warnReq := warnRequest{
 		chatID:      pc.fromChat,
+		threadID:    pc.msg.MessageThreadID,
 		subjectID:   pc.spamUserID,
 		messageID:   pc.msg.ID,
 		text:        warnText,
@@ -491,6 +492,7 @@ func (l *TelegramListener) postBanGroupMessage(ctx context.Context, pc pipelineC
 	}
 	if err := l.ActionExecutor.PostBanMessage(ctx, banMessageRequest{
 		chatID:      pc.fromChat,
+		threadID:    pc.msg.MessageThreadID,
 		text:        text,
 		incidentID:  incidentID,
 		botUsername: l.BotUsername,

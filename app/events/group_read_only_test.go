@@ -91,7 +91,7 @@ func TestGroupReadOnlyReports(t *testing.T) {
 			r.deleteReportCommand(10, 123)
 			assert.Equal(t, m.allowed, len(api.RequestCalls()) == 1, "report command delete")
 
-			r.notifyPrimaryChat(reportOutcomeAccepted, 0, false, 123)
+			r.notifyPrimaryChat(reportOutcomeAccepted, 0, false, 123, 0)
 			assert.Equal(t, m.allowed, len(api.SendCalls()) == 1, "report status")
 		})
 	}

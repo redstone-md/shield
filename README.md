@@ -262,6 +262,8 @@ Inline buttons in the admin chat work only for super-users, which means `SUPER_U
 
 **Dry and training modes**: `--dry` leaves the group untouched, including explicit admin commands. `--training` leaves the group untouched for automatic actions and `/report`, while explicit admin actions stay real. The admin chat keeps getting reports and errors in both modes.
 
+**Forum topics**: in a group with topics, warnings, ban notices, chat replies and report statuses go to the topic of the message that caused them, not to General.
+
 **Full message cleanup**: when admins use `/spam` or `/ban` (or `/clear`), the bot deletes every message of the banned user it has seen, across all monitored groups. `/ban` accepts several targets at once, separated by spaces: `/ban 123456789 @username`.
 
 **Linked channel**: if the group is linked to a Telegram channel, the channel automatically receives superuser privileges without extra configuration.

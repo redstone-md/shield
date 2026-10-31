@@ -171,6 +171,7 @@ func (l *TelegramListener) sendBotResponse(resp bot.Response, chatID int64, noti
 	// bot response texts are plain strings; escape them so raw < > & in user
 	// names or quoted text cannot break the HTML parse mode
 	tbMsg := tbapi.NewMessage(chatID, htmlEscape(resp.Text))
+	tbMsg.MessageThreadID = resp.MessageThreadID
 	tbMsg.ParseMode = tbapi.ModeHTML
 	tbMsg.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
 	tbMsg.ReplyParameters = tbapi.ReplyParameters{MessageID: resp.ReplyTo}
