@@ -67,6 +67,44 @@ func TestSpam_CheckIsCasSpamUserAgent(t *testing.T) {
 	}
 }
 
+func TestSpam_CheckIsCasSpamToken(t *testing.T) {
+	tests := []struct {
+		name           string
+		token          string
+		expectedHeader string
+	}{
+		{name: "with token", token: "secret", expectedHeader: "Bearer secret"},
+		{name: "without token", token: "", expectedHeader: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockedHTTPClient := &mocks.HTTPClientMock{
+				DoFunc: func(req *http.Request) (*http.Response, error) {
+					assert.Equal(t, tt.expectedHeader, req.Header.Get("Authorization"))
+					assert.Equal(t, "user_id=123", req.URL.RawQuery, "token must not leak into the url")
+					return &http.Response{
+						StatusCode: 200,
+						Body:       io.NopCloser(bytes.NewBufferString(`{"ok": false, "description": "Not a spammer"}`)),
+					}, nil
+				},
+			}
+
+			d := NewDetector(Config{
+				CasAPI:           "http://localhost",
+				CasToken:         tt.token,
+				HTTPClient:       mockedHTTPClient,
+				MaxAllowedEmoji:  -1,
+				FirstMessageOnly: true,
+			})
+
+			d.Check(spamcheck.Request{UserID: "123", Msg: "test message"})
+
+			assert.Len(t, mockedHTTPClient.DoCalls(), 1)
+		})
+	}
+}
+
 func TestSpam_CheckIsCasSpamRetry(t *testing.T) {
 	t.Run("retry on network failure then success", func(t *testing.T) {
 		callCount := 0

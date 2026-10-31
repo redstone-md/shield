@@ -59,6 +59,7 @@ type options struct {
 		API       string        `long:"api" env:"API" default:"https://api.cas.chat" description:"CAS API"`
 		Timeout   time.Duration `long:"timeout" env:"TIMEOUT" default:"5s" description:"CAS timeout"`
 		UserAgent string        `long:"user-agent" env:"USER_AGENT" description:"User-Agent header for CAS API requests"`
+		Token     string        `long:"token" env:"TOKEN" description:"CAS API key"`
 	} `group:"cas" namespace:"cas" env-namespace:"CAS"`
 
 	Meta struct {
@@ -244,7 +245,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	masked := []string{opts.Telegram.Token, opts.OpenAI.Token, opts.Gemini.Token}
+	masked := []string{opts.Telegram.Token, opts.OpenAI.Token, opts.Gemini.Token, opts.CAS.Token}
 	if opts.Server.AuthPasswd != "auto" && opts.Server.AuthPasswd != "" {
 		// auto passwd should not be masked as we print it
 		masked = append(masked, opts.Server.AuthPasswd)

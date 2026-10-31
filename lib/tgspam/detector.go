@@ -99,6 +99,7 @@ type Config struct {
 	MaxAllowedEmoji       int              // maximum number of emojis allowed in a message
 	CasAPI                string           // CAS API URL
 	CasUserAgent          string           // CAS API User-Agent header value, set only if non-empty
+	CasToken              string           // CAS API key sent as a bearer token, set only if non-empty
 	FirstMessageOnly      bool             // if true, only the first message from a user is checked
 	FirstMessagesCount    int              // number of first messages to check for spam
 	HTTPClient            HTTPClient       // http client to use for requests

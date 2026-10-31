@@ -339,6 +339,7 @@ func buildDetectorConfig(opts options, ruleSet rules.RuleSet) tgspam.Config {
 		MinSpamProbability:    ruleSet.Detection.MinSpamProbability,
 		CasAPI:                casAPI,
 		CasUserAgent:          opts.CAS.UserAgent,
+		CasToken:              opts.CAS.Token,
 		HTTPClient:            &http.Client{Timeout: opts.CAS.Timeout},
 		FirstMessageOnly:      !ruleSet.Detection.ParanoidMode,
 		FirstMessagesCount:    ruleSet.Detection.FirstMessagesCount,

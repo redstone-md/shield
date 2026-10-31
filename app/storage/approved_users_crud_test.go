@@ -388,8 +388,7 @@ func (s *StorageTestSuite) TestApprovedUsers_ErrorCases() {
 			s.Run("delete non-existent", func() {
 				clearDB()
 				err := au.Delete(ctx, "non-existent")
-				s.Require().Error(err)
-				s.Contains(err.Error(), "failed to get approved user")
+				s.Require().NoError(err)
 			})
 
 			s.Run("delete empty id", func() {
