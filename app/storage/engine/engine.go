@@ -202,22 +202,32 @@ func (e *SQL) Adopt(q string) string {
 	return result.String()
 }
 
-// sqliteDSN wraps a sqlite path or URI with _time_format=sqlite so DATETIME
-// columns round-trip through time.Time scanners regardless of the host's
-// timezone abbreviation (Go's t.String() can emit single-letter zones like
-// "R" on Windows, which modernc's legacy parser rejects).
+// sqliteDSN wraps a sqlite path or URI with the options every pooled connection needs.
+//
+// _time_format=sqlite makes DATETIME columns round-trip through time.Time scanners regardless of the host's
+// timezone abbreviation (Go's t.String() can emit single-letter zones like "R" on Windows, which modernc's legacy
+// parser rejects).
+//
+// busy_timeout makes a write wait for the lock held by another connection instead of failing with SQLITE_BUSY. It is
+// set per connection, so it has to be in the DSN rather than in setSqlitePragma, which only reaches one connection.
 func sqliteDSN(path string) string {
-	if strings.HasPrefix(path, "file:") {
-		if strings.Contains(path, "_time_format=") {
-			return path
+	if !strings.HasPrefix(path, "file:") {
+		path = "file:" + path
+	}
+	for _, opt := range []struct{ key, value string }{
+		{key: "_time_format=", value: "_time_format=sqlite"},
+		{key: "busy_timeout", value: "_pragma=busy_timeout(5000)"},
+	} {
+		if strings.Contains(path, opt.key) {
+			continue
 		}
 		sep := "?"
 		if strings.Contains(path, "?") {
 			sep = "&"
 		}
-		return path + sep + "_time_format=sqlite"
+		path += sep + opt.value
 	}
-	return "file:" + path + "?_time_format=sqlite"
+	return path
 }
 
 func setSqlitePragma(db *sqlx.DB) error {
@@ -227,7 +237,6 @@ func setSqlitePragma(db *sqlx.DB) error {
 		"journal_mode": "DELETE", // explicitly set to DELETE mode to prevent WAL files
 		// "journal_mode": "WAL",
 		// "synchronous": "NORMAL",
-		// "busy_timeout": "5000",
 		// "foreign_keys": "ON",
 	}
 
