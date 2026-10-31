@@ -276,8 +276,8 @@ func (l *Locator) AddMessage(ctx context.Context, msg string, chatID, userID int
 	defer l.Unlock()
 
 	hash := l.MsgHash(msg)
-	observability.Logf(ctx, "[DEBUG] add message to locator: %q, hash:%s, userID:%d, user name:%q, chatID:%d, msgID:%d",
-		msg, hash, userID, userName, chatID, msgID)
+	observability.Logf(ctx, "[DEBUG] add message to locator, hash:%s, userID:%d, user name:%q, chatID:%d, msgID:%d",
+		hash, userID, userName, chatID, msgID)
 
 	query, err := locatorQueries.Pick(l.Type(), CmdAddLocatorMessage)
 	if err != nil {

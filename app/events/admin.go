@@ -243,8 +243,8 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 		return errors.New("empty message text")
 	}
 
-	log.Printf("[DEBUG] forwarded message from superuser %q (%d) to admin chat %d: %q",
-		update.Message.From.UserName, update.Message.From.ID, a.adminChatID, msgTxt)
+	log.Printf("[DEBUG] forwarded message from superuser %q (%d) to admin chat %d, chars:%d",
+		update.Message.From.UserName, update.Message.From.ID, a.adminChatID, len(msgTxt))
 
 	info, ok := a.locator.Message(ctx, msgTxt)
 	if !ok {

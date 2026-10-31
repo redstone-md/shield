@@ -119,3 +119,19 @@ func TestHandleUpdateIgnoresMessageWithoutSender(t *testing.T) {
 
 	assert.NotPanics(t, func() { require.NoError(t, l.handleUpdate(context.Background(), update)) })
 }
+
+func TestDirectWarnReportDryRecordsNoStrike(t *testing.T) {
+	spy := &detectedSpamCounterSpy{}
+	api := okTbAPI()
+	a := admin{tbAPI: api, dry: true, detectedSpam: spy, moderation: ModerationConfig{WarnStrikes: 3}}
+
+	err := a.DirectWarnReport(tbapi.Update{Message: &tbapi.Message{
+		MessageID: 2, Chat: tbapi.Chat{ID: 123}, From: &tbapi.User{ID: 1, UserName: "admin"},
+		ReplyToMessage: &tbapi.Message{MessageID: 1, Chat: tbapi.Chat{ID: 123}, From: &tbapi.User{ID: 42}, Text: "spam"},
+	}})
+
+	require.NoError(t, err)
+	assert.Empty(t, spy.writes, "a warning that was not sent must not count as a strike")
+	assert.Empty(t, api.SendCalls())
+	assert.Empty(t, api.RequestCalls())
+}
