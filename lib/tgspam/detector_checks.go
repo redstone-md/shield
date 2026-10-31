@@ -3,6 +3,7 @@ package tgspam
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -70,6 +71,9 @@ func (d *Detector) cosineSimilarity(a, b map[string]int) float64 {
 	return float64(dotProduct) / (math.Sqrt(float64(normA)) * math.Sqrt(float64(normB)))
 }
 
+// errCasRejected marks a CAS response refusing the API key, which retrying cannot fix.
+var errCasRejected = errors.New("api key rejected")
+
 // isCasSpam checks if a given user ID is a spammer with CAS API.
 func (d *Detector) isCasSpam(msgID string) spamcheck.Response {
 	if msgID == "" {
@@ -106,6 +110,12 @@ func (d *Detector) isCasSpam(msgID string) spamcheck.Response {
 			return fmt.Errorf("server error: %d", resp.StatusCode)
 		}
 
+		// a rejected key cannot start working on retry
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			_ = resp.Body.Close()
+			return fmt.Errorf("%w: %d", errCasRejected, resp.StatusCode)
+		}
+
 		// retry on non-200 status
 		if resp.StatusCode != http.StatusOK {
 			_ = resp.Body.Close()
@@ -120,7 +130,7 @@ func (d *Detector) isCasSpam(msgID string) spamcheck.Response {
 		}
 
 		return nil // success - exit retry loop
-	})
+	}, errCasRejected)
 
 	if err != nil {
 		log.Printf("[WARN] CAS API request failed for user %s after retries: %v", msgID, err)
