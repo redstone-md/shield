@@ -28,11 +28,15 @@ func TestRetentionService_CleanNow(t *testing.T) {
 		created_at DATETIME, updated_at DATETIME)`)
 	require.NoError(t, err)
 
+	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS incident_comments (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME)`)
+	require.NoError(t, err)
+
 	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS incoming_events (
 		id INTEGER PRIMARY KEY AUTOINCREMENT, gid TEXT DEFAULT '', tenant_id TEXT DEFAULT '',
 		event_type TEXT DEFAULT '', event_id TEXT DEFAULT '', chat_id INTEGER DEFAULT 0,
 		user_id INTEGER DEFAULT 0, correlation_id TEXT DEFAULT '', idempotency_key TEXT DEFAULT '',
-		status TEXT DEFAULT '', timestamp DATETIME)`)
+		status TEXT DEFAULT '', received_at DATETIME)`)
 	require.NoError(t, err)
 
 	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS usage_counters (
@@ -51,11 +55,11 @@ func TestRetentionService_CleanNow(t *testing.T) {
 		"test", now, now)
 	require.NoError(t, err)
 
-	_, err = db.ExecContext(ctx, `INSERT INTO incoming_events (tenant_id, timestamp) VALUES (?, ?)`,
+	_, err = db.ExecContext(ctx, `INSERT INTO incoming_events (tenant_id, received_at) VALUES (?, ?)`,
 		"test", now.Add(-48*time.Hour))
 	require.NoError(t, err)
 
-	_, err = db.ExecContext(ctx, `INSERT INTO incoming_events (tenant_id, timestamp) VALUES (?, ?)`,
+	_, err = db.ExecContext(ctx, `INSERT INTO incoming_events (tenant_id, received_at) VALUES (?, ?)`,
 		"test", now)
 	require.NoError(t, err)
 
@@ -73,6 +77,25 @@ func TestRetentionService_CleanNow(t *testing.T) {
 	assert.Equal(t, 1, report["incidents"])
 	assert.Equal(t, 1, report["incoming_events"])
 	assert.Equal(t, 1, report["usage_counters"])
+}
+
+func TestRetentionService_CleanNowReturnsDeleteError(t *testing.T) {
+	db := newRetentionDB(t)
+	svc := NewRetentionService(db, RetentionConfig{IncidentsTTL: time.Hour})
+
+	_, err := svc.CleanNow(t.Context())
+
+	require.Error(t, err, "incidents table does not exist")
+	assert.Contains(t, err.Error(), "delete expired rows")
+}
+
+func TestRetentionService_LeavesLocatorTables(t *testing.T) {
+	db := newRetentionDB(t)
+	svc := NewRetentionService(db, RetentionConfig{IncomingEventsTTL: time.Hour, ModerationActionsTTL: time.Hour})
+
+	for _, c := range svc.buildCleaners() {
+		assert.NotContains(t, []string{"messages", "spam"}, c.table)
+	}
 }
 
 func TestRetentionService_ZeroTTL_NoDelete(t *testing.T) {
