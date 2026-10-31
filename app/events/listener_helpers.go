@@ -55,7 +55,7 @@ func (l *TelegramListener) procLeftChatMemberMessage(ctx context.Context, update
 		return nil
 	}
 	if _, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{
-		BaseChatMessage: tbapi.BaseChatMessage{ChatConfig: tbapi.ChatConfig{ChatID: fromChat}, MessageID: msg.MsgID},
+		ChatID: fromChat, MessageID: msg.MsgID,
 	}); err != nil {
 		return fmt.Errorf("failed to delete new chat member message %d: %w", msg.MsgID, err)
 	}
@@ -65,10 +65,8 @@ func (l *TelegramListener) procLeftChatMemberMessage(ctx context.Context, update
 
 func (l *TelegramListener) deleteSystemMessage(msgID int, chatID int64, msgType string) {
 	deleteMsg := tbapi.DeleteMessageConfig{
-		BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID:  msgID,
-			ChatConfig: tbapi.ChatConfig{ChatID: chatID},
-		},
+		MessageID: msgID,
+		ChatID:    chatID,
 	}
 	if _, err := l.TbAPI.Request(deleteMsg); err != nil {
 		log.Printf("[WARN] failed to delete %s message %d: %v", msgType, msgID, err)
@@ -173,7 +171,7 @@ func (l *TelegramListener) getChatID(group string) (int64, error) {
 		return chatID, nil
 	}
 
-	chat, err := l.TbAPI.GetChat(tbapi.ChatInfoConfig{ChatConfig: tbapi.ChatConfig{SuperGroupUsername: "@" + group}})
+	chat, err := l.TbAPI.GetChat(tbapi.ChatInfoConfig{SuperGroupUsername: "@" + group})
 	if err != nil {
 		return 0, fmt.Errorf("can't get chat for %s: %w", group, err)
 	}
@@ -200,7 +198,7 @@ func (l *TelegramListener) updateSupers() {
 	}
 	seen := make(map[int64]struct{})
 	for _, chatID := range chatIDs {
-		admins, err := l.TbAPI.GetChatAdministrators(tbapi.ChatAdministratorsConfig{ChatConfig: tbapi.ChatConfig{ChatID: chatID}})
+		admins, err := l.TbAPI.GetChatAdministrators(tbapi.ChatAdministratorsConfig{ChatID: chatID})
 		if err != nil {
 			log.Printf("[WARN] failed to get chat administrators for %d: %v", chatID, err)
 			continue

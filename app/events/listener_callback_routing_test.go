@@ -15,7 +15,7 @@ func TestTelegramListener_CallbackRouting(t *testing.T) {
 	t.Run("R+ callback routes to reportsHandler", func(t *testing.T) {
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+				return tbapi.ChatFullInfo{ID: 123}, nil
 			},
 			GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
 				return []tbapi.ChatMember{{User: &tbapi.User{UserName: "admin", ID: 1}}}, nil
@@ -88,7 +88,7 @@ func TestTelegramListener_CallbackRouting(t *testing.T) {
 	t.Run("? callback routes to adminHandler", func(t *testing.T) {
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+				return tbapi.ChatFullInfo{ID: 123}, nil
 			},
 			GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
 				return []tbapi.ChatMember{{User: &tbapi.User{UserName: "admin", ID: 1}}}, nil
@@ -148,7 +148,7 @@ func TestTelegramListener_CallbackRouting(t *testing.T) {
 	t.Run("R- callback routes to reportsHandler", func(t *testing.T) {
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+				return tbapi.ChatFullInfo{ID: 123}, nil
 			},
 			GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
 				return []tbapi.ChatMember{{User: &tbapi.User{UserName: "admin", ID: 1}}}, nil
@@ -213,7 +213,7 @@ func TestTelegramListener_CallbackRouting(t *testing.T) {
 	t.Run("+ callback routes to adminHandler", func(t *testing.T) {
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+				return tbapi.ChatFullInfo{ID: 123}, nil
 			},
 			GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
 				return []tbapi.ChatMember{{User: &tbapi.User{UserName: "admin", ID: 1}}}, nil
@@ -277,7 +277,7 @@ func TestTelegramListener_CallbackRouting(t *testing.T) {
 	t.Run("no prefix callback routes to adminHandler", func(t *testing.T) {
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+				return tbapi.ChatFullInfo{ID: 123}, nil
 			},
 			GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
 				return []tbapi.ChatMember{{User: &tbapi.User{UserName: "admin", ID: 1}}}, nil

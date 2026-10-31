@@ -101,7 +101,8 @@ func (a *admin) DirectBanTarget(ctx context.Context, update tbapi.Update, target
 
 	for _, t := range targets {
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: t.userID,
-			tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: t.userName}
+			tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: t.userName,
+		}
 		if err := a.banInAllChats(ctx, banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", t.userID, err))
 		}
@@ -128,10 +129,8 @@ func (a *admin) userNameFromTelegram(userID int64) string {
 	}
 	for _, chatID := range a.primChatIDs {
 		member, err := a.tbAPI.GetChatMember(tbapi.GetChatMemberConfig{
-			ChatConfigWithUser: tbapi.ChatConfigWithUser{
-				ChatConfig: tbapi.ChatConfig{ChatID: chatID},
-				UserID:     userID,
-			},
+			ChatID: chatID,
+			UserID: userID,
 		})
 		if err != nil {
 			log.Printf("[DEBUG] can't resolve name for %d in chat %d via telegram api: %v", userID, chatID, err)
@@ -458,7 +457,8 @@ func (a *admin) recordManualWarn(ctx context.Context, msg *bot.Message, subjectI
 		Name:    manualWarnSignalSource,
 		Spam:    true,
 		Details: fmt.Sprintf("ручное предупреждение %d/%d", warnNum, a.moderation.WarnStrikes),
-	}}
+	},
+	}
 	userName := msg.From.Username
 	if msg.SenderChat.UserName != "" {
 		userName = msg.SenderChat.UserName
@@ -491,10 +491,10 @@ func (a *admin) deleteMessage(ctx context.Context, chatID int64, msgID int, labe
 		return nil
 	}
 
-	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID:  msgID,
-		ChatConfig: tbapi.ChatConfig{ChatID: chatID},
-	}})
+	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
+		MessageID: msgID,
+		ChatID:    chatID,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to delete message %d: %w", msgID, err)
 	}
@@ -632,20 +632,20 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 		}
 	}
 
-	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID:  origMsg.MessageID,
-		ChatConfig: tbapi.ChatConfig{ChatID: a.chatIDOrFallback(origMsg.Chat.ID)},
-	}})
+	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
+		MessageID: origMsg.MessageID,
+		ChatID:    a.chatIDOrFallback(origMsg.Chat.ID),
+	})
 	if err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to delete message %d: %w", origMsg.MessageID, err))
 	} else {
 		log.Printf("[INFO] spam message %d deleted", origMsg.MessageID)
 	}
 
-	_, err = a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID:  update.Message.MessageID,
-		ChatConfig: tbapi.ChatConfig{ChatID: update.Message.Chat.ID},
-	}})
+	_, err = a.tbAPI.Request(tbapi.DeleteMessageConfig{
+		MessageID: update.Message.MessageID,
+		ChatID:    update.Message.Chat.ID,
+	})
 	if err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to delete message %d: %w", update.Message.MessageID, err))
 	} else {
@@ -662,7 +662,8 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 			a.chatIDOrFallback(origMsg.Chat.ID))
 	} else {
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: origMsg.From.ID, channelID: channelID,
-			tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
+			tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username,
+		}
 
 		if err := a.banInAllChats(ctx, banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", origMsg.From.ID, err))

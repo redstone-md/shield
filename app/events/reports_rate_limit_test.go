@@ -26,11 +26,9 @@ func TestUserReports_checkReportRateLimit(t *testing.T) {
 		}
 
 		rep := &userReports{
-			ReportConfig: ReportConfig{
-				Storage:    mockReports,
-				RateLimit:  10,
-				RatePeriod: 1 * time.Hour,
-			},
+			Storage:    mockReports,
+			RateLimit:  10,
+			RatePeriod: 1 * time.Hour,
 		}
 
 		exceeded, err := rep.checkReportRateLimit(ctx, 123)
@@ -47,11 +45,9 @@ func TestUserReports_checkReportRateLimit(t *testing.T) {
 		}
 
 		rep := &userReports{
-			ReportConfig: ReportConfig{
-				Storage:    mockReports,
-				RateLimit:  10,
-				RatePeriod: 1 * time.Hour,
-			},
+			Storage:    mockReports,
+			RateLimit:  10,
+			RatePeriod: 1 * time.Hour,
 		}
 
 		exceeded, err := rep.checkReportRateLimit(ctx, 123)
@@ -68,11 +64,9 @@ func TestUserReports_checkReportRateLimit(t *testing.T) {
 		}
 
 		rep := &userReports{
-			ReportConfig: ReportConfig{
-				Storage:    mockReports,
-				RateLimit:  0,
-				RatePeriod: 1 * time.Hour,
-			},
+			Storage:    mockReports,
+			RateLimit:  0,
+			RatePeriod: 1 * time.Hour,
 		}
 
 		exceeded, err := rep.checkReportRateLimit(ctx, 123)
@@ -83,11 +77,9 @@ func TestUserReports_checkReportRateLimit(t *testing.T) {
 
 	t.Run("reports storage not initialized", func(t *testing.T) {
 		rep := &userReports{
-			ReportConfig: ReportConfig{
-				Storage:    nil,
-				RateLimit:  10,
-				RatePeriod: 1 * time.Hour,
-			},
+			Storage:    nil,
+			RateLimit:  10,
+			RatePeriod: 1 * time.Hour,
 		}
 
 		exceeded, err := rep.checkReportRateLimit(ctx, 123)
@@ -104,11 +96,9 @@ func TestUserReports_checkReportRateLimit(t *testing.T) {
 		}
 
 		rep := &userReports{
-			ReportConfig: ReportConfig{
-				Storage:    mockReports,
-				RateLimit:  10,
-				RatePeriod: 1 * time.Hour,
-			},
+			Storage:    mockReports,
+			RateLimit:  10,
+			RatePeriod: 1 * time.Hour,
 		}
 
 		exceeded, err := rep.checkReportRateLimit(ctx, 123)

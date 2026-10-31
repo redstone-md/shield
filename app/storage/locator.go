@@ -291,13 +291,11 @@ func (l *Locator) AddMessage(ctx context.Context, msg string, chatID, userID int
 			GID      string `db:"gid"`
 			TenantID string `db:"tenant_id"`
 		}{
-			MsgMeta: MsgMeta{
-				Time:     time.Now(),
-				ChatID:   chatID,
-				UserID:   userID,
-				UserName: userName,
-				MsgID:    msgID,
-			},
+			Time:     time.Now(),
+			ChatID:   chatID,
+			UserID:   userID,
+			UserName: userName,
+			MsgID:    msgID,
 			Hash:     hash,
 			GID:      l.GID(),
 			TenantID: l.TenantID(),

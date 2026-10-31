@@ -19,7 +19,7 @@ func TestUserReports_CheckReportThreshold(t *testing.T) {
 			},
 		}
 
-		rep := &userReports{ReportConfig: ReportConfig{Storage: mockReports, Threshold: 3}}
+		rep := &userReports{Storage: mockReports, Threshold: 3}
 
 		outcome, err := rep.checkReportThreshold(context.Background(), 100, 200)
 		require.NoError(t, err)
@@ -40,9 +40,9 @@ func TestUserReports_CheckReportThreshold(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			ReportConfig: ReportConfig{Storage: mockReports, Threshold: 2},
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			Storage:     mockReports, Threshold: 2,
 		}
 
 		outcome, err := rep.checkReportThreshold(context.Background(), 100, 200)
@@ -63,9 +63,9 @@ func TestUserReports_CheckReportThreshold(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			ReportConfig: ReportConfig{Storage: mockReports, Threshold: 2},
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			Storage:     mockReports, Threshold: 2,
 		}
 
 		outcome, err := rep.checkReportThreshold(context.Background(), 100, 200)
@@ -75,7 +75,7 @@ func TestUserReports_CheckReportThreshold(t *testing.T) {
 	})
 
 	t.Run("reports storage not initialized returns error", func(t *testing.T) {
-		rep := &userReports{ReportConfig: ReportConfig{Storage: nil, Threshold: 2}}
+		rep := &userReports{Storage: nil, Threshold: 2}
 
 		outcome, err := rep.checkReportThreshold(context.Background(), 100, 200)
 		require.Error(t, err)
@@ -90,7 +90,7 @@ func TestUserReports_CheckReportThreshold(t *testing.T) {
 			},
 		}
 
-		rep := &userReports{ReportConfig: ReportConfig{Storage: mockReports, Threshold: 2}}
+		rep := &userReports{Storage: mockReports, Threshold: 2}
 
 		outcome, err := rep.checkReportThreshold(context.Background(), 100, 200)
 		require.Error(t, err)
@@ -137,15 +137,13 @@ func TestUserReports_AutoBan(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:       mockAPI,
-			bot:         mockBot,
-			primChatIDs: []int64{200},
-			adminChatID: 456,
-			ReportConfig: ReportConfig{
-				Storage:          mockReports,
-				Threshold:        2,
-				AutoBanThreshold: 5,
-			},
+			tbAPI:            mockAPI,
+			bot:              mockBot,
+			primChatIDs:      []int64{200},
+			adminChatID:      456,
+			Storage:          mockReports,
+			Threshold:        2,
+			AutoBanThreshold: 5,
 		}
 
 		_, err := rep.checkReportThreshold(context.Background(), 100, 200)
@@ -194,16 +192,14 @@ func TestUserReports_AutoBan(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:       mockAPI,
-			bot:         mockBot,
-			primChatIDs: []int64{200},
-			adminChatID: 456,
-			softBanMode: true,
-			ReportConfig: ReportConfig{
-				Storage:          mockReports,
-				Threshold:        2,
-				AutoBanThreshold: 3,
-			},
+			tbAPI:            mockAPI,
+			bot:              mockBot,
+			primChatIDs:      []int64{200},
+			adminChatID:      456,
+			softBanMode:      true,
+			Storage:          mockReports,
+			Threshold:        2,
+			AutoBanThreshold: 3,
 		}
 
 		_, err := rep.checkReportThreshold(context.Background(), 100, 200)
@@ -254,15 +250,13 @@ func TestUserReports_AutoBan(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:       mockAPI,
-			bot:         mockBot,
-			primChatIDs: []int64{200},
-			adminChatID: 456,
-			ReportConfig: ReportConfig{
-				Storage:          mockReports,
-				Threshold:        2,
-				AutoBanThreshold: 5,
-			},
+			tbAPI:            mockAPI,
+			bot:              mockBot,
+			primChatIDs:      []int64{200},
+			adminChatID:      456,
+			Storage:          mockReports,
+			Threshold:        2,
+			AutoBanThreshold: 5,
 		}
 
 		_, err := rep.checkReportThreshold(context.Background(), 100, 200)
@@ -295,14 +289,12 @@ func TestUserReports_AutoBan(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:       mockAPI,
-			primChatIDs: []int64{200},
-			adminChatID: 456,
-			ReportConfig: ReportConfig{
-				Storage:          mockReports,
-				Threshold:        2,
-				AutoBanThreshold: 5,
-			},
+			tbAPI:            mockAPI,
+			primChatIDs:      []int64{200},
+			adminChatID:      456,
+			Storage:          mockReports,
+			Threshold:        2,
+			AutoBanThreshold: 5,
 		}
 
 		_, err := rep.checkReportThreshold(context.Background(), 100, 200)
@@ -341,16 +333,14 @@ func TestUserReports_AutoBan(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:       mockAPI,
-			bot:         mockBot,
-			primChatIDs: []int64{200},
-			adminChatID: 456,
-			dry:         true,
-			ReportConfig: ReportConfig{
-				Storage:          mockReports,
-				Threshold:        2,
-				AutoBanThreshold: 3,
-			},
+			tbAPI:            mockAPI,
+			bot:              mockBot,
+			primChatIDs:      []int64{200},
+			adminChatID:      456,
+			dry:              true,
+			Storage:          mockReports,
+			Threshold:        2,
+			AutoBanThreshold: 3,
 		}
 
 		_, err := rep.checkReportThreshold(context.Background(), 100, 200)
@@ -389,15 +379,13 @@ func TestUserReports_AutoBan(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:       mockAPI,
-			bot:         mockBot,
-			primChatIDs: []int64{200},
-			adminChatID: 456,
-			ReportConfig: ReportConfig{
-				Storage:          mockReports,
-				Threshold:        2,
-				AutoBanThreshold: 3,
-			},
+			tbAPI:            mockAPI,
+			bot:              mockBot,
+			primChatIDs:      []int64{200},
+			adminChatID:      456,
+			Storage:          mockReports,
+			Threshold:        2,
+			AutoBanThreshold: 3,
 		}
 
 		_, err := rep.checkReportThreshold(context.Background(), 100, 200)

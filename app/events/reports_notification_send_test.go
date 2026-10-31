@@ -33,9 +33,9 @@ func TestUserReports_SendReportNotification(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			ReportConfig: ReportConfig{Storage: mockReports},
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			Storage:     mockReports,
 		}
 
 		reports := []storage.Report{
@@ -82,9 +82,9 @@ func TestUserReports_SendReportNotification(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			ReportConfig: ReportConfig{Storage: mockReports},
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			Storage:     mockReports,
 		}
 
 		reports := []storage.Report{
@@ -118,9 +118,9 @@ func TestUserReports_SendReportNotification(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			ReportConfig: ReportConfig{Storage: mockReports},
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			Storage:     mockReports,
 		}
 
 		longMsg := strings.Repeat("spam ", 100)
@@ -150,9 +150,9 @@ func TestUserReports_SendReportNotification(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			ReportConfig: ReportConfig{Storage: mockReports},
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			Storage:     mockReports,
 		}
 
 		reports := []storage.Report{
@@ -169,9 +169,9 @@ func TestUserReports_SendReportNotification(t *testing.T) {
 		mockReports := &mocks.ReportsMock{}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  0,
-			ReportConfig: ReportConfig{Storage: mockReports},
+			tbAPI:       mockAPI,
+			adminChatID: 0,
+			Storage:     mockReports,
 		}
 
 		reports := []storage.Report{
@@ -188,9 +188,9 @@ func TestUserReports_SendReportNotification(t *testing.T) {
 		mockReports := &mocks.ReportsMock{}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			ReportConfig: ReportConfig{Storage: mockReports},
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			Storage:     mockReports,
 		}
 
 		err := rep.sendReportNotification(context.Background(), []storage.Report{})
@@ -208,9 +208,9 @@ func TestUserReports_SendReportNotification(t *testing.T) {
 		mockReports := &mocks.ReportsMock{}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			ReportConfig: ReportConfig{Storage: mockReports},
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			Storage:     mockReports,
 		}
 
 		reports := []storage.Report{
@@ -237,9 +237,9 @@ func TestUserReports_SendReportNotification(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			ReportConfig: ReportConfig{Storage: mockReports},
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			Storage:     mockReports,
 		}
 
 		reports := []storage.Report{
@@ -269,9 +269,9 @@ func TestUserReports_SendReportNotification(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			ReportConfig: ReportConfig{Storage: mockReports},
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			Storage:     mockReports,
 		}
 
 		reports := []storage.Report{
@@ -306,9 +306,9 @@ func TestUserReports_SendReportNotification(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			ReportConfig: ReportConfig{Storage: mockReports},
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			Storage:     mockReports,
 		}
 
 		reports := []storage.Report{

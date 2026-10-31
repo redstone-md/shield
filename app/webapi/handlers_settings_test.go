@@ -37,12 +37,13 @@ func TestHTMLSettingsEditHandler_RendersForm(t *testing.T) {
 	prov := &settingsRuleSetStub{get: rules.RuleSet{
 		Detection: rules.DetectionRules{MaxEmoji: 5},
 		OpenAI:    rules.LLMRules{Model: "gpt-4o-mini"},
-	}}
-	srv := &Server{Config: Config{
+	},
+	}
+	srv := &Server{
 		RuleSetProvider: prov,
 		Settings:        Settings{TenantID: "tg-spam"},
 		EnvPinnedKeys:   map[string]bool{"detection.max_emoji": true},
-	}}
+	}
 
 	rr := httptest.NewRecorder()
 	srv.htmlSettingsEditHandler(rr, httptest.NewRequest(http.MethodGet, "/settings/edit", http.NoBody))
@@ -56,7 +57,7 @@ func TestHTMLSettingsEditHandler_RendersForm(t *testing.T) {
 
 func TestSaveSettingsHandler_ValidUpdate(t *testing.T) {
 	prov := &settingsRuleSetStub{get: rules.RuleSet{WorkspaceID: "tg-spam", Version: 3}}
-	srv := &Server{Config: Config{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}}
+	srv := &Server{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}
 
 	form := url.Values{"detection.max_emoji": {"9"}, "llm.mode": {"flagged"}, "llm.consensus": {"any"}}
 	req := httptest.NewRequest(http.MethodPost, "/settings/save", strings.NewReader(form.Encode()))
@@ -74,7 +75,7 @@ func TestSaveSettingsHandler_ValidUpdate(t *testing.T) {
 
 func TestSaveSettingsHandler_ValidationError(t *testing.T) {
 	prov := &settingsRuleSetStub{get: rules.RuleSet{WorkspaceID: "tg-spam"}}
-	srv := &Server{Config: Config{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}}
+	srv := &Server{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}
 
 	form := url.Values{"detection.max_emoji": {"abc"}, "llm.mode": {"flagged"}, "llm.consensus": {"any"}}
 	req := httptest.NewRequest(http.MethodPost, "/settings/save", strings.NewReader(form.Encode()))
@@ -105,8 +106,9 @@ func TestSettingsEditRoute_Registered(t *testing.T) {
 func TestHTMLSettingsEditHandler_RendersJoinGate(t *testing.T) {
 	prov := &settingsRuleSetStub{get: rules.RuleSet{
 		JoinGate: rules.JoinGateRules{BannedDCs: []int{2, 4}},
-	}}
-	srv := &Server{Config: Config{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}}
+	},
+	}
+	srv := &Server{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}
 
 	rr := httptest.NewRecorder()
 	srv.htmlSettingsEditHandler(rr, httptest.NewRequest(http.MethodGet, "/settings/edit", http.NoBody))
@@ -120,7 +122,7 @@ func TestHTMLSettingsEditHandler_RendersJoinGate(t *testing.T) {
 
 func TestSaveSettingsHandler_JoinGate(t *testing.T) {
 	prov := &settingsRuleSetStub{get: rules.RuleSet{WorkspaceID: "tg-spam"}}
-	srv := &Server{Config: Config{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}}
+	srv := &Server{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}
 
 	form := url.Values{"join_gate.banned_dcs": {"2,4"}}
 	req := httptest.NewRequest(http.MethodPost, "/settings/save", strings.NewReader(form.Encode()))
@@ -137,8 +139,9 @@ func TestSaveSettingsHandler_JoinGate(t *testing.T) {
 func TestSaveSettingsHandler_JoinGateEmptyDisables(t *testing.T) {
 	prov := &settingsRuleSetStub{get: rules.RuleSet{
 		JoinGate: rules.JoinGateRules{BannedDCs: []int{2}},
-	}}
-	srv := &Server{Config: Config{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}}
+	},
+	}
+	srv := &Server{RuleSetProvider: prov, Settings: Settings{TenantID: "tg-spam"}}
 
 	form := url.Values{"join_gate.banned_dcs": {""}}
 	req := httptest.NewRequest(http.MethodPost, "/settings/save", strings.NewReader(form.Encode()))

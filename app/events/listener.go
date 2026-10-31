@@ -211,7 +211,7 @@ func (l *TelegramListener) Do(ctx context.Context) error {
 		l.chatIDsSet[chatID] = struct{}{}
 		log.Printf("[INFO] resolved group %q -> chat ID %d", g, chatID)
 
-		chatInfo, err := l.TbAPI.GetChat(tbapi.ChatInfoConfig{ChatConfig: tbapi.ChatConfig{ChatID: chatID}})
+		chatInfo, err := l.TbAPI.GetChat(tbapi.ChatInfoConfig{ChatID: chatID})
 		if err != nil {
 			log.Printf("[WARN] failed to get chat info for group %d: %v", chatID, err)
 		} else if chatInfo.LinkedChatID != 0 {
@@ -437,9 +437,9 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 
 	if !fromSuper && l.isReportCommand(update.Message.Text) && update.Message.ReplyToMessage == nil {
 		log.Printf("[DEBUG] deleting orphaned /report command from %s (%d)", update.Message.From.UserName, update.Message.From.ID)
-		_, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID: update.Message.MessageID, ChatConfig: tbapi.ChatConfig{ChatID: update.Message.Chat.ID},
-		}})
+		_, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{
+			MessageID: update.Message.MessageID, ChatID: update.Message.Chat.ID,
+		})
 		if err != nil {
 			log.Printf("[WARN] failed to delete orphaned /report message %d: %v", update.Message.MessageID, err)
 		}
@@ -767,10 +767,8 @@ func (l *TelegramListener) isAllowedBot(user *tbapi.User) bool {
 	}
 	// admin status check via Telegram API. errors treat the bot as not allowed so that we delete on the safe side.
 	member, err := l.TbAPI.GetChatMember(tbapi.GetChatMemberConfig{
-		ChatConfigWithUser: tbapi.ChatConfigWithUser{
-			ChatConfig: tbapi.ChatConfig{ChatID: l.chatID},
-			UserID:     user.ID,
-		},
+		ChatID: l.chatID,
+		UserID: user.ID,
 	})
 	if err != nil {
 		log.Printf("[WARN] guest-bot check: GetChatMember failed for %d: %v", user.ID, err)
@@ -786,10 +784,10 @@ func (l *TelegramListener) deleteGuestBotMessage(ctx context.Context, msg *tbapi
 			msg.MessageID, msg.From.UserName, msg.From.ID)
 		return
 	}
-	_, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID:  msg.MessageID,
-		ChatConfig: tbapi.ChatConfig{ChatID: msg.Chat.ID},
-	}})
+	_, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{
+		MessageID: msg.MessageID,
+		ChatID:    msg.Chat.ID,
+	})
 	if err != nil {
 		log.Printf("[WARN] failed to delete guest bot message %d from %q (%d): %v",
 			msg.MessageID, msg.From.UserName, msg.From.ID, err)
@@ -827,10 +825,10 @@ func (l *TelegramListener) handleChatReply(ctx context.Context, update tbapi.Upd
 	if !l.chatLimiter.allow(update.Message.From.ID, time.Now().UTC()) {
 		msg := tbapi.NewMessage(update.Message.Chat.ID, chatLimitWarningText)
 		if sent, err := l.TbAPI.Send(msg); err == nil {
-			_, _ = l.TbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-				ChatConfig: tbapi.ChatConfig{ChatID: update.Message.Chat.ID},
-				MessageID:  sent.MessageID,
-			}})
+			_, _ = l.TbAPI.Request(tbapi.DeleteMessageConfig{
+				ChatID:    update.Message.Chat.ID,
+				MessageID: sent.MessageID,
+			})
 		} else {
 			log.Printf("[WARN] failed to send rate-limit warning: %v", err)
 		}
@@ -859,7 +857,8 @@ func (l *TelegramListener) sendChatReply(ctx context.Context, update tbapi.Updat
 		req.History = []slowpath.HistoryMessage{{
 			UserName: msg.ReplyToMessage.From.UserName,
 			Text:     msg.ReplyToMessage.Text,
-		}}
+		},
+		}
 	}
 	result, err := replyChatWithRetry(ctx, l.SlowPathChatEngine, req, time.Sleep)
 	if err != nil {

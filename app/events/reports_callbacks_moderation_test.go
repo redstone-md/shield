@@ -40,12 +40,12 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		actions := &actionExecutorSpy{}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			primChatIDs:  []int64{200},
-			ReportConfig: ReportConfig{Storage: mockReports},
-			bot:          mockBot,
-			actions:      actions,
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			primChatIDs: []int64{200},
+			Storage:     mockReports,
+			bot:         mockBot,
+			actions:     actions,
 		}
 
 		query := &tbapi.CallbackQuery{
@@ -96,11 +96,11 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			primChatIDs:  []int64{200},
-			ReportConfig: ReportConfig{Storage: mockReports},
-			bot:          mockBot,
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			primChatIDs: []int64{200},
+			Storage:     mockReports,
+			bot:         mockBot,
 		}
 
 		query := &tbapi.CallbackQuery{
@@ -131,9 +131,9 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		}
 
 		rep := &userReports{
-			adminChatID:  456,
-			primChatIDs:  []int64{200},
-			ReportConfig: ReportConfig{Storage: mockReports},
+			adminChatID: 456,
+			primChatIDs: []int64{200},
+			Storage:     mockReports,
 		}
 
 		query := &tbapi.CallbackQuery{
@@ -187,9 +187,7 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 			bot:         mockBot,
 			primChatIDs: []int64{200},
 			softBanMode: true,
-			ReportConfig: ReportConfig{
-				Storage: mockReports,
-			},
+			Storage:     mockReports,
 		}
 
 		query := &tbapi.CallbackQuery{
@@ -247,9 +245,7 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 			bot:         mockBot,
 			primChatIDs: []int64{200},
 			softBanMode: false,
-			ReportConfig: ReportConfig{
-				Storage: mockReports,
-			},
+			Storage:     mockReports,
 		}
 
 		query := &tbapi.CallbackQuery{
@@ -288,17 +284,15 @@ func TestUserReports_ExecuteAutoBanUsesSharedActionExecutor(t *testing.T) {
 	actions := &actionExecutorSpy{}
 
 	rep := &userReports{
-		tbAPI:       mockAPI,
-		bot:         mockBot,
-		actions:     actions,
-		primChatIDs: []int64{200},
-		adminChatID: 456,
-		softBanMode: true,
-		ReportConfig: ReportConfig{
-			Storage:          mockReports,
-			Threshold:        2,
-			AutoBanThreshold: 3,
-		},
+		tbAPI:            mockAPI,
+		bot:              mockBot,
+		actions:          actions,
+		primChatIDs:      []int64{200},
+		adminChatID:      456,
+		softBanMode:      true,
+		Storage:          mockReports,
+		Threshold:        2,
+		AutoBanThreshold: 3,
 	}
 
 	err := rep.executeAutoBan(context.Background(), []storage.Report{
@@ -335,10 +329,10 @@ func TestUserReports_CallbackReportReject(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			adminChatID:  456,
-			primChatIDs:  []int64{200},
-			ReportConfig: ReportConfig{Storage: mockReports},
+			tbAPI:       mockAPI,
+			adminChatID: 456,
+			primChatIDs: []int64{200},
+			Storage:     mockReports,
 		}
 
 		query := &tbapi.CallbackQuery{
@@ -366,9 +360,9 @@ func TestUserReports_CallbackReportReject(t *testing.T) {
 		}
 
 		rep := &userReports{
-			adminChatID:  456,
-			primChatIDs:  []int64{200},
-			ReportConfig: ReportConfig{Storage: mockReports},
+			adminChatID: 456,
+			primChatIDs: []int64{200},
+			Storage:     mockReports,
 		}
 
 		query := &tbapi.CallbackQuery{
@@ -413,9 +407,9 @@ func TestUserReports_CallbackReportBanReporterAsk(t *testing.T) {
 		}
 
 		rep := &userReports{
-			tbAPI:        mockAPI,
-			primChatIDs:  []int64{200},
-			ReportConfig: ReportConfig{Storage: mockReports},
+			tbAPI:       mockAPI,
+			primChatIDs: []int64{200},
+			Storage:     mockReports,
 		}
 
 		query := &tbapi.CallbackQuery{
@@ -436,7 +430,7 @@ func TestUserReports_CallbackReportBanReporterAsk(t *testing.T) {
 			},
 		}
 
-		rep := &userReports{primChatIDs: []int64{200}, ReportConfig: ReportConfig{Storage: mockReports}}
+		rep := &userReports{primChatIDs: []int64{200}, Storage: mockReports}
 		query := &tbapi.CallbackQuery{Data: "R?666:100:200", Message: &tbapi.Message{Chat: tbapi.Chat{ID: 456}}}
 
 		err := rep.callbackReportBanReporterAsk(context.Background(), query)

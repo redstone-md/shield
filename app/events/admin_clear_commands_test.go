@@ -152,7 +152,8 @@ func TestTelegramListener_DoWithDirectClearByID(t *testing.T) {
 		Chat:      tbapi.Chat{ID: 456},
 		Text:      "/clear 222",
 		From:      &tbapi.User{UserName: "superuser1", ID: 77},
-	}}
+	},
+	}
 
 	err := runClearListener(t, l, updMsg)
 	require.EqualError(t, err, "telegram update chan closed")
@@ -184,7 +185,8 @@ func TestTelegramListener_DoWithDirectClearReply(t *testing.T) {
 			From:      &tbapi.User{ID: 222, UserName: "spammer"},
 			Text:      "message to clear",
 		},
-	}}
+	},
+	}
 
 	err := runClearListener(t, l, updMsg)
 	require.EqualError(t, err, "telegram update chan closed")
@@ -205,9 +207,9 @@ func newClearListenerMocks(t *testing.T, messageIDs []int) (*mocks.TbAPIMock, *m
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
 			if config.SuperGroupUsername == "@admin" || config.ChatID == 456 {
-				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 456}}, nil
+				return tbapi.ChatFullInfo{ID: 456}, nil
 			}
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{}, nil

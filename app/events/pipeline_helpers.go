@@ -261,7 +261,8 @@ func slowPathCheckResponses(result *slowpath.SlowPathResult) []spamcheck.Respons
 		Name:    slowPathCheckName(strings.Join(result.Providers, ",")),
 		Spam:    result.Spam,
 		Details: slowPathCheckDetails(result.Reason, result.Confidence),
-	}}
+	},
+	}
 }
 
 func slowPathErrorCheck(err error) spamcheck.Response {
@@ -365,12 +366,10 @@ func retryableSlowPathError(err error) bool {
 	if err == nil {
 		return false
 	}
-	var apiErr *openai.APIError
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[*openai.APIError](err); ok {
 		return retryableStatus(apiErr.HTTPStatusCode)
 	}
-	var reqErr *openai.RequestError
-	if errors.As(err, &reqErr) {
+	if reqErr, ok := errors.AsType[*openai.RequestError](err); ok {
 		return retryableStatus(reqErr.HTTPStatusCode)
 	}
 	text := strings.ToLower(err.Error())

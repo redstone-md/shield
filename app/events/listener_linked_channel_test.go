@@ -65,7 +65,7 @@ func TestTelegramListener_LinkedChannelBanSpam(t *testing.T) {
 			mockAPI := &mocks.TbAPIMock{
 				GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
 					return tbapi.ChatFullInfo{
-						Chat:         tbapi.Chat{ID: groupChatID},
+						ID:           groupChatID,
 						LinkedChatID: linkedChannelID,
 					}, nil
 				},
@@ -201,7 +201,7 @@ func TestTelegramListener_LinkedChannelSkipsSpamCheck(t *testing.T) {
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
 				return tbapi.ChatFullInfo{
-					Chat:         tbapi.Chat{ID: groupChatID},
+					ID:           groupChatID,
 					LinkedChatID: linkedChannelID,
 				}, nil
 			},
@@ -215,7 +215,8 @@ func TestTelegramListener_LinkedChannelSkipsSpamCheck(t *testing.T) {
 		botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 			t.Fatalf("bot.OnMessage should not be called for linked channel message")
 			return bot.Response{}
-		}}
+		},
+		}
 
 		locator, teardown := prepTestLocator(t)
 		defer teardown()
@@ -263,7 +264,7 @@ func TestTelegramListener_LinkedChannelSkipsSpamCheck(t *testing.T) {
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
 				return tbapi.ChatFullInfo{
-					Chat:         tbapi.Chat{ID: groupChatID},
+					ID:           groupChatID,
 					LinkedChatID: linkedChannelID,
 				}, nil
 			},
@@ -279,7 +280,8 @@ func TestTelegramListener_LinkedChannelSkipsSpamCheck(t *testing.T) {
 		}
 		botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 			return bot.Response{}
-		}}
+		},
+		}
 
 		locator, teardown := prepTestLocator(t)
 		defer teardown()
@@ -327,7 +329,7 @@ func TestTelegramListener_LinkedChannelSkipsSpamCheck(t *testing.T) {
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
 				return tbapi.ChatFullInfo{
-					Chat:         tbapi.Chat{ID: groupChatID},
+					ID:           groupChatID,
 					LinkedChatID: linkedChannelID,
 				}, nil
 			},
@@ -341,7 +343,8 @@ func TestTelegramListener_LinkedChannelSkipsSpamCheck(t *testing.T) {
 		botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 			t.Fatalf("bot.OnMessage should not be called for linked channel reply")
 			return bot.Response{}
-		}}
+		},
+		}
 
 		locator, teardown := prepTestLocator(t)
 		defer teardown()
@@ -415,7 +418,8 @@ func TestTelegramListener_LinkedChannelGetChatFailure(t *testing.T) {
 	}
 	botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 		return bot.Response{}
-	}}
+	},
+	}
 
 	locator, teardown := prepTestLocator(t)
 	defer teardown()

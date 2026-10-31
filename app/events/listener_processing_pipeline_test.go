@@ -24,7 +24,7 @@ func TestTelegramListener_TracerBulletSmoke(t *testing.T) {
 
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{}, nil
@@ -134,7 +134,7 @@ func TestTelegramListener_TracerBulletSmoke(t *testing.T) {
 func TestTelegramListener_AutomaticWarnCarriesMessageIDAndDeleteDuration(t *testing.T) {
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{}, nil
@@ -149,7 +149,8 @@ func TestTelegramListener_AutomaticWarnCarriesMessageIDAndDeleteDuration(t *test
 			return bot.Response{
 				Send: true,
 				User: bot.User{ID: 42, Username: "baz_02l_wss", DisplayName: "Asya Kilisa",
-					FirstName: "Asya", LastName: "Kilisa"},
+					FirstName: "Asya", LastName: "Kilisa",
+				},
 				CheckResults: []spamcheck.Response{{Name: "slowpath", Spam: true, Details: "vision spam reason"}},
 			}
 		},
@@ -195,7 +196,8 @@ func TestTelegramListener_AutomaticWarnCarriesMessageIDAndDeleteDuration(t *test
 			Chat:      tbapi.Chat{ID: 123},
 			Text:      "spam payload",
 			From: &tbapi.User{ID: 42, UserName: "baz_02l_wss",
-				FirstName: "Asya", LastName: "Kilisa"},
+				FirstName: "Asya", LastName: "Kilisa",
+			},
 			Date: int(time.Now().Unix()),
 		},
 	}
@@ -550,7 +552,7 @@ func TestTelegramListener_Do(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{Text: c.(tbapi.MessageConfig).Text, From: &tbapi.User{UserName: "user"}}, nil
@@ -570,7 +572,8 @@ func TestTelegramListener_Do(t *testing.T) {
 	botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 		t.Logf("on-message: %+v", msg)
 		return bot.Response{}
-	}}
+	},
+	}
 
 	locator, teardown := prepTestLocator(t)
 	defer teardown()

@@ -247,7 +247,8 @@ func (a *admin) callbackBanConfirmed(ctx context.Context, query *tbapi.CallbackQ
 			userName = ""
 		}
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: userID, channelID: channelIDFromCallback(userID),
-			tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: userName, restrict: false}
+			tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: userName, restrict: false,
+		}
 		if err := a.banInAllChats(ctx, banReq); err != nil {
 			return fmt.Errorf("failed to ban user %d: %w", userID, err)
 		}
@@ -326,7 +327,7 @@ func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.Callbac
 func (a *admin) unbanInChat(userID, chatID int64) error {
 	if a.softBan {
 		_, err := a.tbAPI.Request(tbapi.RestrictChatMemberConfig{
-			ChatMemberConfig: tbapi.ChatMemberConfig{UserID: userID, ChatConfig: tbapi.ChatConfig{ChatID: chatID}},
+			UserID: userID, ChatID: chatID,
 			Permissions: &tbapi.ChatPermissions{
 				CanSendMessages:      true,
 				CanSendAudios:        true,
@@ -348,8 +349,8 @@ func (a *admin) unbanInChat(userID, chatID int64) error {
 	}
 
 	cfg := tbapi.UnbanChatMemberConfig{
-		ChatMemberConfig: tbapi.ChatMemberConfig{UserID: userID, ChatConfig: tbapi.ChatConfig{ChatID: chatID}},
-		OnlyIfBanned:     true,
+		UserID: userID, ChatID: chatID,
+		OnlyIfBanned: true,
 	}
 	_, err := a.tbAPI.Request(cfg)
 	if err != nil {
@@ -360,7 +361,7 @@ func (a *admin) unbanInChat(userID, chatID int64) error {
 
 func (a *admin) unbanChannelInChat(channelID, chatID int64) error {
 	_, err := a.tbAPI.Request(tbapi.UnbanChatSenderChatConfig{
-		ChatConfig:   tbapi.ChatConfig{ChatID: chatID},
+		ChatID:       chatID,
 		SenderChatID: channelID,
 	})
 	if err != nil {
@@ -415,10 +416,10 @@ func (a *admin) deleteAndBan(ctx context.Context, query *tbapi.CallbackQuery, us
 		}
 	}
 
-	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID:  msgID,
-		ChatConfig: tbapi.ChatConfig{ChatID: a.chatIDOrFallback(chatID)},
-	}})
+	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
+		MessageID: msgID,
+		ChatID:    a.chatIDOrFallback(chatID),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to delete message %d: %w", query.Message.MessageID, err)
 	}
@@ -636,8 +637,8 @@ func (a *admin) unbanHardInAllChats(userID int64) error {
 	var errs *multierror.Error
 	for _, chatID := range a.primChatIDs {
 		_, err := a.tbAPI.Request(tbapi.UnbanChatMemberConfig{
-			ChatMemberConfig: tbapi.ChatMemberConfig{UserID: userID, ChatConfig: tbapi.ChatConfig{ChatID: chatID}},
-			OnlyIfBanned:     true,
+			UserID: userID, ChatID: chatID,
+			OnlyIfBanned: true,
 		})
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to unban user %d in chat %d: %w", userID, chatID, err))

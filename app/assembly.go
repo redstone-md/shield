@@ -199,7 +199,7 @@ func activateServer(
 		TGDebugModeEnabled:       opts.TGDbg,
 	}
 
-	srv := webapi.Server{Config: webapi.Config{
+	srv := webapi.Server{
 		ListenAddr:            opts.Server.ListenAddr,
 		Detector:              web.Detector,
 		SpamFilter:            web.SpamFilter,
@@ -229,7 +229,7 @@ func activateServer(
 		Dbg:                   opts.Dbg,
 		Settings:              settings,
 		EnvPinnedKeys:         envPinnedKeys(),
-	}}
+	}
 
 	go func() {
 		if err := srv.Run(ctx); err != nil {
