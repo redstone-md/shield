@@ -79,13 +79,9 @@ func (d *Detector) isCasSpam(msgID string) spamcheck.Response {
 		return spamcheck.Response{Spam: false, Name: "cas", Details: fmt.Sprintf("invalid user id %q", msgID)}
 	}
 	reqURL := fmt.Sprintf("%s/check?user_id=%s", d.CasAPI, msgID)
-	req, err := http.NewRequest("GET", reqURL, http.NoBody)
+	req, err := d.newCasRequest(reqURL)
 	if err != nil {
 		return spamcheck.Response{Spam: false, Name: "cas", Details: fmt.Sprintf("failed to make request %s: %v", reqURL, err)}
-	}
-
-	if d.CasUserAgent != "" {
-		req.Header.Set("User-Agent", d.CasUserAgent)
 	}
 
 	var resp *http.Response
@@ -156,6 +152,21 @@ func (d *Detector) isCasSpam(msgID string) spamcheck.Response {
 		details = "not found"
 	}
 	return spamcheck.Response{Name: "cas", Spam: false, Details: details}
+}
+
+// newCasRequest builds a CAS API request with the configured User-Agent and API key headers.
+func (d *Detector) newCasRequest(reqURL string) (*http.Request, error) {
+	req, err := http.NewRequest("GET", reqURL, http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("new request: %w", err)
+	}
+	if d.CasUserAgent != "" {
+		req.Header.Set("User-Agent", d.CasUserAgent)
+	}
+	if d.CasToken != "" {
+		req.Header.Set("Authorization", "Bearer "+d.CasToken)
+	}
+	return req, nil
 }
 
 // isSpamClassified classify tokens from a document
