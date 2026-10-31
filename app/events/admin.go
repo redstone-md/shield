@@ -296,10 +296,8 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 	}
 
 	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
-		BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID:  info.MsgID,
-			ChatConfig: tbapi.ChatConfig{ChatID: info.ChatID},
-		},
+		MessageID: info.MsgID,
+		ChatID:    info.ChatID,
 	})
 	if err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to delete message %d: %w", info.MsgID, err))
@@ -312,7 +310,8 @@ func (a *admin) MsgHandler(ctx context.Context, update tbapi.Update) error {
 	} else {
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: info.UserID,
 			channelID: channelIDFromCallback(info.UserID),
-			tbAPI:     a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
+			tbAPI:     a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username,
+		}
 		if err := a.banInAllChats(ctx, banReq); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", info.UserID, err))
 		}
@@ -431,7 +430,8 @@ func (a *admin) msgHandlerFallback(ctx context.Context, update tbapi.Update, fwd
 	}
 
 	banReq := banRequest{duration: bot.PermanentBanDuration, userID: fwdID,
-		tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username}
+		tbAPI: a.tbAPI, dry: a.dry, training: a.trainingMode, userName: username,
+	}
 	if err := a.banInAllChats(ctx, banReq); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to ban user %d: %w", fwdID, err))
 	}
@@ -521,10 +521,8 @@ func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted i
 				chatID = a.firstChatID()
 			}
 			_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
-				BaseChatMessage: tbapi.BaseChatMessage{
-					MessageID:  m.MsgID,
-					ChatConfig: tbapi.ChatConfig{ChatID: chatID},
-				},
+				MessageID: m.MsgID,
+				ChatID:    chatID,
 			})
 			if err == nil {
 				deleted++

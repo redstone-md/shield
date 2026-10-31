@@ -16,7 +16,7 @@ func TestTelegramListener_PrivateChatStoresUser(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{}, nil
@@ -29,7 +29,8 @@ func TestTelegramListener_PrivateChatStoresUser(t *testing.T) {
 	botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 		t.Fatal("bot.OnMessage should not be called for private chat messages")
 		return bot.Response{}
-	}}
+	},
+	}
 
 	locatorMock := &mocks.LocatorMock{
 		AddMessageFunc: func(ctx context.Context, msg string, chatID, userID int64, userName string, msgID int) error {
@@ -152,7 +153,7 @@ func TestTelegramListener_PrivateChatViaDoLoop(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{}, nil
@@ -168,7 +169,8 @@ func TestTelegramListener_PrivateChatViaDoLoop(t *testing.T) {
 		}
 		t.Fatal("bot.OnMessage should not be called for private chat messages via Do loop")
 		return bot.Response{}
-	}}
+	},
+	}
 
 	locator, teardown := prepTestLocator(t)
 	defer teardown()
@@ -284,10 +286,10 @@ func TestTelegramListener_ApplyRuleSet_propagatesToSubHandlers(t *testing.T) {
 		dry:     false,
 	}
 	l.reportsHandler = &userReports{
-		ReportConfig: ReportConfig{Enabled: true, Threshold: 2},
-		moderation:   ModerationConfig{FirstStrike: 10 * time.Minute, SecondStrike: time.Hour},
-		softBanMode:  false,
-		dry:          false,
+		Enabled: true, Threshold: 2,
+		moderation:  ModerationConfig{FirstStrike: 10 * time.Minute, SecondStrike: time.Hour},
+		softBanMode: false,
+		dry:         false,
 	}
 
 	rs := rules.RuleSet{

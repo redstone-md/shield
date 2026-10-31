@@ -56,12 +56,10 @@ func TestUserReports_DirectUserReport_SuccessfulReportFromRegularUser(t *testing
 		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{"superuser"},
-		ReportConfig: ReportConfig{
-			Storage:    mockReports,
-			RateLimit:  10,
-			RatePeriod: 1 * time.Hour,
-			Threshold:  2,
-		},
+		Storage:     mockReports,
+		RateLimit:   10,
+		RatePeriod:  1 * time.Hour,
+		Threshold:   2,
 	}
 
 	update := tbapi.Update{
@@ -131,12 +129,10 @@ func TestUserReports_DirectUserReport_LlmConfirmedReportTriggersImmediateModerat
 		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
-		ReportConfig: ReportConfig{
-			Storage:    mockReports,
-			RateLimit:  10,
-			RatePeriod: time.Hour,
-			Threshold:  2,
-		},
+		Storage:     mockReports,
+		RateLimit:   10,
+		RatePeriod:  time.Hour,
+		Threshold:   2,
 	}
 
 	update := tbapi.Update{
@@ -169,11 +165,11 @@ func TestUserReports_DirectUserReport_ReporterIsSuperuserShouldReturnError(t *te
 	mockReports := &mocks.ReportsMock{}
 
 	rep := &userReports{
-		tbAPI:        mockAPI,
-		primChatIDs:  []int64{123},
-		adminChatID:  456,
-		superUsers:   SuperUsers{"superuser"},
-		ReportConfig: ReportConfig{Storage: mockReports},
+		tbAPI:       mockAPI,
+		primChatIDs: []int64{123},
+		adminChatID: 456,
+		superUsers:  SuperUsers{"superuser"},
+		Storage:     mockReports,
 	}
 
 	update := tbapi.Update{
@@ -203,11 +199,11 @@ func TestUserReports_DirectUserReport_ReportedUserIsSuperuserShouldReturnError(t
 	mockReports := &mocks.ReportsMock{}
 
 	rep := &userReports{
-		tbAPI:        mockAPI,
-		primChatIDs:  []int64{123},
-		adminChatID:  456,
-		superUsers:   SuperUsers{"superuser"},
-		ReportConfig: ReportConfig{Storage: mockReports},
+		tbAPI:       mockAPI,
+		primChatIDs: []int64{123},
+		adminChatID: 456,
+		superUsers:  SuperUsers{"superuser"},
+		Storage:     mockReports,
 	}
 
 	update := tbapi.Update{
@@ -237,11 +233,11 @@ func TestUserReports_DirectUserReport_ForumTopicCreationMessageShouldReturnError
 	mockReports := &mocks.ReportsMock{}
 
 	rep := &userReports{
-		tbAPI:        mockAPI,
-		primChatIDs:  []int64{123},
-		adminChatID:  456,
-		superUsers:   SuperUsers{},
-		ReportConfig: ReportConfig{Storage: mockReports},
+		tbAPI:       mockAPI,
+		primChatIDs: []int64{123},
+		adminChatID: 456,
+		superUsers:  SuperUsers{},
+		Storage:     mockReports,
 	}
 
 	update := tbapi.Update{
@@ -288,11 +284,9 @@ func TestUserReports_DirectUserReport_RateLimitExceededShouldDeleteCommandAndRet
 		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
-		ReportConfig: ReportConfig{
-			Storage:    mockReports,
-			RateLimit:  10,
-			RatePeriod: 1 * time.Hour,
-		},
+		Storage:     mockReports,
+		RateLimit:   10,
+		RatePeriod:  1 * time.Hour,
 	}
 
 	update := tbapi.Update{
@@ -342,11 +336,9 @@ func TestUserReports_DirectUserReport_ReportsStorageAddError(t *testing.T) {
 		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
-		ReportConfig: ReportConfig{
-			Storage:    mockReports,
-			RateLimit:  10,
-			RatePeriod: 1 * time.Hour,
-		},
+		Storage:     mockReports,
+		RateLimit:   10,
+		RatePeriod:  1 * time.Hour,
 	}
 
 	update := tbapi.Update{
@@ -400,12 +392,10 @@ func TestUserReports_DirectUserReport_EmptyMessageTextShouldUseTransformedMessag
 		primChatIDs: []int64{123},
 		adminChatID: 456,
 		superUsers:  SuperUsers{},
-		ReportConfig: ReportConfig{
-			Storage:    mockReports,
-			RateLimit:  10,
-			RatePeriod: 1 * time.Hour,
-			Threshold:  2,
-		},
+		Storage:     mockReports,
+		RateLimit:   10,
+		RatePeriod:  1 * time.Hour,
+		Threshold:   2,
 	}
 
 	update := tbapi.Update{

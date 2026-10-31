@@ -1,6 +1,6 @@
 module github.com/redstone-md/shield/_examples/simplechat
 
-go 1.26.0
+go 1.27.0
 
 require (
 	github.com/redstone-md/shield v0.0.0

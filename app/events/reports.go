@@ -102,17 +102,17 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 	}
 	if rateLimited {
 		log.Printf("[INFO] reporter %d (%s) exceeded rate limit", update.Message.From.ID, update.Message.From.UserName)
-		_, _ = r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID:  update.Message.MessageID,
-			ChatConfig: tbapi.ChatConfig{ChatID: r.chatIDOrFallback(origMsg.Chat.ID)},
-		}})
+		_, _ = r.tbAPI.Request(tbapi.DeleteMessageConfig{
+			MessageID: update.Message.MessageID,
+			ChatID:    r.chatIDOrFallback(origMsg.Chat.ID),
+		})
 		return fmt.Errorf("rate limit exceeded for reporter %d", update.Message.From.ID)
 	}
 
-	_, err = r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID:  update.Message.MessageID,
-		ChatConfig: tbapi.ChatConfig{ChatID: r.chatIDOrFallback(origMsg.Chat.ID)},
-	}})
+	_, err = r.tbAPI.Request(tbapi.DeleteMessageConfig{
+		MessageID: update.Message.MessageID,
+		ChatID:    r.chatIDOrFallback(origMsg.Chat.ID),
+	})
 	if err != nil {
 		log.Printf("[WARN] failed to delete report message %d: %v", update.Message.MessageID, err)
 	} else {
@@ -227,10 +227,10 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 			log.Printf("[WARN] failed to delete LLM-confirmed reported message %d: %v", origMsg.MessageID, err)
 		}
 	} else if !r.dry {
-		_, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID:  origMsg.MessageID,
-			ChatConfig: tbapi.ChatConfig{ChatID: r.chatIDOrFallback(origMsg.Chat.ID)},
-		}})
+		_, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{
+			MessageID: origMsg.MessageID,
+			ChatID:    r.chatIDOrFallback(origMsg.Chat.ID),
+		})
 		if err != nil {
 			log.Printf("[WARN] failed to delete LLM-confirmed reported message %d: %v", origMsg.MessageID, err)
 		}
@@ -443,10 +443,10 @@ func (r *userReports) executeAutoBan(ctx context.Context, reports []storage.Repo
 			log.Printf("[INFO] reported message %d auto-deleted", msgID)
 		}
 	} else if !r.dry {
-		_, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID:  msgID,
-			ChatConfig: tbapi.ChatConfig{ChatID: chatID},
-		}})
+		_, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{
+			MessageID: msgID,
+			ChatID:    chatID,
+		})
 		if err != nil {
 			log.Printf("[WARN] failed to delete reported message %d: %v", msgID, err)
 		} else {

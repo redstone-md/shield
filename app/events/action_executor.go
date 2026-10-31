@@ -61,10 +61,10 @@ func (e telegramActionExecutor) DeleteMessage(ctx context.Context, chatID int64,
 		return nil
 	}
 
-	_, err := e.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-		MessageID:  msgID,
-		ChatConfig: tbapi.ChatConfig{ChatID: chatID},
-	}})
+	_, err := e.tbAPI.Request(tbapi.DeleteMessageConfig{
+		MessageID: msgID,
+		ChatID:    chatID,
+	})
 	if err != nil {
 		observability.Logf(ctx, "[WARN] failed to delete message %d: %v", msgID, err)
 		e.recordAction(ctx, commandDeleteMessage, chatID, 0, msgID, attempt, err)
@@ -334,7 +334,7 @@ func banUserOrChannel(ctx context.Context, r banRequest) error {
 
 	if r.channelID != 0 {
 		resp, err := r.tbAPI.Request(tbapi.BanChatSenderChatConfig{
-			ChatConfig:   tbapi.ChatConfig{ChatID: r.chatID},
+			ChatID:       r.chatID,
 			SenderChatID: r.channelID,
 			UntilDate:    int(time.Now().Add(r.duration).Unix()),
 		})
@@ -350,10 +350,8 @@ func banUserOrChannel(ctx context.Context, r banRequest) error {
 
 	if r.restrict {
 		resp, err := r.tbAPI.Request(tbapi.RestrictChatMemberConfig{
-			ChatMemberConfig: tbapi.ChatMemberConfig{
-				ChatConfig: tbapi.ChatConfig{ChatID: r.chatID},
-				UserID:     r.userID,
-			},
+			ChatID:    r.chatID,
+			UserID:    r.userID,
 			UntilDate: time.Now().Add(r.duration).Unix(),
 			Permissions: &tbapi.ChatPermissions{
 				CanSendMessages:      false,
@@ -380,10 +378,8 @@ func banUserOrChannel(ctx context.Context, r banRequest) error {
 	}
 
 	resp, err := r.tbAPI.Request(tbapi.BanChatMemberConfig{
-		ChatMemberConfig: tbapi.ChatMemberConfig{
-			ChatConfig: tbapi.ChatConfig{ChatID: r.chatID},
-			UserID:     r.userID,
-		},
+		ChatID:    r.chatID,
+		UserID:    r.userID,
 		UntilDate: time.Now().Add(r.duration).Unix(),
 	})
 	if err != nil {
@@ -410,10 +406,8 @@ func verifyBanApplied(ctx context.Context, api TbAPI, chatID, userID int64) {
 		}
 	}()
 	member, mErr := api.GetChatMember(tbapi.GetChatMemberConfig{
-		ChatConfigWithUser: tbapi.ChatConfigWithUser{
-			ChatConfig: tbapi.ChatConfig{ChatID: chatID},
-			UserID:     userID,
-		},
+		ChatID: chatID,
+		UserID: userID,
 	})
 	if mErr != nil {
 		observability.Logf(ctx, "[WARN] post-ban GetChatMember failed for user %d in chat %d: %v", userID, chatID, mErr)

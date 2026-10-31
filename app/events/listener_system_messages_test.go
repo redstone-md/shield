@@ -110,7 +110,7 @@ func TestProcLeftChatMemberMessage(t *testing.T) {
 
 			mockAPI := &mocks.TbAPIMock{
 				GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-					return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+					return tbapi.ChatFullInfo{ID: 123}, nil
 				},
 				SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 					return tbapi.Message{Text: c.(tbapi.MessageConfig).Text, From: &tbapi.User{UserName: "user"}}, nil
@@ -172,7 +172,7 @@ func TestTelegramListener_ForwardedGiveaway(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{Text: c.(tbapi.MessageConfig).Text, From: &tbapi.User{UserName: "user"}}, nil
@@ -242,7 +242,7 @@ func TestTelegramListener_ForwardedGiveaway(t *testing.T) {
 func TestTelegramListener_DeleteJoinMessages(t *testing.T) {
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
 			return nil, nil
@@ -301,7 +301,7 @@ func TestTelegramListener_DeleteJoinMessages(t *testing.T) {
 func TestTelegramListener_DeleteLeaveMessages(t *testing.T) {
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
 			return nil, nil
@@ -394,7 +394,7 @@ func TestTelegramListener_DeleteSystemMessage(t *testing.T) {
 func TestTelegramListener_NoDeleteWhenFlagsDisabled(t *testing.T) {
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		GetChatAdministratorsFunc: func(config tbapi.ChatAdministratorsConfig) ([]tbapi.ChatMember, error) {
 			return nil, nil

@@ -35,8 +35,7 @@ func collectOptionEnvKeys(t reflect.Type, prefix string, keys map[string]struct{
 		return
 	}
 
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
+	for field := range t.Fields() {
 		if envName := field.Tag.Get("env"); envName != "" {
 			keys[joinEnvKey(prefix, envName)] = struct{}{}
 		}

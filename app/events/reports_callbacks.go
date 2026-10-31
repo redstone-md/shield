@@ -51,10 +51,10 @@ func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.Callba
 			log.Printf("[INFO] reported message %d deleted", msgID)
 		}
 	} else if !r.dry {
-		_, err = r.tbAPI.Request(tbapi.DeleteMessageConfig{BaseChatMessage: tbapi.BaseChatMessage{
-			MessageID:  msgID,
-			ChatConfig: tbapi.ChatConfig{ChatID: chatID},
-		}})
+		_, err = r.tbAPI.Request(tbapi.DeleteMessageConfig{
+			MessageID: msgID,
+			ChatID:    chatID,
+		})
 		if err != nil {
 			log.Printf("[WARN] failed to delete reported message %d: %v", msgID, err)
 		} else {

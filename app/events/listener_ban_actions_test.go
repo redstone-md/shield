@@ -16,7 +16,7 @@ func TestTelegramListener_DoWithBotBan(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{Text: c.(tbapi.MessageConfig).Text, From: &tbapi.User{UserName: "user"}}, nil
@@ -33,7 +33,9 @@ func TestTelegramListener_DoWithBotBan(t *testing.T) {
 		if msg.Text == "text 123" && msg.From.Username == "user" {
 			return bot.Response{Send: true, Text: "bot's answer", BanInterval: 2 * time.Minute,
 				User: bot.User{Username: "user", ID: 1}, CheckResults: []spamcheck.Response{
-					{Name: "Check1", Spam: true, Details: "Details 1"}}}
+					{Name: "Check1", Spam: true, Details: "Details 1"},
+				},
+			}
 		}
 		if msg.From.Username == "ChannelBot" {
 			return bot.Response{Send: true, Text: "bot's answer for channel", BanInterval: 2 * time.Minute, User: bot.User{Username: "user", ID: 1}, ChannelID: msg.SenderChat.ID}
@@ -42,7 +44,8 @@ func TestTelegramListener_DoWithBotBan(t *testing.T) {
 			return bot.Response{Send: true, Text: "bot's answer for admin", BanInterval: 2 * time.Minute, User: bot.User{Username: "user", ID: 1}, ChannelID: msg.ReplyTo.SenderChat.ID}
 		}
 		return bot.Response{}
-	}}
+	},
+	}
 
 	locator, teardown := prepTestLocator(t)
 	defer teardown()
@@ -221,7 +224,9 @@ func TestTelegramListener_DoWithBotBan(t *testing.T) {
 			if msg.Text == "edited spam message" && msg.From.Username == "edited_user" {
 				return bot.Response{Send: true, Text: "edited message is spam", BanInterval: 1 * time.Minute,
 					User: bot.User{Username: "edited_user", ID: 456}, CheckResults: []spamcheck.Response{
-						{Name: "EditedCheck", Spam: true, Details: "Edited message detected as spam"}}}
+						{Name: "EditedCheck", Spam: true, Details: "Edited message detected as spam"},
+					},
+				}
 			}
 			return bot.Response{}
 		}
@@ -244,7 +249,7 @@ func TestTelegramListener_DoWithBotSoftBan(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{Text: c.(tbapi.MessageConfig).Text, From: &tbapi.User{UserName: "user"}}, nil
@@ -261,7 +266,9 @@ func TestTelegramListener_DoWithBotSoftBan(t *testing.T) {
 		if msg.Text == "text 123" && msg.From.Username == "user" {
 			return bot.Response{Send: true, Text: "bot's answer", BanInterval: 2 * time.Minute,
 				User: bot.User{Username: "user", ID: 1}, CheckResults: []spamcheck.Response{
-					{Name: "Check1", Spam: true, Details: "Details 1"}}}
+					{Name: "Check1", Spam: true, Details: "Details 1"},
+				},
+			}
 		}
 		if msg.From.Username == "ChannelBot" {
 			return bot.Response{Send: true, Text: "bot's answer for channel", BanInterval: 2 * time.Minute, User: bot.User{Username: "user", ID: 1}, ChannelID: msg.SenderChat.ID}
@@ -270,7 +277,8 @@ func TestTelegramListener_DoWithBotSoftBan(t *testing.T) {
 			return bot.Response{Send: true, Text: "bot's answer for admin", BanInterval: 2 * time.Minute, User: bot.User{Username: "user", ID: 1}, ChannelID: msg.ReplyTo.SenderChat.ID}
 		}
 		return bot.Response{}
-	}}
+	},
+	}
 
 	locator, teardown := prepTestLocator(t)
 	defer teardown()
@@ -324,7 +332,7 @@ func TestTelegramListener_DoWithTraining(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{Text: c.(tbapi.MessageConfig).Text, From: &tbapi.User{UserName: "ChannelBot"}}, nil
@@ -339,8 +347,10 @@ func TestTelegramListener_DoWithTraining(t *testing.T) {
 	botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 		t.Logf("on-message: %+v", msg)
 		return bot.Response{DeleteReplyTo: true, ReplyTo: msg.ID, ChannelID: msg.ChatID, BanInterval: time.Hour,
-			Send: true, Text: "bot's answer", User: bot.User{Username: "user", ID: 1, DisplayName: "First Last"}}
-	}}
+			Send: true, Text: "bot's answer", User: bot.User{Username: "user", ID: 1, DisplayName: "First Last"},
+		}
+	},
+	}
 
 	locator, teardown := prepTestLocator(t)
 	defer teardown()
@@ -393,7 +403,7 @@ func TestTelegramListener_DoDeleteMessages(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{Text: c.(tbapi.MessageConfig).Text, From: &tbapi.User{UserName: "ChannelBot"}}, nil
@@ -409,10 +419,12 @@ func TestTelegramListener_DoDeleteMessages(t *testing.T) {
 		t.Logf("on-message: %+v", msg)
 		if msg.Text == "text 123" && msg.From.Username == "user" {
 			return bot.Response{DeleteReplyTo: true, ReplyTo: msg.ID, ChannelID: msg.ChatID, BanInterval: time.Hour,
-				Send: true, Text: "bot's answer", User: bot.User{Username: "user", ID: 1, DisplayName: "First Last"}}
+				Send: true, Text: "bot's answer", User: bot.User{Username: "user", ID: 1, DisplayName: "First Last"},
+			}
 		}
 		return bot.Response{}
-	}}
+	},
+	}
 
 	locator, teardown := prepTestLocator(t)
 	defer teardown()

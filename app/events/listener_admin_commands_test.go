@@ -17,7 +17,7 @@ func TestTelegramListener_DoWithDirectWarnReportUsesActionExecutor(t *testing.T)
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{Text: c.(tbapi.MessageConfig).Text, From: &tbapi.User{UserName: "user"}}, nil
@@ -88,7 +88,7 @@ func TestTelegramListener_DoWithDirectDeleteReply(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 			return &tbapi.APIResponse{Ok: true}, nil
@@ -118,7 +118,8 @@ func TestTelegramListener_DoWithDirectDeleteReply(t *testing.T) {
 			From:      &tbapi.User{ID: 777, UserName: "bot"},
 			Text:      "bot message",
 		},
-	}}
+	},
+	}
 	updChan := make(chan tbapi.Update, 1)
 	updChan <- updMsg
 	close(updChan)
@@ -139,7 +140,7 @@ func TestTelegramListener_DirectDeleteReplyRequiresSuperUser(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 			return &tbapi.APIResponse{Ok: true}, nil
@@ -173,7 +174,8 @@ func TestTelegramListener_DirectDeleteReplyRequiresSuperUser(t *testing.T) {
 			From:      &tbapi.User{ID: 777, UserName: "bot"},
 			Text:      "bot message",
 		},
-	}}
+	},
+	}
 	updChan := make(chan tbapi.Update, 1)
 	updChan <- updMsg
 	close(updChan)
@@ -190,7 +192,7 @@ func TestTelegramListener_DoWithDirectDeleteByID(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 			return &tbapi.APIResponse{Ok: true}, nil
@@ -214,7 +216,8 @@ func TestTelegramListener_DoWithDirectDeleteByID(t *testing.T) {
 		Chat:      tbapi.Chat{ID: 456},
 		Text:      "/del 202",
 		From:      &tbapi.User{UserName: "superuser1", ID: 77},
-	}}
+	},
+	}
 	updChan := make(chan tbapi.Update, 1)
 	updChan <- updMsg
 	close(updChan)
@@ -235,7 +238,7 @@ func TestTelegramListener_DoWithDirectBanTarget(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		GetChatMemberFunc: func(config tbapi.GetChatMemberConfig) (tbapi.ChatMember, error) {
 			return tbapi.ChatMember{}, fmt.Errorf("Bad Request: user not found")
@@ -270,7 +273,8 @@ func TestTelegramListener_DoWithDirectBanTarget(t *testing.T) {
 		Chat:      tbapi.Chat{ID: 456},
 		Text:      "/ban 222",
 		From:      &tbapi.User{UserName: "superuser1", ID: 77},
-	}}
+	},
+	}
 	updChan := make(chan tbapi.Update, 1)
 	updChan <- updMsg
 	close(updChan)
@@ -294,7 +298,7 @@ func TestTelegramListener_DirectBanTargetRequiresSuperUser(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 			return &tbapi.APIResponse{Ok: true}, nil
@@ -319,7 +323,8 @@ func TestTelegramListener_DirectBanTargetRequiresSuperUser(t *testing.T) {
 		Chat:      tbapi.Chat{ID: 456},
 		Text:      "/ban 222",
 		From:      &tbapi.User{UserName: "regular", ID: 77},
-	}}
+	},
+	}
 	updChan := make(chan tbapi.Update, 1)
 	updChan <- updMsg
 	close(updChan)
@@ -337,7 +342,7 @@ func TestTelegramListener_DoWithAdminUnBan(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			if mc, ok := c.(tbapi.MessageConfig); ok {
@@ -410,7 +415,7 @@ func TestTelegramListener_DoWithAdminSoftUnBan(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			if mc, ok := c.(tbapi.MessageConfig); ok {
@@ -486,7 +491,7 @@ func TestTelegramListener_DoWithAdminSoftUnBanEmptyText(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			if mc, ok := c.(tbapi.MessageConfig); ok {
@@ -561,7 +566,7 @@ func TestTelegramListener_DoWithAdminUnBan_Training(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			if mc, ok := c.(tbapi.MessageConfig); ok {
@@ -633,7 +638,7 @@ func TestTelegramListener_DoWithAdminUnBanConfirmation(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+			return tbapi.ChatFullInfo{ID: 123}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			if mc, ok := c.(tbapi.MessageConfig); ok {

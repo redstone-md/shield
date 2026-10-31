@@ -16,7 +16,7 @@ func TestTelegramListener_AnonymousAdminPostSkipsSpamCheck(t *testing.T) {
 	mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 	mockAPI := &mocks.TbAPIMock{
 		GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-			return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: -1001688024850}}, nil
+			return tbapi.ChatFullInfo{ID: -1001688024850}, nil
 		},
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			return tbapi.Message{Text: c.(tbapi.MessageConfig).Text, From: &tbapi.User{UserName: "user"}}, nil
@@ -30,7 +30,8 @@ func TestTelegramListener_AnonymousAdminPostSkipsSpamCheck(t *testing.T) {
 		botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 			t.Fatalf("bot.OnMessage should not be called for anonymous admin post from group itself")
 			return bot.Response{}
-		}}
+		},
+		}
 
 		locator, teardown := prepTestLocator(t)
 		defer teardown()
@@ -83,7 +84,8 @@ func TestTelegramListener_AnonymousAdminPostSkipsSpamCheck(t *testing.T) {
 				ReplyTo:       msg.ID,
 				DeleteReplyTo: true,
 			}
-		}}
+		},
+		}
 
 		mockAPI.RequestFunc = func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 			return &tbapi.APIResponse{Ok: true}, nil
@@ -148,7 +150,8 @@ func TestTelegramListener_AnonymousAdminPostSkipsSpamCheck(t *testing.T) {
 				DeleteReplyTo: true,
 				CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
 			}
-		}}
+		},
+		}
 
 		mockAPI.RequestFunc = func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 			return &tbapi.APIResponse{Ok: true}, nil
@@ -205,7 +208,8 @@ func TestTelegramListener_AnonymousAdminPostSkipsSpamCheck(t *testing.T) {
 				ReplyTo:       msg.ID,
 				DeleteReplyTo: true,
 			}
-		}}
+		},
+		}
 
 		mockAPI.RequestFunc = func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 			return &tbapi.APIResponse{Ok: true}, nil
@@ -252,7 +256,8 @@ func TestTelegramListener_AnonymousAdminPostSkipsSpamCheck(t *testing.T) {
 		botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 			t.Fatalf("bot.OnMessage should not be called for anonymous admin post from testing chat")
 			return bot.Response{}
-		}}
+		},
+		}
 
 		locator, teardown := prepTestLocator(t)
 		defer teardown()

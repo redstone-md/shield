@@ -21,7 +21,7 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 		deleteCalled := false
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+				return tbapi.ChatFullInfo{ID: 123}, nil
 			},
 			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 				if deleteMsg, ok := c.(tbapi.DeleteMessageConfig); ok {
@@ -37,7 +37,8 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 		}
 		botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 			return bot.Response{}
-		}}
+		},
+		}
 
 		locator, teardown := prepTestLocator(t)
 		defer teardown()
@@ -80,7 +81,7 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 		deleteCalled := false
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+				return tbapi.ChatFullInfo{ID: 123}, nil
 			},
 			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 				if _, ok := c.(tbapi.DeleteMessageConfig); ok {
@@ -94,7 +95,8 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 		}
 		botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 			return bot.Response{}
-		}}
+		},
+		}
 
 		locator, teardown := prepTestLocator(t)
 		defer teardown()
@@ -136,7 +138,7 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 		deleteCalled := false
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+				return tbapi.ChatFullInfo{ID: 123}, nil
 			},
 			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 				if _, ok := c.(tbapi.DeleteMessageConfig); ok {
@@ -150,7 +152,8 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 		}
 		botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 			return bot.Response{}
-		}}
+		},
+		}
 
 		locator, teardown := prepTestLocator(t)
 		defer teardown()
@@ -203,7 +206,7 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 				deleteCalled := false
 				mockAPI := &mocks.TbAPIMock{
 					GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-						return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+						return tbapi.ChatFullInfo{ID: 123}, nil
 					},
 					RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 						if _, ok := c.(tbapi.DeleteMessageConfig); ok {
@@ -217,7 +220,8 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 				}
 				botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 					return bot.Response{}
-				}}
+				},
+				}
 
 				locator, teardown := prepTestLocator(t)
 				defer teardown()
@@ -262,7 +266,7 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 		deleteCalled := false
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+				return tbapi.ChatFullInfo{ID: 123}, nil
 			},
 			RequestFunc: func(c tbapi.Chattable) (*tbapi.APIResponse, error) {
 				if _, ok := c.(tbapi.DeleteMessageConfig); ok {
@@ -276,7 +280,8 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 		}
 		botMock := &mocks.BotMock{OnMessageFunc: func(msg bot.Message, checkOnly bool) bot.Response {
 			return bot.Response{}
-		}}
+		},
+		}
 
 		locator, teardown := prepTestLocator(t)
 		defer teardown()
@@ -317,7 +322,7 @@ func TestTelegramListener_OrphanedReportDeletion(t *testing.T) {
 		mockLogger := &mocks.SpamLoggerMock{SaveFunc: func(msg *bot.Message, response *bot.Response) {}}
 		mockAPI := &mocks.TbAPIMock{
 			GetChatFunc: func(config tbapi.ChatInfoConfig) (tbapi.ChatFullInfo, error) {
-				return tbapi.ChatFullInfo{Chat: tbapi.Chat{ID: 123}}, nil
+				return tbapi.ChatFullInfo{ID: 123}, nil
 			},
 			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 				return tbapi.Message{Text: c.(tbapi.MessageConfig).Text, From: &tbapi.User{UserName: "bot"}}, nil
@@ -498,7 +503,8 @@ func TestTelegramListener_handleChatReplyUsesSlowPathEngine(t *testing.T) {
 		assert.Equal(t, "alice", req.History[0].UserName)
 		assert.Equal(t, "previous", req.History[0].Text)
 		return &slowpath.ChatResult{Text: "answer"}, nil
-	}}
+	},
+	}
 	mockAPI := &mocks.TbAPIMock{
 		SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 			sent = append(sent, c)
@@ -533,7 +539,8 @@ func TestTelegramListener_handleChatReplyUsesSlowPathEngine(t *testing.T) {
 			Text:      "previous",
 			From:      &tbapi.User{UserName: "alice"},
 		},
-	}})
+	},
+	})
 
 	require.Len(t, sent, 1)
 	require.Len(t, chatEngine.calls, 1)
@@ -545,11 +552,13 @@ func TestTelegramListener_handleChatReplyStripsThoughtTags(t *testing.T) {
 	var sent []tbapi.Chattable
 	chatEngine := &slowPathChatEngineStub{replyFunc: func(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error) {
 		return &slowpath.ChatResult{Text: "<thought>private\nreasoning</thought> visible answer"}, nil
-	}}
+	},
+	}
 	mockAPI := &mocks.TbAPIMock{SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) {
 		sent = append(sent, c)
 		return tbapi.Message{MessageID: 99}, nil
-	}}
+	},
+	}
 	l := TelegramListener{TbAPI: mockAPI, SlowPathChatEngine: chatEngine, TenantID: "tg-spam", SuperUsers: SuperUsers{"super"}}
 
 	l.handleChatReply(context.Background(), tbapi.Update{Message: &tbapi.Message{
@@ -558,7 +567,8 @@ func TestTelegramListener_handleChatReplyStripsThoughtTags(t *testing.T) {
 		Text:      "hello bot",
 		From:      &tbapi.User{UserName: "alice", ID: 1},
 		Date:      int(time.Now().Unix()),
-	}})
+	},
+	})
 
 	require.Len(t, sent, 1)
 	assert.Equal(t, "visible answer", sent[0].(tbapi.MessageConfig).Text)
@@ -587,7 +597,8 @@ func TestTelegramListener_handleChatReplyRateLimits(t *testing.T) {
 		Group: "gr",
 		SlowPathChatEngine: &slowPathChatEngineStub{replyFunc: func(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error) {
 			return &slowpath.ChatResult{Text: "answer"}, nil
-		}},
+		},
+		},
 		TenantID:   "tg-spam",
 		SuperUsers: SuperUsers{"super"},
 		chatLimiter: &chatRateLimiter{entries: map[int64][]time.Time{42: {
@@ -596,7 +607,9 @@ func TestTelegramListener_handleChatReplyRateLimits(t *testing.T) {
 			time.Now().UTC().Add(-30 * time.Second),
 			time.Now().UTC().Add(-40 * time.Second),
 			time.Now().UTC().Add(-50 * time.Second),
-		}}},
+		},
+		},
+		},
 	}
 
 	l.handleChatReply(context.Background(), tbapi.Update{Message: &tbapi.Message{
@@ -605,7 +618,8 @@ func TestTelegramListener_handleChatReplyRateLimits(t *testing.T) {
 		Text:      "hello bot",
 		From:      &tbapi.User{UserName: "alice", ID: 42},
 		Date:      int(time.Now().Unix()),
-	}})
+	},
+	})
 
 	assert.Equal(t, []string{chatLimitWarningText}, sent)
 	assert.Equal(t, 1, deleted)
@@ -629,14 +643,17 @@ func TestTelegramListener_handleChatReplySuperuserBypassesLimit(t *testing.T) {
 		SlowPathChatEngine: &slowPathChatEngineStub{replyFunc: func(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error) {
 			calls++
 			return &slowpath.ChatResult{Text: fmt.Sprintf("reply-%d", calls)}, nil
-		}},
+		},
+		},
 		chatLimiter: &chatRateLimiter{entries: map[int64][]time.Time{42: {
 			time.Now().UTC().Add(-10 * time.Second),
 			time.Now().UTC().Add(-20 * time.Second),
 			time.Now().UTC().Add(-30 * time.Second),
 			time.Now().UTC().Add(-40 * time.Second),
 			time.Now().UTC().Add(-50 * time.Second),
-		}}},
+		},
+		},
+		},
 	}
 
 	l.handleChatReply(context.Background(), tbapi.Update{Message: &tbapi.Message{
@@ -645,7 +662,8 @@ func TestTelegramListener_handleChatReplySuperuserBypassesLimit(t *testing.T) {
 		Text:      "hello bot",
 		From:      &tbapi.User{UserName: "super", ID: 42},
 		Date:      int(time.Now().Unix()),
-	}})
+	},
+	})
 
 	assert.Equal(t, 1, calls)
 }
@@ -659,7 +677,8 @@ func TestReplyChatWithRetryRetriesTransientErrors(t *testing.T) {
 			return nil, fmt.Errorf("openai chat reply: %w", &openai.APIError{HTTPStatusCode: 502, HTTPStatus: "502 Bad Gateway"})
 		}
 		return &slowpath.ChatResult{Text: "answer"}, nil
-	}}
+	},
+	}
 
 	result, err := replyChatWithRetry(context.Background(), chatEngine, slowpath.ChatRequest{Message: "hello"}, func(d time.Duration) {
 		sleeps = append(sleeps, d)
@@ -678,7 +697,8 @@ func TestReplyChatWithRetryDoesNotRetryPermanentErrors(t *testing.T) {
 	chatEngine := &slowPathChatEngineStub{replyFunc: func(ctx context.Context, req slowpath.ChatRequest) (*slowpath.ChatResult, error) {
 		attempts++
 		return nil, fmt.Errorf("openai chat reply: %w", &openai.APIError{HTTPStatusCode: 400, HTTPStatus: "400 Bad Request", Message: wantErr.Error()})
-	}}
+	},
+	}
 
 	result, err := replyChatWithRetry(context.Background(), chatEngine, slowpath.ChatRequest{Message: "hello"}, func(d time.Duration) {
 		t.Fatal("sleep should not be called for permanent errors")
