@@ -592,6 +592,14 @@ func applyLiveReload(a *runtimeAssembly, opts options, rs rules.RuleSet) {
 	log.Printf("[INFO] live reload applied: version=%d", rs.Version)
 }
 
+// startRetention runs the cleanup in the background. Call it after every store has created its tables: a cleanup holds
+// the SQLite write lock, and creating a schema at the same time fails with SQLITE_BUSY and stops the process.
+func (a *runtimeAssembly) startRetention(ctx context.Context) {
+	if a.RetentionSvc != nil {
+		go a.RetentionSvc.Run(ctx)
+	}
+}
+
 func (a *runtimeAssembly) wireLiveReload(opts options) {
 	a.RuleSetService.OnChange(func(rs rules.RuleSet) {
 		applyLiveReload(a, opts, rs)

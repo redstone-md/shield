@@ -326,16 +326,13 @@ func execute(ctx context.Context, opts options) error {
 		return nil
 	}
 
-	if assembly.RetentionSvc != nil {
-		go assembly.RetentionSvc.Run(ctx)
-	}
-
 	// activate web server if enabled, server-only mode (no telegram token)
 	if opts.Server.Enabled && (opts.Telegram.Token == "" || !hasGroup) {
 		// server starts in background goroutine without DM users provider
 		if srvErr := activateWebRuntime(ctx, opts, assembly.Web, nil); srvErr != nil {
 			return fmt.Errorf("can't activate web server, %w", srvErr)
 		}
+		assembly.startRetention(ctx)
 		runtimeProbe.SetReady(true)
 		log.Printf("[WARN] no telegram token and group set, web server only mode")
 		<-ctx.Done()
@@ -359,6 +356,7 @@ func execute(ctx context.Context, opts options) error {
 			return fmt.Errorf("can't activate web server, %w", srvErr)
 		}
 	}
+	assembly.startRetention(ctx)
 	runtimeProbe.SetReady(true)
 
 	// run telegram listener and event processor loop
