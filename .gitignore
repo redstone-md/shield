@@ -26,9 +26,7 @@ go.work
 data/spam-dynamic.txt
 data/ham-dynamic.txt
 data/approved-users.txt
-tg-spam.db
-tg-spam.db-shm
-tg-spam.db-wal
+tg-spam.db*
 logs/
 site/public/
 _examples/simplechat/messages.db
