@@ -103,20 +103,34 @@ func checkVolumeMount(opts options) (ok bool) {
 	return false
 }
 
+// resolveServerPassword returns the plain password for the web server. A hash takes over completely, because the routes
+// check the plain password on top of the hash and no credentials could pass both. "auto" generates a password and logs it.
+func resolveServerPassword(authPasswd, authHash string) (string, error) {
+	if authHash != "" {
+		return "", nil
+	}
+	if authPasswd != "auto" {
+		return authPasswd, nil
+	}
+
+	passwd, err := webapi.GenerateRandomPassword(20)
+	if err != nil {
+		return "", fmt.Errorf("can't generate random password, %w", err)
+	}
+	hash, err := rest.GenerateBcryptHash(passwd)
+	if err != nil {
+		return "", fmt.Errorf("can't generate bcrypt hash for password, %w", err)
+	}
+	log.Printf("[WARN] generated basic auth password for user tg-spam: %q, bcrypt hash: %s", passwd, hash)
+	return passwd, nil
+}
+
 func activateServer(
 	ctx context.Context, opts options, web webRuntimeAssembly, dmUsersProvider webapi.DMUsersProvider,
 ) (err error) {
-	authPassswd := opts.Server.AuthPasswd
-	if opts.Server.AuthPasswd == "auto" {
-		authPassswd, err = webapi.GenerateRandomPassword(20)
-		if err != nil {
-			return fmt.Errorf("can't generate random password, %w", err)
-		}
-		authHash, err := rest.GenerateBcryptHash(authPassswd)
-		if err != nil {
-			return fmt.Errorf("can't generate bcrypt hash for password, %w", err)
-		}
-		log.Printf("[WARN] generated basic auth password for user tg-spam: %q, bcrypt hash: %s", authPassswd, authHash)
+	authPassswd, err := resolveServerPassword(opts.Server.AuthPasswd, opts.Server.AuthHash)
+	if err != nil {
+		return err
 	}
 
 	// make store and load approved users

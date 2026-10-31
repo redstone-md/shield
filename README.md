@@ -296,7 +296,7 @@ appeal resolved on the website unbans and notifies the user identically.
 
 Enable with `--server.enabled`. Listen address: `--server.listen` (default `:8080`).
 
-Protected by basic auth (user `tg-spam`). Default password is auto-generated and printed on startup. Set custom password with `--server.auth` or a bcrypt hash with `--server.auth-hash`.
+Protected by basic auth (user `tg-spam`). Default password is auto-generated and printed on startup. Set custom password with `--server.auth` or a bcrypt hash with `--server.auth-hash`. A hash replaces the password, and then nothing is generated or printed.
 
 ### API endpoints
 
