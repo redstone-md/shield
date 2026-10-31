@@ -146,7 +146,7 @@ func activateServer(
 		SuperUsers:              opts.SuperUsers,
 		StorageTimeout:          opts.StorageTimeout,
 		NoSpamReply:             opts.NoSpamReply,
-		CasEnabled:              opts.CAS.API != "",
+		CasEnabled:              casConfigured(opts),
 		MetaEnabled: opts.Meta.ImageOnly || opts.Meta.LinksLimit >= 0 || opts.Meta.MentionsLimit >= 0 ||
 			opts.Meta.LinksOnly || opts.Meta.VideosOnly || opts.Meta.AudiosOnly || opts.Meta.ContactOnly ||
 			opts.Meta.Forward || opts.Meta.Keyboard || opts.Meta.UsernameSymbols != "" || opts.Meta.Giveaway,
@@ -327,9 +327,15 @@ func applyLLMCheckers(detector *tgspam.Detector, opts options, ruleSet rules.Rul
 	}
 }
 
+// casConfigured reports whether the CAS check can run: the API rejects every lookup without a key, and without one no
+// user ID is sent to the third party.
+func casConfigured(opts options) bool {
+	return opts.CAS.API != "" && opts.CAS.Token != ""
+}
+
 func buildDetectorConfig(opts options, ruleSet rules.RuleSet) tgspam.Config {
 	casAPI := ""
-	if ruleSet.Detection.CasEnabled {
+	if ruleSet.Detection.CasEnabled && casConfigured(opts) {
 		casAPI = opts.CAS.API
 	}
 	cfg := tgspam.Config{
