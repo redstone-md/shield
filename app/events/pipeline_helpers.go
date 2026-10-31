@@ -233,15 +233,10 @@ func applyMediaSlowPath(ctx context.Context, cfg mediaSlowPathConfig, event mode
 }
 
 func logMediaSlowPathPayload(ctx context.Context, mime string, data []byte) {
-	headLen := min(len(data), 64)
-	encoded := base64.StdEncoding.EncodeToString(data)
 	prefix := "data:" + mime + ";base64,"
-	previewLen := min(len(encoded), 128)
 	sum := sha256.Sum256(data)
-	observability.Logf(ctx,
-		"[DEBUG] slowpath image payload: mime=%s image_bytes=%d image_sha256=%x image_head_hex=%x data_url_len=%d data_url_prefix=%q",
-		mime, len(data), sum, data[:headLen], len(prefix)+len(encoded), prefix+encoded[:previewLen],
-	)
+	observability.Logf(ctx, "[DEBUG] slowpath image payload: mime=%s image_bytes=%d image_sha256=%x data_url_len=%d",
+		mime, len(data), sum, len(prefix)+base64.StdEncoding.EncodedLen(len(data)))
 }
 
 func slowPathCheckResponses(result *slowpath.SlowPathResult) []spamcheck.Response {

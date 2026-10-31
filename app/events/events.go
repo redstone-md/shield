@@ -457,10 +457,10 @@ func transform(msg *tbapi.Message) *bot.Message {
 	// handle caption - either as main text if no text present, or append to existing text
 	if msg.Caption != "" {
 		if message.Text == "" {
-			log.Printf("[DEBUG] caption only message: %q", msg.Caption)
+			log.Printf("[DEBUG] caption only message, chars:%d", len(msg.Caption))
 			message.Text = msg.Caption
 		} else {
-			log.Printf("[DEBUG] caption appended to message: %q", msg.Caption)
+			log.Printf("[DEBUG] caption appended to message, chars:%d", len(msg.Caption))
 			message.Text += "\n" + msg.Caption
 		}
 	}

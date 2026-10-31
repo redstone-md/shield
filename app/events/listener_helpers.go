@@ -167,7 +167,7 @@ func (l *TelegramListener) sendBotResponse(resp bot.Response, chatID int64, noti
 		return nil
 	}
 
-	log.Printf("[DEBUG] bot response - %+v, reply-to:%d", strings.ReplaceAll(resp.Text, "\n", "\\n"), resp.ReplyTo)
+	log.Printf("[DEBUG] bot response prepared, chars:%d, reply-to:%d", len(resp.Text), resp.ReplyTo)
 	// bot response texts are plain strings; escape them so raw < > & in user
 	// names or quoted text cannot break the HTML parse mode
 	tbMsg := tbapi.NewMessage(chatID, htmlEscape(resp.Text))
@@ -236,7 +236,7 @@ func (l *TelegramListener) updateSupers() {
 		}
 	}
 
-	log.Printf("[INFO] added admins from %d groups, full list of supers: {%s}", len(l.chatIDs), strings.Join(l.SuperUsers, ", "))
+	log.Printf("[INFO] added admins from %d groups, total supers: %d", len(l.chatIDs), len(l.SuperUsers))
 }
 
 type SuperUsers []string

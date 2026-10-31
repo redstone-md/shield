@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -220,17 +219,11 @@ type pipelineContext struct {
 func (l *TelegramListener) processQueuedEvent(ctx context.Context, event moderation.IncomingEvent, update tbapi.Update) error {
 	ctx = observability.WithModerationMetadata(ctx, event.EventID, event.CorrelationID, event.IdempotencyKey)
 
-	msgJSON, errJSON := json.Marshal(update.Message)
-	if errJSON != nil {
-		return fmt.Errorf("failed to marshal update.Message to json: %w", errJSON)
-	}
-
 	fromChat := update.Message.Chat.ID
-	observability.Logf(ctx, "[DEBUG] %s", string(msgJSON))
 	msg := transform(update.Message)
 
-	observability.Logf(ctx, "[DEBUG] incoming msg: %+v", strings.ReplaceAll(msg.Text, "\n", " "))
-	observability.Logf(ctx, "[DEBUG] incoming msg details: %+v", msg)
+	observability.Logf(ctx, "[DEBUG] incoming msg: chat:%d, id:%d, from:%d, chars:%d, image:%t",
+		fromChat, msg.ID, msg.From.ID, len(msg.Text), msg.Image != nil)
 
 	l.locateMessage(ctx, msg, fromChat)
 

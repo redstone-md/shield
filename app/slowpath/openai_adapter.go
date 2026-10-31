@@ -196,15 +196,12 @@ func (a *OpenAIAdapter) AnalyzeImage(ctx context.Context, imageData []byte, mime
 func logVisionPayloadDebug(
 	model, mime string, imageData []byte, dataURL, prompt string, req openai.ChatCompletionRequest,
 ) {
-	headLen := min(len(imageData), 64)
-	urlPreviewLen := min(len(dataURL), 160)
 	sum := sha256.Sum256(imageData)
 	log.Printf(
 		"[DEBUG] openai vision payload: model=%q max_tokens=%d response_format=%q messages=%d "+
-			"prompt_len=%d mime=%q image_bytes=%d image_sha256=%x image_head_hex=%x "+
-			"data_url_len=%d data_url_prefix=%q",
+			"prompt_len=%d mime=%q image_bytes=%d image_sha256=%x data_url_len=%d",
 		model, req.MaxTokens, req.ResponseFormat.Type, len(req.Messages), len(prompt), mime,
-		len(imageData), sum, imageData[:headLen], len(dataURL), dataURL[:urlPreviewLen],
+		len(imageData), sum, len(dataURL),
 	)
 }
 
