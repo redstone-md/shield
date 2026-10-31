@@ -112,3 +112,10 @@ func TestAdminActionsFollowDryOnly(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleUpdateIgnoresMessageWithoutSender(t *testing.T) {
+	l := TelegramListener{TbAPI: okTbAPI(), adminChatID: 123}
+	update := tbapi.Update{Message: &tbapi.Message{MessageID: 1, Chat: tbapi.Chat{ID: 123}}}
+
+	assert.NotPanics(t, func() { require.NoError(t, l.handleUpdate(context.Background(), update)) })
+}

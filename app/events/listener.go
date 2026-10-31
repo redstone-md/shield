@@ -345,6 +345,10 @@ func (l *TelegramListener) eventLoop(ctx context.Context) error {
 }
 
 func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update) error {
+	if update.Message != nil && update.Message.From == nil {
+		log.Printf("[DEBUG] message %d in chat %d has no sender, ignored", update.Message.MessageID, update.Message.Chat.ID)
+		return nil
+	}
 	if update.Message != nil && l.isAdminChat(update.Message.Chat.ID, update.Message.From.UserName, update.Message.From.ID) {
 		l.incMetric("admin_messages")
 		if update.Message.ReplyToMessage != nil && l.SuperUsers.IsSuper(update.Message.From.UserName, update.Message.From.ID) {
