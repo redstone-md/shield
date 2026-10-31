@@ -28,10 +28,6 @@ func TestRetentionService_CleanNow(t *testing.T) {
 		created_at DATETIME, updated_at DATETIME)`)
 	require.NoError(t, err)
 
-	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS reports (
-		id INTEGER PRIMARY KEY AUTOINCREMENT, report_time DATETIME)`)
-	require.NoError(t, err)
-
 	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS incident_comments (
 		id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME)`)
 	require.NoError(t, err)
@@ -93,12 +89,12 @@ func TestRetentionService_CleanNowReturnsDeleteError(t *testing.T) {
 	assert.Contains(t, err.Error(), "delete expired rows")
 }
 
-func TestRetentionService_LeavesLocatorTables(t *testing.T) {
+func TestRetentionService_LeavesTablesOwnedByTheirStores(t *testing.T) {
 	db := newRetentionDB(t)
 	svc := NewRetentionService(db, RetentionConfig{IncomingEventsTTL: time.Hour, ModerationActionsTTL: time.Hour})
 
 	for _, c := range svc.buildCleaners() {
-		assert.NotContains(t, []string{"messages", "spam"}, c.table)
+		assert.NotContains(t, []string{"messages", "spam", "reports"}, c.table)
 	}
 }
 

@@ -29,8 +29,6 @@ func (s *StorageTestSuite) TestRetentionService_CleanersMatchRealSchema() {
 			s.Require().NoError(err)
 			_, err = NewModerationActions(ctx, db)
 			s.Require().NoError(err)
-			_, err = NewReports(ctx, db)
-			s.Require().NoError(err)
 			_, err = NewUsageMetering(ctx, db)
 			s.Require().NoError(err)
 
@@ -54,8 +52,6 @@ func (s *StorageTestSuite) TestRetentionService_DeletesExpiredRows() {
 			s.Require().NoError(err)
 			actions, err := NewModerationActions(ctx, db)
 			s.Require().NoError(err)
-			reports, err := NewReports(ctx, db)
-			s.Require().NoError(err)
 
 			now := time.Now().UTC()
 			ts := now.UnixNano()
@@ -77,12 +73,6 @@ func (s *StorageTestSuite) TestRetentionService_DeletesExpiredRows() {
 			s.Require().NoError(actions.Add(ctx, ModerationActionEntry{EventID: oldAction, Command: "ban_user", Status: "completed", CreatedAt: old}))
 			s.Require().NoError(actions.Add(ctx, ModerationActionEntry{EventID: freshAction, Command: "ban_user", Status: "completed", CreatedAt: now}))
 
-			oldMsg, freshMsg := int(ts%1_000_000), int(ts%1_000_000)+1
-			s.Require().NoError(reports.Add(ctx, Report{MsgID: oldMsg, ChatID: 1, ReporterUserID: 1, ReportedUserID: 2, MsgText: "x"}))
-			s.Require().NoError(reports.Add(ctx, Report{MsgID: freshMsg, ChatID: 1, ReporterUserID: 1, ReportedUserID: 2, MsgText: "x"}))
-			_, err = db.ExecContext(ctx, db.Adopt("UPDATE reports SET report_time = ? WHERE msg_id = ?"), old, oldMsg)
-			s.Require().NoError(err)
-
 			svc := NewRetentionService(db, RetentionConfig{IncomingEventsTTL: 24 * time.Hour, ModerationActionsTTL: 24 * time.Hour})
 			_, err = svc.CleanNow(ctx)
 			s.Require().NoError(err)
@@ -98,13 +88,6 @@ func (s *StorageTestSuite) TestRetentionService_DeletesExpiredRows() {
 			got, err = actions.ByEventID(ctx, freshAction)
 			s.Require().NoError(err)
 			s.Len(got, 1)
-
-			rows, err := reports.GetByMessage(ctx, oldMsg, 1)
-			s.Require().NoError(err)
-			s.Empty(rows, "expired report is deleted")
-			rows, err = reports.GetByMessage(ctx, freshMsg, 1)
-			s.Require().NoError(err)
-			s.Len(rows, 1)
 		})
 	}
 }
