@@ -479,7 +479,7 @@ func TestTelegramListener_DoWithAdminSoftUnBan(t *testing.T) {
 	assert.Equal(t, "принято", mockAPI.RequestCalls()[0].C.(tbapi.CallbackConfig).Text)
 
 	assert.Equal(t, int64(777), mockAPI.RequestCalls()[1].C.(tbapi.RestrictChatMemberConfig).UserID)
-	assert.Equal(t, &tbapi.ChatPermissions{CanSendMessages: true, CanSendAudios: true, CanSendDocuments: true, CanSendPhotos: true, CanSendVideos: true, CanSendVideoNotes: true, CanSendVoiceNotes: true, CanSendOtherMessages: true, CanChangeInfo: true, CanInviteUsers: true, CanPinMessages: true},
+	assert.Equal(t, &tbapi.ChatPermissions{CanSendMessages: true, CanSendAudios: true, CanSendDocuments: true, CanSendPhotos: true, CanSendVideos: true, CanSendVideoNotes: true, CanSendVoiceNotes: true, CanSendPolls: true, CanSendOtherMessages: true, CanAddWebPagePreviews: true, CanChangeInfo: true, CanInviteUsers: true, CanPinMessages: true},
 		mockAPI.RequestCalls()[1].C.(tbapi.RestrictChatMemberConfig).Permissions)
 	require.Len(t, b.UpdateHamCalls(), 1)
 	assert.Equal(t, "this was the ham, not spam", b.UpdateHamCalls()[0].Msg)
@@ -555,7 +555,7 @@ func TestTelegramListener_DoWithAdminSoftUnBanEmptyText(t *testing.T) {
 	assert.Equal(t, "принято", mockAPI.RequestCalls()[0].C.(tbapi.CallbackConfig).Text)
 
 	assert.Equal(t, int64(777), mockAPI.RequestCalls()[1].C.(tbapi.RestrictChatMemberConfig).UserID)
-	assert.Equal(t, &tbapi.ChatPermissions{CanSendMessages: true, CanSendAudios: true, CanSendDocuments: true, CanSendPhotos: true, CanSendVideos: true, CanSendVideoNotes: true, CanSendVoiceNotes: true, CanSendOtherMessages: true, CanChangeInfo: true, CanInviteUsers: true, CanPinMessages: true},
+	assert.Equal(t, &tbapi.ChatPermissions{CanSendMessages: true, CanSendAudios: true, CanSendDocuments: true, CanSendPhotos: true, CanSendVideos: true, CanSendVideoNotes: true, CanSendVoiceNotes: true, CanSendPolls: true, CanSendOtherMessages: true, CanAddWebPagePreviews: true, CanChangeInfo: true, CanInviteUsers: true, CanPinMessages: true},
 		mockAPI.RequestCalls()[1].C.(tbapi.RestrictChatMemberConfig).Permissions)
 	require.Empty(t, b.UpdateHamCalls())
 	require.Len(t, b.AddApprovedUserCalls(), 1)
