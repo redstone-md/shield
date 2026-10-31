@@ -1,8 +1,6 @@
 module github.com/redstone-md/shield
 
-go 1.25.0
-
-toolchain go1.25.13
+go 1.27.0
 
 require (
 	github.com/OvyFlash/telegram-bot-api v0.0.0-20251112155921-e82db5fd534b
