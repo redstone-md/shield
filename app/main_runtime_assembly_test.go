@@ -671,3 +671,27 @@ func TestApplySlowPathPrompts_FromRuleSet(t *testing.T) {
 	assert.Equal(t, "openai sys", system)
 	assert.Equal(t, "vision sys", slowpath.ExportVisionPrompt(eng))
 }
+
+func TestLogSecrets(t *testing.T) {
+	tests := []struct {
+		name   string
+		db     string
+		masked bool
+	}{
+		{name: "postgres url", db: "postgres://shield:secret@postgres:5432/shield", masked: true},
+		{name: "sqlite file", db: "tg-spam.db"},
+		{name: "sqlite url", db: "sqlite:///srv/data/tg-spam.db"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var opts options
+			opts.DataBaseURL = tt.db
+			if tt.masked {
+				assert.Contains(t, logSecrets(opts), tt.db)
+				return
+			}
+			assert.NotContains(t, logSecrets(opts), tt.db)
+		})
+	}
+}

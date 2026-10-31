@@ -685,9 +685,10 @@ func TestAdmin_WarningNotSpamCallback(t *testing.T) {
 		mockAPI := &mocks.TbAPIMock{
 			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{}, nil },
 		}
-		adm := admin{tbAPI: mockAPI, adminChatID: 456}
+		adm := admin{superUsers: SuperUsers{"admin"}, tbAPI: mockAPI, adminChatID: 456}
 
 		query := &tbapi.CallbackQuery{
+			From: &tbapi.User{UserName: "admin"},
 			Data: "W?7187750383:777",
 			Message: &tbapi.Message{
 				MessageID: 100,
@@ -718,7 +719,7 @@ func TestAdmin_WarningNotSpamCallback(t *testing.T) {
 		botMock := &mocks.BotMock{UpdateHamFunc: func(msg string) error { return nil }}
 		autoLearner := &autoLearnerSpy{}
 		detectedSpy := &detectedSpamCounterSpy{count: 2, deleteResult: true}
-		adm := admin{tbAPI: mockAPI, bot: botMock, adminChatID: 456, autoLearner: autoLearner, detectedSpam: detectedSpy}
+		adm := admin{superUsers: SuperUsers{"admin"}, tbAPI: mockAPI, bot: botMock, adminChatID: 456, autoLearner: autoLearner, detectedSpam: detectedSpy}
 
 		query := &tbapi.CallbackQuery{
 			ID:   "callback-id",
@@ -758,9 +759,10 @@ func TestAdmin_WarningNotSpamCallback(t *testing.T) {
 		mockAPI := &mocks.TbAPIMock{
 			SendFunc: func(c tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{}, nil },
 		}
-		adm := admin{tbAPI: mockAPI, adminChatID: 456}
+		adm := admin{superUsers: SuperUsers{"admin"}, tbAPI: mockAPI, adminChatID: 456}
 
 		query := &tbapi.CallbackQuery{
+			From: &tbapi.User{UserName: "admin"},
 			Data: "WX7187750383:777",
 			Message: &tbapi.Message{
 				MessageID: 100,

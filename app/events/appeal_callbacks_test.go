@@ -49,7 +49,7 @@ func TestAdmin_callbackAppealResolve_Accept(t *testing.T) {
 		RequestFunc: func(tbapi.Chattable) (*tbapi.APIResponse, error) { return &tbapi.APIResponse{Ok: true}, nil },
 		SendFunc:    func(tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{}, nil },
 	}
-	a := &admin{tbAPI: mockAPI, adminChatID: 12345, appeals: resolver}
+	a := &admin{superUsers: SuperUsers{"admin"}, tbAPI: mockAPI, adminChatID: 12345, appeals: resolver}
 
 	err := a.InlineCallbackHandler(context.Background(), appealCallbackQuery("AA88"))
 	require.NoError(t, err)
@@ -62,7 +62,7 @@ func TestAdmin_callbackAppealResolve_Reject(t *testing.T) {
 		RequestFunc: func(tbapi.Chattable) (*tbapi.APIResponse, error) { return &tbapi.APIResponse{Ok: true}, nil },
 		SendFunc:    func(tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{}, nil },
 	}
-	a := &admin{tbAPI: mockAPI, adminChatID: 12345, appeals: resolver}
+	a := &admin{superUsers: SuperUsers{"admin"}, tbAPI: mockAPI, adminChatID: 12345, appeals: resolver}
 
 	err := a.InlineCallbackHandler(context.Background(), appealCallbackQuery("AR88"))
 	require.NoError(t, err)
@@ -81,7 +81,7 @@ func TestAdmin_callbackAppealResolve_AlreadyResolved(t *testing.T) {
 		},
 		SendFunc: func(tbapi.Chattable) (tbapi.Message, error) { return tbapi.Message{}, nil },
 	}
-	a := &admin{tbAPI: mockAPI, adminChatID: 12345, appeals: resolver}
+	a := &admin{superUsers: SuperUsers{"admin"}, tbAPI: mockAPI, adminChatID: 12345, appeals: resolver}
 
 	err := a.InlineCallbackHandler(context.Background(), appealCallbackQuery("AA88"))
 	require.NoError(t, err)
@@ -94,14 +94,14 @@ func TestAdmin_callbackAppealResolve_BadID(t *testing.T) {
 	mockAPI := &mocks.TbAPIMock{
 		RequestFunc: func(tbapi.Chattable) (*tbapi.APIResponse, error) { return &tbapi.APIResponse{Ok: true}, nil },
 	}
-	a := &admin{tbAPI: mockAPI, adminChatID: 12345, appeals: resolver}
+	a := &admin{superUsers: SuperUsers{"admin"}, tbAPI: mockAPI, adminChatID: 12345, appeals: resolver}
 
 	err := a.InlineCallbackHandler(context.Background(), appealCallbackQuery("AAxyz"))
 	require.Error(t, err)
 }
 
 func TestAdmin_callbackAppealResolve_NoResolver(t *testing.T) {
-	a := &admin{adminChatID: 12345}
+	a := &admin{superUsers: SuperUsers{"admin"}, adminChatID: 12345}
 	err := a.InlineCallbackHandler(context.Background(), appealCallbackQuery("AA88"))
 	require.Error(t, err)
 }

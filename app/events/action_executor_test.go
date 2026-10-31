@@ -22,7 +22,7 @@ func TestTelegramActionExecutor_DeleteExtraMessages(t *testing.T) {
 		},
 	}
 	journal := &moderationActionsSpy{}
-	exec := newTelegramActionExecutor(mockAPI, false, false, nil, journal)
+	exec := newTelegramActionExecutor(mockAPI, nil, journal)
 
 	ctx := observability.WithModerationMetadata(context.Background(), "evt-1", "corr-1", "key-1")
 	err := exec.DeleteExtraMessages(ctx, []spamcheck.Response{{
@@ -47,7 +47,7 @@ func TestTelegramActionExecutor_ApplyBan(t *testing.T) {
 		},
 	}
 	journal := &moderationActionsSpy{}
-	exec := newTelegramActionExecutor(mockAPI, false, false, nil, journal)
+	exec := newTelegramActionExecutor(mockAPI, nil, journal)
 
 	ctx := observability.WithModerationMetadata(context.Background(), "evt-1", "corr-1", "key-1")
 	err := exec.ApplyBan(ctx, banRequest{
@@ -75,7 +75,7 @@ func TestTelegramActionExecutor_SkipCompletedReplay(t *testing.T) {
 	journal := &moderationActionsSpy{
 		last: storage.ModerationActionReplay{Found: true, Completed: true, Attempt: 1},
 	}
-	exec := newTelegramActionExecutor(mockAPI, false, false, nil, journal)
+	exec := newTelegramActionExecutor(mockAPI, nil, journal)
 
 	ctx := observability.WithModerationMetadata(context.Background(), "evt-1", "corr-1", "key-1")
 	err := exec.DeleteMessage(ctx, 123, 77)
@@ -93,7 +93,7 @@ func TestTelegramActionExecutor_RetryFailedActionWithNextAttempt(t *testing.T) {
 	journal := &moderationActionsSpy{
 		last: storage.ModerationActionReplay{Found: true, Completed: false, Attempt: 1, LastError: "telegram timeout"},
 	}
-	exec := newTelegramActionExecutor(mockAPI, false, false, nil, journal)
+	exec := newTelegramActionExecutor(mockAPI, nil, journal)
 
 	ctx := observability.WithModerationMetadata(context.Background(), "evt-2", "corr-2", "key-1")
 	err := exec.ApplyBan(ctx, banRequest{
@@ -115,7 +115,7 @@ func TestTelegramActionExecutor_WarnUser(t *testing.T) {
 		},
 	}
 	journal := &moderationActionsSpy{}
-	exec := newTelegramActionExecutor(mockAPI, false, false, nil, journal)
+	exec := newTelegramActionExecutor(mockAPI, nil, journal)
 
 	ctx := observability.WithModerationMetadata(context.Background(), "evt-3", "corr-3", "key-3")
 	err := exec.WarnUser(ctx, warnRequest{
@@ -142,7 +142,7 @@ func TestTelegramActionExecutor_WarnUserAppealButton(t *testing.T) {
 			return tbapi.Message{MessageID: 1}, nil
 		},
 	}
-	exec := newTelegramActionExecutor(mockAPI, false, false, nil, nil)
+	exec := newTelegramActionExecutor(mockAPI, nil, nil)
 
 	err := exec.WarnUser(context.Background(), warnRequest{
 		chatID:      100,
@@ -172,7 +172,7 @@ func TestTelegramActionExecutor_WarnUserNoButtonWithoutIncident(t *testing.T) {
 			return tbapi.Message{MessageID: 1}, nil
 		},
 	}
-	exec := newTelegramActionExecutor(mockAPI, false, false, nil, nil)
+	exec := newTelegramActionExecutor(mockAPI, nil, nil)
 
 	err := exec.WarnUser(context.Background(), warnRequest{chatID: 100, subjectID: 200, text: "warned"})
 	require.NoError(t, err)
@@ -187,7 +187,7 @@ func TestTelegramActionExecutor_PostBanMessage(t *testing.T) {
 			return tbapi.Message{MessageID: 7}, nil
 		},
 	}
-	exec := newTelegramActionExecutor(mockAPI, false, false, nil, nil)
+	exec := newTelegramActionExecutor(mockAPI, nil, nil)
 
 	err := exec.PostBanMessage(context.Background(), banMessageRequest{
 		chatID:      100,

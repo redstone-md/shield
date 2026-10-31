@@ -222,8 +222,8 @@ func (a *admin) DirectWarnReport(update tbapi.Update) error {
 		m := transform(origMsg)
 		msgTxt = m.Text
 	}
-	log.Printf("[DEBUG] reported warn message from superuser %q (%d): %q",
-		update.Message.From.UserName, update.Message.From.ID, msgTxt)
+	log.Printf("[DEBUG] reported warn message from superuser %q (%d), chars:%d",
+		update.Message.From.UserName, update.Message.From.ID, len(msgTxt))
 	if origMsg.From.UserName != "" && a.superUsers.IsSuper(origMsg.From.UserName, origMsg.From.ID) {
 		return fmt.Errorf("warn message is from super-user %s (%d), ignored", origMsg.From.UserName, origMsg.From.ID)
 	}
@@ -255,7 +255,7 @@ func (a *admin) DirectWarnReport(update tbapi.Update) error {
 	warnMsg := buildWarningText(warnNum, a.moderation.WarnStrikes, warnDisplayUser(origMsg), subjectID, a.warnMsg, "")
 	if err := a.sendWarnMessage(ctx, origMsg, warnMsg); err != nil {
 		errs = multierror.Append(errs, err)
-	} else {
+	} else if !a.dry {
 		a.recordManualWarn(ctx, origBotMsg, subjectID, warnNum)
 	}
 
@@ -483,6 +483,10 @@ func (a *admin) deleteWarnMessage(ctx context.Context, chatID int64, msgID int, 
 }
 
 func (a *admin) deleteMessage(ctx context.Context, chatID int64, msgID int, label string) error {
+	if a.dry {
+		log.Printf("[INFO] dry run: would delete %s message %d", label, msgID)
+		return nil
+	}
 	if a.actions != nil {
 		if err := a.actions.DeleteMessage(ctx, chatID, msgID); err != nil {
 			return fmt.Errorf("failed to delete message %d: %w", msgID, err)
@@ -503,6 +507,10 @@ func (a *admin) deleteMessage(ctx context.Context, chatID int64, msgID int, labe
 }
 
 func (a *admin) sendWarnMessage(ctx context.Context, origMsg *tbapi.Message, warnMsg string) error {
+	if a.dry {
+		log.Printf("[INFO] dry run: would warn user %d", warnSubjectID(origMsg))
+		return nil
+	}
 	if a.actions != nil {
 		if err := a.actions.WarnUser(ctx, warnRequest{
 			chatID:      a.chatIDOrFallback(origMsg.Chat.ID),
@@ -567,8 +575,8 @@ func (a *admin) directReport(ctx context.Context, update tbapi.Update, updateSam
 	if origMsg.Quote != nil && origMsg.Quote.Text != "" {
 		msgTxt = msgTxt + "\n" + origMsg.Quote.Text
 	}
-	log.Printf("[DEBUG] reported spam message from superuser %q (%d): %q",
-		update.Message.From.UserName, update.Message.From.ID, msgTxt)
+	log.Printf("[DEBUG] reported spam message from superuser %q (%d), chars:%d",
+		update.Message.From.UserName, update.Message.From.ID, len(msgTxt))
 
 	if origMsg.From.UserName != "" && a.superUsers.IsSuper(origMsg.From.UserName, origMsg.From.ID) {
 		return fmt.Errorf("banned message is from super-user %s (%d), ignored", origMsg.From.UserName, origMsg.From.ID)

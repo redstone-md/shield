@@ -194,6 +194,7 @@ func newDCGateAdmin(t *testing.T) (*mocks.TbAPIMock, *mocks.BotMock, *admin) {
 	}
 	botMock := &mocks.BotMock{AddApprovedUserFunc: func(int64, string) error { return nil }}
 	adm := &admin{
+		superUsers:  SuperUsers{"admin"},
 		tbAPI:       api,
 		bot:         botMock,
 		primChatIDs: []int64{123},

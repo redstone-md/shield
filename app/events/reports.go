@@ -102,22 +102,11 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 	}
 	if rateLimited {
 		log.Printf("[INFO] reporter %d (%s) exceeded rate limit", update.Message.From.ID, update.Message.From.UserName)
-		_, _ = r.tbAPI.Request(tbapi.DeleteMessageConfig{
-			MessageID: update.Message.MessageID,
-			ChatID:    r.chatIDOrFallback(origMsg.Chat.ID),
-		})
+		r.deleteReportCommand(update.Message.MessageID, r.chatIDOrFallback(origMsg.Chat.ID))
 		return fmt.Errorf("rate limit exceeded for reporter %d", update.Message.From.ID)
 	}
 
-	_, err = r.tbAPI.Request(tbapi.DeleteMessageConfig{
-		MessageID: update.Message.MessageID,
-		ChatID:    r.chatIDOrFallback(origMsg.Chat.ID),
-	})
-	if err != nil {
-		log.Printf("[WARN] failed to delete report message %d: %v", update.Message.MessageID, err)
-	} else {
-		log.Printf("[INFO] report message %d deleted", update.Message.MessageID)
-	}
+	r.deleteReportCommand(update.Message.MessageID, r.chatIDOrFallback(origMsg.Chat.ID))
 
 	msgTxt := origMsg.Text
 	if msgTxt == "" {
@@ -162,7 +151,28 @@ func (r *userReports) DirectUserReport(ctx context.Context, update tbapi.Update)
 	return nil
 }
 
+// groupReadOnly reports whether the report flow must leave the group untouched on its own initiative.
+func (r *userReports) groupReadOnly() bool {
+	return r.dry || r.trainingMode
+}
+
+func (r *userReports) deleteReportCommand(msgID int, chatID int64) {
+	if r.groupReadOnly() {
+		log.Printf("[INFO] dry/training run: would delete report message %d", msgID)
+		return
+	}
+	if _, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{MessageID: msgID, ChatID: chatID}); err != nil {
+		log.Printf("[WARN] failed to delete report message %d: %v", msgID, err)
+		return
+	}
+	log.Printf("[INFO] report message %d deleted", msgID)
+}
+
 func (r *userReports) notifyPrimaryChat(outcome reportOutcome, duration time.Duration, restrict bool, chatID int64) {
+	if r.groupReadOnly() {
+		log.Printf("[INFO] dry/training run: would send report status to the primary chat")
+		return
+	}
 	if chatID == 0 {
 		chatID = r.firstChatID()
 	}
@@ -173,7 +183,7 @@ func (r *userReports) notifyPrimaryChat(outcome reportOutcome, duration time.Dur
 	var text string
 	switch outcome {
 	case reportOutcomeBanned:
-		text = reportStatusText(duration, restrict, r.dry)
+		text = reportStatusText(duration, restrict)
 	case reportOutcomeReview:
 		text = "Репорт принят. Сообщение отправлено на проверку."
 	case reportOutcomeAccepted:
@@ -222,11 +232,13 @@ func (r *userReports) applyImmediateReportModeration(ctx context.Context, update
 		}
 	}
 
-	if r.actions != nil {
+	if r.groupReadOnly() {
+		log.Printf("[INFO] dry/training run: would delete LLM-confirmed reported message %d", origMsg.MessageID)
+	} else if r.actions != nil {
 		if err := r.actions.DeleteMessage(ctx, r.chatIDOrFallback(origMsg.Chat.ID), origMsg.MessageID); err != nil {
 			log.Printf("[WARN] failed to delete LLM-confirmed reported message %d: %v", origMsg.MessageID, err)
 		}
-	} else if !r.dry {
+	} else {
 		_, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{
 			MessageID: origMsg.MessageID,
 			ChatID:    r.chatIDOrFallback(origMsg.Chat.ID),
@@ -436,13 +448,15 @@ func (r *userReports) executeAutoBan(ctx context.Context, reports []storage.Repo
 		}
 	}
 
-	if r.actions != nil {
+	if r.groupReadOnly() {
+		log.Printf("[INFO] dry/training run: would auto-delete reported message %d", msgID)
+	} else if r.actions != nil {
 		if err := r.actions.DeleteMessage(ctx, chatID, msgID); err != nil {
 			log.Printf("[WARN] failed to delete reported message %d: %v", msgID, err)
 		} else {
 			log.Printf("[INFO] reported message %d auto-deleted", msgID)
 		}
-	} else if !r.dry {
+	} else {
 		_, err := r.tbAPI.Request(tbapi.DeleteMessageConfig{
 			MessageID: msgID,
 			ChatID:    chatID,

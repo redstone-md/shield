@@ -200,7 +200,7 @@ func (s *SpamFilter) OnMessageWithContext(ctx context.Context, msg Message, chec
 	}
 	checkResultStr := strings.Join(crs, ", ")
 	if isSpam {
-		observability.Logf(ctx, "[INFO] user %s detected as spammer: %s, %q", displayUsername, checkResultStr, msgText)
+		observability.Logf(ctx, "[INFO] user %s detected as spammer: %s, chars:%d", displayUsername, checkResultStr, len(msgText))
 		msgPrefix := s.params.SpamMsg
 		if s.params.Dry {
 			msgPrefix = s.params.SpamDryMsg
@@ -239,28 +239,28 @@ func spamVerdictText(results []spamcheck.Response, fallback string) string {
 // UpdateSpam appends a message to the spam samples file and updates the classifier
 func (s *SpamFilter) UpdateSpam(msg string) error {
 	cleanMsg := strings.ReplaceAll(msg, "\n", " ")
-	log.Printf("[DEBUG] update spam samples with %q", cleanMsg)
+	log.Printf("[DEBUG] update spam samples, chars:%d", len(cleanMsg))
 	if s.updater == nil {
 		return fmt.Errorf("sample updater not configured")
 	}
 	if err := s.updater.UpdateSpam(cleanMsg); err != nil {
 		return fmt.Errorf("can't update spam samples: %w", err)
 	}
-	log.Printf("[INFO] updated spam samples with %q", cleanMsg)
+	log.Printf("[INFO] updated spam samples, chars:%d", len(cleanMsg))
 	return nil
 }
 
 // UpdateHam appends a message to the ham samples file and updates the classifier
 func (s *SpamFilter) UpdateHam(msg string) error {
 	cleanMsg := strings.ReplaceAll(msg, "\n", " ")
-	log.Printf("[DEBUG] update ham samples with %q", cleanMsg)
+	log.Printf("[DEBUG] update ham samples, chars:%d", len(cleanMsg))
 	if s.updater == nil {
 		return fmt.Errorf("sample updater not configured")
 	}
 	if err := s.updater.UpdateHam(cleanMsg); err != nil {
 		return fmt.Errorf("can't update ham samples: %w", err)
 	}
-	log.Printf("[INFO] updated ham samples with %q", cleanMsg)
+	log.Printf("[INFO] updated ham samples, chars:%d", len(cleanMsg))
 	return nil
 }
 

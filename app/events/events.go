@@ -252,28 +252,16 @@ func moderationActionText(duration time.Duration, restrict, dry bool) string {
 	return "забанен навсегда"
 }
 
-func reportStatusText(duration time.Duration, restrict, dry bool) string {
+func reportStatusText(duration time.Duration, restrict bool) string {
 	if restrict {
 		switch {
 		case duration <= 30*time.Minute:
-			if dry {
-				return "Репорт подтвержден. DRY mode: пользователь был бы замучен на 30 минут."
-			}
 			return "Репорт подтвержден. Пользователь замучен на 30 минут."
 		case duration <= 6*time.Hour:
-			if dry {
-				return "Репорт подтвержден. DRY mode: пользователь был бы замучен на 6 часов."
-			}
 			return "Репорт подтвержден. Пользователь замучен на 6 часов."
 		default:
-			if dry {
-				return "Репорт подтвержден. DRY mode: пользователь был бы ограничен."
-			}
 			return "Репорт подтвержден. Пользователь ограничен."
 		}
-	}
-	if dry {
-		return "Репорт подтвержден. DRY mode: пользователь был бы забанен."
 	}
 	return "Репорт подтвержден. Пользователь забанен."
 }
@@ -469,10 +457,10 @@ func transform(msg *tbapi.Message) *bot.Message {
 	// handle caption - either as main text if no text present, or append to existing text
 	if msg.Caption != "" {
 		if message.Text == "" {
-			log.Printf("[DEBUG] caption only message: %q", msg.Caption)
+			log.Printf("[DEBUG] caption only message, chars:%d", len(msg.Caption))
 			message.Text = msg.Caption
 		} else {
-			log.Printf("[DEBUG] caption appended to message: %q", msg.Caption)
+			log.Printf("[DEBUG] caption appended to message, chars:%d", len(msg.Caption))
 			message.Text += "\n" + msg.Caption
 		}
 	}

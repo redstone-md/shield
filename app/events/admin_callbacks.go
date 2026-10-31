@@ -17,18 +17,18 @@ import (
 )
 
 func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.CallbackQuery) error {
-	callbackData := query.Data
-	chatID := query.Message.Chat.ID
-	if chatID != a.adminChatID {
+	if !authorizeCallback(a.tbAPI, query, a.adminChatID, a.superUsers) {
 		return nil
 	}
+
+	callbackData := query.Data
+	chatID := query.Message.Chat.ID
 
 	if strings.HasPrefix(callbackData, confirmationPrefix) {
 		if err := a.callbackAskBanConfirmation(query); err != nil {
 			return fmt.Errorf("failed to make ban confirmation dialog: %w", err)
 		}
-		log.Printf("[DEBUG] unban confirmation request sent, chatID: %d, userID: %s, orig: %q",
-			chatID, callbackData[1:], query.Message.Text)
+		log.Printf("[DEBUG] unban confirmation request sent, chatID: %d, userID: %s", chatID, callbackData[1:])
 		return nil
 	}
 
@@ -36,7 +36,7 @@ func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.Callback
 		if err := a.callbackBanConfirmed(ctx, query); err != nil {
 			return fmt.Errorf("failed confirmation ban: %w", err)
 		}
-		log.Printf("[DEBUG] ban confirmed, chatID: %d, userID: %s, orig: %q", chatID, callbackData, query.Message.Text)
+		log.Printf("[DEBUG] ban confirmed, chatID: %d, userID: %s", chatID, callbackData)
 		return nil
 	}
 
@@ -44,7 +44,7 @@ func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.Callback
 		if err := a.callbackShowInfo(ctx, query); err != nil {
 			return fmt.Errorf("failed to show spam info: %w", err)
 		}
-		log.Printf("[DEBUG] spam info sent, chatID: %d, userID: %s, orig: %q", chatID, callbackData, query.Message.Text)
+		log.Printf("[DEBUG] spam info sent, chatID: %d, userID: %s", chatID, callbackData)
 		return nil
 	}
 
@@ -52,8 +52,7 @@ func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.Callback
 		if err := a.callbackAskWarningHamConfirmation(query); err != nil {
 			return fmt.Errorf("failed to make warning ham confirmation dialog: %w", err)
 		}
-		log.Printf("[DEBUG] warning ham confirmation request sent, chatID: %d, data: %s, orig: %q",
-			chatID, callbackData, query.Message.Text)
+		log.Printf("[DEBUG] warning ham confirmation request sent, chatID: %d, data: %s", chatID, callbackData)
 		return nil
 	}
 
@@ -61,7 +60,7 @@ func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.Callback
 		if err := a.callbackWarningHamConfirmed(ctx, query); err != nil {
 			return fmt.Errorf("failed to confirm warning ham: %w", err)
 		}
-		log.Printf("[DEBUG] warning ham confirmed, chatID: %d, data: %s, orig: %q", chatID, callbackData, query.Message.Text)
+		log.Printf("[DEBUG] warning ham confirmed, chatID: %d, data: %s", chatID, callbackData)
 		return nil
 	}
 
@@ -110,11 +109,11 @@ func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.Callback
 		return nil
 	}
 
-	log.Printf("[DEBUG] unban action activated, chatID: %d, userID: %s, orig: %q", chatID, callbackData, query.Message.Text)
+	log.Printf("[DEBUG] unban action activated, chatID: %d, userID: %s", chatID, callbackData)
 	if err := a.callbackUnbanConfirmed(ctx, query); err != nil {
 		return fmt.Errorf("failed to unban user: %w", err)
 	}
-	log.Printf("[INFO] user unbanned, chatID: %d, userID: %s, orig: %q", chatID, callbackData, query.Message.Text)
+	log.Printf("[INFO] user unbanned, chatID: %d, userID: %s", chatID, callbackData)
 
 	return nil
 }
@@ -243,7 +242,7 @@ func (a *admin) callbackBanConfirmed(ctx context.Context, query *tbapi.CallbackQ
 	if a.softBan && !a.trainingMode {
 		userName, err := a.extractUsername(query.Message.Text)
 		if err != nil {
-			log.Printf("[DEBUG] failed to extract username from %q: %v", query.Message.Text, err)
+			log.Printf("[DEBUG] failed to extract username from message %d: %v", query.Message.MessageID, err)
 			userName = ""
 		}
 		banReq := banRequest{duration: bot.PermanentBanDuration, userID: userID, channelID: channelIDFromCallback(userID),
@@ -290,7 +289,7 @@ func (a *admin) callbackUnbanConfirmed(ctx context.Context, query *tbapi.Callbac
 
 	name, err := a.extractUsername(query.Message.Text)
 	if err != nil {
-		log.Printf("[DEBUG] failed to extract username from %q: %v", query.Message.Text, err)
+		log.Printf("[DEBUG] failed to extract username from message %d: %v", query.Message.MessageID, err)
 		name = ""
 	}
 	if err := a.bot.AddApprovedUser(userID, name); err != nil {
@@ -418,11 +417,12 @@ func (a *admin) deleteAndBan(ctx context.Context, query *tbapi.CallbackQuery, us
 		}
 	}
 
-	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
+	if a.dry {
+		log.Printf("[INFO] dry run: would delete message %d", msgID)
+	} else if _, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
 		MessageID: msgID,
 		ChatID:    a.chatIDOrFallback(chatID),
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("failed to delete message %d: %w", query.Message.MessageID, err)
 	}
 

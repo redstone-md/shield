@@ -28,7 +28,7 @@ services:
     logging: *default_logging
     environment:
       - POSTGRES_USER=tg-spam
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env or shell}
       - POSTGRES_DB=tg-spam
     volumes:
       - pg-data:/var/lib/postgresql/data

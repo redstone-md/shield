@@ -10,9 +10,6 @@ func (s *StorageTestSuite) TestUsageMetering_IncrementAutoCreate() {
 	for _, dbt := range s.getTestDB() {
 		db := dbt.DB
 		s.Run(fmt.Sprintf("with %s", db.Type()), func() {
-			if db.Type() == "postgres" {
-				s.T().Skip("Increment uses sql.Result, unsupported by pgx")
-			}
 			m, err := NewUsageMetering(ctx, db)
 			s.Require().NoError(err)
 
@@ -37,9 +34,6 @@ func (s *StorageTestSuite) TestUsageMetering_IncrementExisting() {
 	for _, dbt := range s.getTestDB() {
 		db := dbt.DB
 		s.Run(fmt.Sprintf("with %s", db.Type()), func() {
-			if db.Type() == "postgres" {
-				s.T().Skip("Increment uses sql.Result, unsupported by pgx")
-			}
 			m, err := NewUsageMetering(ctx, db)
 			s.Require().NoError(err)
 
@@ -79,9 +73,6 @@ func (s *StorageTestSuite) TestUsageMetering_GetPresent() {
 	for _, dbt := range s.getTestDB() {
 		db := dbt.DB
 		s.Run(fmt.Sprintf("with %s", db.Type()), func() {
-			if db.Type() == "postgres" {
-				s.T().Skip("Increment uses sql.Result, unsupported by pgx")
-			}
 			m, err := NewUsageMetering(ctx, db)
 			s.Require().NoError(err)
 
@@ -107,9 +98,6 @@ func (s *StorageTestSuite) TestUsageMetering_ListByWindow() {
 	for _, dbt := range s.getTestDB() {
 		db := dbt.DB
 		s.Run(fmt.Sprintf("with %s", db.Type()), func() {
-			if db.Type() == "postgres" {
-				s.T().Skip("Increment uses sql.Result, unsupported by pgx")
-			}
 			m, err := NewUsageMetering(ctx, db)
 			s.Require().NoError(err)
 
@@ -138,9 +126,6 @@ func (s *StorageTestSuite) TestUsageMetering_ResetTenant() {
 	for _, dbt := range s.getTestDB() {
 		db := dbt.DB
 		s.Run(fmt.Sprintf("with %s", db.Type()), func() {
-			if db.Type() == "postgres" {
-				s.T().Skip("Increment uses sql.Result, unsupported by pgx")
-			}
 			m, err := NewUsageMetering(ctx, db)
 			s.Require().NoError(err)
 

@@ -54,6 +54,10 @@ func (l *TelegramListener) procLeftChatMemberMessage(ctx context.Context, update
 		log.Printf("[DEBUG] no new chat member message found for %d in chat %d", update.Message.LeftChatMember.ID, fromChat)
 		return nil
 	}
+	if l.groupReadOnly() {
+		log.Printf("[INFO] dry/training run: would delete new chat member message %d", msg.MsgID)
+		return nil
+	}
 	if _, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{
 		ChatID: fromChat, MessageID: msg.MsgID,
 	}); err != nil {
@@ -63,7 +67,17 @@ func (l *TelegramListener) procLeftChatMemberMessage(ctx context.Context, update
 	return nil
 }
 
+// groupReadOnly reports whether the bot must leave the group untouched on its own initiative. Explicit admin actions
+// follow Dry only, and the admin chat keeps getting reports and errors in both modes.
+func (l *TelegramListener) groupReadOnly() bool {
+	return l.Dry || l.TrainingMode
+}
+
 func (l *TelegramListener) deleteSystemMessage(msgID int, chatID int64, msgType string) {
+	if l.groupReadOnly() {
+		log.Printf("[INFO] dry/training run: would delete %s message %d", msgType, msgID)
+		return
+	}
 	deleteMsg := tbapi.DeleteMessageConfig{
 		MessageID: msgID,
 		ChatID:    chatID,
@@ -148,8 +162,12 @@ func (l *TelegramListener) sendBotResponse(resp bot.Response, chatID int64, noti
 	if !resp.Send {
 		return nil
 	}
+	if l.groupReadOnly() && chatID != l.adminChatID {
+		log.Printf("[INFO] dry/training run: would send bot response to chat %d", chatID)
+		return nil
+	}
 
-	log.Printf("[DEBUG] bot response - %+v, reply-to:%d", strings.ReplaceAll(resp.Text, "\n", "\\n"), resp.ReplyTo)
+	log.Printf("[DEBUG] bot response prepared, chars:%d, reply-to:%d", len(resp.Text), resp.ReplyTo)
 	// bot response texts are plain strings; escape them so raw < > & in user
 	// names or quoted text cannot break the HTML parse mode
 	tbMsg := tbapi.NewMessage(chatID, htmlEscape(resp.Text))
@@ -218,7 +236,7 @@ func (l *TelegramListener) updateSupers() {
 		}
 	}
 
-	log.Printf("[INFO] added admins from %d groups, full list of supers: {%s}", len(l.chatIDs), strings.Join(l.SuperUsers, ", "))
+	log.Printf("[INFO] added admins from %d groups, total supers: %d", len(l.chatIDs), len(l.SuperUsers))
 }
 
 type SuperUsers []string
@@ -231,9 +249,31 @@ func (s SuperUsers) IsSuper(userName string, userID int64) bool {
 			}
 			continue
 		}
+		if userName == "" {
+			continue
+		}
 		if strings.EqualFold(userName, super) || strings.EqualFold("/"+userName, super) {
 			return true
 		}
+	}
+	return false
+}
+
+// authorizeCallback reports whether an inline callback may run: it has to come from the admin chat and its sender
+// has to be a superuser. A refused sender gets a toast, and nothing is posted to the admin chat.
+func authorizeCallback(tbAPI TbAPI, query *tbapi.CallbackQuery, adminChatID int64, supers SuperUsers) bool {
+	if query.Message == nil || query.Message.Chat.ID != adminChatID {
+		return false
+	}
+	if query.From != nil && supers.IsSuper(query.From.UserName, query.From.ID) {
+		return true
+	}
+
+	if query.From != nil {
+		log.Printf("[WARN] callback refused for non-superuser %s (%d)", query.From.UserName, query.From.ID)
+	}
+	if _, err := tbAPI.Request(tbapi.NewCallback(query.ID, "нет прав")); err != nil {
+		log.Printf("[WARN] failed to answer refused callback: %v", err)
 	}
 	return false
 }

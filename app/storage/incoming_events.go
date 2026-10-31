@@ -278,7 +278,8 @@ func (s *IncomingEvents) Reserve(ctx context.Context, event moderation.IncomingE
 		Recorded:  false,
 		Processed: record.ProcessedAt.Valid,
 	}
-	if !record.ProcessedAt.Valid && (record.DecisionAction != "" || record.ActionError != "" || record.ActionApplied.Valid) {
+	if !record.ProcessedAt.Valid {
+		// polling has a single consumer, so an unfinished row can only be left over from a crash and is safe to reclaim
 		replay.Recorded = true
 	}
 	if record.ProcessedAt.Valid {

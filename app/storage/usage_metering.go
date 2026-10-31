@@ -55,7 +55,8 @@ var usageCountersQueries = engine.NewQueryMap().
 			ON CONFLICT(tenant_id, meter_type, window_start) DO UPDATE SET count = count + 1, updated_at = excluded.updated_at`,
 		Postgres: `INSERT INTO usage_counters (gid, tenant_id, meter_type, count, window_start, window_end, updated_at)
 			VALUES ($1, $2, $3, 1, $4, $5, $6)
-			ON CONFLICT(tenant_id, meter_type, window_start) DO UPDATE SET count = count + 1, updated_at = excluded.updated_at`,
+			ON CONFLICT(tenant_id, meter_type, window_start) DO UPDATE
+			SET count = usage_counters.count + 1, updated_at = excluded.updated_at`,
 	}).
 	AddSame(CmdGetUsageCounter, `SELECT id, tenant_id, meter_type, count, window_start, window_end, updated_at
 		FROM usage_counters WHERE tenant_id = ? AND meter_type = ? AND window_start = ?`).

@@ -22,22 +22,16 @@ type ActionExecutor interface {
 }
 
 type telegramActionExecutor struct {
-	tbAPI        TbAPI
-	dry          bool
-	trainingMode bool
-	superUsers   SuperUsers
-	actions      ModerationActions
+	tbAPI      TbAPI
+	superUsers SuperUsers
+	actions    ModerationActions
 }
 
-func newTelegramActionExecutor(tbAPI TbAPI, dry, trainingMode bool, superUsers SuperUsers,
-	actions ModerationActions,
-) telegramActionExecutor {
+func newTelegramActionExecutor(tbAPI TbAPI, superUsers SuperUsers, actions ModerationActions) telegramActionExecutor {
 	return telegramActionExecutor{
-		tbAPI:        tbAPI,
-		dry:          dry,
-		trainingMode: trainingMode,
-		superUsers:   superUsers,
-		actions:      actions,
+		tbAPI:      tbAPI,
+		superUsers: superUsers,
+		actions:    actions,
 	}
 }
 
@@ -88,7 +82,7 @@ func (e telegramActionExecutor) ForwardMessage(ctx context.Context, fromChatID, 
 func (e telegramActionExecutor) DeleteExtraMessages(ctx context.Context, checkResults []spamcheck.Response,
 	userID int64, username string, chatID int64,
 ) error {
-	if len(checkResults) == 0 || e.dry || e.trainingMode {
+	if len(checkResults) == 0 {
 		return nil
 	}
 

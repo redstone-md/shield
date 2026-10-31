@@ -475,7 +475,7 @@ func (d *Detector) collectLLMCheck(req spamcheck.Request, cleanMsg string, cr []
 
 	if cfg.mode == LLMModeFlagged && !spam && details.Error == nil {
 		allChecks := append(append(make([]spamcheck.Response, 0, len(cr)+1), cr...), details)
-		log.Printf("[DEBUG] %s vetoed ham message: %q, checks: %s", cfg.name, req.Msg, spamcheck.ChecksToString(allChecks))
+		log.Printf("[DEBUG] %s vetoed ham message, chars:%d, checks: %s", cfg.name, len(req.Msg), spamcheck.ChecksToString(allChecks))
 	}
 
 	flip := false

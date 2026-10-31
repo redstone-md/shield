@@ -40,6 +40,7 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		actions := &actionExecutorSpy{}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			adminChatID: 456,
 			primChatIDs: []int64{200},
@@ -96,6 +97,7 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			adminChatID: 456,
 			primChatIDs: []int64{200},
@@ -131,12 +133,14 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			adminChatID: 456,
 			primChatIDs: []int64{200},
 			Storage:     mockReports,
 		}
 
 		query := &tbapi.CallbackQuery{
+			From: &tbapi.User{UserName: "admin"},
 			Data: "R+666:100:200",
 			Message: &tbapi.Message{
 				Chat: tbapi.Chat{ID: 456},
@@ -183,6 +187,7 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			bot:         mockBot,
 			primChatIDs: []int64{200},
@@ -241,6 +246,7 @@ func TestUserReports_CallbackReportBan(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			bot:         mockBot,
 			primChatIDs: []int64{200},
@@ -284,6 +290,7 @@ func TestUserReports_ExecuteAutoBanUsesSharedActionExecutor(t *testing.T) {
 	actions := &actionExecutorSpy{}
 
 	rep := &userReports{
+		superUsers:       SuperUsers{"admin"},
 		tbAPI:            mockAPI,
 		bot:              mockBot,
 		actions:          actions,
@@ -329,6 +336,7 @@ func TestUserReports_CallbackReportReject(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			adminChatID: 456,
 			primChatIDs: []int64{200},
@@ -360,12 +368,14 @@ func TestUserReports_CallbackReportReject(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			adminChatID: 456,
 			primChatIDs: []int64{200},
 			Storage:     mockReports,
 		}
 
 		query := &tbapi.CallbackQuery{
+			From: &tbapi.User{UserName: "admin"},
 			Data: "R-666:100:200",
 			Message: &tbapi.Message{
 				Chat: tbapi.Chat{ID: 456},
@@ -407,12 +417,14 @@ func TestUserReports_CallbackReportBanReporterAsk(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			primChatIDs: []int64{200},
 			Storage:     mockReports,
 		}
 
 		query := &tbapi.CallbackQuery{
+			From:    &tbapi.User{UserName: "admin"},
 			Data:    "R?666:100",
 			Message: &tbapi.Message{Chat: tbapi.Chat{ID: 456}, MessageID: 999},
 		}
@@ -430,7 +442,7 @@ func TestUserReports_CallbackReportBanReporterAsk(t *testing.T) {
 			},
 		}
 
-		rep := &userReports{primChatIDs: []int64{200}, Storage: mockReports}
+		rep := &userReports{superUsers: SuperUsers{"admin"}, primChatIDs: []int64{200}, Storage: mockReports}
 		query := &tbapi.CallbackQuery{Data: "R?666:100:200", Message: &tbapi.Message{Chat: tbapi.Chat{ID: 456}}}
 
 		err := rep.callbackReportBanReporterAsk(context.Background(), query)

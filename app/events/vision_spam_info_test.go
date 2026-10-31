@@ -32,7 +32,8 @@ func TestAdminCallbackShowInfoFallsBackToExistingDiagnostics(t *testing.T) {
 		},
 	}
 	adm := admin{
-		tbAPI: mockAPI,
+		superUsers: SuperUsers{"admin"},
+		tbAPI:      mockAPI,
 		locator: &mocks.LocatorMock{
 			SpamFunc: func(ctx context.Context, userID int64) (storage.SpamData, bool) {
 				return storage.SpamData{}, false

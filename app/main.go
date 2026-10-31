@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -245,16 +246,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	masked := []string{opts.Telegram.Token, opts.OpenAI.Token, opts.Gemini.Token, opts.CAS.Token}
-	if opts.Server.AuthPasswd != "auto" && opts.Server.AuthPasswd != "" {
-		// auto passwd should not be masked as we print it
-		masked = append(masked, opts.Server.AuthPasswd)
-	}
-	if opts.Server.AuthHash != "" {
-		masked = append(masked, opts.Server.AuthHash)
-	}
-
-	setupLog(opts.Dbg, masked...)
+	setupLog(opts.Dbg, logSecrets(opts)...)
 
 	debugLogFields("options", opts)
 
@@ -370,6 +362,23 @@ func execute(ctx context.Context, opts options) error {
 		return fmt.Errorf("telegram listener failed, %w", err)
 	}
 	return nil
+}
+
+// logSecrets lists the option values that must never appear in logs.
+func logSecrets(opts options) []string {
+	secrets := []string{opts.Telegram.Token, opts.OpenAI.Token, opts.Gemini.Token, opts.CAS.Token}
+	if opts.Server.AuthPasswd != "auto" && opts.Server.AuthPasswd != "" {
+		// auto passwd should not be masked as we print it
+		secrets = append(secrets, opts.Server.AuthPasswd)
+	}
+	if opts.Server.AuthHash != "" {
+		secrets = append(secrets, opts.Server.AuthHash)
+	}
+	// a sqlite path carries no credentials and is useful in logs
+	if strings.HasPrefix(opts.DataBaseURL, "postgres://") {
+		secrets = append(secrets, opts.DataBaseURL)
+	}
+	return secrets
 }
 
 func setupLog(dbg bool, secrets ...string) {

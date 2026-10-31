@@ -118,6 +118,37 @@ func TestIncomingEventsReserveAndComplete(t *testing.T) {
 	assert.True(t, record.ActionApplied.Bool)
 }
 
+func TestIncomingEventsReserveReclaimsRowLeftByCrash(t *testing.T) {
+	db, err := engine.NewSqlite(":memory:", "gr1")
+	require.NoError(t, err)
+	defer db.Close()
+
+	store, err := NewIncomingEvents(context.Background(), db)
+	require.NoError(t, err)
+
+	event := moderation.IncomingEvent{
+		EventID:        "evt-crash",
+		CorrelationID:  "corr-crash",
+		TenantID:       "tg-spam",
+		Source:         "telegram.update",
+		UpdateID:       703,
+		ChatID:         123,
+		MessageID:      79,
+		IdempotencyKey: "telegram:update:703:chat:123:message:79:edited:0",
+		ReceivedAt:     time.Date(2026, 4, 13, 11, 5, 0, 0, time.UTC),
+	}
+
+	replay, err := store.Reserve(context.Background(), event)
+	require.NoError(t, err)
+	require.True(t, replay.Recorded)
+
+	// the process dies here, before any decision is stored, and Telegram redelivers the update
+	replay, err = store.Reserve(context.Background(), event)
+	require.NoError(t, err)
+	assert.True(t, replay.Recorded, "unfinished row has to be processed again")
+	assert.False(t, replay.Processed)
+}
+
 func TestIncomingEventsReserveAllowsRetryAfterFailedAction(t *testing.T) {
 	db, err := engine.NewSqlite(":memory:", "gr1")
 	require.NoError(t, err)
