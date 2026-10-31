@@ -53,7 +53,7 @@ func TestRuleSet_LegacyPayloadDecodesNewFieldsAsZero(t *testing.T) {
 }
 
 func TestCurrentSchemaVersion(t *testing.T) {
-	assert.Equal(t, 4, CurrentSchemaVersion)
+	assert.Equal(t, 5, CurrentSchemaVersion)
 }
 
 func TestRuleSet_JoinGateJSONRoundTrip(t *testing.T) {
