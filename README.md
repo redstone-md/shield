@@ -258,6 +258,10 @@ Setting `--admin.group` enables an admin chat where the bot reports detected spa
 - **`/ban`** or **`ban`** reply: ban without adding to samples.
 - **`/warn`** or **`warn`** reply: delete the message and send a warning.
 
+Inline buttons in the admin chat work only for super-users, which means `SUPER_USER` entries and the group admins found at startup. Anyone else in the chat gets a "нет прав" toast. Prefer numeric IDs in `SUPER_USER`, because a username can change hands.
+
+**Dry and training modes**: `--dry` leaves the group untouched, including explicit admin commands. `--training` leaves the group untouched for automatic actions and `/report`, while explicit admin actions stay real. The admin chat keeps getting reports and errors in both modes.
+
 **Full message cleanup**: when admins use `/spam` or `/ban` (or `/clear`), the bot deletes every message of the banned user it has seen, across all monitored groups. `/ban` accepts several targets at once, separated by spaces: `/ban 123456789 @username`.
 
 **Linked channel**: if the group is linked to a Telegram channel, the channel automatically receives superuser privileges without extra configuration.
