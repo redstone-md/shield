@@ -409,7 +409,7 @@ See [docker-compose.yml](docker-compose.yml) for the standard tgadmin setup with
 
 ### With PostgreSQL
 
-See [docker-compose-with-psql.yml](docker-compose-with-psql.yml).
+See [docker-compose-with-psql.yml](docker-compose-with-psql.yml). It needs `POSTGRES_PASSWORD` in `.env` or the shell and refuses to start without it. Use the same password in `DB`, for example `DB=postgres://tg-spam:<password>@postgres:5432/tg-spam?sslmode=disable`.
 
 ## Railway
 
