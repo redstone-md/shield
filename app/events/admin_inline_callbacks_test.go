@@ -49,6 +49,7 @@ func TestAdmin_InlineCallbacks(t *testing.T) {
 		}
 
 		adm := &admin{
+			superUsers:   SuperUsers{"admin"},
 			tbAPI:        mockAPI,
 			bot:          botMock,
 			primChatIDs:  []int64{123},
@@ -265,6 +266,7 @@ func TestAdmin_CallbackShowInfo_HTMLMode(t *testing.T) {
 		}
 
 		adm := &admin{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			adminChatID: 456,
 		}
@@ -317,6 +319,7 @@ func TestAdmin_CallbackShowInfo_HTMLMode(t *testing.T) {
 		}
 
 		adm := admin{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			adminChatID: 123,
 		}
@@ -366,6 +369,7 @@ func TestAdmin_CallbackShowInfo_HTMLMode(t *testing.T) {
 		}
 
 		adm := admin{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			adminChatID: 123,
 		}

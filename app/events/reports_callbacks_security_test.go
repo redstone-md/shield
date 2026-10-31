@@ -42,6 +42,7 @@ func TestUserReports_CallbackReportBanReporterConfirm(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			primChatIDs: []int64{200},
 			Storage:     mockReports,
@@ -91,6 +92,7 @@ func TestUserReports_CallbackReportBanReporterConfirm(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			primChatIDs: []int64{200},
 			Storage:     mockReports,
@@ -140,6 +142,7 @@ func TestUserReports_CallbackReportBanReporterConfirm(t *testing.T) {
 		actions := &actionExecutorSpy{}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			primChatIDs: []int64{200},
 			Storage:     mockReports,
@@ -181,7 +184,7 @@ func TestUserReports_CallbackReportCancel(t *testing.T) {
 			},
 		}
 
-		rep := &userReports{tbAPI: mockAPI}
+		rep := &userReports{superUsers: SuperUsers{"admin"}, tbAPI: mockAPI}
 
 		query := &tbapi.CallbackQuery{
 			Data:    "RX666:100:200",
@@ -215,6 +218,7 @@ func TestUserReports_HandleReportCallback_SecurityValidation(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			adminChatID: 456,
 			primChatIDs: []int64{200},
@@ -259,6 +263,7 @@ func TestUserReports_HandleReportCallback_SecurityValidation(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			adminChatID: 456,
 			primChatIDs: []int64{200},
@@ -311,6 +316,7 @@ func TestUserReports_HandleReportCallback_SecurityValidation(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			bot:         mockBot,
 			adminChatID: 456,
@@ -358,6 +364,7 @@ func TestUserReports_HandleReportCallback_SecurityValidation(t *testing.T) {
 		}
 
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			tbAPI:       mockAPI,
 			adminChatID: 456,
 			primChatIDs: []int64{200},
@@ -385,6 +392,7 @@ func TestUserReports_HandleReportCallback_SecurityValidation(t *testing.T) {
 
 	t.Run("callback with invalid data format should return error", func(t *testing.T) {
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			adminChatID: 456,
 			primChatIDs: []int64{200},
 		}
@@ -406,6 +414,7 @@ func TestUserReports_HandleReportCallback_SecurityValidation(t *testing.T) {
 
 	t.Run("callback with unknown prefix should return error", func(t *testing.T) {
 		rep := &userReports{
+			superUsers:  SuperUsers{"admin"},
 			adminChatID: 456,
 			primChatIDs: []int64{200},
 		}

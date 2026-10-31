@@ -231,9 +231,31 @@ func (s SuperUsers) IsSuper(userName string, userID int64) bool {
 			}
 			continue
 		}
+		if userName == "" {
+			continue
+		}
 		if strings.EqualFold(userName, super) || strings.EqualFold("/"+userName, super) {
 			return true
 		}
+	}
+	return false
+}
+
+// authorizeCallback reports whether an inline callback may run: it has to come from the admin chat and its sender
+// has to be a superuser. A refused sender gets a toast, and nothing is posted to the admin chat.
+func authorizeCallback(tbAPI TbAPI, query *tbapi.CallbackQuery, adminChatID int64, supers SuperUsers) bool {
+	if query.Message == nil || query.Message.Chat.ID != adminChatID {
+		return false
+	}
+	if query.From != nil && supers.IsSuper(query.From.UserName, query.From.ID) {
+		return true
+	}
+
+	if query.From != nil {
+		log.Printf("[WARN] callback refused for non-superuser %s (%d)", query.From.UserName, query.From.ID)
+	}
+	if _, err := tbAPI.Request(tbapi.NewCallback(query.ID, "нет прав")); err != nil {
+		log.Printf("[WARN] failed to answer refused callback: %v", err)
 	}
 	return false
 }

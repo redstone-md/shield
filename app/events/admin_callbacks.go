@@ -17,11 +17,12 @@ import (
 )
 
 func (a *admin) InlineCallbackHandler(ctx context.Context, query *tbapi.CallbackQuery) error {
-	callbackData := query.Data
-	chatID := query.Message.Chat.ID
-	if chatID != a.adminChatID {
+	if !authorizeCallback(a.tbAPI, query, a.adminChatID, a.superUsers) {
 		return nil
 	}
+
+	callbackData := query.Data
+	chatID := query.Message.Chat.ID
 
 	if strings.HasPrefix(callbackData, confirmationPrefix) {
 		if err := a.callbackAskBanConfirmation(query); err != nil {
