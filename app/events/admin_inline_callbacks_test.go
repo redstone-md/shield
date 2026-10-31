@@ -399,3 +399,19 @@ func TestAdmin_CallbackShowInfo_HTMLMode(t *testing.T) {
 		assert.Equal(t, tbapi.ModeHTML, usedParseMode, "Should use HTML parse mode")
 	})
 }
+
+func TestAdmin_UnbanInChatSoftBanRestoresAllSendPermissions(t *testing.T) {
+	api := &mocks.TbAPIMock{
+		RequestFunc: func(tbapi.Chattable) (*tbapi.APIResponse, error) { return &tbapi.APIResponse{Ok: true}, nil },
+	}
+	adm := &admin{tbAPI: api, softBan: true}
+
+	require.NoError(t, adm.unbanInChat(123, 456))
+
+	require.Len(t, api.RequestCalls(), 1)
+	perms := api.RequestCalls()[0].C.(tbapi.RestrictChatMemberConfig).Permissions
+	assert.True(t, perms.CanSendPolls, "polls must be restored")
+	assert.True(t, perms.CanAddWebPagePreviews, "web page previews must be restored")
+	assert.True(t, perms.CanSendMessages)
+	assert.True(t, perms.CanSendOtherMessages)
+}
