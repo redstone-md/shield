@@ -28,6 +28,10 @@ func TestRetentionService_CleanNow(t *testing.T) {
 		created_at DATETIME, updated_at DATETIME)`)
 	require.NoError(t, err)
 
+	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS reports (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, report_time DATETIME)`)
+	require.NoError(t, err)
+
 	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS incident_comments (
 		id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME)`)
 	require.NoError(t, err)
