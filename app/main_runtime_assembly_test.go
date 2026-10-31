@@ -600,6 +600,7 @@ func TestBuildDetectorConfig_ReadsDetectionFromRuleSet(t *testing.T) {
 	opts.LLM.Mode = "always"
 	opts.LLM.Consensus = "all"
 	opts.CAS.API = "https://api.cas.chat"
+	opts.CAS.Token = "key"
 
 	rs := rules.RuleSet{
 		Detection: rules.DetectionRules{
@@ -627,6 +628,29 @@ func TestBuildDetectorConfig_ReadsDetectionFromRuleSet(t *testing.T) {
 	assert.Equal(t, tgspam.LLMConsensusMode("any"), cfg.LLMConsensus)
 	assert.Equal(t, 4, cfg.LLMHistoryContextSize)
 	assert.Equal(t, "https://api.cas.chat", cfg.CasAPI)
+}
+
+func TestBuildDetectorConfig_CasRequiresToken(t *testing.T) {
+	tests := []struct {
+		name       string
+		api, token string
+		enabled    bool
+		wantAPI    string
+	}{
+		{name: "api and token", api: "https://api.cas.chat", token: "key", enabled: true, wantAPI: "https://api.cas.chat"},
+		{name: "no token", api: "https://api.cas.chat", enabled: true},
+		{name: "no api", token: "key", enabled: true},
+		{name: "turned off in rules", api: "https://api.cas.chat", token: "key"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var opts options
+			opts.CAS.API, opts.CAS.Token = tt.api, tt.token
+			cfg := buildDetectorConfig(opts, rules.RuleSet{Detection: rules.DetectionRules{CasEnabled: tt.enabled}})
+			assert.Equal(t, tt.wantAPI, cfg.CasAPI)
+		})
+	}
 }
 
 func TestBuildDetectorConfig_CasDisabledClearsAPI(t *testing.T) {

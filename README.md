@@ -66,7 +66,7 @@ The bot is configured through command-line flags or environment variables. Out o
 | `OPENAI_TOKEN` | `--openai.token` | Enable OpenAI text and vision checks |
 | `OPENAI_API_BASE` | `--openai.apibase` | Custom OpenAI-compatible endpoint |
 | `GEMINI_TOKEN` | `--gemini.token` | Enable Gemini text and vision checks |
-| `CAS_TOKEN` | `--cas.token` | CAS API key, required by `api.cas.chat` |
+| `CAS_TOKEN` | `--cas.token` | CAS API key, the CAS check is disabled without it |
 | `FILES_DYNAMIC` | `--files.dynamic` | Dynamic data directory; put `prompt-override.md` here to override the slow-path system prompt |
 | `LLM_CONSENSUS` | `--llm.consensus` | `any` or `all` when multiple LLMs are eligible |
 | `LLM_MIN_INPUT_CHARS` | `--llm.min-input-chars` | Minimum text length for automatic LLM checks; default `5` |
@@ -105,7 +105,7 @@ Checks messages against a curated stop-word list stored in the database. Support
 
 ### Combot Anti-Spam System (CAS)
 
-Enabled by default. Cross-references users with the external CAS database. The API requires a key, set it with `--cas.token` (`CAS_TOKEN`); without it every lookup fails with a 401 and the check reports ham. Disable with `--cas.api=""`. Custom User-Agent: `--cas.user-agent`.
+Disabled by default. Cross-references users with the external CAS database, which requires an API key. Set it with `--cas.token` (`CAS_TOKEN`) to turn the check on; until then no user IDs leave the bot, and a warning is logged at startup. A rejected key (401 or 403) is not retried, and the check reports ham. To turn it off with a key still set, use `--cas.api=""`. Custom User-Agent: `--cas.user-agent`.
 
 ### OpenAI integration
 

@@ -105,6 +105,27 @@ func TestSpam_CheckIsCasSpamToken(t *testing.T) {
 	}
 }
 
+func TestSpam_CheckIsCasSpamRejectedKeyNotRetried(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			mockedHTTPClient := &mocks.HTTPClientMock{
+				DoFunc: func(*http.Request) (*http.Response, error) {
+					return &http.Response{StatusCode: status, Body: io.NopCloser(bytes.NewBufferString(`{}`))}, nil
+				},
+			}
+			d := NewDetector(Config{
+				CasAPI: "http://localhost", CasToken: "bad", HTTPClient: mockedHTTPClient,
+				MaxAllowedEmoji: -1, FirstMessageOnly: true,
+			})
+
+			spam, _ := d.Check(spamcheck.Request{UserID: "123", Msg: "test message"})
+
+			assert.False(t, spam)
+			assert.Len(t, mockedHTTPClient.DoCalls(), 1)
+		})
+	}
+}
+
 func TestSpam_CheckIsCasSpamRetry(t *testing.T) {
 	t.Run("retry on network failure then success", func(t *testing.T) {
 		callCount := 0

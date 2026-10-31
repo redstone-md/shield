@@ -60,7 +60,7 @@ type options struct {
 		API       string        `long:"api" env:"API" default:"https://api.cas.chat" description:"CAS API"`
 		Timeout   time.Duration `long:"timeout" env:"TIMEOUT" default:"5s" description:"CAS timeout"`
 		UserAgent string        `long:"user-agent" env:"USER_AGENT" description:"User-Agent header for CAS API requests"`
-		Token     string        `long:"token" env:"TOKEN" description:"CAS API key"`
+		Token     string        `long:"token" env:"TOKEN" description:"CAS API key, the check is disabled without it"`
 	} `group:"cas" namespace:"cas" env-namespace:"CAS"`
 
 	Meta struct {
@@ -294,6 +294,10 @@ func main() {
 func execute(ctx context.Context, opts options) error {
 	if opts.Dry {
 		log.Print("[WARN] dry mode, no actual bans")
+	}
+
+	if opts.CAS.API != "" && opts.CAS.Token == "" {
+		log.Print("[WARN] CAS check disabled, CAS_TOKEN is not set")
 	}
 
 	convertOnly := opts.Convert == "only"
