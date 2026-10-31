@@ -514,6 +514,7 @@ func (a *admin) sendWarnMessage(ctx context.Context, origMsg *tbapi.Message, war
 	if a.actions != nil {
 		if err := a.actions.WarnUser(ctx, warnRequest{
 			chatID:      a.chatIDOrFallback(origMsg.Chat.ID),
+			threadID:    topicThreadID(origMsg),
 			subjectID:   warnSubjectID(origMsg),
 			messageID:   origMsg.MessageID,
 			text:        warnMsg,
@@ -525,7 +526,9 @@ func (a *admin) sendWarnMessage(ctx context.Context, origMsg *tbapi.Message, war
 	}
 
 	// buildWarningText already renders HTML, so the message goes out as-is
-	if err := send(tbapi.NewMessage(a.chatIDOrFallback(origMsg.Chat.ID), warnMsg), a.tbAPI); err != nil {
+	msg := tbapi.NewMessage(a.chatIDOrFallback(origMsg.Chat.ID), warnMsg)
+	msg.MessageThreadID = topicThreadID(origMsg)
+	if err := send(msg, a.tbAPI); err != nil {
 		return fmt.Errorf("failed to send warning to main chat: %w", err)
 	}
 	return nil

@@ -114,6 +114,7 @@ func (e telegramActionExecutor) WarnUser(ctx context.Context, req warnRequest) e
 	}
 
 	msgConfig := tbapi.NewMessage(req.chatID, req.text)
+	msgConfig.MessageThreadID = req.threadID
 	msgConfig.ParseMode = tbapi.ModeHTML
 	msgConfig.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
 	if kb, ok := appealKeyboard(req.botUsername, req.incidentID); ok {
@@ -152,6 +153,7 @@ func (e telegramActionExecutor) scheduleDelete(ctx context.Context, chatID int64
 // appeal button and schedules its deletion the same way a warning is deleted.
 func (e telegramActionExecutor) PostBanMessage(ctx context.Context, req banMessageRequest) error {
 	msgConfig := tbapi.NewMessage(req.chatID, req.text)
+	msgConfig.MessageThreadID = req.threadID
 	msgConfig.ParseMode = tbapi.ModeHTML
 	msgConfig.LinkPreviewOptions = tbapi.LinkPreviewOptions{IsDisabled: true}
 	if kb, ok := appealKeyboard(req.botUsername, req.incidentID); ok {
@@ -284,6 +286,7 @@ type banRequest struct {
 
 type warnRequest struct {
 	chatID      int64
+	threadID    int // forum topic to post in, 0 for the main chat or General
 	subjectID   int64
 	messageID   int
 	text        string
@@ -294,6 +297,7 @@ type warnRequest struct {
 
 type banMessageRequest struct {
 	chatID      int64
+	threadID    int // forum topic to post in, 0 for the main chat or General
 	text        string
 	incidentID  int64
 	botUsername string

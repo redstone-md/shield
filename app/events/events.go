@@ -266,6 +266,15 @@ func reportStatusText(duration time.Duration, restrict bool) string {
 	return "Репорт подтвержден. Пользователь забанен."
 }
 
+// topicThreadID returns the forum topic of a message. Telegram also sets a thread id on replies in discussion groups,
+// where sending to it fails, so only messages marked as topic messages count.
+func topicThreadID(msg *tbapi.Message) int {
+	if msg == nil || !msg.IsTopicMessage {
+		return 0
+	}
+	return msg.MessageThreadID
+}
+
 // transform converts telegram message to internal message format.
 // properly handles all message types - text, photo, video, etc, and their combinations.
 // also handles forwarded messages, replies, and message entities like links and mentions.
@@ -307,10 +316,11 @@ func transform(msg *tbapi.Message) *bot.Message {
 
 	// initialize message with basic fields
 	message := bot.Message{
-		ID:     msg.MessageID,
-		Sent:   msg.Time(),
-		Text:   msg.Text,
-		ChatID: msg.Chat.ID,
+		MessageThreadID: topicThreadID(msg),
+		ID:              msg.MessageID,
+		Sent:            msg.Time(),
+		Text:            msg.Text,
+		ChatID:          msg.Chat.ID,
 	}
 
 	// set sender info
