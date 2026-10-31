@@ -487,6 +487,10 @@ var cleanupRateInterval = 35 * time.Millisecond
 // deleteUserMessages deletes every message of the user known to the locator,
 // across all monitored chats, until the stored history is exhausted.
 func (a *admin) deleteUserMessages(ctx context.Context, userID int64) (deleted int, err error) {
+	if a.dry {
+		log.Printf("[INFO] dry run: would delete messages of user %d", userID)
+		return 0, nil
+	}
 	rateLimiter := time.NewTicker(cleanupRateInterval)
 	defer rateLimiter.Stop()
 

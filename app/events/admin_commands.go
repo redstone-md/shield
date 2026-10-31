@@ -483,6 +483,10 @@ func (a *admin) deleteWarnMessage(ctx context.Context, chatID int64, msgID int, 
 }
 
 func (a *admin) deleteMessage(ctx context.Context, chatID int64, msgID int, label string) error {
+	if a.dry {
+		log.Printf("[INFO] dry run: would delete %s message %d", label, msgID)
+		return nil
+	}
 	if a.actions != nil {
 		if err := a.actions.DeleteMessage(ctx, chatID, msgID); err != nil {
 			return fmt.Errorf("failed to delete message %d: %w", msgID, err)
@@ -503,6 +507,10 @@ func (a *admin) deleteMessage(ctx context.Context, chatID int64, msgID int, labe
 }
 
 func (a *admin) sendWarnMessage(ctx context.Context, origMsg *tbapi.Message, warnMsg string) error {
+	if a.dry {
+		log.Printf("[INFO] dry run: would warn user %d", warnSubjectID(origMsg))
+		return nil
+	}
 	if a.actions != nil {
 		if err := a.actions.WarnUser(ctx, warnRequest{
 			chatID:      a.chatIDOrFallback(origMsg.Chat.ID),

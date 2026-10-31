@@ -110,7 +110,7 @@ func (l *TelegramListener) ensurePipeline() {
 		l.processor = listenerEventProcessor{listener: l}
 	}
 	if l.ActionExecutor == nil {
-		exec := newTelegramActionExecutor(l.TbAPI, l.Dry, l.TrainingMode, l.SuperUsers, l.ModerationActions)
+		exec := newTelegramActionExecutor(l.TbAPI, l.SuperUsers, l.ModerationActions)
 		l.ActionExecutor = exec
 	}
 	if l.PolicyEngine == nil {
@@ -439,7 +439,10 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 		incidentID:  pc.incidentID,
 		botUsername: l.BotUsername,
 	}
-	if err := l.ActionExecutor.WarnUser(ctx, warnReq); err != nil {
+	readOnly := l.groupReadOnly()
+	if readOnly {
+		observability.Logf(ctx, "[INFO] dry/training run: would warn user %d and delete message %d", pc.spamUserID, pc.msg.ID)
+	} else if err := l.ActionExecutor.WarnUser(ctx, warnReq); err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to send warning: %w", err))
 		actionResult.Error = err.Error()
 	}
@@ -448,9 +451,11 @@ func (l *TelegramListener) processWarn(ctx context.Context, pc pipelineContext) 
 		l.adminHandler.ReportWarn(pc.banUserStr, pc.msg, warnNum, warnTotal, slowpathReason(pc.resp.CheckResults))
 	}
 
-	l.forwardImageToAdminBeforeDelete(ctx, pc)
-	if err := l.ActionExecutor.DeleteMessage(ctx, pc.fromChat, pc.msg.ID); err != nil {
-		observability.Logf(ctx, "[WARN] failed to delete spam message %d in warn mode: %v", pc.msg.ID, err)
+	if !readOnly {
+		l.forwardImageToAdminBeforeDelete(ctx, pc)
+		if err := l.ActionExecutor.DeleteMessage(ctx, pc.fromChat, pc.msg.ID); err != nil {
+			observability.Logf(ctx, "[WARN] failed to delete spam message %d in warn mode: %v", pc.msg.ID, err)
+		}
 	}
 
 	if actionResult.Error == "" {
@@ -571,16 +576,18 @@ func (l *TelegramListener) forwardImageToAdminBeforeDelete(ctx context.Context, 
 }
 
 func (l *TelegramListener) cleanupAfterAction(ctx context.Context, pc pipelineContext, errs *multierror.Error) error {
-	if err := l.ActionExecutor.DeleteExtraMessages(ctx, pc.resp.CheckResults,
-		pc.msg.From.ID, pc.msg.From.Username, pc.fromChat); err != nil {
-		errs = multierror.Append(errs, err)
-	}
-
-	canDelete := pc.resp.DeleteReplyTo && pc.resp.ReplyTo != 0 && !l.Dry &&
-		!l.SuperUsers.IsSuper(pc.msg.From.Username, pc.msg.From.ID) && !l.TrainingMode
-	if canDelete {
-		if err := l.ActionExecutor.DeleteMessage(ctx, pc.fromChat, pc.resp.ReplyTo); err != nil {
+	if !l.groupReadOnly() {
+		if err := l.ActionExecutor.DeleteExtraMessages(ctx, pc.resp.CheckResults,
+			pc.msg.From.ID, pc.msg.From.Username, pc.fromChat); err != nil {
 			errs = multierror.Append(errs, err)
+		}
+
+		canDelete := pc.resp.DeleteReplyTo && pc.resp.ReplyTo != 0 &&
+			!l.SuperUsers.IsSuper(pc.msg.From.Username, pc.msg.From.ID)
+		if canDelete {
+			if err := l.ActionExecutor.DeleteMessage(ctx, pc.fromChat, pc.resp.ReplyTo); err != nil {
+				errs = multierror.Append(errs, err)
+			}
 		}
 	}
 

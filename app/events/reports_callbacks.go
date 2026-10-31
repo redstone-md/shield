@@ -44,13 +44,15 @@ func (r *userReports) callbackReportBan(ctx context.Context, query *tbapi.Callba
 		}
 	}
 
-	if r.actions != nil {
+	if r.dry {
+		log.Printf("[INFO] dry run: would delete reported message %d", msgID)
+	} else if r.actions != nil {
 		if delErr := r.actions.DeleteMessage(ctx, chatID, msgID); delErr != nil {
 			log.Printf("[WARN] failed to delete reported message %d: %v", msgID, delErr)
 		} else {
 			log.Printf("[INFO] reported message %d deleted", msgID)
 		}
-	} else if !r.dry {
+	} else {
 		_, err = r.tbAPI.Request(tbapi.DeleteMessageConfig{
 			MessageID: msgID,
 			ChatID:    chatID,

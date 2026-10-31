@@ -436,6 +436,10 @@ func (l *TelegramListener) handleUpdate(ctx context.Context, update tbapi.Update
 	}
 
 	if !fromSuper && l.isReportCommand(update.Message.Text) && update.Message.ReplyToMessage == nil {
+		if l.groupReadOnly() {
+			log.Printf("[INFO] dry/training run: would delete orphaned /report command %d", update.Message.MessageID)
+			return nil
+		}
 		log.Printf("[DEBUG] deleting orphaned /report command from %s (%d)", update.Message.From.UserName, update.Message.From.ID)
 		_, err := l.TbAPI.Request(tbapi.DeleteMessageConfig{
 			MessageID: update.Message.MessageID, ChatID: update.Message.Chat.ID,
@@ -779,8 +783,8 @@ func (l *TelegramListener) isAllowedBot(user *tbapi.User) bool {
 
 // deleteGuestBotMessage removes a single message from a non-admin bot in the primary chat and logs the outcome.
 func (l *TelegramListener) deleteGuestBotMessage(ctx context.Context, msg *tbapi.Message) {
-	if l.Dry {
-		log.Printf("[INFO] dry run: would delete guest bot message %d from %q (%d)",
+	if l.groupReadOnly() {
+		log.Printf("[INFO] dry/training run: would delete guest bot message %d from %q (%d)",
 			msg.MessageID, msg.From.UserName, msg.From.ID)
 		return
 	}
@@ -814,6 +818,10 @@ func (l *TelegramListener) handleChatReply(ctx context.Context, update tbapi.Upd
 	}
 	if l.SlowPathChatEngine == nil {
 		return false
+	}
+	if l.groupReadOnly() {
+		log.Printf("[INFO] dry/training run: would answer chat message %d", update.Message.MessageID)
+		return true
 	}
 	if l.SuperUsers.IsSuper(update.Message.From.UserName, update.Message.From.ID) {
 		l.sendChatReply(ctx, update)

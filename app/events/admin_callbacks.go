@@ -419,11 +419,12 @@ func (a *admin) deleteAndBan(ctx context.Context, query *tbapi.CallbackQuery, us
 		}
 	}
 
-	_, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
+	if a.dry {
+		log.Printf("[INFO] dry run: would delete message %d", msgID)
+	} else if _, err := a.tbAPI.Request(tbapi.DeleteMessageConfig{
 		MessageID: msgID,
 		ChatID:    a.chatIDOrFallback(chatID),
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("failed to delete message %d: %w", query.Message.MessageID, err)
 	}
 
