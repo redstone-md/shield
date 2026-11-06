@@ -4,7 +4,7 @@ go 1.27.0
 
 require (
 	github.com/redstone-md/shield v0.0.0
-	modernc.org/sqlite v1.61.0
+	modernc.org/sqlite v1.61.1
 )
 
 replace github.com/redstone-md/shield => ../..
