@@ -156,12 +156,12 @@ func TestSpamFilter_OnMessage_IgnoresTelegramTextQuote(t *testing.T) {
 
 func TestSpamFilter_OnMessage_ChecksExternalReplyQuote(t *testing.T) {
 	runSpamFilterOnMessageCase(t, spamFilterOnMessageCase{
-		name: "appends quote of an outside channel post",
+		name: "adds quote of an outside channel post",
 		message: Message{
-			Text:              "Дякую, виплатили!",
-			From:              User{ID: 1, Username: "user1"},
-			Quote:             "ОТРИМАЙТЕ 500 ГРН НА КАРТКУ",
-			ExternalReplyChat: SenderChat{ID: -1003825153488, UserName: "privat24abu"},
+			Text:          "Дякую, виплатили!",
+			From:          User{ID: 1, Username: "user1"},
+			Quote:         "ОТРИМАЙТЕ 500 ГРН НА КАРТКУ",
+			ExternalReply: ExternalReply{ChatID: -1003825153488, Title: "Приват24", UserName: "privat24abu"},
 		},
 		wantResponse: Response{
 			Text:          `detected: "user1" (1)`,
@@ -172,10 +172,33 @@ func TestSpamFilter_OnMessage_ChecksExternalReplyQuote(t *testing.T) {
 			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
 		},
 		wantRequest: spamcheck.Request{
-			Msg:      "Дякую, виплатили!\nОТРИМАЙТЕ 500 ГРН НА КАРТКУ",
-			UserID:   "1",
-			UserName: "user1",
+			Msg: "Дякую, виплатили!\nОТРИМАЙТЕ 500 ГРН НА КАРТКУ",
+			LLMMessage: "Дякую, виплатили!\n\nThis message is a reply to a post of outside chat «Приват24» (@privat24abu):\n" +
+				"ОТРИМАЙТЕ 500 ГРН НА КАРТКУ",
+			HistoryMsg: "Дякую, виплатили!",
+			UserID:     "1",
+			UserName:   "user1",
 		},
+	})
+}
+
+func TestSpamFilter_OnMessage_ExternalReplyWithoutQuote(t *testing.T) {
+	runSpamFilterOnMessageCase(t, spamFilterOnMessageCase{
+		name: "outside reply without quote checks own text only",
+		message: Message{
+			Text:          "Дякую, виплатили!",
+			From:          User{ID: 1, Username: "user1"},
+			ExternalReply: ExternalReply{ChatID: -1003825153488, Title: "Приват24"},
+		},
+		wantResponse: Response{
+			Text:          `detected: "user1" (1)`,
+			Send:          true,
+			BanInterval:   PermanentBanDuration,
+			DeleteReplyTo: true,
+			User:          User{ID: 1, Username: "user1"},
+			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
+		},
+		wantRequest: spamcheck.Request{Msg: "Дякую, виплатили!", UserID: "1", UserName: "user1"},
 	})
 }
 

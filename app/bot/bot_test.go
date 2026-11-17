@@ -50,3 +50,21 @@ func TestDisplayName(t *testing.T) {
 		})
 	}
 }
+
+func TestExternalReply_String(t *testing.T) {
+	tbl := []struct {
+		name string
+		in   ExternalReply
+		want string
+	}{
+		{name: "title and username", in: ExternalReply{ChatID: -100, Title: "Приват24", UserName: "privat24abu"},
+			want: "«Приват24» (@privat24abu)"},
+		{name: "title only", in: ExternalReply{ChatID: -100, Title: "Приват24"}, want: "«Приват24»"},
+		{name: "id only", in: ExternalReply{ChatID: -100}, want: "chat -100"},
+	}
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.in.String())
+		})
+	}
+}

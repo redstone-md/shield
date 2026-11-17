@@ -38,6 +38,25 @@ type SenderChat struct {
 	UserName string `json:"username,omitempty"`
 }
 
+// ExternalReply describes the chat (usually a channel) of a replied-to message that lives outside the current chat.
+type ExternalReply struct {
+	ChatID   int64  `json:"chat_id"`
+	Title    string `json:"title,omitempty"`
+	UserName string `json:"username,omitempty"`
+}
+
+// String returns a readable source label, e.g. «Приват24» (@privat24abu).
+func (e ExternalReply) String() string {
+	name := "«" + e.Title + "»"
+	if e.Title == "" {
+		name = fmt.Sprintf("chat %d", e.ChatID)
+	}
+	if e.UserName != "" {
+		name += " (@" + e.UserName + ")"
+	}
+	return name
+}
+
 // Message is primary record to pass data from/to bots
 type Message struct {
 	ID         int
@@ -59,9 +78,8 @@ type Message struct {
 	} `json:",omitzero"`
 	Quote string `json:",omitempty"` // quoted text from TextQuote
 
-	// ExternalReplyChat is the chat (usually a channel) of the message this one replies to
-	// when that message lives outside the current chat; zero for regular replies
-	ExternalReplyChat SenderChat `json:"external_reply_chat,omitzero"`
+	// ExternalReply is the outside chat whose post this message replies to; zero for regular replies
+	ExternalReply ExternalReply `json:"external_reply,omitzero"`
 
 	MessageThreadID int `json:",omitempty"` // forum topic the message was sent to, 0 outside topics
 

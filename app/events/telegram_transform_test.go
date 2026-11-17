@@ -330,11 +330,12 @@ func TestTelegramListener_transformExternalReply(t *testing.T) {
 	tbl := []struct {
 		name string
 		ext  *tbapi.ExternalReplyInfo
-		want bot.SenderChat
+		want bot.ExternalReply
 	}{
 		{name: "reply to outside channel post",
-			ext:  &tbapi.ExternalReplyInfo{Chat: &tbapi.Chat{ID: -1003825153488, UserName: "privat24abu"}, MessageID: 4},
-			want: bot.SenderChat{ID: -1003825153488, UserName: "privat24abu"}},
+			ext: &tbapi.ExternalReplyInfo{Chat: &tbapi.Chat{ID: -1003825153488, Title: "Приват24", UserName: "privat24abu"},
+				MessageID: 4},
+			want: bot.ExternalReply{ChatID: -1003825153488, Title: "Приват24", UserName: "privat24abu"}},
 		{name: "reply to another topic of the same chat",
 			ext: &tbapi.ExternalReplyInfo{Chat: &tbapi.Chat{ID: 123}, MessageID: 7}},
 		{name: "external reply without chat", ext: &tbapi.ExternalReplyInfo{MessageID: 7}},
@@ -345,7 +346,7 @@ func TestTelegramListener_transformExternalReply(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			res := transform(&tbapi.Message{MessageID: 100, Chat: tbapi.Chat{ID: 123}, Text: "Дякую, виплатили!",
 				From: &tbapi.User{ID: 456}, ExternalReply: tt.ext})
-			assert.Equal(t, tt.want, res.ExternalReplyChat)
+			assert.Equal(t, tt.want, res.ExternalReply)
 		})
 	}
 }
