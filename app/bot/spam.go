@@ -128,8 +128,6 @@ func (s *SpamFilter) OnMessageWithContext(ctx context.Context, msg Message, chec
 	}
 	displayUsername := DisplayName(msg)
 
-	msgText := msg.Text
-
 	// use channel identity for spam check when message is from a channel,
 	// so that approved/banned status is tracked per-channel, not for the shared Channel_Bot user
 	checkUserID := msg.From.ID
@@ -141,10 +139,11 @@ func (s *SpamFilter) OnMessageWithContext(ctx context.Context, msg Message, chec
 		firstName, lastName, isPremium = "", "", false // channels don't have personal user fields
 	}
 
-	spamReq := spamcheck.Request{Msg: msgText, CheckOnly: checkOnly,
+	spamReq := spamcheck.Request{Msg: msg.Text, CheckOnly: checkOnly,
 		UserID: strconv.FormatInt(checkUserID, 10), UserName: checkUserName,
 		FirstName: firstName, LastName: lastName, IsPremium: isPremium,
 		ForceLLM: msg.ForceLLM, LLMContext: msg.LLMContext}
+	addExternalQuote(&spamReq, msg)
 	if msg.Image != nil {
 		spamReq.Meta.Images = 1
 	}
@@ -200,7 +199,7 @@ func (s *SpamFilter) OnMessageWithContext(ctx context.Context, msg Message, chec
 	}
 	checkResultStr := strings.Join(crs, ", ")
 	if isSpam {
-		observability.Logf(ctx, "[INFO] user %s detected as spammer: %s, chars:%d", displayUsername, checkResultStr, len(msgText))
+		observability.Logf(ctx, "[INFO] user %s detected as spammer: %s, chars:%d", displayUsername, checkResultStr, len(spamReq.Msg))
 		msgPrefix := s.params.SpamMsg
 		if s.params.Dry {
 			msgPrefix = s.params.SpamDryMsg
@@ -214,6 +213,23 @@ func (s *SpamFilter) OnMessageWithContext(ctx context.Context, msg Message, chec
 	}
 	observability.Logf(ctx, "[DEBUG] user %s is not a spammer, %s", displayUsername, checkResultStr)
 	return Response{CheckResults: checkResults} // not a spam
+}
+
+// addExternalQuote adds the quote of a replied-to post from an outside chat to the request. such a quote
+// is content the sender pulls into the group: text checks see it as part of the message, the LLM sees it
+// labeled with its source, and LLM chat history keeps only the sender's own text.
+// quotes of in-group messages are someone else's words and are ignored.
+func addExternalQuote(req *spamcheck.Request, msg Message) {
+	if msg.ExternalReply.ChatID == 0 || msg.Quote == "" {
+		return
+	}
+	source := "a post of outside chat " + msg.ExternalReply.String()
+	req.Msg = strings.TrimSpace(msg.Text + "\n" + msg.Quote)
+	req.LLMMessage = strings.TrimSpace(fmt.Sprintf("%s\n\nThis message is a reply to %s:\n%s", msg.Text, source, msg.Quote))
+	req.HistoryMsg = msg.Text
+	if req.HistoryMsg == "" { // empty history text falls back to Msg, which would put the quote into history
+		req.HistoryMsg = "[reply to " + source + "]"
+	}
 }
 
 func spamVerdictText(results []spamcheck.Response, fallback string) string {

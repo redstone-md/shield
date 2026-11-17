@@ -59,7 +59,8 @@
 
 ### Quoted/Reply-to Text Handling
 - Automatic spam detection checks only the current message text from the sender.
-- Do not include `ReplyTo.Text` or Telegram `Quote` text in `app/bot/spam.go:OnMessage`; it biases LLM checks by making replied-to content look authored by the current user.
+- Exception: when the message replies to a post from another chat (`ExternalReply`, e.g. a fake channel post), `transform` sets `bot.Message.ExternalReply` and `OnMessage` (`addExternalQuote`) uses `Quote`, if present: text checks get `Text + "\n" + Quote`, the LLM gets the quote labeled with its source chat via `Request.LLMMessage`, and LLM chat history keeps only the sender's text via `Request.HistoryMsg`. Replies to outside posts commonly carry the whole post as the quote, and it is the actual ad the sender pulls into the group.
+- Otherwise do not include `ReplyTo.Text` or Telegram `Quote` text in `app/bot/spam.go:OnMessage`; it biases LLM checks by making replied-to content look authored by the current user.
 - Admin `/spam` (`app/events/admin.go:directReport`) and user `/report` (`app/events/reports.go:DirectUserReport`) still append `origMsg.Quote.Text` to the reported message text for explicit moderation/training workflows.
 - The reporting-path concatenation uses a newline separator: `msgTxt + "\n" + origMsg.Quote.Text`.
 - Empty quote text is ignored (no extra newline added).

@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   e2e-ui:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # playwright has no chromium build for ubuntu 26.04 (current ubuntu-latest)
     timeout-minutes: 10
     env:
       # azureedge.net CDN is dead; npmmirror keeps driver builds >= 1.55

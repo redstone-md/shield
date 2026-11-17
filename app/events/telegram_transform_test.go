@@ -326,6 +326,31 @@ func TestTelegramListener_transformQuote(t *testing.T) {
 	}
 }
 
+func TestTelegramListener_transformExternalReply(t *testing.T) {
+	tbl := []struct {
+		name string
+		ext  *tbapi.ExternalReplyInfo
+		want bot.ExternalReply
+	}{
+		{name: "reply to outside channel post",
+			ext: &tbapi.ExternalReplyInfo{Chat: &tbapi.Chat{ID: -1003825153488, Title: "Приват24", UserName: "privat24abu"},
+				MessageID: 4},
+			want: bot.ExternalReply{ChatID: -1003825153488, Title: "Приват24", UserName: "privat24abu"}},
+		{name: "reply to another topic of the same chat",
+			ext: &tbapi.ExternalReplyInfo{Chat: &tbapi.Chat{ID: 123}, MessageID: 7}},
+		{name: "external reply without chat", ext: &tbapi.ExternalReplyInfo{MessageID: 7}},
+		{name: "no external reply"},
+	}
+
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			res := transform(&tbapi.Message{MessageID: 100, Chat: tbapi.Chat{ID: 123}, Text: "Дякую, виплатили!",
+				From: &tbapi.User{ID: 456}, ExternalReply: tt.ext})
+			assert.Equal(t, tt.want, res.ExternalReply)
+		})
+	}
+}
+
 func TestTelegramListener_transformSticker(t *testing.T) {
 	tests := []struct {
 		name     string
