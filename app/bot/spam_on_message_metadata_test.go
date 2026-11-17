@@ -182,6 +182,32 @@ func TestSpamFilter_OnMessage_ChecksExternalReplyQuote(t *testing.T) {
 	})
 }
 
+func TestSpamFilter_OnMessage_ExternalReplyQuoteWithoutOwnText(t *testing.T) {
+	runSpamFilterOnMessageCase(t, spamFilterOnMessageCase{
+		name: "quote of an outside post without own text stays out of history",
+		message: Message{
+			From:          User{ID: 1, Username: "user1"},
+			Quote:         "ОТРИМАЙТЕ 500 ГРН НА КАРТКУ",
+			ExternalReply: ExternalReply{ChatID: -1003825153488, Title: "Приват24"},
+		},
+		wantResponse: Response{
+			Text:          `detected: "user1" (1)`,
+			Send:          true,
+			BanInterval:   PermanentBanDuration,
+			DeleteReplyTo: true,
+			User:          User{ID: 1, Username: "user1"},
+			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
+		},
+		wantRequest: spamcheck.Request{
+			Msg:        "ОТРИМАЙТЕ 500 ГРН НА КАРТКУ",
+			LLMMessage: "This message is a reply to a post of outside chat «Приват24»:\nОТРИМАЙТЕ 500 ГРН НА КАРТКУ",
+			HistoryMsg: "[reply to a post of outside chat «Приват24»]",
+			UserID:     "1",
+			UserName:   "user1",
+		},
+	})
+}
+
 func TestSpamFilter_OnMessage_ExternalReplyWithoutQuote(t *testing.T) {
 	runSpamFilterOnMessageCase(t, spamFilterOnMessageCase{
 		name: "outside reply without quote checks own text only",

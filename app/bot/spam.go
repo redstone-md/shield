@@ -223,10 +223,13 @@ func addExternalQuote(req *spamcheck.Request, msg Message) {
 	if msg.ExternalReply.ChatID == 0 || msg.Quote == "" {
 		return
 	}
-	req.Msg = msg.Text + "\n" + msg.Quote
-	const llmFormat = "%s\n\nThis message is a reply to a post of outside chat %s:\n%s"
-	req.LLMMessage = fmt.Sprintf(llmFormat, msg.Text, msg.ExternalReply, msg.Quote)
+	source := "a post of outside chat " + msg.ExternalReply.String()
+	req.Msg = strings.TrimSpace(msg.Text + "\n" + msg.Quote)
+	req.LLMMessage = strings.TrimSpace(fmt.Sprintf("%s\n\nThis message is a reply to %s:\n%s", msg.Text, source, msg.Quote))
 	req.HistoryMsg = msg.Text
+	if req.HistoryMsg == "" { // empty history text falls back to Msg, which would put the quote into history
+		req.HistoryMsg = "[reply to " + source + "]"
+	}
 }
 
 func spamVerdictText(results []spamcheck.Response, fallback string) string {
