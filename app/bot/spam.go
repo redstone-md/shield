@@ -128,7 +128,7 @@ func (s *SpamFilter) OnMessageWithContext(ctx context.Context, msg Message, chec
 	}
 	displayUsername := DisplayName(msg)
 
-	msgText := msg.Text
+	msgText := checkedText(msg)
 
 	// use channel identity for spam check when message is from a channel,
 	// so that approved/banned status is tracked per-channel, not for the shared Channel_Bot user
@@ -214,6 +214,16 @@ func (s *SpamFilter) OnMessageWithContext(ctx context.Context, msg Message, chec
 	}
 	observability.Logf(ctx, "[DEBUG] user %s is not a spammer, %s", displayUsername, checkResultStr)
 	return Response{CheckResults: checkResults} // not a spam
+}
+
+// checkedText returns the text the spam checks run on: the sender's own text, plus the quote when the
+// message replies to a post from an outside chat. such a quote is content the sender pulls into the group,
+// while quotes of in-group messages are someone else's words and are ignored.
+func checkedText(msg Message) string {
+	if msg.ExternalReplyChat.ID != 0 && msg.Quote != "" {
+		return msg.Text + "\n" + msg.Quote
+	}
+	return msg.Text
 }
 
 func spamVerdictText(results []spamcheck.Response, fallback string) string {

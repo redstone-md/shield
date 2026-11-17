@@ -59,6 +59,10 @@ type Message struct {
 	} `json:",omitzero"`
 	Quote string `json:",omitempty"` // quoted text from TextQuote
 
+	// ExternalReplyChat is the chat (usually a channel) of the message this one replies to
+	// when that message lives outside the current chat; zero for regular replies
+	ExternalReplyChat SenderChat `json:"external_reply_chat,omitzero"`
+
 	MessageThreadID int `json:",omitempty"` // forum topic the message was sent to, 0 outside topics
 
 	WithVideo     bool         `json:",omitempty"`

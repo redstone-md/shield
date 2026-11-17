@@ -275,6 +275,16 @@ func topicThreadID(msg *tbapi.Message) int {
 	return msg.MessageThreadID
 }
 
+// externalReplyChat returns the chat of the replied-to message when it lives outside msg's chat,
+// e.g. a post of an outside channel. replies to other topics of the same chat return zero value.
+func externalReplyChat(msg *tbapi.Message) bot.SenderChat {
+	ext := msg.ExternalReply
+	if ext == nil || ext.Chat == nil || ext.Chat.ID == msg.Chat.ID {
+		return bot.SenderChat{}
+	}
+	return bot.SenderChat{ID: ext.Chat.ID, UserName: ext.Chat.UserName}
+}
+
 // transform converts telegram message to internal message format.
 // properly handles all message types - text, photo, video, etc, and their combinations.
 // also handles forwarded messages, replies, and message entities like links and mentions.
@@ -463,6 +473,8 @@ func transform(msg *tbapi.Message) *bot.Message {
 	if msg.Quote != nil && msg.Quote.Text != "" {
 		message.Quote = msg.Quote.Text
 	}
+
+	message.ExternalReplyChat = externalReplyChat(msg)
 
 	// handle caption - either as main text if no text present, or append to existing text
 	if msg.Caption != "" {

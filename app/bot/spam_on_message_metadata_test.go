@@ -154,6 +154,31 @@ func TestSpamFilter_OnMessage_IgnoresTelegramTextQuote(t *testing.T) {
 	})
 }
 
+func TestSpamFilter_OnMessage_ChecksExternalReplyQuote(t *testing.T) {
+	runSpamFilterOnMessageCase(t, spamFilterOnMessageCase{
+		name: "appends quote of an outside channel post",
+		message: Message{
+			Text:              "Дякую, виплатили!",
+			From:              User{ID: 1, Username: "user1"},
+			Quote:             "ОТРИМАЙТЕ 500 ГРН НА КАРТКУ",
+			ExternalReplyChat: SenderChat{ID: -1003825153488, UserName: "privat24abu"},
+		},
+		wantResponse: Response{
+			Text:          `detected: "user1" (1)`,
+			Send:          true,
+			BanInterval:   PermanentBanDuration,
+			DeleteReplyTo: true,
+			User:          User{ID: 1, Username: "user1"},
+			CheckResults:  []spamcheck.Response{{Name: "test", Spam: true, Details: "spam"}},
+		},
+		wantRequest: spamcheck.Request{
+			Msg:      "Дякую, виплатили!\nОТРИМАЙТЕ 500 ГРН НА КАРТКУ",
+			UserID:   "1",
+			UserName: "user1",
+		},
+	})
+}
+
 func TestSpamFilter_OnMessage_SpamWithUserFirstLastNameAndPremium(t *testing.T) {
 	runSpamFilterOnMessageCase(t, spamFilterOnMessageCase{
 		name: "spam with user first/last name and premium",
